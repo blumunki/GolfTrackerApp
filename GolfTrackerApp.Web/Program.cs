@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using GolfTrackerApp.Web.Components;
 using GolfTrackerApp.Web.Components.Account;
 using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,9 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
     .AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+
+builder.Services.AddScoped<IGolfCourseService, GolfCourseService>();
+builder.Services.AddScoped<IPlayerService, PlayerService>();
 
 var app = builder.Build();
 
