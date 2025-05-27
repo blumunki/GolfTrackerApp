@@ -1,4 +1,6 @@
 @page "/golfcourses/add"
+@attribute [Authorize]
+@using Microsoft.AspNetCore.Authorization // Add this line
 @inject IGolfCourseService GolfCourseService
 @using GolfTrackerApp.Web.Services
 @inject NavigationManager NavigationManager
