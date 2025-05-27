@@ -1,10 +1,11 @@
 ﻿@implements IDisposable
+@using Microsoft.AspNetCore.Authorization; // Good to have for clarity, even if not strictly needed for AuthorizeView if globally registered
 
 @inject NavigationManager NavigationManager
 
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">GolfTrackerApp.Web</a>
+        <a class="navbar-brand" href="">GolfTrackerApp</a> @* Shortened for neatness, was GolfTrackerApp.Web *@
     </div>
 </div>
 
@@ -30,20 +31,30 @@
             </NavLink>
         </div>
 
+        @* "Golf Courses" link accessible to all users *@
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="golfcourses">
                 <span class="bi bi-flag-fill-nav-menu" aria-hidden="true"></span> Golf Courses
             </NavLink>
         </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="auth">
-                <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required
-            </NavLink>
-        </div>
-
         <AuthorizeView>
             <Authorized>
+                @* "Add Course" link only for authorized (logged-in) users *@
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="golfcourses/add">
+                        <span class="bi bi-plus-circle-dotted-nav-menu" aria-hidden="true"></span> Add Course
+                    </NavLink>
+                </div>
+
+                @* "Auth Required" link - assuming this is for testing pages that need authorization *@
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="auth"> @* Ensure the "auth" page has [Authorize] *@
+                        <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required Page
+                    </NavLink>
+                </div>
+
+                @* User Account Management & Logout - This was already well structured *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="Account/Manage">
                         <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
@@ -72,6 +83,16 @@
                 </div>
             </NotAuthorized>
         </AuthorizeView>
+
+        @* Example of an Admin-only link *@
+        <AuthorizeView Roles="Admin">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/admin/dashboard"> @* Create this page later *@
+                    <span class="bi bi-shield-lock-nav-menu" aria-hidden="true"></span> Admin Area
+                </NavLink>
+            </div>
+        </AuthorizeView>
+
     </nav>
 </div>
 
@@ -95,4 +116,3 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
-
