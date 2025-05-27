@@ -1,0 +1,80 @@
+@page "/golfcourses/add"
+@inject IGolfCourseService GolfCourseService
+@using GolfTrackerApp.Web.Services
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Add Golf Course</PageTitle>
+
+<h3>Add New Golf Course</h3>
+
+<EditForm Model="@newGolfCourse" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label for="name" class="form-label">Course Name:</label>
+        <InputText id="name" @bind-Value="newGolfCourse.Name" class="form-control" />
+        <ValidationMessage For="@(() => newGolfCourse.Name)" />
+    </div>
+
+    <div class="mb-3">
+        <label for="location" class="form-label">Location:</label>
+        <InputText id="location" @bind-Value="newGolfCourse.Location" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label for="numberOfHoles" class="form-label">Number of Holes:</label>
+        <InputNumber id="numberOfHoles" @bind-Value="newGolfCourse.NumberOfHoles" class="form-control" />
+        <ValidationMessage For="@(() => newGolfCourse.NumberOfHoles)" />
+    </div>
+
+    <div class="mb-3">
+        <label for="defaultPar" class="form-label">Default Par:</label>
+        <InputNumber id="defaultPar" @bind-Value="newGolfCourse.DefaultPar" class="form-control" />
+        <ValidationMessage For="@(() => newGolfCourse.DefaultPar)" />
+    </div>
+
+    <button type="submit" class="btn btn-success">Save Golf Course</button>
+    <button type="button" class="btn btn-secondary" @onclick="GoToListPage">Cancel</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="text-danger mt-3">@errorMessage</p>
+}
+ @if (!string.IsNullOrEmpty(successMessage))
+{
+    <p class="text-success mt-3">@successMessage</p>
+}
+
+
+@code {
+    private GolfTrackerApp.Web.Models.GolfCourse newGolfCourse = new();
+    private string? errorMessage;
+    private string? successMessage;
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            errorMessage = null;
+            successMessage = null;
+            await GolfCourseService.AddGolfCourseAsync(newGolfCourse);
+            successMessage = "Golf course added successfully!";
+            // Optionally navigate back to the list or clear form for another entry
+            // NavigationManager.NavigateTo("/golfcourses");
+            newGolfCourse = new(); // Clear the form for a new entry
+        }
+        catch (Exception ex)
+        {
+            // Log the exception (ex)
+            errorMessage = $"Error adding golf course: {ex.Message}";
+        }
+    }
+
+    private void GoToListPage()
+    {
+        NavigationManager.NavigateTo("/golfcourses");
+    }
+}
