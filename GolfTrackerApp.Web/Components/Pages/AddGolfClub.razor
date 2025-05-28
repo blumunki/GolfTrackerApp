@@ -1,0 +1,98 @@
+@page "/golfclubs/add"
+@attribute [Authorize] // Or specific roles
+@inject IGolfClubService GolfClubService
+@inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@rendermode InteractiveServer
+
+<PageTitle>Add Golf Club</PageTitle>
+
+<h3>Add New Golf Club</h3>
+
+<EditForm Model="@newGolfClub" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label">Club Name:</label>
+        <InputText @bind-Value="newGolfClub.Name" class="form-control" />
+        <ValidationMessage For="@(() => newGolfClub.Name)" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Address Line 1:</label>
+        <InputText @bind-Value="newGolfClub.AddressLine1" class="form-control" />
+        <ValidationMessage For="@(() => newGolfClub.AddressLine1)" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Address Line 2:</label>
+        <InputText @bind-Value="newGolfClub.AddressLine2" class="form-control" />
+        <ValidationMessage For="@(() => newGolfClub.AddressLine2)" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">City:</label>
+        <InputText @bind-Value="newGolfClub.City" class="form-control" />
+         <ValidationMessage For="@(() => newGolfClub.City)" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Postcode:</label>
+        <InputText @bind-Value="newGolfClub.Postcode" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">County/Region:</label>
+        <InputText @bind-Value="newGolfClub.CountyOrRegion" class="form-control" />
+        <ValidationMessage For="@(() => newGolfClub.CountyOrRegion)" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Country:</label>
+        <InputText @bind-Value="newGolfClub.Country" class="form-control" />
+        <ValidationMessage For="@(() => newGolfClub.Country)" />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Website:</label>
+        <InputText @bind-Value="newGolfClub.Website" class="form-control" />
+        <ValidationMessage For="@(() => newGolfClub.Website)" />
+    </div>
+    @* Add other fields as necessary *@
+
+    <button type="submit" class="btn btn-success">Save Golf Club</button>
+    <button type="button" class="btn btn-secondary" @onclick="GoToListPage">Cancel</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <p class="text-success mt-3">@successMessage</p>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p class="text-danger mt-3">@errorMessage</p>
+}
+
+@code {
+    private GolfClub newGolfClub = new();
+    private string? successMessage;
+    private string? errorMessage;
+
+    private async Task HandleValidSubmit()
+    {
+        successMessage = null;
+        errorMessage = null;
+        try
+        {
+            await GolfClubService.AddGolfClubAsync(newGolfClub);
+            successMessage = "Golf club added successfully!";
+            newGolfClub = new(); // Reset form for another entry
+            // Optionally navigate: NavigationManager.NavigateTo("/golfclubs");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error adding golf club: {ex.Message}";
+        }
+    }
+
+    private void GoToListPage()
+    {
+        NavigationManager.NavigateTo("/golfclubs");
+    }
+}

@@ -1,9 +1,11 @@
 @page "/golfcourses/add"
 @attribute [Authorize]
-@using Microsoft.AspNetCore.Authorization // Add this line
 @inject IGolfCourseService GolfCourseService
-@using GolfTrackerApp.Web.Services
+@inject IGolfClubService GolfClubService
 @inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
 @rendermode InteractiveServer
 
 <PageTitle>Add Golf Course</PageTitle>
@@ -15,16 +17,28 @@
     <ValidationSummary />
 
     <div class="mb-3">
-        <label for="name" class="form-label">Course Name:</label>
-        <InputText id="name" @bind-Value="newGolfCourse.Name" class="form-control" />
-        <ValidationMessage For="@(() => newGolfCourse.Name)" />
+        <label for="golfClubId" class="form-label">Golf Club:</label>
+        @if (golfClubs == null)
+        {
+            <p><em>Loading clubs...</em></p>
+        }
+        else
+        {
+            <InputSelect @bind-Value="newGolfCourse.GolfClubId" class="form-select">
+                <option value="0">-- Select Golf Club --</option>
+                @foreach (var club in golfClubs)
+                {
+                    <option value="@club.GolfClubId">@club.Name</option>
+                }
+            </InputSelect>
+        }
+        <ValidationMessage For="@(() => newGolfCourse.GolfClubId)" />
     </div>
 
     <div class="mb-3">
-        <label for="golfClubId" class="form-label">Golf Club ID:</label>
-        <InputNumber id="golfClubId" @bind-Value="newGolfCourse.GolfClubId" class="form-control" />
-        <ValidationMessage For="@(() => newGolfCourse.GolfClubId)" />
-        @* TODO: Replace this with a dropdown of existing Golf Clubs *@
+        <label for="name" class="form-label">Course Name:</label>
+        <InputText id="name" @bind-Value="newGolfCourse.Name" class="form-control" />
+        <ValidationMessage For="@(() => newGolfCourse.Name)" />
     </div>
 
     <div class="mb-3">
@@ -39,7 +53,7 @@
         <ValidationMessage For="@(() => newGolfCourse.DefaultPar)" />
     </div>
 
-    <button type="submit" class="btn btn-success">Save Golf Course</button>
+    <button type="submit" class="btn btn-success" disabled="@(newGolfCourse.GolfClubId == 0)">Save Golf Course</button>
     <button type="button" class="btn btn-secondary" @onclick="GoToListPage">Cancel</button>
 </EditForm>
 
@@ -47,32 +61,39 @@
 {
     <p class="text-danger mt-3">@errorMessage</p>
 }
- @if (!string.IsNullOrEmpty(successMessage))
+@if (!string.IsNullOrEmpty(successMessage))
 {
     <p class="text-success mt-3">@successMessage</p>
 }
 
-
 @code {
-    private GolfTrackerApp.Web.Models.GolfCourse newGolfCourse = new();
+    private GolfCourse newGolfCourse = new() { GolfClubId = 0 }; // Initialize GolfClubId to 0 for "Select"
+    private List<GolfClub>? golfClubs;
     private string? errorMessage;
     private string? successMessage;
 
+    protected override async Task OnInitializedAsync()
+    {
+        golfClubs = await GolfClubService.GetAllGolfClubsAsync();
+    }
+
     private async Task HandleValidSubmit()
     {
+        if (newGolfCourse.GolfClubId == 0) // Basic validation for dropdown
+        {
+            errorMessage = "Please select a Golf Club.";
+            return;
+        }
+        errorMessage = null;
+        successMessage = null;
         try
         {
-            errorMessage = null;
-            successMessage = null;
             await GolfCourseService.AddGolfCourseAsync(newGolfCourse);
             successMessage = "Golf course added successfully!";
-            // Optionally navigate back to the list or clear form for another entry
-            // NavigationManager.NavigateTo("/golfcourses");
-            newGolfCourse = new(); // Clear the form for a new entry
+            newGolfCourse = new() { GolfClubId = 0 }; // Clear the form
         }
         catch (Exception ex)
         {
-            // Log the exception (ex)
             errorMessage = $"Error adding golf course: {ex.Message}";
         }
     }

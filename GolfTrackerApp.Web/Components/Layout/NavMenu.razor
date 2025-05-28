@@ -21,6 +21,11 @@
 
         @* "Golf Courses" link accessible to all users *@
         <div class="nav-item px-3">
+            <NavLink class="nav-link" href="golfclubs">
+                <span class="bi bi-building-nav-menu" aria-hidden="true"></span> Golf Clubs
+            </NavLink>
+        </div>
+        <div class="nav-item px-3">
             <NavLink class="nav-link" href="golfcourses">
                 <span class="bi bi-flag-fill-nav-menu" aria-hidden="true"></span> Golf Courses
             </NavLink>
@@ -28,6 +33,12 @@
 
         <AuthorizeView>
             <Authorized>
+                @* "Add Club" link only for authorized (logged-in) users *@
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="golfclubs/add">
+                        <span class="bi bi-plus-circle-dotted-nav-menu" aria-hidden="true"></span> Add Club
+                    </NavLink>
+                </div>
                 @* "Add Course" link only for authorized (logged-in) users *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="golfcourses/add">

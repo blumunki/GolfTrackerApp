@@ -1,0 +1,66 @@
+@page "/golfclubs"
+@inject IGolfClubService GolfClubService
+@using GolfTrackerApp.Web.Services
+@inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@rendermode InteractiveServer
+
+<PageTitle>Golf Clubs</PageTitle>
+
+<h1>Golf Clubs</h1>
+
+<p>
+    <button class="btn btn-primary" @onclick="GoToAddGolfClubPage">Add New Golf Club</button>
+</p>
+
+@if (golfClubs == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!golfClubs.Any())
+{
+    <p><em>No golf clubs found. Please add some.</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>City</th>
+                <th>County/Region</th>
+                <th>Postcode</th>
+                <th>Country</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var club in golfClubs)
+            {
+                <tr>
+                    <td>@club.Name</td>
+                    <td>@club.CountyOrRegion</td>
+                    <td>@club.Postcode</td>
+                    <td>@club.Country</td>
+                    <td>
+                        @* Edit/Delete buttons can be added later *@
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<GolfClub>? golfClubs;
+
+    protected override async Task OnInitializedAsync()
+    {
+        golfClubs = await GolfClubService.GetAllGolfClubsAsync();
+    }
+
+    private void GoToAddGolfClubPage()
+    {
+        NavigationManager.NavigateTo("/golfclubs/add");
+    }
+}
