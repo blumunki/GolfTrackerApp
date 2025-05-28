@@ -18,6 +18,13 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<GolfCourse> AddGolfCourseAsync(GolfCourse golfCourse)
         {
+            // You might want to add validation here to ensure golfCourse.GolfClubId refers to an existing GolfClub
+            var clubExists = await _context.GolfClubs.AnyAsync(c => c.GolfClubId == golfCourse.GolfClubId);
+            if (!clubExists)
+            {
+                throw new ArgumentException($"GolfClub with ID {golfCourse.GolfClubId} does not exist.");
+            }
+
             _context.GolfCourses.Add(golfCourse);
             await _context.SaveChangesAsync();
             return golfCourse;
@@ -37,14 +44,16 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<GolfCourse>> GetAllGolfCoursesAsync()
         {
-            return await _context.GolfCourses.ToListAsync();
+            return await _context.GolfCourses
+                                .Include(gc => gc.GolfClub) // Optionally include club details
+                                .ToListAsync();
         }
 
         public async Task<GolfCourse?> GetGolfCourseByIdAsync(int id)
         {
-            return await _context.GolfCourses.FindAsync(id);
-            // Or use this to include related entities if needed later:
-            // return await _context.GolfCourses.Include(gc => gc.Holes).FirstOrDefaultAsync(gc => gc.GolfCourseId == id);
+            return await _context.GolfCourses
+                                .Include(gc => gc.GolfClub) // Optionally include club details
+                                .FirstOrDefaultAsync(gc => gc.GolfCourseId == id);
         }
 
         public async Task<GolfCourse?> UpdateGolfCourseAsync(GolfCourse golfCourse)
@@ -52,15 +61,20 @@ namespace GolfTrackerApp.Web.Services
             var existingCourse = await _context.GolfCourses.FindAsync(golfCourse.GolfCourseId);
             if (existingCourse == null)
             {
-                return null; // Or throw an exception
+                return null;
+            }
+
+            // Ensure GolfClubId is valid if it's being changed
+            if (existingCourse.GolfClubId != golfCourse.GolfClubId)
+            {
+                var clubExists = await _context.GolfClubs.AnyAsync(c => c.GolfClubId == golfCourse.GolfClubId);
+                if (!clubExists)
+                {
+                    throw new ArgumentException($"GolfClub with ID {golfCourse.GolfClubId} does not exist for update.");
+                }
             }
 
             _context.Entry(existingCourse).CurrentValues.SetValues(golfCourse);
-            // Or update specific properties:
-            // existingCourse.Name = golfCourse.Name;
-            // existingCourse.Location = golfCourse.Location;
-            // ... etc.
-
             await _context.SaveChangesAsync();
             return existingCourse;
         }

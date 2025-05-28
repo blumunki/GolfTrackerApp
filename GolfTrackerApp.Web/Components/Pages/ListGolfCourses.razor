@@ -26,7 +26,6 @@ else
         <thead>
             <tr>
                 <th>Name</th>
-                <th>Location</th>
                 <th>Number of Holes</th>
                 <th>Default Par</th>
                 <th>Actions</th>
@@ -36,8 +35,8 @@ else
             @foreach (var course in golfCourses)
             {
                 <tr>
+                    <td>@(course.GolfClub?.Name ?? "N/A")</td>
                     <td>@course.Name</td>
-                    <td>@course.Location</td>
                     <td>@course.NumberOfHoles</td>
                     <td>@course.DefaultPar</td>
                     <td>

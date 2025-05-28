@@ -17,6 +17,7 @@ namespace GolfTrackerApp.Web.Data
 
         // Add DbSet properties for your application models
         public DbSet<Player> Players { get; set; }
+        public DbSet<GolfClub> GolfClubs { get; set; }
         public DbSet<GolfCourse> GolfCourses { get; set; }
         public DbSet<Hole> Holes { get; set; }
         public DbSet<Round> Rounds { get; set; }
@@ -66,6 +67,11 @@ namespace GolfTrackerApp.Web.Data
                 .HasOne(rp => rp.Player)
                 .WithMany(p => p.RoundPlayers)
                 .HasForeignKey(rp => rp.PlayerId);
+            
+            builder.Entity<GolfCourse>()
+                .HasOne(gc => gc.GolfClub)
+                .WithMany(club => club.GolfCourses)
+                .HasForeignKey(gc => gc.GolfClubId);
 
             // Add any other specific configurations if needed
             // For example, to prevent cascade delete on a specific relationship if necessary:

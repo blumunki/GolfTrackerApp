@@ -21,8 +21,10 @@
     </div>
 
     <div class="mb-3">
-        <label for="location" class="form-label">Location:</label>
-        <InputText id="location" @bind-Value="newGolfCourse.Location" class="form-control" />
+        <label for="golfClubId" class="form-label">Golf Club ID:</label>
+        <InputNumber id="golfClubId" @bind-Value="newGolfCourse.GolfClubId" class="form-control" />
+        <ValidationMessage For="@(() => newGolfCourse.GolfClubId)" />
+        @* TODO: Replace this with a dropdown of existing Golf Clubs *@
     </div>
 
     <div class="mb-3">
