@@ -46,6 +46,9 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 builder.Services.AddScoped<IGolfCourseService, GolfCourseService>();
 builder.Services.AddScoped<IPlayerService, PlayerService>();
 builder.Services.AddScoped<IGolfClubService, GolfClubService>();
+builder.Services.AddScoped<IHoleService, HoleService>();
+builder.Services.AddScoped<IRoundService, RoundService>();
+builder.Services.AddScoped<IScoreService, ScoreService>();
 
 var app = builder.Build();
 
