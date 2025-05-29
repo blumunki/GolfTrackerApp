@@ -7,10 +7,12 @@
 @using System.Globalization
 @using CsvHelper
 @using CsvHelper.Configuration
+@using GolfTrackerApp.Web.Data
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
 
 @rendermode InteractiveServer
 
@@ -48,19 +50,18 @@
 </div>
 
 
-@* --- Placeholder for Players Import --- *@
+@* --- Import Players --- *@
 <div class="migration-section mb-4">
     <h4>3. Import Players</h4>
-    <p>CSV Format: FirstName, LastName, Email (for creating user account), Handicap (optional)</p>
-    @* <InputFile OnChange="HandlePlayersUpload" accept=".csv" /> *@
-    @* <button class="btn btn-primary mt-2" @onclick="ProcessPlayers" disabled="@(playersFile == null || isProcessingPlayers)"> *@
-    @* Process Players *@
-    @* </button> *@
-    @* @if (!string.IsNullOrEmpty(playersImportLog)) *@
-    @* { *@
-    @* <pre class="log-output">@playersImportLog</pre> *@
-    @* } *@
-    <p><em>(Players import UI to be implemented)</em></p>
+    <p>CSV Format: FirstName, LastName, Email (optional; if provided, attempts to link/create system user), Handicap (optional)</p>
+    <InputFile OnChange="HandlePlayersUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessPlayers" disabled="@(playersFile == null || isProcessingPlayers || isProcessingGolfClubs || isProcessingGolfCourses)">
+        @if (isProcessingPlayers) { <span>Processing...</span> } else { <span>Import Players</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(playersImportLog))
+    {
+        <pre class="log-output">@playersImportLog</pre>
+    }
 </div>
 
 @* --- Further placeholders for Holes, Rounds, Scores --- *@
@@ -102,17 +103,29 @@
         public string? Website { get; set; }
     }
 
-        public class GolfCourseCsvRecord
-        {
-            public string? ClubName { get; set; } // To look up GolfClubId
-            public string? CourseName { get; set; }
-            public int DefaultPar { get; set; }
-            public int NumberOfHoles { get; set; } = 18; // Default if not in CSV
-        }
+    public class GolfCourseCsvRecord
+    {
+        public string? ClubName { get; set; } // To look up GolfClubId
+        public string? CourseName { get; set; }
+        public int DefaultPar { get; set; }
+        public int NumberOfHoles { get; set; } = 18; // Default if not in CSV
+    }
 
-        private IBrowserFile? golfCoursesFile;
-        private string golfCoursesImportLog = string.Empty;
-        private bool isProcessingGolfCourses = false;
+    private IBrowserFile? golfCoursesFile;
+    private string golfCoursesImportLog = string.Empty;
+    private bool isProcessingGolfCourses = false;
+
+    public class PlayerCsvRecord
+    {
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Email { get; set; } // Optional
+        public double? Handicap { get; set; }
+    }
+
+    private IBrowserFile? playersFile;
+    private string playersImportLog = string.Empty;
+    private bool isProcessingPlayers = false;
 
     // --- Golf Clubs Import Logic ---
     private void HandleGolfClubsUpload(InputFileChangeEventArgs e)
@@ -332,6 +345,155 @@
             StateHasChanged();
         }
     }
+
+
+    private void HandlePlayersUpload(InputFileChangeEventArgs e)
+    {
+        playersFile = e.File;
+        playersImportLog = $"Selected file: {playersFile.Name}";
+    }
+
+    private async Task ProcessPlayers()
+    {
+        if (playersFile == null)
+        {
+            playersImportLog = "Please select a Players CSV file first.";
+            return;
+        }
+
+        isProcessingPlayers = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Players import from {playersFile.Name}...");
+        StateHasChanged();
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var playerService = scope.ServiceProvider.GetRequiredService<IPlayerService>();
+        //var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>(); // For ApplicationUser
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); // Changed to ApplicationUser
+
+        // Cache existing players to help avoid duplicates
+        // For registered players, check by ApplicationUserId
+        // For managed players, check by FirstName + LastName (case-insensitive)
+        var existingRegisteredPlayerUserIds = (await playerService.GetAllPlayersAsync())
+                                            .Where(p => !string.IsNullOrEmpty(p.ApplicationUserId))
+                                            .Select(p => p.ApplicationUserId)
+                                            .ToHashSet();
+        var existingManagedPlayerNames = (await playerService.GetAllPlayersAsync())
+                                        .Where(p => string.IsNullOrEmpty(p.ApplicationUserId))
+                                        .Select(p => $"{p.FirstName?.ToLowerInvariant()}_{p.LastName?.ToLowerInvariant()}")
+                                        .ToHashSet();
+        int successCount = 0;
+        int skippedCount = 0;
+        int usersCreatedCount = 0;
+
+        try
+        {
+            await using var stream = playersFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true });
+
+            await foreach (var record in csv.GetRecordsAsync<PlayerCsvRecord>())
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(record.FirstName) || string.IsNullOrWhiteSpace(record.LastName))
+                    {
+                        log.AppendLine("Skipped row: FirstName or LastName is missing.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    string? appUserId = null;
+                    bool isRegisteredPlayer = !string.IsNullOrWhiteSpace(record.Email);
+
+                    if (isRegisteredPlayer)
+                    {
+                        var user = await userManager.FindByEmailAsync(record.Email!);
+                        if (user == null)
+                        {
+                            // Create new ApplicationUser
+                            //user = new IdentityUser { UserName = record.Email, Email = record.Email, EmailConfirmed = true }; // Auto-confirm for simplicity
+                            user = new ApplicationUser { UserName = record.Email, Email = record.Email, EmailConfirmed = true }; // Changed to ApplicationUser, Auto-confirm for simplicity
+                            var createUserResult = await userManager.CreateAsync(user, $"DefaultP@ssw0rd{DateTime.Now.Ticks}"); // Generate a complex default password
+                            if (!createUserResult.Succeeded)
+                            {
+                                log.AppendLine($"Failed to create user for {record.Email}: {string.Join(", ", createUserResult.Errors.Select(e => e.Description))}");
+                                skippedCount++;
+                                continue;
+                            }
+                            // Optionally add to "User" role
+                            await userManager.AddToRoleAsync(user, "User");
+                            log.AppendLine($"Created new system user for email: {record.Email}");
+                            usersCreatedCount++;
+                        }
+                        appUserId = user.Id;
+
+                        if (existingRegisteredPlayerUserIds.Contains(appUserId))
+                        {
+                            log.AppendLine($"Skipped: Player profile for user {record.Email} already exists.");
+                            skippedCount++;
+                            continue;
+                        }
+                    }
+                    else // Managed player
+                    {
+                        var managedPlayerKey = $"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}";
+                        if (existingManagedPlayerNames.Contains(managedPlayerKey))
+                        {
+                            log.AppendLine($"Skipped: Managed player '{record.FirstName} {record.LastName}' already exists.");
+                            skippedCount++;
+                            continue;
+                        }
+                    }
+
+                    var newPlayer = new Player
+                    {
+                        FirstName = record.FirstName,
+                        LastName = record.LastName,
+                        // // Store email on Player model if you added it, useful even for managed players
+                        Handicap = record.Handicap,
+                        ApplicationUserId = appUserId
+                    };
+
+                    await playerService.AddPlayerAsync(newPlayer);
+
+                    if (isRegisteredPlayer && appUserId != null)
+                    {
+                        existingRegisteredPlayerUserIds.Add(appUserId);
+                    }
+                    else
+                    {
+                        existingManagedPlayerNames.Add($"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}");
+                    }
+                    successCount++;
+                    log.AppendLine($"Added Player: {newPlayer.FirstName} {newPlayer.LastName} {(isRegisteredPlayer ? $"(User: {record.Email})" : "(Managed)")}");
+                }
+                catch (Exception rowEx)
+                {
+                    log.AppendLine($"Error processing player record (Name: {record?.FirstName} {record?.LastName}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nPlayers import complete. Added: {successCount}, Skipped/Errors: {skippedCount}, New System Users Created: {usersCreatedCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Players import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null) { log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'"); }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Players import: {ex.Message}");
+        }
+        finally
+        {
+            playersImportLog = log.ToString();
+            isProcessingPlayers = false;
+            playersFile = null; // Reset file input
+            StateHasChanged();
+        }
+    }
+
 
     // --- Placeholder for other entity import logic (GolfCourses, Players, etc.) ---
     // private IBrowserFile? golfCoursesFile;
