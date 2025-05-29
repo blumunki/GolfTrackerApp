@@ -86,6 +86,11 @@
         @* Example of an Admin-only link *@
         <AuthorizeView Roles="Admin">
             <div class="nav-item px-3">
+                <NavLink class="nav-link" href="admin/datamigration">
+                    <span class="bi bi-database-up-nav-menu" aria-hidden="true"></span> Data Migration
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/admin/dashboard"> @* Create this page later *@
                     <span class="bi bi-shield-lock-nav-menu" aria-hidden="true"></span> Admin Area
                 </NavLink>

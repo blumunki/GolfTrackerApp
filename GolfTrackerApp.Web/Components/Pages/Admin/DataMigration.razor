@@ -1,0 +1,218 @@
+@page "/admin/datamigration"
+@attribute [Authorize(Roles = "Admin")] // Only Admins can access this page
+@inject NavigationManager NavigationManager
+@inject IServiceScopeFactory ServiceScopeFactory // For resolving services in a long-running task
+
+@using System.IO
+@using System.Globalization
+@using CsvHelper
+@using CsvHelper.Configuration
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>Data Migration</PageTitle>
+
+<h1>Data Migration Utility</h1>
+
+<p><strong>Important:</strong> Upload files in the specified order. Ensure CSV files are UTF-8 encoded.</p>
+
+<div class="migration-section mb-4">
+    <h4>1. Import Golf Clubs</h4>
+    <p>CSV Format: Name, AddressLine1, AddressLine2, City, CountyOrRegion, Postcode, Country, Website</p>
+    <InputFile OnChange="HandleGolfClubsUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessGolfClubs" disabled="@(golfClubsFile == null || isProcessingGolfClubs)">
+        @if (isProcessingGolfClubs) { <span>Processing...</span> } else { <span>Import Golf Clubs</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(golfClubsImportLog))
+    {
+        <pre class="log-output">@golfClubsImportLog</pre>
+    }
+</div>
+
+@* --- Placeholder for Golf Courses Import --- *@
+<div class="migration-section mb-4">
+    <h4>2. Import Golf Courses</h4>
+    <p>CSV Format: ClubName (must match imported club), CourseName, DefaultPar, NumberOfHoles</p>
+    @* <InputFile OnChange="HandleGolfCoursesUpload" accept=".csv" /> *@
+    @* <button class="btn btn-primary mt-2" @onclick="ProcessGolfCourses" disabled="@(golfCoursesFile == null || isProcessingGolfCourses)"> *@
+    @* Process Golf Courses *@
+    @* </button> *@
+    @* @if (!string.IsNullOrEmpty(golfCoursesImportLog)) *@
+    @* { *@
+    @* <pre class="log-output">@golfCoursesImportLog</pre> *@
+    @* } *@
+    <p><em>(Golf Courses import UI to be implemented)</em></p>
+</div>
+
+
+@* --- Placeholder for Players Import --- *@
+<div class="migration-section mb-4">
+    <h4>3. Import Players</h4>
+    <p>CSV Format: FirstName, LastName, Email (for creating user account), Handicap (optional)</p>
+    @* <InputFile OnChange="HandlePlayersUpload" accept=".csv" /> *@
+    @* <button class="btn btn-primary mt-2" @onclick="ProcessPlayers" disabled="@(playersFile == null || isProcessingPlayers)"> *@
+    @* Process Players *@
+    @* </button> *@
+    @* @if (!string.IsNullOrEmpty(playersImportLog)) *@
+    @* { *@
+    @* <pre class="log-output">@playersImportLog</pre> *@
+    @* } *@
+    <p><em>(Players import UI to be implemented)</em></p>
+</div>
+
+@* --- Further placeholders for Holes, Rounds, Scores --- *@
+
+
+<style>
+    .migration-section {
+        border: 1px solid #ccc;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+    }
+    .log-output {
+        background-color: #f5f5f5;
+        border: 1px solid #eee;
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin-top:10px;
+    }
+</style>
+
+@code {
+    private IBrowserFile? golfClubsFile;
+    private string golfClubsImportLog = string.Empty;
+    private bool isProcessingGolfClubs = false;
+
+    public class GolfClubCsvRecord
+    {
+        public string? Name { get; set; }
+        public string? AddressLine1 { get; set; }
+        public string? AddressLine2 { get; set; }
+        public string? City { get; set; }
+        public string? CountyOrRegion { get; set; }
+        public string? Postcode { get; set; }
+        public string? Country { get; set; }
+        public string? Website { get; set; }
+    }
+
+    // --- Golf Clubs Import Logic ---
+    private void HandleGolfClubsUpload(InputFileChangeEventArgs e)
+    {
+        golfClubsFile = e.File;
+        golfClubsImportLog = $"Selected file: {golfClubsFile.Name}";
+    }
+
+    private async Task ProcessGolfClubs()
+    {
+        if (golfClubsFile == null)
+        {
+            golfClubsImportLog = "Please select a file first.";
+            return;
+        }
+
+        isProcessingGolfClubs = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Golf Clubs import from {golfClubsFile.Name}...");
+        StateHasChanged(); // Update UI to show processing
+
+        // Use IServiceScopeFactory for long-running operations or when services have a shorter lifetime
+        // than the component. For EF Core DbContext, this is good practice.
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var golfClubService = scope.ServiceProvider.GetRequiredService<IGolfClubService>();
+        var existingClubNames = (await golfClubService.GetAllGolfClubsAsync()).Select(gc => gc.Name.ToLowerInvariant()).ToHashSet();
+        int successCount = 0;
+        int skippedCount = 0;
+
+        try
+        {
+            // Max file size (e.g., 5MB). Adjust as needed.
+            await using var stream = golfClubsFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true, // Assuming your CSV has a header row
+                MissingFieldFound = null, // Handle missing fields gracefully if needed
+                HeaderValidated = null, // Handle header validation if needed
+            });
+
+
+            await foreach (var record in csv.GetRecordsAsync<GolfClubCsvRecord>())
+            {
+                try
+                {
+                    var clubName = record.Name;
+                    if (string.IsNullOrWhiteSpace(clubName))
+                    {
+                        log.AppendLine("Skipped row: Club Name is missing.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    if (existingClubNames.Contains(clubName.ToLowerInvariant()))
+                    {
+                        log.AppendLine($"Skipped: Golf Club '{clubName}' already exists.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newClub = new GolfClub
+                    {
+                        Name = clubName,
+                        AddressLine1 = record.AddressLine1,
+                        AddressLine2 = record.AddressLine2,
+                        City = record.City,
+                        CountyOrRegion = record.CountyOrRegion,
+                        Postcode = record.Postcode,
+                        Country = record.Country,
+                        Website = record.Website
+                    };
+                    await golfClubService.AddGolfClubAsync(newClub);
+                    existingClubNames.Add(newClub.Name.ToLowerInvariant()); // Add to local cache
+                    successCount++;
+                    log.AppendLine($"Added: {newClub.Name}");
+                }
+                catch (Exception rowEx)
+                {
+                    //log.AppendLine($"Error processing row: {rowEx.Message}. Row data: {string.Join(",", csv.Context.Parser.Record ?? Array.Empty<string>())}");
+                    log.AppendLine($"Error processing record (Name: {record?.Name ?? "N/A"}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nImport complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+        }
+        catch (CsvHelperException csvEx) // Specifically catch CsvHelper exceptions for better diagnostics
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null)
+            {
+                log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'");
+            }
+        }
+        catch (Exception ex) // Catches other exceptions (e.g., DB errors, file stream issues not caught by CsvHelperException)
+        {
+            log.AppendLine($"\nFATAL ERROR during import: {ex.Message}");
+        }
+        finally
+        {
+            golfClubsImportLog = log.ToString();
+            isProcessingGolfClubs = false;
+            golfClubsFile = null; // Reset file input
+            StateHasChanged(); // Update UI
+        }
+    }
+    
+
+    // --- Placeholder for other entity import logic (GolfCourses, Players, etc.) ---
+    // private IBrowserFile? golfCoursesFile;
+    // private string golfCoursesImportLog = string.Empty;
+    // private bool isProcessingGolfCourses = false;
+    // ... and so on for other types
+}
