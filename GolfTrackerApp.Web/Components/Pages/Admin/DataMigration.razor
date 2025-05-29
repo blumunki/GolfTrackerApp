@@ -33,19 +33,18 @@
     }
 </div>
 
-@* --- Placeholder for Golf Courses Import --- *@
+@* --- Import Golf Courses --- *@
 <div class="migration-section mb-4">
     <h4>2. Import Golf Courses</h4>
-    <p>CSV Format: ClubName (must match imported club), CourseName, DefaultPar, NumberOfHoles</p>
-    @* <InputFile OnChange="HandleGolfCoursesUpload" accept=".csv" /> *@
-    @* <button class="btn btn-primary mt-2" @onclick="ProcessGolfCourses" disabled="@(golfCoursesFile == null || isProcessingGolfCourses)"> *@
-    @* Process Golf Courses *@
-    @* </button> *@
-    @* @if (!string.IsNullOrEmpty(golfCoursesImportLog)) *@
-    @* { *@
-    @* <pre class="log-output">@golfCoursesImportLog</pre> *@
-    @* } *@
-    <p><em>(Golf Courses import UI to be implemented)</em></p>
+    <p>CSV Format: ClubName (must match an already imported club's name), CourseName, DefaultPar, NumberOfHoles</p>
+    <InputFile OnChange="HandleGolfCoursesUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessGolfCourses" disabled="@(golfCoursesFile == null || isProcessingGolfCourses || isProcessingGolfClubs)">
+        @if (isProcessingGolfCourses) { <span>Processing...</span> } else { <span>Import Golf Courses</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(golfCoursesImportLog))
+    {
+        <pre class="log-output">@golfCoursesImportLog</pre>
+    }
 </div>
 
 
@@ -102,6 +101,18 @@
         public string? Country { get; set; }
         public string? Website { get; set; }
     }
+
+        public class GolfCourseCsvRecord
+        {
+            public string? ClubName { get; set; } // To look up GolfClubId
+            public string? CourseName { get; set; }
+            public int DefaultPar { get; set; }
+            public int NumberOfHoles { get; set; } = 18; // Default if not in CSV
+        }
+
+        private IBrowserFile? golfCoursesFile;
+        private string golfCoursesImportLog = string.Empty;
+        private bool isProcessingGolfCourses = false;
 
     // --- Golf Clubs Import Logic ---
     private void HandleGolfClubsUpload(InputFileChangeEventArgs e)
@@ -209,6 +220,118 @@
         }
     }
     
+    private void HandleGolfCoursesUpload(InputFileChangeEventArgs e)
+    {
+        golfCoursesFile = e.File;
+        golfCoursesImportLog = $"Selected file: {golfCoursesFile.Name}";
+    }
+
+    private async Task ProcessGolfCourses()
+    {
+        if (golfCoursesFile == null)
+        {
+            golfCoursesImportLog = "Please select a Golf Courses CSV file first.";
+            return;
+        }
+
+        isProcessingGolfCourses = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Golf Courses import from {golfCoursesFile.Name}...");
+        StateHasChanged();
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var golfCourseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+        var golfClubService = scope.ServiceProvider.GetRequiredService<IGolfClubService>(); // To look up Club IDs
+
+        // Create a lookup for GolfClubId by ClubName
+        var clubNameToIdLookup = (await golfClubService.GetAllGolfClubsAsync())
+                                    .ToDictionary(gc => gc.Name.ToLowerInvariant(), gc => gc.GolfClubId);
+
+        var existingCourseNames = (await golfCourseService.GetAllGolfCoursesAsync())
+                                     .Select(course => $"{course.GolfClubId}_{course.Name.ToLowerInvariant()}")
+                                     .ToHashSet(); // Check for course name uniqueness within a club
+
+        int successCount = 0;
+        int skippedCount = 0;
+
+        try
+        {
+            await using var stream = golfCoursesFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                HeaderValidated = null,
+            });
+
+            await foreach (var record in csv.GetRecordsAsync<GolfCourseCsvRecord>())
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName))
+                    {
+                        log.AppendLine("Skipped row: Course Name or Club Name is missing.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    if (!clubNameToIdLookup.TryGetValue(record.ClubName.ToLowerInvariant(), out var golfClubId))
+                    {
+                        log.AppendLine($"Skipped: Golf Club '{record.ClubName}' not found for course '{record.CourseName}'. Please import clubs first.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var uniqueCourseKey = $"{golfClubId}_{record.CourseName.ToLowerInvariant()}";
+                    if (existingCourseNames.Contains(uniqueCourseKey))
+                    {
+                        log.AppendLine($"Skipped: Golf Course '{record.CourseName}' already exists for club '{record.ClubName}'.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newCourse = new GolfCourse
+                    {
+                        GolfClubId = golfClubId,
+                        Name = record.CourseName,
+                        DefaultPar = record.DefaultPar,
+                        NumberOfHoles = record.NumberOfHoles <= 0 ? 18 : record.NumberOfHoles // Basic validation/default for NumberOfHoles
+                    };
+
+                    await golfCourseService.AddGolfCourseAsync(newCourse);
+                    existingCourseNames.Add(uniqueCourseKey); // Add to local cache
+                    successCount++;
+                    log.AppendLine($"Added Course: {newCourse.Name} (Club: {record.ClubName})");
+                }
+                catch (Exception rowEx)
+                {
+                    log.AppendLine($"Error processing course record (CourseName: {record?.CourseName ?? "N/A"}, ClubName: {record?.ClubName ?? "N/A"}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nGolf Courses import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Golf Courses import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null)
+            {
+                log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Golf Courses import: {ex.Message}");
+        }
+        finally
+        {
+            golfCoursesImportLog = log.ToString();
+            isProcessingGolfCourses = false;
+            golfCoursesFile = null; // Reset file input
+            StateHasChanged();
+        }
+    }
 
     // --- Placeholder for other entity import logic (GolfCourses, Players, etc.) ---
     // private IBrowserFile? golfCoursesFile;
