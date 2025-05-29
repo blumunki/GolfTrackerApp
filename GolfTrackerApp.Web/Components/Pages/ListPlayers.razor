@@ -1,0 +1,75 @@
+@page "/players"
+@attribute [Authorize] // Or specific roles like "Admin" if only admins should see all players
+@inject IPlayerService PlayerService
+@inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@rendermode InteractiveServer
+
+<PageTitle>Players</PageTitle>
+
+<h1>Players</h1>
+
+@* <p> *@
+@* <button class="btn btn-primary" @onclick="GoToAddPlayerPage">Add New Player</button> *@
+@* </p> *@
+<p><em>(Add/Edit Player UI to be implemented more fully later. For now, verify imported players.)</em></p>
+
+@if (players == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!players.Any())
+{
+    <p><em>No players found.</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Handicap</th>
+                <th>User Type</th>
+                <th>Registered Email</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var player in players)
+            {
+                <tr>
+                    <td>@player.FirstName @player.LastName</td>
+                    <td>@(player.Handicap.HasValue ? player.Handicap.Value.ToString("N1") : "N/A")</td>
+                    <td>@(string.IsNullOrEmpty(player.ApplicationUserId) ? "Managed" : "Registered")</td>
+                    <td>@(player.ApplicationUser?.Email ?? "N/A")</td>
+                    <td>
+                        @* Edit/Delete buttons can be added later *@
+                        @* <button class="btn btn-sm btn-info" @onclick="() => GoToEditPlayerPage(player.PlayerId)">Edit</button> *@
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Player>? players;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // PlayerService.GetAllPlayersAsync() already includes ApplicationUser
+        players = await PlayerService.GetAllPlayersAsync();
+    }
+
+    // private void GoToAddPlayerPage()
+    // {
+    //     NavigationManager.NavigateTo("/players/add");
+    // }
+
+    // private void GoToEditPlayerPage(int playerId)
+    // {
+    //     NavigationManager.NavigateTo($"/players/edit/{playerId}");
+    // }
+}
