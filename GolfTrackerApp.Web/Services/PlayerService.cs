@@ -18,12 +18,28 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Player> AddPlayerAsync(Player player)
         {
-            // Basic validation: ensure ApplicationUserId is not already linked to another Player
-            var existingPlayerForUser = await _context.Players
-                                            .FirstOrDefaultAsync(p => p.ApplicationUserId == player.ApplicationUserId);
-            if (existingPlayerForUser != null)
+            // If an ApplicationUserId is provided, check if it's already linked.
+            if (!string.IsNullOrEmpty(player.ApplicationUserId))
             {
-                throw new InvalidOperationException("A player profile already exists for this application user.");
+                var existingPlayerForUser = await _context.Players
+                                                .FirstOrDefaultAsync(p => p.ApplicationUserId == player.ApplicationUserId);
+                if (existingPlayerForUser != null)
+                {
+                    throw new InvalidOperationException($"A player profile (ID: {existingPlayerForUser.PlayerId}) already exists for this application user ID.");
+                }
+            }
+            else // This is a managed player (ApplicationUserId is null or empty)
+            {
+                // Optional: Add logic to prevent duplicate managed players by FirstName/LastName if desired.
+                // For example:
+                // var existingManagedPlayer = await _context.Players
+                //    .FirstOrDefaultAsync(p => p.ApplicationUserId == null &&
+                //                              p.FirstName == player.FirstName &&
+                //                              p.LastName == player.LastName);
+                // if (existingManagedPlayer != null)
+                // {
+                //    throw new InvalidOperationException($"A managed player named '{player.FirstName} {player.LastName}' already exists.");
+                // }
             }
 
             _context.Players.Add(player);
@@ -66,14 +82,20 @@ namespace GolfTrackerApp.Web.Services
             {
                 return null;
             }
-            // Prevent changing the ApplicationUserId for an existing player profile
-            if (existingPlayer.ApplicationUserId != player.ApplicationUserId)
+
+            // If ApplicationUserId is being set or changed, ensure it's not already in use by another player profile
+            if (!string.IsNullOrEmpty(player.ApplicationUserId) && existingPlayer.ApplicationUserId != player.ApplicationUserId)
             {
-               throw new InvalidOperationException("Cannot change the ApplicationUserId of an existing player profile.");
+                var anotherPlayerWithUser = await _context.Players
+                                                .FirstOrDefaultAsync(p => p.PlayerId != player.PlayerId && p.ApplicationUserId == player.ApplicationUserId);
+                if (anotherPlayerWithUser != null)
+                {
+                    throw new InvalidOperationException($"The ApplicationUser ID '{player.ApplicationUserId}' is already linked to another player profile (ID: {anotherPlayerWithUser.PlayerId}).");
+                }
             }
 
             _context.Entry(existingPlayer).CurrentValues.SetValues(player);
-            // Ensure ApplicationUserId is not overwritten by SetValues if it's not part of the editable fields
+            // Explicitly set ApplicationUserId as SetValues might not handle transitions from value to null well if not careful.
             existingPlayer.ApplicationUserId = player.ApplicationUserId;
 
 

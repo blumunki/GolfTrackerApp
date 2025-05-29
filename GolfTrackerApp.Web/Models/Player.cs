@@ -1,14 +1,14 @@
 // In GolfTrackerApp.Web/Models/Player.cs
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema; // For ForeignKey
-using GolfTrackerApp.Web.Data; // Add this using directive for ApplicationUser
-using Microsoft.AspNetCore.Identity; // Required if you directly link to ApplicationUser ID
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.AspNetCore.Identity;
+using GolfTrackerApp.Web.Data; // Assuming this is the namespace where ApplicationUser is defined
 
 namespace GolfTrackerApp.Web.Models
 {
     public class Player
     {
-        public int PlayerId { get; set; } // Primary Key
+        public int PlayerId { get; set; }
 
         [Required]
         [StringLength(50)]
@@ -20,16 +20,14 @@ namespace GolfTrackerApp.Web.Models
 
         public double? Handicap { get; set; }
 
-        // Foreign key to ApplicationUser (from ASP.NET Core Identity)
-        // This links a Player profile to a registered user.
-        [Required]
-        public string ApplicationUserId { get; set; } = string.Empty;
-        [ForeignKey("ApplicationUserId")]
-        public virtual ApplicationUser? ApplicationUser { get; set; } // Navigation property
+        // ApplicationUserId is now nullable
+        public string? ApplicationUserId { get; set; } // Removed [Required], made nullable (string?)
 
-        // Navigation property for Scores
+        [ForeignKey("ApplicationUserId")]
+        //public virtual IdentityUser? ApplicationUser { get; set; } // Navigation property remains nullable
+        public virtual ApplicationUser? ApplicationUser { get; set; } // Changed to ApplicationUser, remains nullable
+
         public virtual ICollection<Score> Scores { get; set; } = new List<Score>();
-        // Navigation property for Rounds (if tracking which players played which round through a join table)
         public virtual ICollection<RoundPlayer> RoundPlayers { get; set; } = new List<RoundPlayer>();
     }
 }
