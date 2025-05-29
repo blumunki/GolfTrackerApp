@@ -1,0 +1,127 @@
+@page "/golfcourses/{CourseId:int}/details" // Note the more specific route
+@attribute [Authorize] // Or remove if public viewing is desired
+@inject IGolfCourseService GolfCourseService
+@inject IHoleService HoleService // To get holes for this course
+@inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>@(golfCourse?.Name ?? "Course Details")</PageTitle>
+
+@if (golfCourse == null && !isLoading && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (isLoading)
+{
+    <p><em>Loading course details...</em></p>
+}
+else if (golfCourse != null)
+{
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/golfclubs">Clubs</a></li>
+            <li class="breadcrumb-item"><a href="/golfclubs/@golfCourse.GolfClubId">@golfCourse.GolfClub?.Name</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@golfCourse.Name</li>
+        </ol>
+    </nav>
+
+    <h2>@golfCourse.Name <small class="text-muted">(@golfCourse.GolfClub?.Name)</small></h2>
+    <p><strong>Par:</strong> @golfCourse.DefaultPar | <strong>Number of Holes:</strong> @golfCourse.NumberOfHoles</p>
+
+    <h3>Holes</h3>
+    @if (holes != null && holes.Any())
+    {
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Hole</th>
+                    <th>Par</th>
+                    <th>Stroke Index</th>
+                    <th>Length (Yards)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var hole in holes.OrderBy(h => h.HoleNumber))
+                {
+                    <tr>
+                        <td>@hole.HoleNumber</td>
+                        <td>@hole.Par</td>
+                        <td>@(hole.StrokeIndex.HasValue ? hole.StrokeIndex.Value.ToString() : "N/A")</td>
+                        <td>@(hole.LengthYards.HasValue ? hole.LengthYards.Value.ToString() : "N/A")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else if (isLoadingHoles)
+    {
+         <p><em>Loading holes...</em></p>
+    }
+    else
+    {
+        <p><em>No holes listed for this course yet.</em></p>
+    }
+    <hr />
+    <button class="btn btn-secondary" @onclick="GoBackToClubDetails">Back to @(golfCourse.GolfClub?.Name ?? "Club")</button>
+}
+else
+{
+    <p><em>Course not found.</em></p>
+}
+
+@code {
+    [Parameter]
+    public int CourseId { get; set; }
+
+    private GolfCourse? golfCourse;
+    private List<Hole>? holes;
+    private bool isLoading = true;
+    private bool isLoadingHoles = true;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        isLoadingHoles = true;
+        errorMessage = null;
+        try
+        {
+            // GolfCourseService.GetGolfCourseByIdAsync should include GolfClub
+            golfCourse = await GolfCourseService.GetGolfCourseByIdAsync(CourseId);
+
+            if (golfCourse != null)
+            {
+                holes = await HoleService.GetHolesForCourseAsync(golfCourse.GolfCourseId);
+                isLoadingHoles = false;
+            }
+            else
+            {
+                errorMessage = $"Golf course with ID {CourseId} not found.";
+                isLoadingHoles = false; // No course, so no holes to load
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading course details: {ex.Message}";
+            // Log the exception (ex)
+            isLoadingHoles = false;
+        }
+        isLoading = false;
+    }
+
+    private void GoBackToClubDetails()
+    {
+        if (golfCourse != null)
+        {
+            NavigationManager.NavigateTo($"/golfclubs/{golfCourse.GolfClubId}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/golfclubs"); // Fallback
+        }
+    }
+}

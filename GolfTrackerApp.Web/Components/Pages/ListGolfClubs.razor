@@ -28,7 +28,6 @@ else
             <tr>
                 <th>Name</th>
                 <th>City</th>
-                <th>County/Region</th>
                 <th>Postcode</th>
                 <th>Country</th>
                 <th>Actions</th>
@@ -40,10 +39,10 @@ else
                 <tr>
                     <td>@club.Name</td>
                     <td>@club.City</td>
-                    <td>@club.CountyOrRegion</td>
                     <td>@club.Postcode</td>
                     <td>@club.Country</td>
                     <td>
+                        <button class="btn btn-sm btn-info" @onclick="() => ViewClubDetails(club.GolfClubId)">View Details</button>
                         @* Edit/Delete buttons can be added later *@
                     </td>
                 </tr>
@@ -63,5 +62,10 @@ else
     private void GoToAddGolfClubPage()
     {
         NavigationManager.NavigateTo("/golfclubs/add");
+    }
+
+    private void ViewClubDetails(int clubId) // New method
+    {
+        NavigationManager.NavigateTo($"/golfclubs/{clubId}");
     }
 }

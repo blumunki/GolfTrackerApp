@@ -1,0 +1,113 @@
+@page "/golfclubs/{ClubId:int}"
+@attribute [Authorize] // Or remove if public viewing is desired
+@inject IGolfClubService GolfClubService
+@inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>@(golfClub?.Name ?? "Club Details")</PageTitle>
+
+@if (golfClub == null && !isLoading && !string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+else if (isLoading)
+{
+    <p><em>Loading club details...</em></p>
+}
+else if (golfClub != null)
+{
+    <h1>@golfClub.Name</h1>
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Club Information</h5>
+            <p><strong>Address:</strong> @FormatAddress(golfClub)</p>
+            @if (!string.IsNullOrWhiteSpace(golfClub.Website))
+            {
+                <p><strong>Website:</strong> <a href="@golfClub.Website" target="_blank">@golfClub.Website</a></p>
+            }
+        </div>
+    </div>
+
+    <h3>Courses at this Club</h3>
+    @if (golfClub.GolfCourses != null && golfClub.GolfCourses.Any())
+    {
+        <ul class="list-group">
+            @foreach (var course in golfClub.GolfCourses)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    @course.Name (Par: @course.DefaultPar, Holes: @course.NumberOfHoles)
+                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewCourseDetails(course.GolfCourseId)">View Holes</button>
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p><em>No courses listed for this club yet.</em></p>
+    }
+    <hr />
+    <button class="btn btn-secondary" @onclick="GoBackToList">Back to Clubs List</button>
+}
+else
+{
+    <p><em>Club not found.</em></p>
+}
+
+
+@code {
+    [Parameter]
+    public int ClubId { get; set; }
+
+    private GolfClub? golfClub;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        try
+        {
+            // GetGolfClubByIdAsync in GolfClubService should include GolfCourses
+            golfClub = await GolfClubService.GetGolfClubByIdAsync(ClubId);
+            if (golfClub == null)
+            {
+                errorMessage = $"Golf club with ID {ClubId} not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading club details: {ex.Message}";
+            // Log the exception (ex)
+        }
+        isLoading = false;
+    }
+
+    private string FormatAddress(GolfClub club)
+    {
+        var addressParts = new List<string?>
+        {
+            club.AddressLine1,
+            club.AddressLine2,
+            club.City,
+            club.CountyOrRegion,
+            club.Postcode,
+            club.Country
+        };
+        return string.Join(", ", addressParts.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private void ViewCourseDetails(int courseId)
+    {
+        NavigationManager.NavigateTo($"/golfcourses/{courseId}/details"); // New route for course details
+    }
+
+    private void GoBackToList()
+    {
+        NavigationManager.NavigateTo("/golfclubs");
+    }
+}
