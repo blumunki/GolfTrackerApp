@@ -64,6 +64,20 @@
     }
 </div>
 
+@* --- Import Holes --- *@
+<div class="migration-section mb-4">
+    <h4>4. Import Holes</h4>
+    <p>CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex (optional), LengthYards (optional)</p>
+    <InputFile OnChange="HandleHolesUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessHoles" disabled="@(holesFile == null || isProcessingHoles || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers)">
+        @if (isProcessingHoles) { <span>Processing...</span> } else { <span>Import Holes</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(holesImportLog))
+    {
+        <pre class="log-output">@holesImportLog</pre>
+    }
+</div>
+
 @* --- Further placeholders for Holes, Rounds, Scores --- *@
 
 
@@ -126,6 +140,21 @@
     private IBrowserFile? playersFile;
     private string playersImportLog = string.Empty;
     private bool isProcessingPlayers = false;
+
+    // Add to @code block in DataMigration.razor
+    public class HoleCsvRecord
+    {
+        public string? ClubName { get; set; }     // To help identify the course
+        public string? CourseName { get; set; }   // Primary identifier for the course within a club
+        public int HoleNumber { get; set; }
+        public int Par { get; set; }
+        public int? StrokeIndex { get; set; } // Nullable if not always present
+        public int? LengthYards { get; set; } // Nullable if not always present
+    }
+
+    private IBrowserFile? holesFile;
+    private string holesImportLog = string.Empty;
+    private bool isProcessingHoles = false;
 
     // --- Golf Clubs Import Logic ---
     private void HandleGolfClubsUpload(InputFileChangeEventArgs e)
@@ -490,6 +519,136 @@
             playersImportLog = log.ToString();
             isProcessingPlayers = false;
             playersFile = null; // Reset file input
+            StateHasChanged();
+        }
+    }
+
+    private void HandleHolesUpload(InputFileChangeEventArgs e)
+    {
+        holesFile = e.File;
+        holesImportLog = $"Selected file: {holesFile.Name}";
+    }
+
+    private async Task ProcessHoles()
+    {
+        if (holesFile == null)
+        {
+            holesImportLog = "Please select a Holes CSV file first.";
+            return;
+        }
+
+        isProcessingHoles = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Holes import from {holesFile.Name}...");
+        StateHasChanged();
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var holeService = scope.ServiceProvider.GetRequiredService<IHoleService>();
+        var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+
+        // Create a lookup for GolfCourseId by a composite key (e.g., "clubname_coursename")
+        // Ensure GolfClub is included to get ClubName if your GolfCourse model doesn't store it directly
+        var courses = await courseService.GetAllGolfCoursesAsync(); // Assumes this includes GolfClub
+        var courseLookup = courses.ToDictionary(
+            // Ensure GolfClub is not null; might need to adjust if GolfClub can be null or if Name is nullable
+            // This key assumes that course names are unique within a club.
+            course => $"{(course.GolfClub?.Name ?? "UNKNOWN_CLUB").ToLowerInvariant()}_{course.Name.ToLowerInvariant()}",
+            course => course.GolfCourseId
+        );
+
+        // Cache existing holes to prevent duplicates for a course (HoleNumber should be unique per course)
+        // Key: "CourseId_HoleNumber"
+        var existingHolesLookup = new HashSet<string>();
+        foreach(var course in courses)
+        {
+            var holesForCourse = await holeService.GetHolesForCourseAsync(course.GolfCourseId);
+            foreach(var hole in holesForCourse)
+            {
+                existingHolesLookup.Add($"{hole.GolfCourseId}_{hole.HoleNumber}");
+            }
+        }
+
+
+        int successCount = 0;
+        int skippedCount = 0;
+
+        try
+        {
+            await using var stream = holesFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // Increased size a bit for hole data
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                HeaderValidated = null,
+            });
+
+            await foreach (var record in csv.GetRecordsAsync<HoleCsvRecord>())
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName) || record.HoleNumber <= 0 || record.Par <= 0)
+                    {
+                        log.AppendLine($"Skipped row: CourseName, ClubName, valid HoleNumber, or Par is missing. Club: '{record.ClubName}', Course: '{record.CourseName}', Hole: {record.HoleNumber}");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var courseLookupKey = $"{record.ClubName.ToLowerInvariant()}_{record.CourseName.ToLowerInvariant()}";
+                    if (!courseLookup.TryGetValue(courseLookupKey, out var golfCourseId))
+                    {
+                        log.AppendLine($"Skipped Hole {record.HoleNumber} for '{record.CourseName}' (Club: {record.ClubName}): Golf Course not found. Please import courses first.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var holeLookupKey = $"{golfCourseId}_{record.HoleNumber}";
+                    if (existingHolesLookup.Contains(holeLookupKey))
+                    {
+                        log.AppendLine($"Skipped: Hole number {record.HoleNumber} already exists for course '{record.CourseName}' (Club: {record.ClubName}).");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newHole = new Hole
+                    {
+                        GolfCourseId = golfCourseId,
+                        HoleNumber = record.HoleNumber,
+                        Par = record.Par,
+                        StrokeIndex = record.StrokeIndex,
+                        LengthYards = record.LengthYards
+                    };
+
+                    await holeService.AddHoleAsync(newHole);
+                    existingHolesLookup.Add(holeLookupKey); // Add to local cache
+                    successCount++;
+                    log.AppendLine($"Added: Hole {newHole.HoleNumber} for {record.CourseName} (Club: {record.ClubName})");
+                }
+                catch (Exception rowEx)
+                {
+                    log.AppendLine($"Error processing hole record (Course: {record?.CourseName ?? "N/A"}, Hole: {record?.HoleNumber}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nHoles import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Holes import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null)
+            {
+                log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Holes import: {ex.Message}");
+        }
+        finally
+        {
+            holesImportLog = log.ToString();
+            isProcessingHoles = false;
+            holesFile = null; // Reset file input
             StateHasChanged();
         }
     }
