@@ -404,6 +404,4 @@ FodyWeavers.xsd
 *.db
 *.db-shm
 *.db-wal
-
-# CSV Files
-*.csv
+GolfTrackerApp.Web/Data/Players.csv
