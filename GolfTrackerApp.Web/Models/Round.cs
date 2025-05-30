@@ -4,6 +4,12 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace GolfTrackerApp.Web.Models
 {
+    public enum RoundTypeOption
+    {
+        Friendly,
+        Competitive
+        // Add more if needed
+    }
     public class Round
     {
         public int RoundId { get; set; } // Primary Key
@@ -15,6 +21,18 @@ namespace GolfTrackerApp.Web.Models
 
         [Required]
         public DateTime DatePlayed { get; set; }
+
+        // New Fields
+        [Required]
+        public int StartingHole { get; set; } = 1; // Default to 1
+
+        [Required]
+        [Range(1, 18)] // Assuming a course won't have more than 100 holes (e.g. 27 hole courses playing 3*9 etc)
+        public int HolesPlayed { get; set; } = 18; // Default to 18
+
+        [Required]
+        [StringLength(50)]
+        public RoundTypeOption RoundType { get; set; } = RoundTypeOption.Friendly; // Or use the Enum: public RoundTypeOption Type {get; set;}
 
         public string? Notes { get; set; } // e.g., weather, conditions
 
