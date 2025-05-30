@@ -90,8 +90,10 @@ namespace GolfTrackerApp.Web.Services
         {
             return await _context.Rounds
                                 .Include(r => r.GolfCourse!)
-                                    .ThenInclude(gc => gc!.GolfClub) // Ensure GolfClub is included
-                                .Include(r => r.Scores!) // Scores will be empty for now
+                                    .ThenInclude(gc => gc!.GolfClub)
+                                .Include(r => r.GolfCourse!)
+                                    .ThenInclude(gc => gc!.Holes)
+                                .Include(r => r.Scores!)
                                     .ThenInclude(s => s!.Hole)
                                 .Include(r => r.RoundPlayers!)
                                     .ThenInclude(rp => rp!.Player)

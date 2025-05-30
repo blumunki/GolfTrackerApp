@@ -1,5 +1,5 @@
 @page "/rounds/{RoundId:int}"
-@attribute [Authorize] // Or specific roles
+@attribute [Authorize]
 @inject IRoundService RoundService
 @inject NavigationManager NavigationManager
 @using GolfTrackerApp.Web.Models
@@ -44,27 +44,102 @@ else
         </div>
     </div>
 
-    <h3>Players in this Round</h3>
+    <h3>Player Scores</h3>
     @if (round.RoundPlayers != null && round.RoundPlayers.Any())
     {
-        <ul class="list-group mb-3">
-            @foreach (var rp in round.RoundPlayers.OrderBy(rp => rp.Player?.LastName).ThenBy(rp => rp.Player?.FirstName))
-            {
-                <li class="list-group-item">
-                    @rp.Player?.FirstName @rp.Player?.LastName
-                    @* Later, we can add their overall score for this round here if we calculate it *@
-                </li>
-            }
-        </ul>
+        foreach (var rp in round.RoundPlayers.OrderBy(rp => rp.Player?.LastName).ThenBy(rp => rp.Player?.FirstName))
+        {
+            var playerScores = round.Scores?
+                .Where(s => s.PlayerId == rp.PlayerId)
+                .OrderBy(s => s.Hole?.HoleNumber)
+                .ToList();
+
+            // Determine the actual range of holes played in this round
+            var holesPlayedInThisRound = Enumerable.Range(round.StartingHole, round.HolesPlayed);
+            
+            // Filter player's scores to only include holes played in this specific round instance
+            var relevantPlayerScores = playerScores?
+                .Where(s => s.Hole != null && holesPlayedInThisRound.Contains(s.Hole.HoleNumber))
+                .ToList() ?? new List<Score>();
+
+            // Get all hole details for the course, then filter for the played holes
+            var allCourseHoles = round.GolfCourse?.Holes?.OrderBy(h => h.HoleNumber).ToList() ?? new List<Hole>();
+            var playedCourseHolesDetails = allCourseHoles
+                .Where(h => holesPlayedInThisRound.Contains(h.HoleNumber))
+                .ToList();
+
+            int totalStrokesForPlayer = relevantPlayerScores.Sum(s => s.Strokes);
+            int totalParForHolesPlayedByPlayer = playedCourseHolesDetails.Sum(h => h.Par);
+            int scoreVsPar = totalStrokesForPlayer - totalParForHolesPlayedByPlayer;
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <strong>@rp.Player?.FirstName @rp.Player?.LastName</strong>
+                </div>
+                <div class="card-body">
+                    @if (relevantPlayerScores.Any())
+                    {
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Hole</th>
+                                    <th>Par</th>
+                                    <th>Strokes</th>
+                                    <th>Putts</th>
+                                    <th>Fairway Hit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var holeDetail in playedCourseHolesDetails)
+                                {
+                                    var scoreForThisHole = relevantPlayerScores.FirstOrDefault(s => s.HoleId == holeDetail.HoleId);
+                                    <tr>
+                                        <td>@holeDetail.HoleNumber</td>
+                                        <td>@holeDetail.Par</td>
+                                        <td>@(scoreForThisHole?.Strokes.ToString() ?? "-")</td>
+                                        <td>@(scoreForThisHole?.Putts?.ToString() ?? "-")</td>
+                                        <td>
+                                            @if (scoreForThisHole?.FairwayHit.HasValue ?? false)
+                                            {
+                                                @(scoreForThisHole.FairwayHit.Value ? "Yes" : "No")
+                                            }
+                                            else
+                                            {
+                                                @("-")
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-info">
+                                    <th colspan="2">Totals</th>
+                                    <th>@totalStrokesForPlayer</th>
+                                    <th>@(relevantPlayerScores.Sum(s => s.Putts ?? 0))</th>
+                                    <th>@(relevantPlayerScores.Count(s => s.FairwayHit == true)) Yes / @(relevantPlayerScores.Count(s => s.FairwayHit == false)) No</th>
+                                </tr>
+                                <tr class="table-info">
+                                    <th colspan="2">Score vs Par</th>
+                                    <th colspan="3">
+                                        @(scoreVsPar > 0 ? $"+{scoreVsPar}" : (scoreVsPar == 0 ? "E" : scoreVsPar.ToString()))
+                                        (Par for round: @totalParForHolesPlayedByPlayer)
+                                    </th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    }
+                    else
+                    {
+                        <p><em>No detailed scores found for this player in this round.</em></p>
+                    }
+                </div>
+            </div>
+        }
     }
     else
     {
         <p><em>No players recorded for this round.</em></p>
     }
-
-    @* Placeholder for displaying detailed scores for each player *@
-    <h3>Scores</h3>
-    <p><em>(Detailed hole-by-hole scores will be displayed here once imported/entered.)</em></p>
 
     <hr />
     <button class="btn btn-secondary" @onclick="GoBackToList">Back to Rounds List</button>
@@ -76,18 +151,22 @@ else
 
     private Round? round;
     private bool isLoading = true;
+    // isLoadingHoles is no longer needed as scores now come with the round object
 
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
         try
         {
-            // GetRoundByIdAsync should include GolfCourse.GolfClub, RoundPlayers.Player, and eventually Scores.Hole
+            // GetRoundByIdAsync in RoundService should include:
+            // GolfCourse.GolfClub,
+            // GolfCourse.Holes (to get par for all holes of the course for calculation),
+            // RoundPlayers.Player,
+            // Scores.Hole (to link score to a hole number and its par)
             round = await RoundService.GetRoundByIdAsync(RoundId);
         }
         catch (Exception ex)
         {
-            // Log error
             Console.WriteLine($"Error loading round {RoundId}: {ex.Message}"); // Replace with proper logging
         }
         isLoading = false;
