@@ -17,36 +17,50 @@ namespace GolfTrackerApp.Web.Services
             _context = context;
         }
 
-        public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
+    public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
+    {
+        // Validate GolfCourseId
+        if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
         {
-            if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
-            {
-                throw new ArgumentException($"GolfCourse with ID {round.GolfCourseId} does not exist.");
-            }
-            if (playerIds == null || !playerIds.Any())
-            {
-                throw new ArgumentException("At least one player must be selected for the round.");
-            }
-
-            _context.Rounds.Add(round); // EF will assign RoundId after SaveChangesAsync
-
-            // Need to save round first to get its ID for RoundPlayers if round.RoundId is 0
-            await _context.SaveChangesAsync();
-
-            foreach (var playerId in playerIds)
-            {
-                if (!await _context.Players.AnyAsync(p => p.PlayerId == playerId))
-                {
-                    // Handle or log error: Player not found
-                    continue; // Or throw exception based on desired strictness
-                }
-                round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
-            }
-            // If round.RoundPlayers was populated before Add, EF might handle this.
-            // If adding after round is tracked, ensure changes are saved.
-            await _context.SaveChangesAsync();
-            return round;
+            throw new ArgumentException($"GolfCourse with ID {round.GolfCourseId} does not exist.");
         }
+        // Validate new Round properties
+        if (round.StartingHole < 1 || round.HolesPlayed < 1) // Add more validation as needed
+        {
+            throw new ArgumentException("Starting hole and holes played must be valid.");
+        }
+
+        if (playerIds == null || !playerIds.Any())
+        {
+            throw new ArgumentException("At least one player must be selected for the round.");
+        }
+
+        _context.Rounds.Add(round); // EF will assign RoundId after first SaveChangesAsync
+
+        // It's often better to save the parent Round first to ensure it gets an ID,
+        // especially if RoundPlayer has a strict FK constraint that's checked immediately.
+        await _context.SaveChangesAsync();
+
+        foreach (var playerId in playerIds)
+        {
+            if (!await _context.Players.AnyAsync(p => p.PlayerId == playerId))
+            {
+                // Log or handle: Player not found for ID {playerId}
+                // Depending on strictness, you might throw or just skip this player for this round.
+                // For now, let's assume playerIds are validated before calling this service or we skip.
+                continue;
+            }
+            // Create the RoundPlayer link. ShotScore and ParScore are not set here.
+            round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
+        }
+
+        // If you added to round.RoundPlayers collection *before* the first SaveChangesAsync
+        // and Round is a new entity, EF Core often handles the relationships.
+        // If RoundPlayers are added *after* Round has an ID and is tracked, a second SaveChangesAsync is needed.
+        // Since we did SaveChangesAsync for Round already, this second one ensures RoundPlayers are saved.
+        await _context.SaveChangesAsync();
+        return round;
+    }
 
 
         public async Task<bool> DeleteRoundAsync(int id)
