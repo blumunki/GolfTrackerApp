@@ -94,6 +94,20 @@
     }
 </div>
 
+@* --- Import Scores --- *@
+<div class="migration-section mb-4">
+    <h4>6. Import Scores (Final Step)</h4>
+    <p>CSV Format: RoundText (from original spreadsheet), HoleNumber, Strokes</p>
+    <InputFile OnChange="HandleScoresUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessScores" disabled="@(scoresFile == null || isProcessingScores || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers || isProcessingHoles || isProcessingRounds)">
+        @if (isProcessingScores) { <span>Processing...</span> } else { <span>Import Scores</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(scoresImportLog))
+    {
+        <pre class="log-output">@scoresImportLog</pre>
+    }
+</div>
+
 @* --- Further placeholders for Holes, Rounds, Scores --- *@
 
 
@@ -188,6 +202,17 @@
     private IBrowserFile? roundsFile; // You should already have this
     private string roundsImportLog = string.Empty; // And this
     private bool isProcessingRounds = false; // And this
+
+    public class ScoreCsvRecord
+    {
+        public string? RoundText { get; set; } // The unique key from your spreadsheet linking to a player's round
+        public int HoleNumber { get; set; }
+        public int Strokes { get; set; }
+    }
+
+    private IBrowserFile? scoresFile;
+    private string scoresImportLog = string.Empty;
+    private bool isProcessingScores = false;
 
     // --- Golf Clubs Import Logic ---
     private void HandleGolfClubsUpload(InputFileChangeEventArgs e)
@@ -896,203 +921,214 @@
         }
     } // End ProcessRounds
 
-    @* private async Task ProcessRounds()
+    private void HandleScoresUpload(InputFileChangeEventArgs e)
     {
-        if (roundsFile == null)
+        scoresFile = e.File;
+        scoresImportLog = $"Selected file: {scoresFile.Name}";
+    }
+
+    private async Task ProcessScores()
+    {
+        if (scoresFile == null)
         {
-            roundsImportLog = "Please select a Rounds CSV file first.";
+            scoresImportLog = "Please select a Scores CSV file first.";
             return;
         }
 
-        isProcessingRounds = true;
+        isProcessingScores = true;
         var log = new System.Text.StringBuilder();
-        log.AppendLine($"Starting Rounds import from {roundsFile.Name}...");
+        log.AppendLine($"Starting Scores import from {scoresFile.Name}...");
         StateHasChanged();
 
         await using var scope = ServiceScopeFactory.CreateAsyncScope();
-        var roundService = scope.ServiceProvider.GetRequiredService<IRoundService>();
-        var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
-        var playerService = scope.ServiceProvider.GetRequiredService<IPlayerService>();
-        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); // For more complex lookups if needed
+        var scoreService = scope.ServiceProvider.GetRequiredService<IScoreService>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); // For direct lookups
 
         // --- Lookups ---
-        var coursesFromDb = await courseService.GetAllGolfCoursesAsync(); // Assumes this includes GolfClub
-        var courseLookup = coursesFromDb.ToDictionary(
-            // Key: "clubname_coursename" (lowercase). Ensure your CSV 'Course' field can be parsed to this.
-            // For reliable parsing, you might need a more robust way to split "Club Name - CourseName" from CSV.
-            // For now, we'll assume CSV 'Course' field is just "CourseName" and 'ClubName' is separate if available in DTO.
-            // Let's refine this based on RoundCsvRecord:
-            // Assuming RoundCsvRecord has separate ClubName and CourseName, or Course is "Club - Course"
-            course => $"{(course.GolfClub?.Name ?? "UNKNOWN_CLUB").ToLowerInvariant()}_{course.Name.ToLowerInvariant()}",
-            course => course.GolfCourseId
+        // We need to map RoundText to a composite key of (Database RoundId, Database PlayerId)
+        // And HoleNumber + CourseId (from Round) to Database HoleId
+
+        // 1. Create a lookup for PlayerId by their name (assuming "firstname lastname")
+        var allPlayers = await dbContext.Players.AsNoTracking().ToListAsync();
+        var playerLookup = allPlayers.ToDictionary(
+            p => $"{p.FirstName?.ToLowerInvariant()} {p.LastName?.ToLowerInvariant()}".Trim(),
+            p => p.PlayerId
         );
 
-        var playersFromDb = await playerService.GetAllPlayersAsync();
-        var playerLookup = playersFromDb.ToDictionary(
-            player => $"{player.FirstName.ToLowerInvariant()} {player.LastName.ToLowerInvariant()}", // Key: "firstname lastname"
-            player => player.PlayerId
+        // 2. Create a lookup for RoundId AND PlayerId using parts of RoundText or other identifiers.
+        // RoundText format: ClubName - CourseName - PlayerName - RoundType - DD/MM/YYYY
+        // We need to find the DB RoundID and DB PlayerID that correspond to this RoundText.
+        var allRoundsWithDetails = await dbContext.Rounds
+            .AsNoTracking()
+            .Include(r => r.GolfCourse!.GolfClub) // For ClubName and CourseName
+            .Include(r => r.RoundPlayers!)
+                .ThenInclude(rp => rp.Player) // For PlayerName
+            .ToListAsync();
+
+        // Key: A string representation similar to RoundText but using DB entity names/IDs for lookup
+        // Value: new { RoundId, PlayerId }
+        // This lookup is complex because RoundText includes player name.
+        // A simpler approach might be to fetch RoundPlayers directly and build a lookup from there.
+        var roundPlayerLookup = new Dictionary<string, (int RoundId, int PlayerId)>();
+        foreach (var r in allRoundsWithDetails)
+        {
+            foreach (var rp in r.RoundPlayers!)
+            {
+                if (rp.Player == null || r.GolfCourse == null || r.GolfCourse.GolfClub == null) continue;
+
+                // Reconstruct a key similar to RoundText but from DB entities
+                // This must EXACTLY match how RoundText is formed in your CSV or how you parse it.
+                string dateStr = r.DatePlayed.ToString("dd/MM/yyyy");
+                string playerFullName = $"{rp.Player.FirstName} {rp.Player.LastName}".Trim();
+                // Note: RoundType in DB is enum, in RoundText it's string.
+                string roundTypeStr = r.RoundType.ToString(); // Assumes RoundType in DB is enum and can be ToString()'d to match CSV
+                
+                // Example key construction (ADAPT THIS TO YOUR CSV RoundText AND DTO PARSING)
+                string lookupKey = $"{r.GolfCourse.GolfClub.Name} - {r.GolfCourse.Name} - {playerFullName} - {roundTypeStr} - {dateStr}".ToLowerInvariant();
+                
+                if (!roundPlayerLookup.ContainsKey(lookupKey)) // Avoid duplicates if any (shouldn't happen with good data)
+                {
+                     roundPlayerLookup.Add(lookupKey, (r.RoundId, rp.PlayerId));
+                }
+            }
+        }
+
+        // 3. Create a lookup for HoleId by (GolfCourseId, HoleNumber)
+        var allHoles = await dbContext.Holes.AsNoTracking().ToListAsync();
+        var holeLookup = allHoles.ToDictionary(
+            h => (h.GolfCourseId, h.HoleNumber), // Composite key
+            h => h.HoleId
         );
 
-        // --- Temporary storage for this import session ---
-        // Key: The grouping key from CSV (e.g., RoundText, or a composite of Date, CourseID, RoundType, StartHole, HolesPlayed)
-        // Value: The newly created database RoundID
-        var processedSharedRoundsLookup = new Dictionary<string, int>();
+        // Cache for existing scores to prevent duplicates (RoundId, PlayerId, HoleId)
+        var existingScoresLookup = (await dbContext.Scores.AsNoTracking().Select(s => new {s.RoundId, s.PlayerId, s.HoleId}).ToListAsync())
+                                   .Select(s => (s.RoundId, s.PlayerId, s.HoleId))
+                                   .ToHashSet();
 
-        int successRoundPlayerCount = 0;
-        int newSharedRoundsCreatedCount = 0;
-        int skippedRowCount = 0;
+
+        int successCount = 0;
+        int skippedCount = 0;
 
         try
         {
-            var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-                MissingFieldFound = null,
-                HeaderValidated = null,
-                PrepareHeaderForMatch = args => args.Header.ToLower().Replace(" ", ""), // More resilient header matching
-            };
+            var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, MissingFieldFound = null, HeaderValidated = null, PrepareHeaderForMatch = args => args.Header.ToLower().Replace(" ", "").Replace("_","") }; // Ensure your config is here
 
-            // It might be easier to read all records into memory first to group them
-            List<RoundCsvRecord> allCsvRows;
-            await using (var stream = roundsFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024))
+            List<ScoreCsvRecord> allScoreCsvRows = new List<ScoreCsvRecord>(); // Initialize the list
+            await using (var stream = scoresFile.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024)) // Ensure scoresFile is not null
             using (var reader = new StreamReader(stream))
             using (var csv = new CsvReader(reader, csvConfig))
             {
-                allCsvRows = csv.GetRecords<RoundCsvRecord>().ToList();
+                // Asynchronously iterate and add to list
+                await foreach (var record in csv.GetRecordsAsync<ScoreCsvRecord>()) // <--- Use GetRecordsAsync
+                {
+                    allScoreCsvRows.Add(record);
+                }
             }
 
-            // Group CSV rows by a unique identifier for the shared round.
-            // `RoundText` seems like a good candidate if it's consistent for all players in a conceptual round.
-            // Alternatively, group by Date, Course (parsed), RoundType, StartingHole, HolesPlayed.
-            // Let's use RoundText for grouping, assuming its format is consistent enough for this.
-            // The part of RoundText that identifies the SHARED round is:
-            // Course & " - " & RoundType & " - " & Date (DD/MM/YYYY)
-            // We'll also need StartingHole and HolesPlayed if they vary and define the round boundary.
-
-            var groupedBySharedRound = allCsvRows.GroupBy(row =>
+            foreach (var record in allScoreCsvRows)
             {
-                var dateParsed = DateTime.TryParseExact(row.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt) ? dt.ToShortDateString() : row.Date;
-                // Grouping key based on discrete fields
-                return $"{row.ClubName?.ToLowerInvariant()}_{row.ActualCourseName?.ToLowerInvariant()}_{dateParsed}_{row.RoundType?.ToLowerInvariant()}_{row.StartingHole}_{row.HolesPlayed}";
-            });
-
-
-            foreach (var group in groupedBySharedRound)
-            {
-                var firstRecordInGroup = group.First(); // Use the first record for shared round details
-                string sharedRoundLogKey = $"Course: {firstRecordInGroup.Course}, Date: {firstRecordInGroup.Date}, Type: {firstRecordInGroup.RoundType}, Start: {firstRecordInGroup.StartingHole}, NumHoles: {firstRecordInGroup.HolesPlayed}";
-
-                // 1. Find or Create the main Round entity
-                int currentDbRoundId;
-                string groupKeyForDbLookup = group.Key; // The key we used for grouping
-
-                if (processedSharedRoundsLookup.TryGetValue(groupKeyForDbLookup, out var existingDbRoundId))
+                try
                 {
-                    currentDbRoundId = existingDbRoundId;
-                }
-                else
-                {
-                    // Attempt to parse ClubName and CourseName from firstRecordInGroup.Course if necessary
-                    // For simplicity, assume firstRecordInGroup.ClubName and firstRecordInGroup.CourseName are distinct in DTO
-                    string courseLookupKey = $"{(firstRecordInGroup.ClubName ?? "UNKNOWN_CLUB").ToLowerInvariant()}_{(firstRecordInGroup.CourseName ?? "UNKNOWN_COURSE").ToLowerInvariant()}";
-
-                    if (!courseLookup.TryGetValue(courseLookupKey, out var golfCourseId))
+                    if (string.IsNullOrWhiteSpace(record.RoundText) || record.HoleNumber <= 0)
                     {
-                        log.AppendLine($"Skipped group ({sharedRoundLogKey}): Golf Course '{firstRecordInGroup.ClubName} - {firstRecordInGroup.CourseName}' not found.");
-                        skippedRowCount += group.Count();
+                        log.AppendLine($"Skipped score row: RoundText or valid HoleNumber is missing. RoundText: '{record.RoundText}', Hole: {record.HoleNumber}");
+                        skippedCount++;
                         continue;
                     }
 
-                    if (!DateTime.TryParseExact(firstRecordInGroup.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var roundDate))
+                    // Attempt to parse RoundText from CSV to match the key format used for roundPlayerLookup
+                    // This parsing needs to be robust and match your CSV's RoundText format!
+                    // Example parsing: "Club Name - Course Name - Player Name - RoundType - DD/MM/YYYY"
+                    var rtParts = record.RoundText.Split(new[] { " - " }, StringSplitOptions.None);
+                    if (rtParts.Length < 5) { // Basic validation for parts
+                        log.AppendLine($"Skipped score: Invalid RoundText format '{record.RoundText}'. Could not parse enough parts.");
+                        skippedCount++;
+                        continue;
+                    }
+                    // This reconstruction needs to be IDENTICAL to how lookupKey was built for roundPlayerLookup
+                    string parsedClubNameFromRT = rtParts[0];
+                    string parsedCourseNameFromRT = rtParts[1];
+                    string parsedPlayerNameFromRT = rtParts[2];
+                    string parsedRoundTypeFromRT = rtParts[3];
+                    string parsedDateFromRT = rtParts[4];
+                    
+                    string lookupKeyFromCsv = $"{parsedClubNameFromRT} - {parsedCourseNameFromRT} - {parsedPlayerNameFromRT} - {parsedRoundTypeFromRT} - {parsedDateFromRT}".ToLowerInvariant();
+
+                    if (!roundPlayerLookup.TryGetValue(lookupKeyFromCsv, out var roundPlayerIds))
                     {
-                        log.AppendLine($"Skipped group ({sharedRoundLogKey}): Invalid date format '{firstRecordInGroup.Date}'. Expected dd/mm/yyyy.");
-                        skippedRowCount += group.Count();
+                        log.AppendLine($"Skipped score for Hole {record.HoleNumber} (RoundText: '{record.RoundText}'): Corresponding Round/Player combination not found in database lookup.");
+                        skippedCount++;
+                        continue;
+                    }
+                    int currentRoundId = roundPlayerIds.RoundId;
+                    int currentPlayerId = roundPlayerIds.PlayerId;
+
+                    // Find GolfCourseId for this RoundId to use in Hole lookup
+                    var roundForHoleLookup = allRoundsWithDetails.FirstOrDefault(r => r.RoundId == currentRoundId);
+                    if (roundForHoleLookup == null || roundForHoleLookup.GolfCourseId == 0) {
+                        log.AppendLine($"Skipped score for Hole {record.HoleNumber} (RoundText: '{record.RoundText}'): Could not determine GolfCourseId for RoundId {currentRoundId}.");
+                        skippedCount++;
                         continue;
                     }
 
-                    RoundTypeOption roundTypeEnum;
-                    if (!Enum.TryParse<RoundTypeOption>(firstRecordInGroup.RoundType, true, out roundTypeEnum))
+                    if (!holeLookup.TryGetValue((roundForHoleLookup.GolfCourseId, record.HoleNumber), out var holeId))
                     {
-                        log.AppendLine($"Skipped group ({sharedRoundLogKey}): Invalid RoundType '{firstRecordInGroup.RoundType}'. Defaulting to Friendly or skipping.");
-                        // Decide to default or skip. Let's try to default for now.
-                        roundTypeEnum = RoundTypeOption.Friendly; // Or skip if strictness is required
+                        log.AppendLine($"Skipped score (RoundText: '{record.RoundText}'): Hole number {record.HoleNumber} not found for course ID {roundForHoleLookup.GolfCourseId}.");
+                        skippedCount++;
+                        continue;
                     }
 
-                    var newDbRound = new Round
+                    if (existingScoresLookup.Contains((currentRoundId, currentPlayerId, holeId)))
                     {
-                        GolfCourseId = golfCourseId,
-                        DatePlayed = roundDate,
-                        StartingHole = firstRecordInGroup.StartingHole,
-                        HolesPlayed = firstRecordInGroup.HolesPlayed,
-                        RoundType = roundTypeEnum.ToString(), // Storing as string as per current Round model
-                        // Notes can be tricky if they differ per player row for the same conceptual round.
-                        // Take notes from the first player or concatenate, or decide on a rule.
-                        Notes = firstRecordInGroup.Notes
+                        log.AppendLine($"Skipped score for Hole {record.HoleNumber} (RoundText: '{record.RoundText}'): Score already exists for this player, round, and hole.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newScore = new Score
+                    {
+                        RoundId = currentRoundId,
+                        PlayerId = currentPlayerId,
+                        HoleId = holeId,
+                        Strokes = record.Strokes
                     };
 
-                    // TODO: Check if an identical Round (same course, date, type, holes) already exists in DB to prevent duplicates from re-runs.
-                    // This requires a query to dbContext.Rounds.
-                    // For now, AddRoundAsync doesn't have this deep duplicate check.
-
-                    var addedDbRound = await roundService.AddRoundAsync(newDbRound, new List<int>()); // Add round shell without players initially
-                    currentDbRoundId = addedDbRound.RoundId;
-                    processedSharedRoundsLookup.Add(groupKeyForDbLookup, currentDbRoundId);
-                    newSharedRoundsCreatedCount++;
-                    log.AppendLine($"Created shared Round ID: {currentDbRoundId} for {sharedRoundLogKey}");
+                    dbContext.Scores.Add(newScore);
+                    // Add to local cache to prevent duplicate additions within this session if CSV has repeats
+                    existingScoresLookup.Add((currentRoundId, currentPlayerId, holeId));
+                    successCount++;
+                    // Log less frequently for scores to avoid massive logs, or log every Nth record
+                    if (successCount % 100 == 0) {
+                        log.AppendLine($"Processed {successCount} scores...");
+                        StateHasChanged(); // Allow UI to update periodically for very long imports
+                    }
                 }
-
-                // 2. Add players to this Round via RoundPlayer entries
-                foreach (var playerRecordInGroup in group)
+                catch (Exception rowEx)
                 {
-                    string playerFullNameCsv = playerRecordInGroup.Player ?? "";
-                    if (!playerLookup.TryGetValue(playerFullNameCsv.ToLowerInvariant(), out var playerId))
-                    {
-                        log.AppendLine($"Skipped player '{playerFullNameCsv}' for round ID {currentDbRoundId}: Player not found.");
-                        skippedRowCount++; // This specific player in this group is skipped
-                        continue;
-                    }
-
-                    // Check if this player is already added to this specific round (idempotency for RoundPlayer)
-                    bool alreadyExists = await dbContext.RoundPlayers
-                                              .AnyAsync(rp => rp.RoundId == currentDbRoundId && rp.PlayerId == playerId);
-                    if (alreadyExists)
-                    {
-                        log.AppendLine($"Player '{playerFullNameCsv}' already in round ID {currentDbRoundId}. Skipping RoundPlayer entry.");
-                        // Don't increment skippedRowCount if it's just a duplicate we're avoiding
-                        continue;
-                    }
-
-                    var roundPlayerEntry = new RoundPlayer
-                    {
-                        RoundId = currentDbRoundId,
-                        PlayerId = playerId
-                        // ShotScore and ParScore are not set here as they will be calculated from hole-by-hole scores
-                    };
-                    dbContext.RoundPlayers.Add(roundPlayerEntry);
-                    successRoundPlayerCount++;
-                    log.AppendLine($"Linked Player '{playerFullNameCsv}' to Round ID {currentDbRoundId}");
+                    log.AppendLine($"Error processing score row (RoundText: {record?.RoundText ?? "N/A"}, Hole: {record?.HoleNumber}): {rowEx.Message}");
+                    skippedCount++;
                 }
-                await dbContext.SaveChangesAsync(); // Save all RoundPlayer entries for this group
             }
-            log.AppendLine($"\nRounds import complete. New Shared Rounds Created: {newSharedRoundsCreatedCount}, Player Links to Rounds Added/Processed: {successRoundPlayerCount}, Skipped CSV Rows: {skippedRowCount}");
+            await dbContext.SaveChangesAsync(); // Save all successfully processed scores at the end
+            log.AppendLine($"\nScores import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
         }
         catch (CsvHelperException csvEx)
         {
-            log.AppendLine($"\nCSV PARSING ERROR during Rounds import: {csvEx.Message}");
+            log.AppendLine($"\nCSV PARSING ERROR during Scores import: {csvEx.Message}");
             if (csvEx.Context?.Parser != null) { log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'"); }
         }
         catch (Exception ex)
         {
-            log.AppendLine($"\nFATAL ERROR during Rounds import: {ex.Message}");
+            log.AppendLine($"\nFATAL ERROR during Scores import: {ex.Message} \nStackTrace: {ex.StackTrace}");
         }
         finally
         {
-            roundsImportLog = log.ToString();
-            isProcessingRounds = false;
-            roundsFile = null;
+            scoresImportLog = log.ToString();
+            isProcessingScores = false;
+            scoresFile = null;
             StateHasChanged();
         }
-    } *@
+    }
 
 
     // --- Placeholder for other entity import logic (GolfCourses, Players, etc.) ---
