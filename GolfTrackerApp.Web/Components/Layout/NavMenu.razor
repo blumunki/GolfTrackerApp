@@ -53,6 +53,13 @@
                     </NavLink>
                 </div>
 
+                @* Inside <Authorized> section of NavMenu.razor *@
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="rounds">
+                        <span class="bi bi-calendar-event-nav-menu" aria-hidden="true"></span> Rounds
+                    </NavLink>
+                </div>
+
                 @* "Auth Required" link - assuming this is for testing pages that need authorization *@
                 <div class="nav-item px-3">
                     <NavLink class="nav-link" href="auth"> @* Ensure the "auth" page has [Authorize] *@

@@ -17,50 +17,50 @@ namespace GolfTrackerApp.Web.Services
             _context = context;
         }
 
-    public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
-    {
-        // Validate GolfCourseId
-        if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
+        public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
         {
-            throw new ArgumentException($"GolfCourse with ID {round.GolfCourseId} does not exist.");
-        }
-        // Validate new Round properties
-        if (round.StartingHole < 1 || round.HolesPlayed < 1) // Add more validation as needed
-        {
-            throw new ArgumentException("Starting hole and holes played must be valid.");
-        }
-
-        if (playerIds == null || !playerIds.Any())
-        {
-            throw new ArgumentException("At least one player must be selected for the round.");
-        }
-
-        _context.Rounds.Add(round); // EF will assign RoundId after first SaveChangesAsync
-
-        // It's often better to save the parent Round first to ensure it gets an ID,
-        // especially if RoundPlayer has a strict FK constraint that's checked immediately.
-        await _context.SaveChangesAsync();
-
-        foreach (var playerId in playerIds)
-        {
-            if (!await _context.Players.AnyAsync(p => p.PlayerId == playerId))
+            // Validate GolfCourseId
+            if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
             {
-                // Log or handle: Player not found for ID {playerId}
-                // Depending on strictness, you might throw or just skip this player for this round.
-                // For now, let's assume playerIds are validated before calling this service or we skip.
-                continue;
+                throw new ArgumentException($"GolfCourse with ID {round.GolfCourseId} does not exist.");
             }
-            // Create the RoundPlayer link. ShotScore and ParScore are not set here.
-            round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
-        }
+            // Validate new Round properties
+            if (round.StartingHole < 1 || round.HolesPlayed < 1) // Add more validation as needed
+            {
+                throw new ArgumentException("Starting hole and holes played must be valid.");
+            }
 
-        // If you added to round.RoundPlayers collection *before* the first SaveChangesAsync
-        // and Round is a new entity, EF Core often handles the relationships.
-        // If RoundPlayers are added *after* Round has an ID and is tracked, a second SaveChangesAsync is needed.
-        // Since we did SaveChangesAsync for Round already, this second one ensures RoundPlayers are saved.
-        await _context.SaveChangesAsync();
-        return round;
-    }
+            if (playerIds == null || !playerIds.Any())
+            {
+                throw new ArgumentException("At least one player must be selected for the round.");
+            }
+
+            _context.Rounds.Add(round); // EF will assign RoundId after first SaveChangesAsync
+
+            // It's often better to save the parent Round first to ensure it gets an ID,
+            // especially if RoundPlayer has a strict FK constraint that's checked immediately.
+            await _context.SaveChangesAsync();
+
+            foreach (var playerId in playerIds)
+            {
+                if (!await _context.Players.AnyAsync(p => p.PlayerId == playerId))
+                {
+                    // Log or handle: Player not found for ID {playerId}
+                    // Depending on strictness, you might throw or just skip this player for this round.
+                    // For now, let's assume playerIds are validated before calling this service or we skip.
+                    continue;
+                }
+                // Create the RoundPlayer link. ShotScore and ParScore are not set here.
+                round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
+            }
+
+            // If you added to round.RoundPlayers collection *before* the first SaveChangesAsync
+            // and Round is a new entity, EF Core often handles the relationships.
+            // If RoundPlayers are added *after* Round has an ID and is tracked, a second SaveChangesAsync is needed.
+            // Since we did SaveChangesAsync for Round already, this second one ensures RoundPlayers are saved.
+            await _context.SaveChangesAsync();
+            return round;
+        }
 
 
         public async Task<bool> DeleteRoundAsync(int id)
@@ -78,22 +78,24 @@ namespace GolfTrackerApp.Web.Services
         public async Task<List<Round>> GetAllRoundsAsync()
         {
             return await _context.Rounds
-                                 .Include(r => r.GolfCourse)
-                                 .Include(r => r.RoundPlayers)
-                                   .ThenInclude(rp => rp.Player)
-                                 .OrderByDescending(r => r.DatePlayed)
-                                 .ToListAsync();
+                                .Include(r => r.GolfCourse!) // Ensure GolfCourse is not null with ! if appropriate for your logic
+                                    .ThenInclude(gc => gc!.GolfClub) // Include GolfClub from GolfCourse
+                                .Include(r => r.RoundPlayers!)
+                                    .ThenInclude(rp => rp!.Player) // Include Player from RoundPlayer
+                                .OrderByDescending(r => r.DatePlayed)
+                                .ToListAsync();
         }
 
         public async Task<Round?> GetRoundByIdAsync(int id)
         {
             return await _context.Rounds
-                                 .Include(r => r.GolfCourse)
-                                 .Include(r => r.Scores)
-                                   .ThenInclude(s => s.Hole)
-                                 .Include(r => r.RoundPlayers)
-                                   .ThenInclude(rp => rp.Player)
-                                 .FirstOrDefaultAsync(r => r.RoundId == id);
+                                .Include(r => r.GolfCourse!)
+                                    .ThenInclude(gc => gc!.GolfClub) // Ensure GolfClub is included
+                                .Include(r => r.Scores!) // Scores will be empty for now
+                                    .ThenInclude(s => s!.Hole)
+                                .Include(r => r.RoundPlayers!)
+                                    .ThenInclude(rp => rp!.Player)
+                                .FirstOrDefaultAsync(r => r.RoundId == id);
         }
 
         public async Task<List<Round>> GetRoundsForPlayerAsync(int playerId)

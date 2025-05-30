@@ -1,0 +1,100 @@
+@page "/rounds/{RoundId:int}"
+@attribute [Authorize] // Or specific roles
+@inject IRoundService RoundService
+@inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@rendermode InteractiveServer
+
+<PageTitle>Round Details - @(round?.DatePlayed.ToShortDateString() ?? "")</PageTitle>
+
+@if (round == null && isLoading)
+{
+    <p><em>Loading round details...</em></p>
+}
+else if (round == null)
+{
+    <div class="alert alert-danger">Round not found or error loading details.</div>
+}
+else
+{
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/rounds">Rounds</a></li>
+            <li class="breadcrumb-item active" aria-current="page">
+                @round.GolfCourse?.GolfClub?.Name - @round.GolfCourse?.Name on @round.DatePlayed.ToShortDateString()
+            </li>
+        </ol>
+    </nav>
+
+    <h2>Round Details</h2>
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">@round.GolfCourse?.GolfClub?.Name - @round.GolfCourse?.Name</h5>
+            <p class="card-text">
+                <strong>Date:</strong> @round.DatePlayed.ToLongDateString()<br />
+                <strong>Type:</strong> @round.RoundType<br />
+                <strong>Holes Played:</strong> @round.HolesPlayed (Starting from Hole @round.StartingHole)<br />
+                @if (!string.IsNullOrWhiteSpace(round.Notes))
+                {
+                    <strong>Notes:</strong> @round.Notes<br />
+                }
+            </p>
+        </div>
+    </div>
+
+    <h3>Players in this Round</h3>
+    @if (round.RoundPlayers != null && round.RoundPlayers.Any())
+    {
+        <ul class="list-group mb-3">
+            @foreach (var rp in round.RoundPlayers.OrderBy(rp => rp.Player?.LastName).ThenBy(rp => rp.Player?.FirstName))
+            {
+                <li class="list-group-item">
+                    @rp.Player?.FirstName @rp.Player?.LastName
+                    @* Later, we can add their overall score for this round here if we calculate it *@
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <p><em>No players recorded for this round.</em></p>
+    }
+
+    @* Placeholder for displaying detailed scores for each player *@
+    <h3>Scores</h3>
+    <p><em>(Detailed hole-by-hole scores will be displayed here once imported/entered.)</em></p>
+
+    <hr />
+    <button class="btn btn-secondary" @onclick="GoBackToList">Back to Rounds List</button>
+}
+
+@code {
+    [Parameter]
+    public int RoundId { get; set; }
+
+    private Round? round;
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        try
+        {
+            // GetRoundByIdAsync should include GolfCourse.GolfClub, RoundPlayers.Player, and eventually Scores.Hole
+            round = await RoundService.GetRoundByIdAsync(RoundId);
+        }
+        catch (Exception ex)
+        {
+            // Log error
+            Console.WriteLine($"Error loading round {RoundId}: {ex.Message}"); // Replace with proper logging
+        }
+        isLoading = false;
+    }
+
+    private void GoBackToList()
+    {
+        NavigationManager.NavigateTo("/rounds");
+    }
+}

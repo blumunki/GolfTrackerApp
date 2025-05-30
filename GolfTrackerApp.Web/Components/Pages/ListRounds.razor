@@ -1,0 +1,85 @@
+@page "/rounds"
+@attribute [Authorize] // Or specific roles
+@inject IRoundService RoundService
+@inject NavigationManager NavigationManager
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization // Ensure this is present
+@rendermode InteractiveServer
+
+<PageTitle>Golf Rounds</PageTitle>
+
+<h1>Golf Rounds</h1>
+
+@* <p><button class="btn btn-primary" @onclick="GoToAddRoundPage">Record New Round</button></p> *@
+<p><em>(Ability to manually record new rounds via UI to be implemented later.)</em></p>
+
+@if (rounds == null && isLoading)
+{
+    <p><em>Loading rounds...</em></p>
+}
+else if (rounds == null || !rounds.Any())
+{
+    <p><em>No rounds found.</em></p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Course</th>
+                <th>Type</th>
+                <th>Holes Played</th>
+                <th>Players</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var round in rounds.OrderByDescending(r => r.DatePlayed))
+            {
+                <tr>
+                    <td>@round.DatePlayed.ToShortDateString()</td>
+                    <td>@(round.GolfCourse?.GolfClub?.Name) - @(round.GolfCourse?.Name)</td>
+                    <td>@round.RoundType</td>
+                    <td>@round.HolesPlayed (Start: @round.StartingHole)</td>
+                    <td>@round.RoundPlayers.Count()</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" @onclick="() => ViewRoundDetails(round.RoundId)">View Details</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Round>? rounds;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+        try
+        {
+            // GetAllRoundsAsync should include GolfCourse.GolfClub and RoundPlayers for the count
+            rounds = await RoundService.GetAllRoundsAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log error
+            Console.WriteLine($"Error loading rounds: {ex.Message}"); // Replace with proper logging
+        }
+        isLoading = false;
+    }
+
+    private void ViewRoundDetails(int roundId)
+    {
+        NavigationManager.NavigateTo($"/rounds/{roundId}");
+    }
+
+    // private void GoToAddRoundPage()
+    // {
+    //     NavigationManager.NavigateTo("/rounds/add"); // For future implementation
+    // }
+}
