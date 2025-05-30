@@ -1,0 +1,111 @@
+@page "/players/add"
+@attribute [Authorize(Roles = "Admin")] // Or adjust authorization as needed
+@inject IPlayerService PlayerService
+@inject UserManager<ApplicationUser> UserManager // Use ApplicationUser if that's your Identity user type
+@inject NavigationManager NavigationManager
+@inject ILogger<AddPlayer> Logger
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Data // For ApplicationUser
+@using GolfTrackerApp.Web.Components.Pages.Players // For PlayerFormComponent
+@using GolfTrackerApp.Web.Services // For IPlayerService
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>Add New Player</PageTitle>
+<h3>Add New Player</h3>
+
+<PlayerFormComponent PlayerModel="@newPlayer"
+                     OnSubmitForm="HandleAddPlayer"
+                     OnCancelForm="HandleCancel"
+                     SubmitButtonText="Create Player" />
+
+@if (!string.IsNullOrEmpty(infoMessage))
+{
+    <div class="alert alert-info mt-3">@infoMessage</div>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">@errorMessage</div>
+}
+
+@code {
+    private Player newPlayer = new();
+    private string? errorMessage;
+    private string? infoMessage;
+
+    private async Task HandleAddPlayer(PlayerFormComponent.FormSubmitArgs args)
+    {
+        errorMessage = null;
+        infoMessage = null;
+        Player playerToCreate = args.PlayerData; // This is the PlayerModel from the form
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(args.EmailToLink))
+            {
+                var user = await UserManager.FindByEmailAsync(args.EmailToLink);
+                if (user == null)
+                {
+                    infoMessage = $"System user with email '{args.EmailToLink}' not found. Player will be created as a 'managed' player (not linked to a system login).";
+                    // To create the user if not found (more advanced, requires password strategy):
+                    // user = new ApplicationUser { UserName = args.EmailToLink, Email = args.EmailToLink, EmailConfirmed = true };
+                    // var createUserResult = await UserManager.CreateAsync(user, "TemporaryP@ssw0rd!"); // Handle result
+                    // if (!createUserResult.Succeeded) { /* error */ }
+                    playerToCreate.ApplicationUserId = null; // Ensure it's null if user not found/created
+                }
+                else
+                {
+                    // User exists, check if this ApplicationUser ID is already linked to another Player profile
+                    var existingPlayerProfile = await PlayerService.GetPlayerByApplicationUserIdAsync(user.Id);
+                    if (existingPlayerProfile != null)
+                    {
+                        errorMessage = $"The system user '{user.Email}' is already linked to player '{existingPlayerProfile.FirstName} {existingPlayerProfile.LastName}'. Cannot link this new player profile to the same system user.";
+                        Logger.LogWarning("Attempt to link new player to already linked ApplicationUser ID {UserId}", user.Id);
+                        return; // Stop processing
+                    }
+                    playerToCreate.ApplicationUserId = user.Id;
+                    infoMessage = $"Player will be linked to system user '{user.Email}'.";
+                }
+            }
+            else
+            {
+                playerToCreate.ApplicationUserId = null; // Explicitly null if no email or linking intended
+            }
+
+            // Additional check: if it's a managed player, ensure name uniqueness if desired
+            if (string.IsNullOrEmpty(playerToCreate.ApplicationUserId))
+            {
+                var existingManagedPlayers = await PlayerService.GetAllPlayersAsync();
+                if (existingManagedPlayers.Any(p => string.IsNullOrEmpty(p.ApplicationUserId) &&
+                                                   p.FirstName.Equals(playerToCreate.FirstName, StringComparison.OrdinalIgnoreCase) &&
+                                                   p.LastName.Equals(playerToCreate.LastName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    errorMessage = $"A managed player named '{playerToCreate.FirstName} {playerToCreate.LastName}' already exists. Please use a different name or link to a system user.";
+                    return; // Stop processing
+                }
+            }
+
+
+            await PlayerService.AddPlayerAsync(playerToCreate);
+            Logger.LogInformation("Player {FirstName} {LastName} added successfully.", playerToCreate.FirstName, playerToCreate.LastName);
+            NavigationManager.NavigateTo("/players", new NavigationOptions { ForceLoad = true }); // Force load to ensure list refreshes
+        }
+        catch (InvalidOperationException opEx) // Catch specific exceptions from PlayerService
+        {
+            Logger.LogError(opEx, "Operation error adding player {FirstName} {LastName}", playerToCreate.FirstName, playerToCreate.LastName);
+            errorMessage = opEx.Message; // Show business rule violations (e.g., "Player already exists")
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Generic error adding player {FirstName} {LastName}", playerToCreate.FirstName, playerToCreate.LastName);
+            errorMessage = $"An unexpected error occurred while adding the player: {ex.Message}";
+        }
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo("/players");
+    }
+}

@@ -1,0 +1,162 @@
+@page "/players/edit/{PlayerId:int}"
+@attribute [Authorize(Roles = "Admin")] // Or adjust authorization as needed
+@inject IPlayerService PlayerService
+@inject UserManager<ApplicationUser> UserManager // Assuming ApplicationUser
+@inject NavigationManager NavigationManager
+@inject ILogger<EditPlayer> Logger
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Data // For ApplicationUser
+@using GolfTrackerApp.Web.Services // For IPlayerService
+@using GolfTrackerApp.Web.Components.Pages.Players // For PlayerFormComponent
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>Edit Player</PageTitle>
+
+@if (playerToEdit == null && !isLoading)
+{
+    <div class="alert alert-warning">Player not found or error loading player details.</div>
+}
+else if (isLoading)
+{
+    <p><em>Loading player details...</em></p>
+}
+else
+{
+    <h3>Edit Player: @playerToEdit?.FirstName @playerToEdit?.LastName</h3>
+    <PlayerFormComponent PlayerModel="@playerToEdit"
+                         InitialUserEmail="@initialEmail"
+                         OnSubmitForm="HandleEditPlayer"
+                         OnCancelForm="HandleCancel"
+                         SubmitButtonText="Update Player" />
+}
+
+@if (!string.IsNullOrEmpty(infoMessage))
+{
+    <div class="alert alert-info mt-3">@infoMessage</div>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger mt-3">@errorMessage</div>
+}
+
+@code {
+    [Parameter]
+    public int PlayerId { get; set; }
+
+    private Player? playerToEdit;
+    private string initialEmail = string.Empty; // To pre-fill email in form component if linked
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? infoMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        try
+        {
+            playerToEdit = await PlayerService.GetPlayerByIdAsync(PlayerId); // Ensure this service method includes ApplicationUser
+            if (playerToEdit != null)
+            {
+                if (playerToEdit.ApplicationUser != null)
+                {
+                    initialEmail = playerToEdit.ApplicationUser.Email ?? string.Empty;
+                }
+            }
+            else
+            {
+                errorMessage = "Player not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading player with ID {PlayerId} for editing.", PlayerId);
+            errorMessage = "Error loading player details.";
+        }
+        isLoading = false;
+    }
+
+    private async Task HandleEditPlayer(PlayerFormComponent.FormSubmitArgs args)
+    {
+        if (playerToEdit == null)
+        {
+            errorMessage = "Cannot update. Player data is not loaded correctly.";
+            return;
+        }
+
+        errorMessage = null;
+        infoMessage = null;
+        Player playerToUpdate = args.PlayerData; // This is the PlayerModel from the form, bound to playerToEdit
+
+        try
+        {
+            // Ensure PlayerId is maintained
+            playerToUpdate.PlayerId = PlayerId;
+
+            if (!string.IsNullOrWhiteSpace(args.EmailToLink)) // If an email was provided for linking
+            {
+                var user = await UserManager.FindByEmailAsync(args.EmailToLink);
+                if (user == null)
+                {
+                    infoMessage = $"System user with email '{args.EmailToLink}' not found. Player link will be removed if previously linked, or remains unlinked.";
+                    playerToUpdate.ApplicationUserId = null; // Remove link if user not found
+                }
+                else
+                {
+                    // User exists. Check if this ApplicationUser ID is already linked to ANOTHER Player profile
+                    var existingPlayerProfile = await PlayerService.GetPlayerByApplicationUserIdAsync(user.Id);
+                    if (existingPlayerProfile != null && existingPlayerProfile.PlayerId != playerToUpdate.PlayerId) {
+                         errorMessage = $"The system user '{user.Email}' is already linked to a different player ('{existingPlayerProfile.FirstName} {existingPlayerProfile.LastName}'). Cannot link this player profile.";
+                         Logger.LogWarning("Attempt to link player {PlayerId} to ApplicationUser ID {UserId} which is already linked to Player ID {ExistingPlayerId}", playerToUpdate.PlayerId, user.Id, existingPlayerProfile.PlayerId);
+                         return; // Stop processing
+                    }
+                    playerToUpdate.ApplicationUserId = user.Id; // Link to this user
+                    infoMessage = $"Player will be linked to system user '{user.Email}'.";
+                }
+            }
+            else // No email provided, or "Link to registered user" was unchecked
+            {
+                playerToUpdate.ApplicationUserId = null; // Remove any existing link
+                if (playerToEdit.ApplicationUserId != null) // If it was previously linked
+                {
+                    infoMessage = "Link to system user has been removed.";
+                }
+            }
+
+            // Uniqueness check for managed players if it became one or was already one
+            if (string.IsNullOrEmpty(playerToUpdate.ApplicationUserId))
+            {
+                var allPlayers = await PlayerService.GetAllPlayersAsync();
+                if (allPlayers.Any(p => string.IsNullOrEmpty(p.ApplicationUserId) &&
+                                       p.PlayerId != playerToUpdate.PlayerId && // Exclude self
+                                       p.FirstName.Equals(playerToUpdate.FirstName, StringComparison.OrdinalIgnoreCase) &&
+                                       p.LastName.Equals(playerToUpdate.LastName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    errorMessage = $"A managed player named '{playerToUpdate.FirstName} {playerToUpdate.LastName}' already exists.";
+                    return; // Stop processing
+                }
+            }
+
+            await PlayerService.UpdatePlayerAsync(playerToUpdate);
+            Logger.LogInformation("Player {PlayerId} updated successfully.", playerToUpdate.PlayerId);
+            NavigationManager.NavigateTo("/players", new NavigationOptions { ForceLoad = true });
+        }
+        catch (InvalidOperationException opEx)
+        {
+            Logger.LogError(opEx, "Operation error updating player {PlayerId}", playerToUpdate.PlayerId);
+            errorMessage = opEx.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Generic error updating player {PlayerId}", playerToUpdate.PlayerId);
+            errorMessage = $"An unexpected error occurred while updating the player: {ex.Message}";
+        }
+    }
+
+    private void HandleCancel()
+    {
+        NavigationManager.NavigateTo("/players");
+    }
+}

@@ -1,26 +1,27 @@
 @page "/players"
-@attribute [Authorize] // Or specific roles like "Admin" if only admins should see all players
+@attribute [Authorize] // Or specific roles
 @inject IPlayerService PlayerService
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime // Keep this if you used the confirm dialog for delete
 @using GolfTrackerApp.Web.Models
-@using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
+@using GolfTrackerApp.Web.Services
 @rendermode InteractiveServer
 
 <PageTitle>Players</PageTitle>
 
 <h1>Players</h1>
 
-@* <p> *@
-@* <button class="btn btn-primary" @onclick="GoToAddPlayerPage">Add New Player</button> *@
-@* </p> *@
-<p><em>(Add/Edit Player UI to be implemented more fully later. For now, verify imported players.)</em></p>
+<p>
+    <button class="btn btn-primary" @onclick="GoToAddPlayerPage">Add New Player</button>
+</p>
 
-@if (players == null)
+
+@if (players == null && !isLoading) // Added !isLoading check
 {
     <p><em>Loading...</em></p>
 }
-else if (!players.Any())
+else if (players == null || !players.Any()) // players can be null if service call failed
 {
     <p><em>No players found.</em></p>
 }
@@ -45,8 +46,8 @@ else
                     <td>@(string.IsNullOrEmpty(player.ApplicationUserId) ? "Managed" : "Registered")</td>
                     <td>@(player.ApplicationUser?.Email ?? "N/A")</td>
                     <td>
-                        @* Edit/Delete buttons can be added later *@
-                        @* <button class="btn btn-sm btn-info" @onclick="() => GoToEditPlayerPage(player.PlayerId)">Edit</button> *@
+                        <button class="btn btn-sm btn-primary" @onclick="() => EditPlayer(player.PlayerId)">Edit</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => PrepareDeletePlayer(player)">Delete</button>
                     </td>
                 </tr>
             }
@@ -54,22 +55,93 @@ else
     </table>
 }
 
+@if (playerToDelete != null)
+{
+    @* Placeholder for a proper modal. For now, the JS confirm is in PrepareDeletePlayer *@
+    <div class="modal fade show" style="display:block;" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Delete</h5>
+                    <button type="button" class="btn-close" @onclick="() => playerToDelete = null"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete player: @playerToDelete.FirstName @playerToDelete.LastName?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => playerToDelete = null">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="() => DeletePlayerConfirmed(playerToDelete!.PlayerId)">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+
 @code {
     private List<Player>? players;
+    private bool isLoading = true; // Added for better loading state
+    private Player? playerToDelete; // For delete confirmation
 
     protected override async Task OnInitializedAsync()
     {
-        // PlayerService.GetAllPlayersAsync() already includes ApplicationUser
-        players = await PlayerService.GetAllPlayersAsync();
+        isLoading = true;
+        try
+        {
+            players = await PlayerService.GetAllPlayersAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading players: {ex.Message}"); // Replace with proper logging
+            // Optionally set an error message to display in the UI
+        }
+        isLoading = false;
     }
 
-    // private void GoToAddPlayerPage()
-    // {
-    //     NavigationManager.NavigateTo("/players/add");
-    // }
+    private void GoToAddPlayerPage()
+    {
+        NavigationManager.NavigateTo("/players/add");
+    }
 
-    // private void GoToEditPlayerPage(int playerId)
+    private void EditPlayer(int playerId)
+    {
+        NavigationManager.NavigateTo($"/players/edit/{playerId}");
+    }
+
+    private void PrepareDeletePlayer(Player player)
+    {
+        playerToDelete = player;
+        // The JS confirm approach has been moved to a Blazor modal example below for better UI.
+        // If you prefer JS confirm, uncomment the JSRuntime version and remove the modal HTML.
+        // StateHasChanged(); // To show the modal
+    }
+
+    private async Task DeletePlayerConfirmed(int playerId)
+    {
+        if (playerToDelete == null || playerToDelete.PlayerId != playerId) return; // Safety check
+
+        try
+        {
+            await PlayerService.DeletePlayerAsync(playerId);
+            players = await PlayerService.GetAllPlayersAsync(); // Refresh list
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error deleting player: {ex.Message}"); // Replace with proper logging
+            // Optionally set an error message to display in the UI
+        }
+        playerToDelete = null; // Close modal
+        StateHasChanged(); // Refresh UI
+    }
+
+    // If you were using the JS confirm:
+    // @inject IJSRuntime JSRuntime // Make sure this is injected at the top
+    // private async Task DeletePlayerUsingJSConfirm(Player player)
     // {
-    //     NavigationManager.NavigateTo($"/players/edit/{playerId}");
+    //     if (await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete {player.FirstName} {player.LastName}? This action cannot be undone."))
+    //     {
+    //         await DeletePlayerConfirmed(player.PlayerId);
+    //     }
     // }
 }
