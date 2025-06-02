@@ -3,6 +3,7 @@ using System;
 using GolfTrackerApp.Web.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GolfTrackerApp.Web.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250602105628_AddOwnershipToPlayersAndRounds")]
+    partial class AddOwnershipToPlayersAndRounds
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.2");
@@ -190,7 +193,6 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CreatedByApplicationUserId")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FirstName")
@@ -222,7 +224,6 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("CreatedByApplicationUserId")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("DatePlayed")
@@ -461,9 +462,7 @@ namespace GolfTrackerApp.Web.Migrations
 
                     b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "CreatedByApplicationUser")
                         .WithMany()
-                        .HasForeignKey("CreatedByApplicationUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CreatedByApplicationUserId");
 
                     b.Navigation("ApplicationUser");
 
@@ -474,9 +473,7 @@ namespace GolfTrackerApp.Web.Migrations
                 {
                     b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "CreatedByApplicationUser")
                         .WithMany()
-                        .HasForeignKey("CreatedByApplicationUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("CreatedByApplicationUserId");
 
                     b.HasOne("GolfTrackerApp.Web.Models.GolfCourse", "GolfCourse")
                         .WithMany("Rounds")

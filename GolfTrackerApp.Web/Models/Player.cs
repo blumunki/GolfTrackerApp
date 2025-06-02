@@ -27,6 +27,12 @@ namespace GolfTrackerApp.Web.Models
         //public virtual IdentityUser? ApplicationUser { get; set; } // Navigation property remains nullable
         public virtual ApplicationUser? ApplicationUser { get; set; } // Changed to ApplicationUser, remains nullable
 
+        // Owner of this player record (especially for managed players)
+        [Required]
+        public string CreatedByApplicationUserId { get; set; } = string.Empty; // No longer nullable
+        [ForeignKey("CreatedByApplicationUserId")]
+        public virtual ApplicationUser? CreatedByApplicationUser { get; set; }
+
         public virtual ICollection<Score> Scores { get; set; } = new List<Score>();
         public virtual ICollection<RoundPlayer> RoundPlayers { get; set; } = new List<RoundPlayer>();
     }

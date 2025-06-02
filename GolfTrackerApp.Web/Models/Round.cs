@@ -1,6 +1,7 @@
 // In GolfTrackerApp.Web/Models/Round.cs
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using GolfTrackerApp.Web.Data;
 
 namespace GolfTrackerApp.Web.Models
 {
@@ -35,6 +36,11 @@ namespace GolfTrackerApp.Web.Models
         public RoundTypeOption RoundType { get; set; } = RoundTypeOption.Friendly; // Or use the Enum: public RoundTypeOption Type {get; set;}
 
         public string? Notes { get; set; } // e.g., weather, conditions
+
+        [Required]
+        public string CreatedByApplicationUserId { get; set; } = string.Empty; // No longer nullable
+        [ForeignKey("CreatedByApplicationUserId")]
+        public virtual ApplicationUser? CreatedByApplicationUser { get; set; }
 
         // Navigation property for Scores in this round
         public virtual ICollection<Score> Scores { get; set; } = new List<Score>();
