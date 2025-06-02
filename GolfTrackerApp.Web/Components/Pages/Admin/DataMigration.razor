@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Admin")] // Only Admins can access this page
 @inject NavigationManager NavigationManager
 @inject IServiceScopeFactory ServiceScopeFactory // For resolving services in a long-running task
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 @using System.IO
 @using System.Globalization
@@ -14,6 +15,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
+@using System.Security.Claims // For ClaimTypes
 
 @rendermode InteractiveServer
 
@@ -135,6 +137,9 @@
     private string golfClubsImportLog = string.Empty;
     private bool isProcessingGolfClubs = false;
 
+    private string _migrationAdminUserId = string.Empty;
+    private bool _isMigrationAdmin = true; // Since page is [Authorize(Roles="Admin")]
+
     public class GolfClubCsvRecord
     {
         public string? Name { get; set; }
@@ -213,6 +218,30 @@
     private IBrowserFile? scoresFile;
     private string scoresImportLog = string.Empty;
     private bool isProcessingScores = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Fetch the admin user's ID once when the component initializes
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null && user.Identity.IsAuthenticated && user.IsInRole("Admin"))
+        {
+            _migrationAdminUserId = user.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? string.Empty;
+            if (string.IsNullOrEmpty(_migrationAdminUserId))
+            {
+                // Handle error: Admin ID could not be retrieved.
+                // This would prevent imports from correctly assigning CreatedByApplicationUserId.
+                // For calls to GetAllPlayersAsync, we might pass a dummy ID or handle differently if this occurs.
+                // For now, assume it's found.
+                Console.WriteLine("CRITICAL: Migration Admin User ID not found!"); // Log this
+            }
+        }
+        else
+        {
+            // Not an admin or not authenticated - should be caught by [Authorize] but good to check.
+            NavigationManager.NavigateTo("/"); // Or an error page
+        }
+    }
 
     // --- Golf Clubs Import Logic ---
     private void HandleGolfClubsUpload(InputFileChangeEventArgs e)
@@ -461,14 +490,19 @@
         // Cache existing players to help avoid duplicates
         // For registered players, check by ApplicationUserId
         // For managed players, check by FirstName + LastName (case-insensitive)
-        var existingRegisteredPlayerUserIds = (await playerService.GetAllPlayersAsync())
+       // VVV UPDATE THIS CALL VVV
+        var allPlayersForCache = await playerService.GetAllPlayersAsync(_migrationAdminUserId, _isMigrationAdmin); // Call ONCE
+
+        var existingRegisteredPlayerUserIds = allPlayersForCache
                                             .Where(p => !string.IsNullOrEmpty(p.ApplicationUserId))
                                             .Select(p => p.ApplicationUserId)
                                             .ToHashSet();
-        var existingManagedPlayerNames = (await playerService.GetAllPlayersAsync())
+        var existingManagedPlayerNames = allPlayersForCache
                                         .Where(p => string.IsNullOrEmpty(p.ApplicationUserId))
-                                        .Select(p => $"{p.FirstName?.ToLowerInvariant()}_{p.LastName?.ToLowerInvariant()}")
+                                         // Key needs to be unique for managed player: Name + Creator
+                                        .Select(p => $"{p.FirstName?.ToLowerInvariant()}_{p.LastName?.ToLowerInvariant()}_{p.CreatedByApplicationUserId}")
                                         .ToHashSet();
+
         int successCount = 0;
         int skippedCount = 0;
         int usersCreatedCount = 0;
@@ -524,10 +558,11 @@
                     }
                     else // Managed player
                     {
-                        var managedPlayerKey = $"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}";
+                        // New managed players will be created by the _migrationAdminUserId
+                        var managedPlayerKey = $"{record.FirstName!.ToLowerInvariant()}_{record.LastName!.ToLowerInvariant()}_{_migrationAdminUserId}";
                         if (existingManagedPlayerNames.Contains(managedPlayerKey))
                         {
-                            log.AppendLine($"Skipped: Managed player '{record.FirstName} {record.LastName}' already exists.");
+                            log.AppendLine($"Skipped: Managed player '{record.FirstName} {record.LastName}' already exists for this admin.");
                             skippedCount++;
                             continue;
                         }
@@ -743,7 +778,8 @@
             course => course.GolfCourseId
         );
 
-        var playersFromDb = await playerService.GetAllPlayersAsync();
+        // VVV UPDATE THIS CALL VVV
+        var playersFromDb = await playerService.GetAllPlayersAsync(_migrationAdminUserId, _isMigrationAdmin);
         // IMPORTANT: Adjust this playerLookup key based on how PlayerName in CSV matches your Player data.
         // This assumes PlayerName in CSV is "FirstName LastName".
         var playerLookup = playersFromDb.ToDictionary(

@@ -4,12 +4,14 @@
 @inject UserManager<ApplicationUser> UserManager // Assuming ApplicationUser
 @inject NavigationManager NavigationManager
 @inject ILogger<EditPlayer> Logger
+@inject AuthenticationStateProvider AuthenticationStateProvider // To get current user
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Data // For ApplicationUser
 @using GolfTrackerApp.Web.Services // For IPlayerService
 @using GolfTrackerApp.Web.Components.Pages.Players // For PlayerFormComponent
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims // For ClaimTypes
 
 @rendermode InteractiveServer
 
@@ -51,10 +53,34 @@ else
     private bool isLoading = true;
     private string? errorMessage;
     private string? infoMessage;
+    private string _currentUserId = string.Empty; // To store current user's ID
+    private bool _isCurrentUserAdmin = false;   // To store current user's admin status
 
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            _currentUserId = user.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? string.Empty;
+            _isCurrentUserAdmin = user.IsInRole("Admin");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("Account/Login", forceLoad: true);
+            isLoading = false;
+            return;
+        }
+
+        if (string.IsNullOrEmpty(_currentUserId) && !_isCurrentUserAdmin)
+        {
+            errorMessage = "Cannot edit player: current user context is missing or invalid.";
+            isLoading = false;
+            return;
+        }
+
         try
         {
             playerToEdit = await PlayerService.GetPlayerByIdAsync(PlayerId); // Ensure this service method includes ApplicationUser
@@ -128,14 +154,16 @@ else
             // Uniqueness check for managed players if it became one or was already one
             if (string.IsNullOrEmpty(playerToUpdate.ApplicationUserId))
             {
-                var allPlayers = await PlayerService.GetAllPlayersAsync();
+                // VVV UPDATE THIS CALL VVV
+                var allPlayers = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin);
                 if (allPlayers.Any(p => string.IsNullOrEmpty(p.ApplicationUserId) &&
-                                       p.PlayerId != playerToUpdate.PlayerId && // Exclude self
-                                       p.FirstName.Equals(playerToUpdate.FirstName, StringComparison.OrdinalIgnoreCase) &&
-                                       p.LastName.Equals(playerToUpdate.LastName, StringComparison.OrdinalIgnoreCase)))
+                                    p.PlayerId != playerToUpdate.PlayerId && 
+                                    p.FirstName.Equals(playerToUpdate.FirstName, StringComparison.OrdinalIgnoreCase) &&
+                                    p.LastName.Equals(playerToUpdate.LastName, StringComparison.OrdinalIgnoreCase) &&
+                                    p.CreatedByApplicationUserId == playerToUpdate.CreatedByApplicationUserId )) // Check within same owner if names clash
                 {
-                    errorMessage = $"A managed player named '{playerToUpdate.FirstName} {playerToUpdate.LastName}' already exists.";
-                    return; // Stop processing
+                    errorMessage = $"A managed player named '{playerToUpdate.FirstName} {playerToUpdate.LastName}' already exists under your management.";
+                    return; 
                 }
             }
 

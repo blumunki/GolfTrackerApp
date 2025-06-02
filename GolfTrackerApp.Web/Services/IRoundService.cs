@@ -7,11 +7,14 @@ namespace GolfTrackerApp.Web.Services
 {
     public interface IRoundService
     {
-        Task<List<Round>> GetAllRoundsAsync(); // Might need pagination later
-        Task<Round?> GetRoundByIdAsync(int id);
+        // Add requestingUserId and isUserAdmin parameters
+        Task<List<Round>> GetAllRoundsAsync(string requestingUserId, bool isUserAdmin);
+        Task<Round?> GetRoundByIdAsync(int id); // Potentially add user context for authorization later
+        // AddRoundAsync will take the Round object which should have CreatedByApplicationUserId pre-filled
         Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds);
-        Task<Round?> UpdateRoundAsync(Round round, IEnumerable<int>? playerIdsToUpdate = null); // Optional player update
+        Task<Round?> UpdateRoundAsync(Round round, IEnumerable<int>? playerIdsToUpdate = null);
         Task<bool> DeleteRoundAsync(int id);
-        Task<List<Round>> GetRoundsForPlayerAsync(int playerId);
+        // GetRoundsForPlayerAsync might implicitly use requestingUserId if it's different from playerId parameter
+        Task<List<Round>> GetRoundsForPlayerAsync(int playerId, string requestingUserId, bool isUserAdmin);
     }
 }

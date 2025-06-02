@@ -3,6 +3,7 @@
 @inject IPlayerService PlayerService
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime // Keep this if you used the confirm dialog for delete
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @using GolfTrackerApp.Web.Models
 @using Microsoft.AspNetCore.Authorization
 @using GolfTrackerApp.Web.Services
@@ -83,13 +84,41 @@ else
     private List<Player>? players;
     private bool isLoading = true; // Added for better loading state
     private Player? playerToDelete; // For delete confirmation
+    private string _currentUserId = string.Empty;
+    private bool _isCurrentUserAdmin = false;
 
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            _currentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
+            _isCurrentUserAdmin = user.IsInRole("Admin");
+        }
+        else
+        {
+            // Handle unauthenticated user access if page isn't fully protected by [Authorize]
+            // or if different behavior is needed. For [Authorize] pages, this block might not be hit.
+            NavigationManager.NavigateTo("Account/Login", forceLoad: true); // Redirect if not authenticated
+            return;
+        }
+
         try
         {
-            players = await PlayerService.GetAllPlayersAsync();
+            if (!string.IsNullOrEmpty(_currentUserId))
+            {
+                players = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin);
+            }
+            else if (_isCurrentUserAdmin) // An admin might not have a typical user ID if it's a system state
+            {
+                players = await PlayerService.GetAllPlayersAsync(string.Empty, true); // Or handle admin differently
+            }
+            else {
+                players = new List<Player>(); // No user, not admin, show empty or handle error
+            }
         }
         catch (Exception ex)
         {
@@ -124,14 +153,16 @@ else
         try
         {
             await PlayerService.DeletePlayerAsync(playerId);
-            players = await PlayerService.GetAllPlayersAsync(); // Refresh list
+            // VVV THIS LINE IS UPDATED VVV
+            players = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin); // Refresh list with user context
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error deleting player: {ex.Message}"); // Replace with proper logging
             // Optionally set an error message to display in the UI
+            // For example: errorMessage = $"Error deleting player: {ex.Message}"; (and define errorMessage field)
         }
-        playerToDelete = null; // Close modal
+        playerToDelete = null; // Close modal / reset state
         StateHasChanged(); // Refresh UI
     }
 

@@ -17,48 +17,47 @@ namespace GolfTrackerApp.Web.Services
             _context = context;
         }
 
+        // In GolfTrackerApp.Web/Services/RoundService.cs
         public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
         {
-            // Validate GolfCourseId
-            if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
+            if (string.IsNullOrEmpty(round.CreatedByApplicationUserId))
+            {
+                throw new InvalidOperationException("Round must have a CreatedByApplicationUserId.");
+            }
+            // ... (rest of existing validation for GolfCourseId, players, etc.)
+            if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId)) // Example
             {
                 throw new ArgumentException($"GolfCourse with ID {round.GolfCourseId} does not exist.");
             }
-            // Validate new Round properties
-            if (round.StartingHole < 1 || round.HolesPlayed < 1) // Add more validation as needed
+            if (round.StartingHole < 1 || round.HolesPlayed < 1)
             {
                 throw new ArgumentException("Starting hole and holes played must be valid.");
             }
+            // No need to check round.RoundType for null if it's a non-nullable enum and has [Required]
 
             if (playerIds == null || !playerIds.Any())
             {
                 throw new ArgumentException("At least one player must be selected for the round.");
             }
 
-            _context.Rounds.Add(round); // EF will assign RoundId after first SaveChangesAsync
-
-            // It's often better to save the parent Round first to ensure it gets an ID,
-            // especially if RoundPlayer has a strict FK constraint that's checked immediately.
-            await _context.SaveChangesAsync();
-
+            // Ensure all playerIds exist
             foreach (var playerId in playerIds)
             {
                 if (!await _context.Players.AnyAsync(p => p.PlayerId == playerId))
                 {
-                    // Log or handle: Player not found for ID {playerId}
-                    // Depending on strictness, you might throw or just skip this player for this round.
-                    // For now, let's assume playerIds are validated before calling this service or we skip.
-                    continue;
+                    throw new ArgumentException($"Player with ID {playerId} not found.");
                 }
-                // Create the RoundPlayer link. ShotScore and ParScore are not set here.
-                round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
             }
 
-            // If you added to round.RoundPlayers collection *before* the first SaveChangesAsync
-            // and Round is a new entity, EF Core often handles the relationships.
-            // If RoundPlayers are added *after* Round has an ID and is tracked, a second SaveChangesAsync is needed.
-            // Since we did SaveChangesAsync for Round already, this second one ensures RoundPlayers are saved.
-            await _context.SaveChangesAsync();
+            _context.Rounds.Add(round);
+            await _context.SaveChangesAsync(); // Save Round to get its ID
+
+            foreach (var playerId in playerIds)
+            {
+                // RoundPlayers are just links, no scores are set here.
+                round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
+            }
+            await _context.SaveChangesAsync(); // Save RoundPlayer links
             return round;
         }
 
@@ -75,15 +74,28 @@ namespace GolfTrackerApp.Web.Services
             return true;
         }
 
-        public async Task<List<Round>> GetAllRoundsAsync()
+        // In GolfTrackerApp.Web/Services/RoundService.cs
+        public async Task<List<Round>> GetAllRoundsAsync(string requestingUserId, bool isUserAdmin)
         {
-            return await _context.Rounds
-                                .Include(r => r.GolfCourse!) // Ensure GolfCourse is not null with ! if appropriate for your logic
-                                    .ThenInclude(gc => gc!.GolfClub) // Include GolfClub from GolfCourse
-                                .Include(r => r.RoundPlayers!)
-                                    .ThenInclude(rp => rp!.Player) // Include Player from RoundPlayer
-                                .OrderByDescending(r => r.DatePlayed)
-                                .ToListAsync();
+            IQueryable<Round> query = _context.Rounds
+                                        .Include(r => r.GolfCourse!)
+                                            .ThenInclude(gc => gc!.GolfClub)
+                                        .Include(r => r.RoundPlayers!)
+                                            .ThenInclude(rp => rp!.Player!) // Ensure Player is included for filtering
+                                                .ThenInclude(p => p!.ApplicationUser); // For checking linked user
+
+            if (!isUserAdmin)
+            {
+                // Regular users see rounds they created OR rounds they participated in
+                // A player participated if their PlayerId is in RoundPlayers,
+                // and if that Player record is linked to their ApplicationUser account.
+                query = query.Where(r =>
+                    r.CreatedByApplicationUserId == requestingUserId ||
+                    r.RoundPlayers.Any(rp => rp.Player != null && rp.Player.ApplicationUserId == requestingUserId)
+                );
+            }
+
+            return await query.OrderByDescending(r => r.DatePlayed).ThenBy(r => r.GolfCourse!.Name).ToListAsync();
         }
 
         public async Task<Round?> GetRoundByIdAsync(int id)
@@ -100,13 +112,52 @@ namespace GolfTrackerApp.Web.Services
                                 .FirstOrDefaultAsync(r => r.RoundId == id);
         }
 
-        public async Task<List<Round>> GetRoundsForPlayerAsync(int playerId)
+        // In GolfTrackerApp.Web/Services/RoundService.cs
+        public async Task<List<Round>> GetRoundsForPlayerAsync(int playerId, string requestingUserId, bool isUserAdmin)
         {
-            return await _context.Rounds
-                .Include(r => r.GolfCourse)
-                .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId))
-                .OrderByDescending(r => r.DatePlayed)
-                .ToListAsync();
+            var playerToListRoundsFor = await _context.Players.FindAsync(playerId);
+            if (playerToListRoundsFor == null)
+            {
+                return new List<Round>(); // Player not found
+            }
+
+            IQueryable<Round> query = _context.Rounds
+                .Include(r => r.GolfCourse!.GolfClub)
+                .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId));
+
+            if (!isUserAdmin)
+            {
+                // Non-admin can see rounds for a player if:
+                // 1. They are requesting their own rounds (playerToListRoundsFor is linked to requestingUserId)
+                // 2. The playerToListRoundsFor is a managed player they created
+                // 3. The round itself was created by them (requestingUserId)
+                // This ensures they don't see rounds of other users' managed players unless they created the round.
+
+                bool isOwnProfile = playerToListRoundsFor.ApplicationUserId == requestingUserId && !string.IsNullOrEmpty(requestingUserId);
+                bool isOwnManagedPlayer = string.IsNullOrEmpty(playerToListRoundsFor.ApplicationUserId) && playerToListRoundsFor.CreatedByApplicationUserId == requestingUserId;
+
+                if (!(isOwnProfile || isOwnManagedPlayer)) // If not viewing self or own managed player
+                {
+                    // Then, only show rounds that the requestingUser created that this player also played in.
+                    // Or, if the round has broad visibility based on participation (already handled by initial query.Where)
+                    // This can get complex. A simpler rule for now:
+                    // If not admin, only show rounds created by the requestingUser OR rounds where requestingUser participated.
+                    // The `query` already filters by playerId. We further filter if the requesting user is not an admin
+                    // and is not directly related to the `playerId` as owner/self.
+                    // The GetAllRoundsAsync logic is more about general list visibility.
+                    // For GetRoundsForPlayerAsync, if they can query for a specific player,
+                    // they should generally see those rounds if they have a reason to.
+                    // For now, let's assume if they query by PlayerID, they see them,
+                    // but the list of available players to query for would be filtered.
+                    // So, the initial query by PlayerID might be sufficient, relying on UI to only allow querying valid players.
+                    // However, to be stricter:
+                    query = query.Where(r =>
+                        r.CreatedByApplicationUserId == requestingUserId || // They created the round
+                        r.RoundPlayers.Any(rp => rp.Player != null && rp.Player.ApplicationUserId == requestingUserId) // They participated
+                    );
+                }
+            }
+            return await query.OrderByDescending(r => r.DatePlayed).ToListAsync();
         }
 
         public async Task<Round?> UpdateRoundAsync(Round round, IEnumerable<int>? playerIdsToUpdate = null)
