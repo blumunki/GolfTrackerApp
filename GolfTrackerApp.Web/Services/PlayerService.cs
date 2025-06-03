@@ -2,6 +2,7 @@
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -10,10 +11,12 @@ namespace GolfTrackerApp.Web.Services
     public class PlayerService : IPlayerService
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<PlayerService> _logger;
 
-        public PlayerService(ApplicationDbContext context)
+        public PlayerService(ApplicationDbContext context,ILogger<PlayerService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // In GolfTrackerApp.Web/Services/PlayerService.cs
@@ -22,6 +25,7 @@ namespace GolfTrackerApp.Web.Services
             // Ensure CreatedByApplicationUserId is set if it's a managed player
             if (string.IsNullOrEmpty(player.ApplicationUserId) && string.IsNullOrEmpty(player.CreatedByApplicationUserId))
             {
+                _logger.LogError("AddPlayerAsync: Managed player submitted without CreatedByApplicationUserId. FirstName: {FirstName}, LastName: {LastName}", player.FirstName, player.LastName);
                 throw new InvalidOperationException("Managed players must have a CreatedByApplicationUserId.");
             }
 
@@ -53,6 +57,7 @@ namespace GolfTrackerApp.Web.Services
 
             _context.Players.Add(player);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Player {PlayerId} created: {FirstName} {LastName}", player.PlayerId, player.FirstName, player.LastName);
             return player;
         }
 
@@ -61,10 +66,12 @@ namespace GolfTrackerApp.Web.Services
             var player = await _context.Players.FindAsync(id);
             if (player == null)
             {
+                _logger.LogWarning("DeletePlayerAsync: Player with ID {PlayerId} not found for deletion.", id);
                 return false;
             }
             _context.Players.Remove(player);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Player {PlayerId} deleted: {FirstName} {LastName}", player.PlayerId, player.FirstName, player.LastName);
             return true;
         }
 
@@ -99,31 +106,54 @@ namespace GolfTrackerApp.Web.Services
                                     .FirstOrDefaultAsync(p => p.ApplicationUserId == applicationUserId);
         }
 
-        public async Task<Player?> UpdatePlayerAsync(Player player)
+        public async Task<Player?> UpdatePlayerAsync(Player playerUpdateData) // playerUpdateData comes from the UI
         {
-            var existingPlayer = await _context.Players.FindAsync(player.PlayerId);
+            var existingPlayer = await _context.Players
+                                        .Include(p => p.ApplicationUser) // Include for checking ApplicationUserId changes
+                                        .FirstOrDefaultAsync(p => p.PlayerId == playerUpdateData.PlayerId);
             if (existingPlayer == null)
             {
+                _logger.LogWarning("UpdatePlayerAsync: Player with ID {PlayerId} not found.", playerUpdateData.PlayerId);
                 return null;
             }
 
-            // If ApplicationUserId is being set or changed, ensure it's not already in use by another player profile
-            if (!string.IsNullOrEmpty(player.ApplicationUserId) && existingPlayer.ApplicationUserId != player.ApplicationUserId)
+            // Explicitly prevent changes to CreatedByApplicationUserId
+            if (existingPlayer.CreatedByApplicationUserId != playerUpdateData.CreatedByApplicationUserId &&
+                !string.IsNullOrEmpty(playerUpdateData.CreatedByApplicationUserId)) // Allow if input is null/empty, but we'll enforce original
             {
-                var anotherPlayerWithUser = await _context.Players
-                                                .FirstOrDefaultAsync(p => p.PlayerId != player.PlayerId && p.ApplicationUserId == player.ApplicationUserId);
-                if (anotherPlayerWithUser != null)
+                // Use _logger field
+                _logger.LogWarning("Attempt to change CreatedByApplicationUserId for PlayerId {PlayerId} from {OriginalOwner} to {AttemptedOwner}. Change rejected.",
+                    existingPlayer.PlayerId, existingPlayer.CreatedByApplicationUserId, playerUpdateData.CreatedByApplicationUserId);
+                // The logic ensures CreatedByApplicationUserId from playerUpdateData is ignored, existingPlayer.CreatedByApplicationUserId is preserved.
+            }
+            // No need to set existingPlayer.CreatedByApplicationUserId = playerUpdateData.CreatedByApplicationUserId;
+            // It simply won't be updated from playerUpdateData.
+
+            // Handle changes to linkable ApplicationUserId (as in previous EditPlayer.razor logic)
+            if (existingPlayer.ApplicationUserId != playerUpdateData.ApplicationUserId)
+            {
+                if (!string.IsNullOrEmpty(playerUpdateData.ApplicationUserId)) // If trying to link or change link
                 {
-                    throw new InvalidOperationException($"The ApplicationUser ID '{player.ApplicationUserId}' is already linked to another player profile (ID: {anotherPlayerWithUser.PlayerId}).");
+                    var anotherPlayerWithUser = await _context.Players
+                                                    .AsNoTracking()
+                                                    .FirstOrDefaultAsync(p => p.PlayerId != playerUpdateData.PlayerId && 
+                                                                        p.ApplicationUserId == playerUpdateData.ApplicationUserId);
+                    if (anotherPlayerWithUser != null)
+                    {
+                        throw new InvalidOperationException($"The system user account is already linked to player '{anotherPlayerWithUser.FirstName} {anotherPlayerWithUser.LastName}'.");
+                    }
                 }
+                existingPlayer.ApplicationUserId = playerUpdateData.ApplicationUserId; // Update the link
             }
 
-            _context.Entry(existingPlayer).CurrentValues.SetValues(player);
-            // Explicitly set ApplicationUserId as SetValues might not handle transitions from value to null well if not careful.
-            existingPlayer.ApplicationUserId = player.ApplicationUserId;
-
+            // Update other mutable fields
+            existingPlayer.FirstName = playerUpdateData.FirstName;
+            existingPlayer.LastName = playerUpdateData.LastName;
+            existingPlayer.Handicap = playerUpdateData.Handicap;
+            // Do NOT update existingPlayer.CreatedByApplicationUserId from playerUpdateData
 
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Player {PlayerId} updated: {FirstName} {LastName}", existingPlayer.PlayerId, existingPlayer.FirstName, existingPlayer.LastName);
             return existingPlayer;
         }
     }
