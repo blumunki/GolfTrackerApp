@@ -1,121 +1,56 @@
-﻿@implements IDisposable
-@using Microsoft.AspNetCore.Authorization; // Good to have for clarity, even if not strictly needed for AuthorizeView if globally registered
+﻿@using MudBlazor
+@using Microsoft.AspNetCore.Authorization @* If not already present globally *@
 
-@inject NavigationManager NavigationManager
+@* Remove old nav structure, replace with MudNavMenu *@
+<MudNavMenu>
+    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
 
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">GolfTrackerApp</a> @* Shortened for neatness, was GolfTrackerApp.Web *@
-    </div>
-</div>
+    @* Example: Golf Clubs link accessible to all *@
+    <MudNavLink Href="golfclubs" Icon="@Icons.Material.Filled.LocationCity">Golf Clubs</MudNavLink>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+    <AuthorizeView>
+        <Authorized>
+            <MudNavLink Href="players" Icon="@Icons.Material.Filled.People">Players</MudNavLink>
+            <MudNavLink Href="rounds" Icon="@Icons.Material.Filled.GolfCourse">Rounds</MudNavLink> @* Using GolfCourse icon for rounds *@
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+            <MudListSubheader>Course Management</MudListSubheader> @* Optional subheader *@
+            <MudNavLink Href="golfcourses/add" Icon="@Icons.Material.Filled.AddCircleOutline">Add Course</MudNavLink> @* Example, refine routes as needed *@
 
-        @* "Golf Courses" link accessible to all users *@
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="golfclubs">
-                <span class="bi bi-building-nav-menu" aria-hidden="true"></span> Golf Clubs
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="golfcourses">
-                <span class="bi bi-flag-fill-nav-menu" aria-hidden="true"></span> Golf Courses
-            </NavLink>
-        </div>
-
-        <AuthorizeView>
-            <Authorized>
-                @* "Add Club" link only for authorized (logged-in) users *@
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="golfclubs/add">
-                        <span class="bi bi-plus-circle-dotted-nav-menu" aria-hidden="true"></span> Add Club
-                    </NavLink>
-                </div>
-                @* "Add Course" link only for authorized (logged-in) users *@
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="golfcourses/add">
-                        <span class="bi bi-plus-circle-dotted-nav-menu" aria-hidden="true"></span> Add Course
-                    </NavLink>
-                </div>
-
-                @* Inside <Authorized> section of NavMenu.razor *@
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="players">
-                        <span class="bi bi-people-fill-nav-menu" aria-hidden="true"></span> Players
-                    </NavLink>
-                </div>
-
-                @* Inside <Authorized> section of NavMenu.razor *@
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="rounds">
-                        <span class="bi bi-calendar-event-nav-menu" aria-hidden="true"></span> Rounds
-                    </NavLink>
-                </div>
-
-                @* "Auth Required" link - assuming this is for testing pages that need authorization *@
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="auth"> @* Ensure the "auth" page has [Authorize] *@
-                        <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Auth Required Page
-                    </NavLink>
-                </div>
-
-                @* User Account Management & Logout - This was already well structured *@
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Manage">
-                        <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Logout
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Register">
-                        <span class="bi bi-person-nav-menu" aria-hidden="true"></span> Register
-                    </NavLink>
-                </div>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Login
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-
-        @* Example of an Admin-only link *@
-        <AuthorizeView Roles="Admin">
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="admin/datamigration">
-                    <span class="bi bi-database-up-nav-menu" aria-hidden="true"></span> Data Migration
-                </NavLink>
+            @* Player Account Links *@
+            <MudListSubheader>My Account</MudListSubheader>
+            <MudNavLink Href="Account/Manage" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
+            @* Logout still needs a form, so it's a bit different.
+               You might keep your existing form-based logout or adapt it.
+               For a MudNavLink style, you might need a component that wraps the form.
+               Alternatively, a button in the AppBar (MainLayout) is common for logout.
+            *@
+            <div class="px-4 mt-2"> @* Simple form for logout, styled as best as possible within nav *@
+                 <form action="Account/Logout" method="post">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Logout">Logout</MudButton>
+                </form>
             </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="/admin/dashboard"> @* Create this page later *@
-                    <span class="bi bi-shield-lock-nav-menu" aria-hidden="true"></span> Admin Area
-                </NavLink>
-            </div>
-        </AuthorizeView>
+        </Authorized>
+        <NotAuthorized>
+            <MudNavLink Href="Account/Register" Icon="@Icons.Material.Filled.PersonAdd">Register</MudNavLink>
+            <MudNavLink Href="Account/Login" Icon="@Icons.Material.Filled.Login">Login</MudNavLink>
+        </NotAuthorized>
+    </AuthorizeView>
 
-    </nav>
-</div>
+    <AuthorizeView Roles="Admin">
+        <MudListSubheader>Admin</MudListSubheader>
+        <MudNavLink Href="admin/datamigration" Icon="@Icons.Material.Filled.Storage">Data Migration</MudNavLink>
+        @* <MudNavLink Href="/admin/dashboard" Icon="@Icons.Material.Filled.AdminPanelSettings">Admin Dashboard</MudNavLink> *@
+    </AuthorizeView>
+</MudNavMenu>
 
 @code {
+    // Keep your existing currentUrl logic for the logout form if you keep that form here.
     private string? currentUrl;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
 
     protected override void OnInitialized()
     {

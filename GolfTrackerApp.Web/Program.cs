@@ -5,6 +5,7 @@ using GolfTrackerApp.Web.Components;
 using GolfTrackerApp.Web.Components.Account;
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Services;
+using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,8 @@ builder.Services.AddScoped<IGolfClubService, GolfClubService>();
 builder.Services.AddScoped<IHoleService, HoleService>();
 builder.Services.AddScoped<IRoundService, RoundService>();
 builder.Services.AddScoped<IScoreService, ScoreService>();
+
+builder.Services.AddMudServices();
 
 var app = builder.Build();
 
