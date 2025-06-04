@@ -1,62 +1,99 @@
 @page "/golfclubs/{ClubId:int}"
-@attribute [Authorize] // Or remove if public viewing is desired
+@attribute [Authorize]
 @inject IGolfClubService GolfClubService
 @inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject ILogger<GolfClubDetails> Logger
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
+@using MudBlazor
 
 @rendermode InteractiveServer
 
 <PageTitle>@(golfClub?.Name ?? "Club Details")</PageTitle>
 
-@if (golfClub == null && !isLoading && !string.IsNullOrEmpty(errorMessage))
+@if (isLoading)
 {
-    <div class="alert alert-danger">@errorMessage</div>
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
-else if (isLoading)
+else if (golfClub == null)
 {
-    <p><em>Loading club details...</em></p>
-}
-else if (golfClub != null)
-{
-    <h1>@golfClub.Name</h1>
-    <div class="card mb-3">
-        <div class="card-body">
-            <h5 class="card-title">Club Information</h5>
-            <p><strong>Address:</strong> @FormatAddress(golfClub)</p>
-            @if (!string.IsNullOrWhiteSpace(golfClub.Website))
-            {
-                <p><strong>Website:</strong> <a href="@golfClub.Website" target="_blank">@golfClub.Website</a></p>
-            }
-        </div>
-    </div>
-
-    <h3>Courses at this Club</h3>
-    @if (golfClub.GolfCourses != null && golfClub.GolfCourses.Any())
-    {
-        <ul class="list-group">
-            @foreach (var course in golfClub.GolfCourses)
-            {
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    @course.Name (Par: @course.DefaultPar, Holes: @course.NumberOfHoles)
-                    <button class="btn btn-sm btn-outline-primary" @onclick="() => ViewCourseDetails(course.GolfCourseId)">View Holes</button>
-                </li>
-            }
-        </ul>
-    }
-    else
-    {
-        <p><em>No courses listed for this club yet.</em></p>
-    }
-    <hr />
-    <button class="btn btn-secondary" @onclick="GoBackToList">Back to Clubs List</button>
+    <MudAlert Severity="Severity.Error">@(errorMessage ?? "Golf club not found.")</MudAlert>
+    <MudButton Variant="Variant.Text" OnClick="@(() => NavigationManager.NavigateTo("/golfclubs"))" Class="mt-4">Back to Clubs List</MudButton>
 }
 else
 {
-    <p><em>Club not found.</em></p>
-}
+    <MudPaper Class="pa-4 mb-4" Elevation="0">
+        <MudGrid Spacing="2" Justify="Justify.SpaceBetween" alignItems="AlignItems.Center" Class="mb-2">
+        @* <MudGrid Spacing="2" Justify="Justify.SpaceBetween" AlignItems="@MudBlazor.AlignItems.Center" Class="mb-2"> *@
+            <MudItem xs="12" sm="8" md="9"> @* Give more space to title *@
+                <MudText Typo="Typo.h4">@golfClub.Name</MudText>
+            </MudItem>
+            <MudItem xs="12" sm="4" md="3" Class="d-flex justify-content-xs-start justify-content-sm-end">
+                <MudButton Variant="Variant.Outlined" 
+                           Color="Color.Primary" 
+                           OnClick="@(() => EditThisClub(golfClub.GolfClubId))" 
+                           StartIcon="@Icons.Material.Filled.Edit">Edit Club</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+    
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Club Information</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudText><strong>Address:</strong> @FormatAddress(golfClub)</MudText>
+            @if (!string.IsNullOrWhiteSpace(golfClub.Website))
+            {
+                <MudText><strong>Website:</strong> <MudLink Href="@golfClub.Website" Target="_blank">@golfClub.Website</MudLink></MudText>
+            }
+        </MudCardContent>
+    </MudCard>
 
+    <MudPaper Class="pa-4 mt-4" Elevation="0">
+        <MudGrid Spacing="2" Justify="Justify.SpaceBetween" alignItems="AlignItems.Center" Class="mb-2">
+        @* <MudGrid Spacing="2" Justify="Justify.SpaceBetween" AlignItems="@MudBlazor.AlignItems.Center" Class="mb-2"> *@
+            <MudItem>
+                <MudText Typo="Typo.h5">Courses at this Club</MudText>
+            </MudItem>
+            <MudItem Class="d-flex justify-content-end"> @* Ensure button aligns right *@
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Success" 
+                           OnClick="@(() => AddCourseToThisClub(golfClub.GolfClubId))" 
+                           StartIcon="@Icons.Material.Filled.Add">Add New Course</MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (golfClub.GolfCourses != null && golfClub.GolfCourses.Any())
+        {
+            @* VVV Explicit T="object" added VVV *@
+            <MudList Dense="true" T="object">
+                @foreach (var course in golfClub.GolfCourses.OrderBy(c => c.Name))
+                {
+                    @* VVV Explicit T="object" added VVV *@
+                    <MudListItem T="object" OnClick="@(() => ViewCourseDetails(course.GolfCourseId))" Text="@($"{course.Name} (Par: {course.DefaultPar}, Holes: {course.NumberOfHoles})")">
+                        <NestedList>
+                             @* VVV Explicit T="object" added VVV *@
+                             <MudListItem T="object" OnClick="@(() => ViewCourseDetails(course.GolfCourseId))" Icon="@Icons.Material.Filled.Visibility" IconColor="Color.Primary">View Holes / Details</MudListItem>
+                             <MudListItem T="object" OnClick="@(() => EditThisCourse(course.GolfCourseId))" Icon="@Icons.Material.Filled.Edit" IconColor="Color.Secondary">Edit Course</MudListItem>
+                        </NestedList>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        }
+        else
+        {
+            <MudText><em>No courses listed for this club yet. You can add one using the button above.</em></MudText>
+        }
+    </MudPaper>
+    
+    <MudButton Variant="Variant.Text" OnClick="GoBackToList" Class="mt-4">Back to Clubs List</MudButton>
+}
 
 @code {
     [Parameter]
@@ -72,17 +109,18 @@ else
         errorMessage = null;
         try
         {
-            // GetGolfClubByIdAsync in GolfClubService should include GolfCourses
-            golfClub = await GolfClubService.GetGolfClubByIdAsync(ClubId);
+            golfClub = await GolfClubService.GetGolfClubByIdAsync(ClubId); // Includes GolfCourses
             if (golfClub == null)
             {
                 errorMessage = $"Golf club with ID {ClubId} not found.";
+                Snackbar.Add(errorMessage, Severity.Warning);
             }
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Error loading club details for ClubId {ClubId}", ClubId);
             errorMessage = $"Error loading club details: {ex.Message}";
-            // Log the exception (ex)
+            Snackbar.Add(errorMessage, Severity.Error);
         }
         isLoading = false;
     }
@@ -103,7 +141,22 @@ else
 
     private void ViewCourseDetails(int courseId)
     {
-        NavigationManager.NavigateTo($"/golfcourses/{courseId}/details"); // New route for course details
+        NavigationManager.NavigateTo($"/golfcourses/{courseId}/details");
+    }
+
+    private void EditThisClub(int clubIdToEdit)
+    {
+        NavigationManager.NavigateTo($"/golfclubs/edit/{clubIdToEdit}");
+    }
+
+    private void AddCourseToThisClub(int clubIdForNewCourse)
+    {
+        NavigationManager.NavigateTo($"/golfcourses/add?clubId={clubIdForNewCourse}");
+    }
+
+    private void EditThisCourse(int courseIdToEdit)
+    {
+        NavigationManager.NavigateTo($"/golfcourses/edit/{courseIdToEdit}");
     }
 
     private void GoBackToList()

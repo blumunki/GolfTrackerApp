@@ -1,0 +1,109 @@
+@page "/golfclubs/edit/{ClubId:int}"
+@attribute [Authorize(Roles = "Admin")] // Or appropriate roles
+@inject IGolfClubService GolfClubService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject ILogger<EditGolfClub> Logger
+@using GolfTrackerApp.Web.Services
+@using GolfTrackerApp.Web.Models
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>Edit Golf Club</PageTitle>
+
+@if (isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (clubToEdit == null)
+{
+    <MudAlert Severity="Severity.Error">Golf club not found or error loading details.
+        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="@(() => NavigationManager.NavigateTo("/golfclubs"))">Back to List</MudButton>
+    </MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h5" GutterBottom="true">Edit Golf Club: @originalClubName</MudText>
+    <EditForm Model="@clubToEdit" OnValidSubmit="HandleUpdateGolfClub">
+        <DataAnnotationsValidator />
+        <MudCard>
+            <MudCardContent>
+                <MudTextField @bind-Value="clubToEdit.Name" For="@(() => clubToEdit.Name)" Label="Club Name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" />
+                <MudTextField @bind-Value="clubToEdit.AddressLine1" For="@(() => clubToEdit.AddressLine1)" Label="Address Line 1" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="clubToEdit.AddressLine2" For="@(() => clubToEdit.AddressLine2)" Label="Address Line 2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="clubToEdit.City" For="@(() => clubToEdit.City)" Label="City" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="clubToEdit.CountyOrRegion" For="@(() => clubToEdit.CountyOrRegion)" Label="County/Region" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="clubToEdit.Postcode" For="@(() => clubToEdit.Postcode)" Label="Postcode" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="clubToEdit.Country" For="@(() => clubToEdit.Country)" Label="Country" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudTextField @bind-Value="clubToEdit.Website" For="@(() => clubToEdit.Website)" Label="Website URL" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Url" />
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Update Club</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="@(() => NavigationManager.NavigateTo("/golfclubs"))">Cancel</MudButton>
+            </MudCardActions>
+        </MudCard>
+        <ValidationSummary /> @* Can be placed at top or bottom *@
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int ClubId { get; set; }
+
+    private GolfClub? clubToEdit;
+    private string originalClubName = string.Empty;
+    private bool isLoading = true;
+    private string? errorMessage; // For displaying errors, though Snackbar is also used
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        try
+        {
+            clubToEdit = await GolfClubService.GetGolfClubByIdAsync(ClubId);
+            if (clubToEdit != null)
+            {
+                originalClubName = clubToEdit.Name;
+            }
+            else
+            {
+                errorMessage = $"Golf Club with ID {ClubId} not found.";
+                Snackbar.Add(errorMessage, Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading golf club {ClubId} for editing", ClubId);
+            errorMessage = "Failed to load club details.";
+            Snackbar.Add(errorMessage, Severity.Error);
+        }
+        isLoading = false;
+    }
+
+    private async Task HandleUpdateGolfClub()
+    {
+        if (clubToEdit == null) return;
+
+        try
+        {
+            var updatedClub = await GolfClubService.UpdateGolfClubAsync(clubToEdit);
+            if (updatedClub != null)
+            {
+                Snackbar.Add("Golf club updated successfully!", Severity.Success);
+                NavigationManager.NavigateTo("/golfclubs");
+            }
+            else
+            {
+                errorMessage = "Failed to update golf club. The club may have been modified or deleted by another user.";
+                Snackbar.Add("Failed to update golf club. Please try again.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+        Logger.LogError(ex, "Error updating golf club {GolfClubId}", clubToEdit.GolfClubId);
+        errorMessage = $"Error updating golf club: {ex.Message}"; // Set error message for potential display
+        Snackbar.Add(errorMessage, Severity.Error);
+        }
+    }
+}

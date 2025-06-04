@@ -1,6 +1,5 @@
 ﻿<!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,17 +11,15 @@
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet />
+    @* Ensure HeadOutlet uses the global render mode if needed, or is set per page/component *@
+    <HeadOutlet @rendermode="RenderMode.InteractiveServer" /> 
 </head>
-
 <body>
-    <MudThemeProvider />
-    <MudDialogProvider />
-    <MudSnackbarProvider />
-    <MudPopoverProvider />
-    <Routes />
+    @* MudThemeProvider will be in MainLayout.razor *@
+
+    <Routes @rendermode="RenderMode.InteractiveServer" /> @* Explicitly setting render mode here *@
+
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
-
 </html>

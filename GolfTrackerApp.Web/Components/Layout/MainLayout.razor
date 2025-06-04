@@ -6,6 +6,11 @@
 
 @inject NavigationManager NavigationManager
 
+<MudThemeProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+
 <MudLayout>
     <MudAppBar Elevation="1" Fixed="true"> @* Fixed="true" is default, but explicit for clarity *@
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
