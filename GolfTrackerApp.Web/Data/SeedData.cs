@@ -21,13 +21,15 @@ namespace GolfTrackerApp.Web.Data
             }
 
             // Optionally create a default Admin user
-            var userManager = services.GetRequiredService<UserManager<IdentityUser>>(); // Or ApplicationUser
+            //var userManager = services.GetRequiredService<UserManager<IdentityUser>>(); // Or ApplicationUser
+            var userManager = services.GetRequiredService<UserManager<ApplicationUser>>(); // Use ApplicationUser
             string adminEmail = "admin@golftracker.local"; // Change as needed
             var adminUser = await userManager.FindByEmailAsync(adminEmail);
 
             if (adminUser == null)
             {
-                adminUser = new IdentityUser // Or ApplicationUser
+                //adminUser = new IdentityUser // Or ApplicationUser
+                adminUser = new ApplicationUser // Use ApplicationUser here too
                 {
                     UserName = adminEmail,
                     Email = adminEmail,
