@@ -1,0 +1,447 @@
+@page "/rounds/record"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<RecordRound> Logger
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IGolfClubService GolfClubService
+@inject IGolfCourseService GolfCourseService
+@inject IPlayerService PlayerService
+@inject IRoundService RoundService
+@inject IScoreService ScoreService
+@inject IHoleService HoleService
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Data
+@using GolfTrackerApp.Web.Components.Shared
+@using GolfTrackerApp.Web.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@using Microsoft.AspNetCore.Authorization
+
+
+<PageTitle>Record New Round</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Record New Golf Round</MudText>
+
+@if (isInitialized && string.IsNullOrWhiteSpace(initializationError))
+{
+    <MudStepper @ref="_stepper" linear="true" @bind-activeStepIndex="_activeIndex">
+        <MudStep Title="1. Round Setup" validation="@(() => PerformRoundSetupStepValidation())">
+            <EditForm Model="@_roundEntryModel" OnValidSubmit="HandleRoundSetupCompleteAndProceed" @ref="_roundSetupForm">
+                <DataAnnotationsValidator />
+                <MudGrid Spacing="2">
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker Label="Date of Round" @bind-Date="_roundEntryModel.DatePlayed" For="@(() => _roundEntryModel.DatePlayed)" Required="true" RequiredError="Date is required." />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudTimePicker Label="Tee Time (Optional)" @bind-Time="_roundEntryModel.TeeTime" TimeEditMode="TimeEditMode.Normal" AmPm="true" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int" Label="Golf Club" @bind-Value="_roundEntryModel.SelectedGolfClubId" 
+                                For="@(() => _roundEntryModel.SelectedGolfClubId)"
+                                Required="true" RequiredError="Golf Club is required!"
+                                onValueChanged="OnGolfClubSelectedAsync">
+                            <MudSelectItem T="int" Value="0">Select a Club</MudSelectItem>
+                            @foreach (var club in _golfClubs)
+                            {
+                                <MudSelectItem T="int" Value="@club.GolfClubId">@club.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="int" Label="Golf Course" @bind-Value="_roundEntryModel.GolfCourseId" 
+                                For="@(() => _roundEntryModel.GolfCourseId)"
+                                Disabled="@(_roundEntryModel.SelectedGolfClubId == 0)" 
+                                Required="true" RequiredError="Golf Course is required!"
+                                onValueChanged="OnGolfCourseSelectedAsync">
+                            <MudSelectItem T="int" Value="0">Select a Course</MudSelectItem>
+                            @foreach (var course in _golfCoursesForSelectedClub)
+                            {
+                                <MudSelectItem T="int" Value="@course.GolfCourseId">@course.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.h6" GutterBottom="true">Players</MudText>
+                        <MudAutocomplete T="Player" Label="Search and Add Player" 
+                                        searchFuncWithCancellationToken="@(async (string val, CancellationToken ct) => await SearchPlayersAsync(val, ct))"
+                                        @bind-Value="_selectedPlayerForAutocomplete" 
+                                        ToStringFunc="@(p => p == null ? string.Empty : $"{p.FirstName} {p.LastName}")"
+                                        ShowProgressIndicator="true" DebounceInterval="300" 
+                                        onItemSelected="PlayerSelectedFromAutocomplete"
+                                        ResetValueOnEmptyText="true" CoerceValue="true" CoerceText="true" 
+                                        Placeholder="Type to search..." 
+                                        Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        
+                        @if (_roundEntryModel.SelectedPlayers.Any())
+                        {
+                            <MudText Class="mt-2">Selected Players:</MudText>
+                            <MudChipSet Class="mt-1" AllClosable="true" OnClose="@((MudChip<Player> chip) => RemovePlayerFromRound(chip))"> @* Corrected OnClose *@
+                                @foreach (var player in _roundEntryModel.SelectedPlayers)
+                                {
+                                    <MudChip T="Player" Value="@player" Text="@($"{player.FirstName} {player.LastName}")" /> @* Added T="Player" *@
+                                }
+                            </MudChipSet>
+                        }
+                        <MudButton OnClick="OpenQuickAddPlayerDialogAsync" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Class="mt-2">Add Guest Player</MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudNumericField @bind-Value="_roundEntryModel.StartingHole" Label="Starting Hole" For="@(() => _roundEntryModel.StartingHole)" Min="1" Max="@_maxHolesForCourse" Required="true" />
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="int" @bind-Value="_roundEntryModel.HolesPlayed" Label="Holes Played" For="@(() => _roundEntryModel.HolesPlayed)" Required="true">
+                            <MudSelectItem T="int" Value="9">9 Holes</MudSelectItem>
+                            <MudSelectItem T="int" Value="18">18 Holes</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="RoundTypeOption" @bind-Value="_roundEntryModel.RoundType" Label="Round Type" For="@(() => _roundEntryModel.RoundType)" Required="true">
+                            @foreach (RoundTypeOption type in Enum.GetValues(typeof(RoundTypeOption)))
+                            {
+                                <MudSelectItem T="RoundTypeOption" Value="@type">@type.ToString()</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_roundEntryModel.Notes" Label="Notes (Optional)" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                    </MudItem>
+                </MudGrid>
+                <ValidationSummary Class="mt-3" />
+                @* Submit button for EditForm if needed for direct submission, or rely on Stepper's Next button logic *@
+                @* <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3">Validate Setup (For EditForm)</MudButton> *@
+            </EditForm>
+        </MudStep>
+
+        <MudStep content="2. Enter Scores">
+            <MudText>Score entry will appear here once Round Setup is complete.</MudText>
+        </MudStep>
+
+        <MudStep content="3. Review & Save">
+            <MudText>Review summary will appear here.</MudText>
+        </MudStep>
+    </MudStepper>
+
+    <MudPaper Elevation="2" Class="pa-4 mt-4 d-flex justify-space-between">
+        <MudButton Variant="Variant.Text" OnClick="GoToPreviousStep" Disabled="@(_activeIndex == 0)">Previous</MudButton>
+        @if (_activeIndex < MaxStepIndex)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="HandleNextStepButtonClick">Next</MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="SubmitRoundAndScoresAsync" Disabled="@(_activeIndex != MaxStepIndex)">Complete & Save Round</MudButton>
+        }
+    </MudPaper>
+}
+else if (!string.IsNullOrWhiteSpace(initializationError))
+{
+    <MudAlert Severity="Severity.Error" Class="mt-4">@initializationError</MudAlert>
+    <MudButton Variant="Variant.Text" OnClick="@(() => NavigationManager.NavigateTo("/"))" Class="mt-2">Go Home</MudButton>
+}
+else // This case means isInitialized is false (still loading initial data)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    <MudText Class="mt-2">Initializing form, please wait...</MudText>
+}
+
+@code {
+    // --- View Models ---
+    private class UIRoundEntryModel
+    {
+        public DateTime? DatePlayed { get; set; } = DateTime.Today;
+        public TimeSpan? TeeTime { get; set; }
+        public int SelectedGolfClubId { get; set; }
+        public int GolfCourseId { get; set; }
+        public int StartingHole { get; set; } = 1;
+        public int HolesPlayed { get; set; } = 18;
+        public RoundTypeOption RoundType { get; set; } = RoundTypeOption.Friendly;
+        public string? Notes { get; set; }
+        public List<Player> SelectedPlayers { get; set; } = new List<Player>();
+        public Dictionary<int, List<HoleScoreEntryModel>> Scorecard { get; set; } = new Dictionary<int, List<HoleScoreEntryModel>>();
+    }
+
+    public class HoleScoreEntryModel // Make public if used in markup directly for binding in complex scenarios
+    {
+        public int HoleId { get; set; }
+        public int HoleNumber { get; set; }
+        public int Par { get; set; }
+        public int StrokeIndex { get; set; }
+        public int? LengthYards { get; set; }
+        public int? Strokes { get; set; }
+        public int? Putts { get; set; }
+        public bool? FairwayHit { get; set; }
+        public int? ScoreVsPar => Strokes.HasValue && Par != 0 ? Strokes - Par : null; // Ensure Par is not 0
+    }
+
+    // --- Page State & Data ---
+    private UIRoundEntryModel _roundEntryModel = new();
+    private EditForm? _roundSetupForm;
+    private MudStepper _stepper = default!;
+    private int _activeIndex = 0;
+    private int MaxStepIndex => (_stepper?.Steps?.Count > 0 ? _stepper.Steps.Count - 1 : 0);
+
+    private string _currentUserId = string.Empty;
+    private bool _isCurrentUserAdmin = false;
+    private bool isInitialized = false; // Ensure this is used to conditionally render form
+    private string? initializationError;
+
+
+    private List<GolfClub> _golfClubs = new();
+    private List<GolfCourse> _golfCoursesForSelectedClub = new();
+    private List<Player> _availablePlayers = new();
+    private Player? _selectedPlayerForAutocomplete;
+    
+    private List<Hole> _allHolesForSelectedCourse = new();
+    private List<Hole> _playedHolesOrdered = new();
+    private int _currentDbRoundId = 0;
+    private int _maxHolesForCourse = 18;
+
+    // --- Lifecycle & Setup ---
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            _currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+            _isCurrentUserAdmin = user.IsInRole("Admin"); // <<--- SET ADMIN STATUS HERE
+
+            if (string.IsNullOrWhiteSpace(_currentUserId))
+            {
+                initializationError = "CRITICAL: Current user ID could not be determined. Please ensure you are properly logged in. Cannot proceed.";
+                Logger.LogError("Current user ID is null, empty, or whitespace in RecordRound.razor after authentication.");
+                isInitialized = true; // So the error message based on initializationError can display
+                return; 
+            }
+        }
+        else
+        {
+            // The [Authorize] attribute on the page should handle this, but as a fallback:
+            initializationError = "User not authenticated. You will be redirected to login.";
+            Logger.LogWarning("Unauthenticated user attempted to access RecordRound.razor OnInitializedAsync.");
+            isInitialized = true; // So the error message can display
+            NavigationManager.NavigateTo("Account/Login", new NavigationOptions { ReplaceHistoryEntry = true }); 
+            return;
+        }
+
+        // If we reach here, _currentUserId is valid.
+        try
+        {
+            _golfClubs = await GolfClubService.GetAllGolfClubsAsync(); // Assuming this doesn't need admin context for now
+            _availablePlayers = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin); // Use admin status here
+            isInitialized = true; // Mark initialization as complete and successful
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during initial data load for RecordRound page.");
+            initializationError = "Error loading necessary data for the page. Please try again later.";
+            isInitialized = true; // So error can be displayed
+        }
+        // StateHasChanged(); // Usually not needed at the end of OnInitializedAsync unless there's complex conditional rendering logic based on early returns.
+    }
+
+    private async Task OnGolfClubSelectedAsync(int selectedClubId) { /* Your existing logic */
+        _roundEntryModel.SelectedGolfClubId = selectedClubId;
+        _roundEntryModel.GolfCourseId = 0; 
+        _golfCoursesForSelectedClub.Clear();
+        _allHolesForSelectedCourse.Clear();
+        _playedHolesOrdered.Clear();
+        _maxHolesForCourse = 18; 
+        if (selectedClubId > 0)
+        {
+            var club = await GolfClubService.GetGolfClubByIdAsync(selectedClubId); 
+            if (club?.GolfCourses != null)
+            {
+                _golfCoursesForSelectedClub = club.GolfCourses.ToList();
+            }
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnGolfCourseSelectedAsync(int selectedCourseId) { /* Your existing logic */
+        _roundEntryModel.GolfCourseId = selectedCourseId;
+        _allHolesForSelectedCourse.Clear();
+        _playedHolesOrdered.Clear();
+        _maxHolesForCourse = 18; 
+        if (selectedCourseId > 0)
+        {
+            _allHolesForSelectedCourse = await HoleService.GetHolesForCourseAsync(selectedCourseId);
+            if(_allHolesForSelectedCourse.Any())
+            {
+                 // Ensure there's at least one hole before calling Max, or check GolfCourse.NumberOfHoles
+                _maxHolesForCourse = _allHolesForSelectedCourse.Max(h => h.HoleNumber); 
+            }
+        }
+         StateHasChanged();
+    }
+
+    private async Task<IEnumerable<Player>> SearchPlayersAsync(string value, CancellationToken token)
+    {
+        // Simulate async work; in a real app, you might await a true async call here
+        await Task.Delay(50, token);
+        if (token.IsCancellationRequested)
+            return Enumerable.Empty<Player>();
+
+        if (string.IsNullOrEmpty(value))
+            return _availablePlayers.Except(_roundEntryModel.SelectedPlayers).OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToList();
+
+        return _availablePlayers.Except(_roundEntryModel.SelectedPlayers)
+            .Where(p => $"{p.FirstName} {p.LastName}".Contains(value, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToList();
+    }
+
+    private void PlayerSelectedFromAutocomplete(Player player) { /* Your existing logic */
+        if (player != null && !_roundEntryModel.SelectedPlayers.Any(p => p.PlayerId == player.PlayerId))
+        {
+            _roundEntryModel.SelectedPlayers.Add(player);
+        }
+        _selectedPlayerForAutocomplete = null; 
+        StateHasChanged();
+    }
+
+    private void RemovePlayerFromRound(MudChip<Player> chip) { /* Your existing logic for MudChip<Player> */
+        if (chip.Value != null)
+        {
+            _roundEntryModel.SelectedPlayers.Remove(chip.Value);
+            StateHasChanged();
+        }
+    }
+
+    // --- Stepper Navigation & Validation ---
+    private bool PerformRoundSetupStepValidation()
+    {
+        if (_roundSetupForm?.EditContext == null) return false;
+        bool isValidByAnnotations = _roundSetupForm.EditContext.Validate();
+
+        if (!isValidByAnnotations) return false; // Let EditForm display errors via ValidationSummary
+
+        if (!_roundEntryModel.SelectedPlayers.Any()) {
+            // Log this or set a flag for HandleNextStepButtonClick to show Snackbar
+            return false;
+        }
+        return true;
+    }
+
+    private async Task HandleRoundSetupFormSubmitAsync()
+    {
+        // This is called when EditForm validation (DataAnnotations) passes.
+        // We still need our custom validation (e.g., at least one player).
+        if (!_roundEntryModel.SelectedPlayers.Any())
+        {
+            Snackbar.Add("Please select at least one player before proceeding.", Severity.Warning);
+            return;
+        }
+        await HandleRoundSetupCompleteAndProceed();
+    }
+
+
+    private async Task HandleNextStepButtonClick()
+    {
+        if (_activeIndex == 0) // If on Round Setup Step
+        {
+            if (PerformRoundSetupStepValidation())
+            {
+                await HandleRoundSetupCompleteAndProceed();
+            }
+            else
+            {
+                Snackbar.Add("Please correct validation errors in Round Setup.", Severity.Warning);
+            }
+        }
+        else if (_activeIndex < MaxStepIndex)
+        {
+            _activeIndex++;
+            StateHasChanged();
+        }
+    }
+
+    private void GoToPreviousStep()
+    {
+        if (_activeIndex > 0)
+        {
+            _activeIndex--;
+            StateHasChanged();
+        }
+    }
+
+
+    private async Task HandleRoundSetupCompleteAndProceed()
+    {
+        Snackbar.Add("Round setup successful (simulated). Preparing scorecard...", Severity.Info);
+        _currentDbRoundId = -1;
+
+        if (_roundEntryModel.GolfCourseId > 0)
+        {
+            if (!_allHolesForSelectedCourse.Any() || _allHolesForSelectedCourse.First().GolfCourseId != _roundEntryModel.GolfCourseId)
+            {
+                _allHolesForSelectedCourse = await HoleService.GetHolesForCourseAsync(_roundEntryModel.GolfCourseId);
+            }
+        }
+        CalculatePlayedHolesOrder();
+        InitializeScorecardStructure();
+
+        _activeIndex++;
+        StateHasChanged();
+    }
+
+
+    private void CalculatePlayedHolesOrder() { /* Your existing logic */ 
+        _playedHolesOrdered.Clear();
+        if (_roundEntryModel.GolfCourseId == 0 || !_allHolesForSelectedCourse.Any() || _roundEntryModel.HolesPlayed == 0)
+        {
+            return;
+        }
+        int currentHoleNum = _roundEntryModel.StartingHole;
+        int maxHoleNumOnCourse = _allHolesForSelectedCourse.Max(h => h.HoleNumber); // Cache this if course doesn't change
+        for (int i = 0; i < _roundEntryModel.HolesPlayed; i++)
+        {
+            var hole = _allHolesForSelectedCourse.FirstOrDefault(h => h.HoleNumber == currentHoleNum);
+            if (hole != null)
+            {
+                _playedHolesOrdered.Add(hole);
+            }
+            currentHoleNum++;
+            if (currentHoleNum > maxHoleNumOnCourse) 
+            {
+                currentHoleNum = 1; // Wrap around
+            }
+        }
+    }
+
+        private void InitializeScorecardStructure() { /* Your existing logic */ 
+        _roundEntryModel.Scorecard.Clear();
+        if (!_roundEntryModel.SelectedPlayers.Any() || !_playedHolesOrdered.Any()) return;
+
+        foreach (var player in _roundEntryModel.SelectedPlayers)
+        {
+            var scoresForPlayer = new List<HoleScoreEntryModel>();
+            foreach (var hole in _playedHolesOrdered)
+            {
+                scoresForPlayer.Add(new HoleScoreEntryModel
+                {
+                    HoleId = hole.HoleId, HoleNumber = hole.HoleNumber, Par = hole.Par,
+                    StrokeIndex = hole.StrokeIndex ?? 0, LengthYards = hole.LengthYards
+                });
+            }
+            _roundEntryModel.Scorecard.Add(player.PlayerId, scoresForPlayer);
+        }
+    }
+
+    private async Task OpenQuickAddPlayerDialogAsync() { /* ... placeholder with await Task.Yield() ... */
+        Snackbar.Add("Quick Add Player dialog to be implemented.", Severity.Info);
+        await Task.Yield();
+    }
+    private async Task SubmitRoundAndScoresAsync() { /* ... placeholder with await Task.Yield() ... */
+        Snackbar.Add("Submitting round and scores logic to be implemented.", Severity.Info);
+        await Task.Yield();
+    }
+}

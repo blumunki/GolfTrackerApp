@@ -11,6 +11,12 @@ namespace GolfTrackerApp.Web.Models
         Competitive
         // Add more if needed
     }
+    public enum RoundCompletionStatus
+    {
+        InProgress,
+        Completed,
+        Abandoned // Optional, for future use
+    }
     public class Round
     {
         public int RoundId { get; set; } // Primary Key
@@ -41,6 +47,9 @@ namespace GolfTrackerApp.Web.Models
         public string CreatedByApplicationUserId { get; set; } = string.Empty; // No longer nullable
         [ForeignKey("CreatedByApplicationUserId")]
         public virtual ApplicationUser? CreatedByApplicationUser { get; set; }
+
+        [Required]
+        public RoundCompletionStatus Status { get; set; } = RoundCompletionStatus.InProgress; // Default to InProgress
 
         // Navigation property for Scores in this round
         public virtual ICollection<Score> Scores { get; set; } = new List<Score>();
