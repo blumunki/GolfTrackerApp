@@ -55,12 +55,13 @@
                         </MudSelect>
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudSelect T="int" Label="Golf Course" @bind-Value="_roundEntryModel.GolfCourseId" 
+                        <MudSelect T="int" Label="Golf Course" 
+                                @bind-Value="_roundEntryModel.GolfCourseId" 
                                 For="@(() => _roundEntryModel.GolfCourseId)"
-                                Disabled="@(_roundEntryModel.SelectedGolfClubId == 0)" 
+                                Disabled="@(_roundEntryModel.SelectedGolfClubId == 0 || !_golfCoursesForSelectedClub.Any())"
                                 Required="true" RequiredError="Golf Course is required!"
                                 onValueChanged="OnGolfCourseSelectedAsync">
-                            <MudSelectItem T="int" Value="0">Select a Course</MudSelectItem>
+                            <MudSelectItem T="int" Value="0">@( _roundEntryModel.SelectedGolfClubId == 0 ? "Select a Club first" : (_golfCoursesForSelectedClub.Any() ? "Select a Course" : "No courses for this club"))</MudSelectItem>
                             @foreach (var course in _golfCoursesForSelectedClub)
                             {
                                 <MudSelectItem T="int" Value="@course.GolfCourseId">@course.Name</MudSelectItem>
@@ -75,18 +76,17 @@
                                         @bind-Value="_selectedPlayerForAutocomplete" 
                                         ToStringFunc="@(p => p == null ? string.Empty : $"{p.FirstName} {p.LastName}")"
                                         ShowProgressIndicator="true" DebounceInterval="300" 
-                                        onItemSelected="PlayerSelectedFromAutocomplete"
+                                        onItemSelected="@((Player selectedPlayer) => PlayerSelectedFromAutocomplete(selectedPlayer))"
                                         ResetValueOnEmptyText="true" CoerceValue="true" CoerceText="true" 
-                                        Placeholder="Type to search..." 
-                                        Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                        Placeholder="Type to search..." Variant="Variant.Outlined" Margin="Margin.Dense"/>
                         
                         @if (_roundEntryModel.SelectedPlayers.Any())
                         {
-                            <MudText Class="mt-2">Selected Players:</MudText>
-                            <MudChipSet Class="mt-1" AllClosable="true" OnClose="@((MudChip<Player> chip) => RemovePlayerFromRound(chip))"> @* Corrected OnClose *@
-                                @foreach (var player in _roundEntryModel.SelectedPlayers)
+                            <MudText Class="mt-2">Selected Players (@_roundEntryModel.SelectedPlayers.Count):</MudText>
+                            <MudChipSet Class="mt-1" AllClosable="true" OnClose="@((MudChip<Player> chip) => RemovePlayerFromRound(chip))">
+                                @foreach (var selectedP in _roundEntryModel.SelectedPlayers) @* Changed loop variable name *@
                                 {
-                                    <MudChip T="Player" Value="@player" Text="@($"{player.FirstName} {player.LastName}")" /> @* Added T="Player" *@
+                                    <MudChip T="Player" Value="@selectedP" Text="@($"{selectedP.FirstName} {selectedP.LastName}")" />
                                 }
                             </MudChipSet>
                         }
@@ -237,7 +237,8 @@ else // This case means isInitialized is false (still loading initial data)
         try
         {
             _golfClubs = await GolfClubService.GetAllGolfClubsAsync(); // Assuming this doesn't need admin context for now
-            _availablePlayers = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin); // Use admin status here
+            _availablePlayers = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin);
+            Logger.LogInformation("Loaded {PlayerCount} available players for selection.", _availablePlayers.Count);
             isInitialized = true; // Mark initialization as complete and successful
         }
         catch (Exception ex)
@@ -255,14 +256,33 @@ else // This case means isInitialized is false (still loading initial data)
         _golfCoursesForSelectedClub.Clear();
         _allHolesForSelectedCourse.Clear();
         _playedHolesOrdered.Clear();
-        _maxHolesForCourse = 18; 
+        _maxHolesForCourse = 18;
+        
         if (selectedClubId > 0)
         {
-            var club = await GolfClubService.GetGolfClubByIdAsync(selectedClubId); 
-            if (club?.GolfCourses != null)
+            try
             {
-                _golfCoursesForSelectedClub = club.GolfCourses.ToList();
+                Logger.LogInformation("Fetching club details for ID {SelectedClubId}...", selectedClubId);
+                var club = await GolfClubService.GetGolfClubByIdAsync(selectedClubId);
+                if (club?.GolfCourses != null)
+                {
+                    _golfCoursesForSelectedClub = club.GolfCourses.OrderBy(c => c.Name).ToList();
+                    Logger.LogInformation("Found {CourseCount} courses for club ID {SelectedClubId}.", _golfCoursesForSelectedClub.Count, selectedClubId);
+                }
+                else
+                {
+                    Logger.LogWarning("Club with ID {SelectedClubId} found, but it has no courses or GolfCourses collection was null.", selectedClubId);
+                }
             }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error fetching courses for club ID {SelectedClubId}", selectedClubId);
+                Snackbar.Add($"Error loading courses for selected club: {ex.Message}", Severity.Error);
+            }
+        }
+        else
+        {
+            Logger.LogInformation("Golf Club selection cleared.");
         }
         StateHasChanged();
     }
@@ -286,25 +306,36 @@ else // This case means isInitialized is false (still loading initial data)
 
     private async Task<IEnumerable<Player>> SearchPlayersAsync(string value, CancellationToken token)
     {
-        // Simulate async work; in a real app, you might await a true async call here
-        await Task.Delay(50, token);
+        await Task.Delay(50, token); // Minimal await for async search behavior
         if (token.IsCancellationRequested)
             return Enumerable.Empty<Player>();
 
-        if (string.IsNullOrEmpty(value))
-            return _availablePlayers.Except(_roundEntryModel.SelectedPlayers).OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToList();
+        var playersToSearch = _availablePlayers.Except(_roundEntryModel.SelectedPlayers).ToList();
 
-        return _availablePlayers.Except(_roundEntryModel.SelectedPlayers)
-            .Where(p => $"{p.FirstName} {p.LastName}".Contains(value, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(p => p.FirstName).ThenBy(p => p.LastName).ToList();
+        if (string.IsNullOrEmpty(value))
+            return playersToSearch.OrderBy(p => p.FirstName).ThenBy(p => p.LastName);
+
+        return playersToSearch
+            .Where(p => $"{p.FirstName} {p.LastName}".Contains(value, StringComparison.OrdinalIgnoreCase) ||
+                        (p.ApplicationUser?.Email ?? "").Contains(value, StringComparison.OrdinalIgnoreCase) ) // Optional: search by email too
+            .OrderBy(p => p.FirstName).ThenBy(p => p.LastName);
     }
 
-    private void PlayerSelectedFromAutocomplete(Player player) { /* Your existing logic */
-        if (player != null && !_roundEntryModel.SelectedPlayers.Any(p => p.PlayerId == player.PlayerId))
+    private void PlayerSelectedFromAutocomplete(Player player) 
+    {
+        if (player != null) // player is the actual selected Player object
         {
-            _roundEntryModel.SelectedPlayers.Add(player);
+            if (!_roundEntryModel.SelectedPlayers.Any(p => p.PlayerId == player.PlayerId))
+            {
+                _roundEntryModel.SelectedPlayers.Add(player);
+                Logger.LogInformation("Player '{FirstName} {LastName}' added to round.", player.FirstName, player.LastName);
+            }
+            else
+            {
+                Logger.LogInformation("Player '{FirstName} {LastName}' is already selected.", player.FirstName, player.LastName);
+            }
         }
-        _selectedPlayerForAutocomplete = null; 
+        _selectedPlayerForAutocomplete = null; // Clear the autocomplete input
         StateHasChanged();
     }
 
