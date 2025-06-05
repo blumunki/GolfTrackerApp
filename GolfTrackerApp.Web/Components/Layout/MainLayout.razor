@@ -1,10 +1,10 @@
 ﻿@inherits LayoutComponentBase
-@using MudBlazor
-@using GolfTrackerApp.Web.Components.Account.Shared 
-@using Microsoft.AspNetCore.Components.Authorization 
-@using System.Security.Claims 
 
-@inject NavigationManager NavigationManager
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@using GolfTrackerApp.Web.Components.Account.Shared
+@using GolfTrackerApp.Web.Components.Layout
 
 <MudThemeProvider />
 <MudDialogProvider />
@@ -12,12 +12,11 @@
 <MudPopoverProvider />
 
 <MudLayout>
-    <MudAppBar Elevation="1" Fixed="true"> @* Fixed="true" is default, but explicit for clarity *@
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+    <MudAppBar Elevation="1" Fixed="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@(() => DrawerToggle())" />
         <MudText Typo="Typo.h6" Class="ml-3">Golf Tracker App</MudText>
         <MudSpacer />
         <AuthorizeView>
-            @* ... your existing AuthorizeView content for login/logout ... *@
             <Authorized>
                 <MudText Typo="Typo.body1" Class="mr-2">Hello, @context.User.Identity?.Name!</MudText>
                 <MudTooltip Text="Manage Account">
@@ -46,17 +45,19 @@
         <NavMenu />
     </MudDrawer>
 
-    @* VVV MODIFIED MudMainContent and added MudContainer VVV *@
-    <MudMainContent> @* Removed Class="pa-4" *@
-        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4 mt-4"> @* Add padding to the container instead, especially top margin/padding *@
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="pa-4 mt-4">
             @Body
         </MudContainer>
     </MudMainContent>
 </MudLayout>
 
 @code {
-    private bool _drawerOpen = true; 
+    private bool _drawerOpen = true;
     private string? currentUrl;
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
 
     protected override void OnInitialized()
     {
@@ -67,9 +68,10 @@
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
     }
 
-    void DrawerToggle()
+    private void DrawerToggle()
     {
         _drawerOpen = !_drawerOpen;
     }

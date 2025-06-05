@@ -376,32 +376,83 @@ else // This case means isInitialized is false (still loading initial data)
 
     private async Task HandleRoundSetupCompleteAndProceed()
     {
-        Snackbar.Add("Round setup successful (simulated). Preparing scorecard...", Severity.Info);
-        _currentDbRoundId = -1;
-
-        if (_roundEntryModel.GolfCourseId > 0)
+        if (string.IsNullOrWhiteSpace(_currentUserId))
         {
-            if (!_allHolesForSelectedCourse.Any() || _allHolesForSelectedCourse.First().GolfCourseId != _roundEntryModel.GolfCourseId)
+            Snackbar.Add("Cannot proceed: User context is missing. Please re-login.", Severity.Error);
+            Logger.LogError("HandleRoundSetupCompleteAndProceed: _currentUserId is missing.");
+            return;
+        }
+
+        if (_roundEntryModel.GolfCourseId == 0 || !_roundEntryModel.SelectedPlayers.Any())
+        {
+            Snackbar.Add("Cannot proceed: Golf Course and at least one Player must be selected.", Severity.Error);
+            return;
+        }
+
+        // Combine Date and TeeTime for the Round's DatePlayed property
+        DateTime roundDateTime = _roundEntryModel.DatePlayed ?? DateTime.Today; // Default to today if somehow null
+        if (_roundEntryModel.TeeTime.HasValue)
+        {
+            roundDateTime = roundDateTime.Date + _roundEntryModel.TeeTime.Value;
+        }
+
+        var newDbRound = new Round
+        {
+            GolfCourseId = _roundEntryModel.GolfCourseId,
+            DatePlayed = roundDateTime,
+            StartingHole = _roundEntryModel.StartingHole,
+            HolesPlayed = _roundEntryModel.HolesPlayed,
+            RoundType = _roundEntryModel.RoundType, // This is RoundTypeOption enum
+            Notes = _roundEntryModel.Notes,
+            Status = RoundCompletionStatus.InProgress, // Set status to InProgress
+            CreatedByApplicationUserId = _currentUserId // Set the owner
+        };
+
+        try
+        {
+            var playerIdsForRound = _roundEntryModel.SelectedPlayers.Select(p => p.PlayerId).ToList();
+            
+            // AddRoundAsync creates the Round and associated RoundPlayer links
+            Round createdRound = await RoundService.AddRoundAsync(newDbRound, playerIdsForRound);
+            
+            _currentDbRoundId = createdRound.RoundId; // Store the ID of the newly created round
+            Snackbar.Add($"Round created with ID: {_currentDbRoundId} and set to 'In Progress'. Proceed to enter scores.", Severity.Success);
+
+            // Prepare data for the scorecard step
+            if (_allHolesForSelectedCourse.Count == 0 || _allHolesForSelectedCourse.First().GolfCourseId != _roundEntryModel.GolfCourseId)
             {
-                _allHolesForSelectedCourse = await HoleService.GetHolesForCourseAsync(_roundEntryModel.GolfCourseId);
+                 _allHolesForSelectedCourse = await HoleService.GetHolesForCourseAsync(_roundEntryModel.GolfCourseId);
+            }
+            CalculatePlayedHolesOrder();    // Uses _roundEntryModel.StartingHole, _roundEntryModel.HolesPlayed, _allHolesForSelectedCourse
+            InitializeScorecardStructure(); // Uses _roundEntryModel.SelectedPlayers, _playedHolesOrdered
+
+            if (_activeIndex < MaxStepIndex)
+            {
+                _activeIndex++;
+                StateHasChanged();
             }
         }
-        CalculatePlayedHolesOrder();
-        InitializeScorecardStructure();
-
-        _activeIndex++;
-        StateHasChanged();
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating round or preparing scorecard structure.");
+            Snackbar.Add($"Error starting round: {ex.Message}", Severity.Error);
+            // Do not advance the stepper if there's an error
+        }
     }
 
-
-    private void CalculatePlayedHolesOrder() { /* Your existing logic */ 
+    private void CalculatePlayedHolesOrder()
+    {
         _playedHolesOrdered.Clear();
         if (_roundEntryModel.GolfCourseId == 0 || !_allHolesForSelectedCourse.Any() || _roundEntryModel.HolesPlayed == 0)
         {
+            Logger.LogWarning("CalculatePlayedHolesOrder: Cannot calculate, missing course, holes, or holes played count.");
             return;
         }
+
         int currentHoleNum = _roundEntryModel.StartingHole;
-        int maxHoleNumOnCourse = _allHolesForSelectedCourse.Max(h => h.HoleNumber); // Cache this if course doesn't change
+        // Find max hole number on the actual selected course to handle wrap-around correctly
+        int maxHoleNumOnCourse = _allHolesForSelectedCourse.Any() ? _allHolesForSelectedCourse.Max(h => h.HoleNumber) : 18; // Default to 18 if no holes loaded (should not happen)
+        
         for (int i = 0; i < _roundEntryModel.HolesPlayed; i++)
         {
             var hole = _allHolesForSelectedCourse.FirstOrDefault(h => h.HoleNumber == currentHoleNum);
@@ -409,17 +460,29 @@ else // This case means isInitialized is false (still loading initial data)
             {
                 _playedHolesOrdered.Add(hole);
             }
+            else
+            {
+                Logger.LogWarning("Could not find hole number {CurrentHoleNum} for course ID {CourseId} during played hole calculation.", currentHoleNum, _roundEntryModel.GolfCourseId);
+                // Potentially add a placeholder or handle this error more gracefully
+            }
+
             currentHoleNum++;
             if (currentHoleNum > maxHoleNumOnCourse) 
             {
-                currentHoleNum = 1; // Wrap around
+                currentHoleNum = 1; // Wrap around to hole 1
             }
         }
+        Logger.LogInformation("Calculated played holes order: {@PlayedHoles}", _playedHolesOrdered.Select(h => h.HoleNumber));
     }
 
-        private void InitializeScorecardStructure() { /* Your existing logic */ 
+    private void InitializeScorecardStructure()
+    {
         _roundEntryModel.Scorecard.Clear();
-        if (!_roundEntryModel.SelectedPlayers.Any() || !_playedHolesOrdered.Any()) return;
+        if (!_roundEntryModel.SelectedPlayers.Any() || !_playedHolesOrdered.Any())
+        {
+            Logger.LogWarning("InitializeScorecardStructure: Cannot initialize, no selected players or no played holes defined.");
+            return;
+        }
 
         foreach (var player in _roundEntryModel.SelectedPlayers)
         {
@@ -428,12 +491,19 @@ else // This case means isInitialized is false (still loading initial data)
             {
                 scoresForPlayer.Add(new HoleScoreEntryModel
                 {
-                    HoleId = hole.HoleId, HoleNumber = hole.HoleNumber, Par = hole.Par,
-                    StrokeIndex = hole.StrokeIndex ?? 0, LengthYards = hole.LengthYards
+                    HoleId = hole.HoleId, // Store actual HoleId
+                    HoleNumber = hole.HoleNumber,
+                    Par = hole.Par,
+                    StrokeIndex = hole.StrokeIndex ?? 0, 
+                    LengthYards = hole.LengthYards,
+                    Strokes = null, // Initialize scores as null
+                    Putts = null,
+                    FairwayHit = null
                 });
             }
             _roundEntryModel.Scorecard.Add(player.PlayerId, scoresForPlayer);
         }
+        Logger.LogInformation("Scorecard structure initialized for {PlayerCount} players and {HoleCount} holes.", _roundEntryModel.SelectedPlayers.Count, _playedHolesOrdered.Count);
     }
 
     private async Task OpenQuickAddPlayerDialogAsync() { /* ... placeholder with await Task.Yield() ... */
