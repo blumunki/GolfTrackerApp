@@ -101,9 +101,9 @@ else
 
         var parameters = new DialogParameters<ConfirmDialog>
         {
-            { x => x.ContentText, $"Are you sure you want to delete golf club: {club.Name}? This may also affect associated courses and rounds. This action cannot be undone." },
-            { x => x.ButtonText, "Delete" },
-            { x => x.Color, Color.Error }
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete {club.Name}? This cannot be undone." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
         };
         var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
         var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters, options);
