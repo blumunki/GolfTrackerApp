@@ -14,9 +14,6 @@
             <MudNavLink Href="rounds" Icon="@Icons.Material.Filled.GolfCourse">Rounds</MudNavLink> @* Using GolfCourse icon for rounds *@
             <MudNavLink Href="rounds/record" Icon="@Icons.Material.Filled.AddCircleOutline" IconColor="Color.Success">Record New Round</MudNavLink>
 
-            <MudListSubheader>Course Management</MudListSubheader> @* Optional subheader *@
-            <MudNavLink Href="golfcourses/add" Icon="@Icons.Material.Filled.AddCircleOutline">Add Course</MudNavLink> @* Example, refine routes as needed *@
-
             @* Player Account Links *@
             <MudListSubheader>My Account</MudListSubheader>
             <MudNavLink Href="Account/Manage" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
