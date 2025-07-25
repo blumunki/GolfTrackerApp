@@ -3,99 +3,78 @@
 @inject IRoundService RoundService
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider // To get current user
+@inject ISnackbar Snackbar
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
-@using Microsoft.AspNetCore.Authorization // Ensure this is present
-@using System.Security.Claims // For ClaimTypes
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
 @rendermode InteractiveServer
 
 <PageTitle>Golf Rounds</PageTitle>
+<MudText Typo="Typo.h4" GutterBottom="true">Golf Rounds</MudText>
 
-<h1>Golf Rounds</h1>
-
-@* <p><button class="btn btn-primary" @onclick="GoToAddRoundPage">Record New Round</button></p> *@
-<p><em>(Ability to manually record new rounds via UI to be implemented later.)</em></p>
-
-@if (rounds == null && isLoading)
+@if (isLoading)
 {
-    <p><em>Loading rounds...</em></p>
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
-else if (rounds == null || !rounds.Any())
+else if (rounds is null || !rounds.Any())
 {
-    <p><em>No rounds found.</em></p>
+    <MudText>No rounds found. Use the "Record New Round" link in the menu to get started.</MudText>
 }
 else
 {
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Course</th>
-                <th>Type</th>
-                <th>Holes Played</th>
-                <th>Players</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var round in rounds.OrderByDescending(r => r.DatePlayed))
-            {
-                <tr>
-                    <td>@round.DatePlayed.ToShortDateString()</td>
-                    <td>@(round.GolfCourse?.GolfClub?.Name) - @(round.GolfCourse?.Name)</td>
-                    <td>@round.RoundType</td>
-                    <td>@round.HolesPlayed (Start: @round.StartingHole)</td>
-                    <td>@round.RoundPlayers.Count()</td>
-                    <td>
-                        <button class="btn btn-sm btn-info" @onclick="() => ViewRoundDetails(round.RoundId)">View Details</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <MudTable Items="@rounds.OrderByDescending(r => r.DatePlayed)" Hover="true" Striped="true" Dense="true" Class="mt-4" Elevation="1">
+        <HeaderContent>
+            <MudTh>Date</MudTh>
+            <MudTh>Course</MudTh>
+            <MudTh>Type</MudTh>
+            <MudTh>Players</MudTh>
+            <MudTh Style="text-align:right">Actions</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Date">@context.DatePlayed.ToString("dd/MM/yyyy")</MudTd>
+            <MudTd DataLabel="Course">@($"{context.GolfCourse?.GolfClub?.Name} - {context.GolfCourse?.Name}")</MudTd>
+            <MudTd DataLabel="Type">@context.RoundType</MudTd>
+            <MudTd DataLabel="Players">@context.RoundPlayers.Count</MudTd>
+            <MudTd Style="text-align:right">
+                <MudTooltip Text="View Details">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewRoundDetails(context.RoundId))" />
+                </MudTooltip>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
 }
 
 @code {
     private List<Round>? rounds;
     private bool isLoading = true;
-    private string _currentUserId = string.Empty; // Ensure this is populated
-    private bool _isCurrentUserAdmin = false;  // Ensure this is populated
+    private string _currentUserId = string.Empty;
+    private bool _isCurrentUserAdmin = false;
 
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync(); // Assuming you inject AuthenticationStateProvider
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        if (user.Identity != null && user.Identity.IsAuthenticated)
+        if (user.Identity is { IsAuthenticated: true })
         {
-            _currentUserId = user.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? string.Empty;
+            _currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
             _isCurrentUserAdmin = user.IsInRole("Admin");
-        }
-        else
-        {
-            NavigationManager.NavigateTo("Account/Login", forceLoad: true);
-            isLoading = false;
-            return;
+            
+            try
+            {
+                rounds = await RoundService.GetAllRoundsAsync(_currentUserId, _isCurrentUserAdmin);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error loading rounds: {ex.Message}", Severity.Error);
+            }
         }
         
-        if (string.IsNullOrEmpty(_currentUserId) && !_isCurrentUserAdmin)
-        {
-            Console.WriteLine("User is authenticated but UserID is missing and not an Admin in ListRounds.");
-            rounds = new List<Round>();
-            isLoading = false;
-            return;
-        }
-
-        try
-        {
-            // VVV UPDATE THIS CALL VVV
-            rounds = await RoundService.GetAllRoundsAsync(_currentUserId, _isCurrentUserAdmin);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading rounds: {ex.Message}");
-        }
         isLoading = false;
     }
 
@@ -103,9 +82,4 @@ else
     {
         NavigationManager.NavigateTo($"/rounds/{roundId}");
     }
-
-    // private void GoToAddRoundPage()
-    // {
-    //     NavigationManager.NavigateTo("/rounds/add"); // For future implementation
-    // }
 }
