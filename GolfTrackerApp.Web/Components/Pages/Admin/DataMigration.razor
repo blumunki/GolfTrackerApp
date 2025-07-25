@@ -482,6 +482,24 @@
         log.AppendLine($"Starting Players import from {playersFile.Name}...");
         StateHasChanged();
 
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userPrincipal = authState.User;
+        if (userPrincipal.Identity is null || !userPrincipal.Identity.IsAuthenticated)
+        {
+            log.AppendLine("FATAL ERROR: You must be logged in to import data.");
+            playersImportLog = log.ToString();
+            isProcessingPlayers = false;
+            return;
+        }
+        var currentUserId = userPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            log.AppendLine("FATAL ERROR: Could not determine the current user's ID.");
+            playersImportLog = log.ToString();
+            isProcessingPlayers = false;
+            return;
+        }
+
         await using var scope = ServiceScopeFactory.CreateAsyncScope();
         var playerService = scope.ServiceProvider.GetRequiredService<IPlayerService>();
         //var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>(); // For ApplicationUser
@@ -559,7 +577,8 @@
                     else // Managed player
                     {
                         // New managed players will be created by the _migrationAdminUserId
-                        var managedPlayerKey = $"{record.FirstName!.ToLowerInvariant()}_{record.LastName!.ToLowerInvariant()}_{_migrationAdminUserId}";
+                        //var managedPlayerKey = $"{record.FirstName!.ToLowerInvariant()}_{record.LastName!.ToLowerInvariant()}_{_migrationAdminUserId}";
+                        var managedPlayerKey = $"{record.FirstName!.ToLowerInvariant()}_{record.LastName!.ToLowerInvariant()}_{currentUserId}";
                         if (existingManagedPlayerNames.Contains(managedPlayerKey))
                         {
                             log.AppendLine($"Skipped: Managed player '{record.FirstName} {record.LastName}' already exists for this admin.");
@@ -574,7 +593,8 @@
                         LastName = record.LastName,
                         // // Store email on Player model if you added it, useful even for managed players
                         Handicap = record.Handicap,
-                        ApplicationUserId = appUserId
+                        ApplicationUserId = appUserId,
+                        CreatedByApplicationUserId = currentUserId
                     };
 
                     await playerService.AddPlayerAsync(newPlayer);
@@ -585,7 +605,8 @@
                     }
                     else
                     {
-                        existingManagedPlayerNames.Add($"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}");
+                        //existingManagedPlayerNames.Add($"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}");
+                        existingManagedPlayerNames.Add($"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}_{currentUserId}");
                     }
                     successCount++;
                     log.AppendLine($"Added Player: {newPlayer.FirstName} {newPlayer.LastName} {(isRegisteredPlayer ? $"(User: {record.Email})" : "(Managed)")}");
@@ -765,6 +786,17 @@
         log.AppendLine($"Starting Rounds import from {roundsFile.Name}...");
         StateHasChanged(); // Update UI to show processing
 
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userPrincipal = authState.User;
+        var currentUserId = userPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            log.AppendLine("FATAL ERROR: You must be logged in to import data.");
+            roundsImportLog = log.ToString();
+            isProcessingRounds = false;
+            return;
+        }
+
         await using var scope = ServiceScopeFactory.CreateAsyncScope();
         var roundService = scope.ServiceProvider.GetRequiredService<IRoundService>();
         var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
@@ -778,14 +810,20 @@
             course => course.GolfCourseId
         );
 
-        // VVV UPDATE THIS CALL VVV
+        var playersFromDb = await playerService.GetAllPlayersAsync(currentUserId, true); // Assuming admin context
+        var playerLookup = playersFromDb.ToDictionary(
+            player => $"{player.FirstName?.ToLowerInvariant()} {player.LastName?.ToLowerInvariant()}".Trim(),
+            player => player.PlayerId
+        );
+
+        @* // VVV UPDATE THIS CALL VVV
         var playersFromDb = await playerService.GetAllPlayersAsync(_migrationAdminUserId, _isMigrationAdmin);
         // IMPORTANT: Adjust this playerLookup key based on how PlayerName in CSV matches your Player data.
         // This assumes PlayerName in CSV is "FirstName LastName".
         var playerLookup = playersFromDb.ToDictionary(
             player => $"{player.FirstName?.ToLowerInvariant()} {player.LastName?.ToLowerInvariant()}".Trim(),
             player => player.PlayerId
-        );
+        ); *@
         // If PlayerName in CSV is just FirstName (and LastName was empty/default during player import):
         // var playerLookup = playersFromDb.ToDictionary(
         //     player => player.FirstName.ToLowerInvariant(),
@@ -889,7 +927,9 @@
                             StartingHole = firstRecordInGroup.StartingHole,
                             HolesPlayed = firstRecordInGroup.HolesPlayed,
                             RoundType = roundTypeEnum, // Assign the enum directly
-                            Notes = null
+                            Notes = null,
+                            CreatedByApplicationUserId = currentUserId,
+                            Status = RoundCompletionStatus.Completed // Default status for imported rounds
                         };
                         dbContext.Rounds.Add(newDbRound);
                         await dbContext.SaveChangesAsync(); // Save to get newDbRound.RoundId
