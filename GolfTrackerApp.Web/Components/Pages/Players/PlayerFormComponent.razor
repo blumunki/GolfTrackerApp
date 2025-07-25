@@ -1,108 +1,37 @@
-@* File: Components/Pages/Players/PlayerFormComponent.razor *@
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Data // Assuming ApplicationUser is here
 @using Microsoft.AspNetCore.Identity
 
-<EditForm Model="@PlayerModel" OnValidSubmit="OnSubmitFormWrapper">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+<MudCardContent>
+    <MudTextField @bind-Value="PlayerModel.FirstName" For="@(() => PlayerModel.FirstName)" Label="First Name" Required="true" RequiredError="First name is required." Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudTextField @bind-Value="PlayerModel.LastName" For="@(() => PlayerModel.LastName)" Label="Last Name" Required="true" RequiredError="Last name is required." Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudNumericField @bind-Value="PlayerModel.Handicap" For="@(() => PlayerModel.Handicap)" Label="Handicap" Format="N1" Variant="Variant.Outlined" Margin="Margin.Dense" />
 
-    <div class="mb-3">
-        <label class="form-label">First Name:</label>
-        <InputText @bind-Value="PlayerModel.FirstName" class="form-control" />
-        <ValidationMessage For="@(() => PlayerModel.FirstName)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Last Name:</label>
-        <InputText @bind-Value="PlayerModel.LastName" class="form-control" />
-        <ValidationMessage For="@(() => PlayerModel.LastName)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Handicap:</label>
-        <InputNumber @bind-Value="PlayerModel.Handicap" class="form-control" />
-        <ValidationMessage For="@(() => PlayerModel.Handicap)" />
-    </div>
-
-    <div class="mb-3 form-check">
-        <InputCheckbox @bind-Value="IsRegisteredUserCandidate" id="isRegistered" class="form-check-input" @oninput="HandleIsRegisteredCheckChange" />
-        <label for="isRegistered" class="form-check-label">Link to a registered system user?</label>
-    </div>
+    <MudSwitch @bind-checked="IsRegisteredUserCandidate" Color="Color.Primary" Label="Link to a registered system user?" T="bool" />
 
     @if (IsRegisteredUserCandidate)
     {
-        <div class="mb-3">
-            <label class="form-label">Registered User Email:</label>
-            <InputText @bind-Value="UserEmailToLink" class="form-control" placeholder="user@example.com" />
-            <ValidationMessage For="@(() => UserEmailToLink)" /> @* Won't validate directly unless UserEmailToLink is a property with attributes on a model used by EditForm *@
-            <small class="form-text text-muted">
-                If an email is provided, the system will attempt to link this player profile.
-                For new system users, they should register through the standard registration process first.
-                If editing, this shows the linked user's email.
-            </small>
-        </div>
+        <MudTextField @bind-Value="UserEmailToLink" Label="Registered User Email" HelperText="The system will link this player to an existing user with this email." Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email" />
     }
-
-    <button type="submit" class="btn btn-success">@SubmitButtonText</button>
-    <button type="button" class="btn btn-secondary" @onclick="OnCancelForm">Cancel</button>
-</EditForm>
+</MudCardContent>
 
 @code {
     [Parameter]
     public Player PlayerModel { get; set; } = new();
 
     [Parameter]
-    public EventCallback<FormSubmitArgs> OnSubmitForm { get; set; } // Changed to pass more args
-
-    [Parameter]
-    public EventCallback OnCancelForm { get; set; }
-
-    [Parameter]
-    public string SubmitButtonText { get; set; } = "Save Player";
-
-    [Parameter]
-    public string InitialUserEmail { get; set; } = string.Empty; // For pre-filling email when editing
+    public string InitialUserEmail { get; set; } = string.Empty;
 
     public bool IsRegisteredUserCandidate { get; set; }
     public string UserEmailToLink { get; set; } = string.Empty;
 
     protected override void OnParametersSet()
     {
-        // If PlayerModel.ApplicationUserId has a value, it means it's linked or intended to be.
-        // IsRegisteredUserCandidate should reflect this.
-        // InitialUserEmail is passed in when editing a player who is already linked.
+        // Pre-populate the form state when editing an existing player
         if (!string.IsNullOrEmpty(PlayerModel.ApplicationUserId) || !string.IsNullOrEmpty(InitialUserEmail))
         {
             IsRegisteredUserCandidate = true;
-            UserEmailToLink = InitialUserEmail; // Pre-fill from parameter if editing linked user
+            UserEmailToLink = InitialUserEmail;
         }
-        else
-        {
-            IsRegisteredUserCandidate = false;
-            UserEmailToLink = string.Empty;
-        }
-    }
-
-    private async Task OnSubmitFormWrapper()
-    {
-        // If "IsRegisteredUserCandidate" is false, ensure UserEmailToLink is considered empty
-        // so the parent component doesn't try to link.
-        string? emailToProcess = IsRegisteredUserCandidate ? UserEmailToLink : null;
-        await OnSubmitForm.InvokeAsync(new FormSubmitArgs { PlayerData = PlayerModel, EmailToLink = emailToProcess });
-    }
-
-    // Optional: Clear email if checkbox is unchecked
-    private void HandleIsRegisteredCheckChange(ChangeEventArgs e)
-    {
-        if (e.Value is bool isChecked && !isChecked)
-        {
-            UserEmailToLink = string.Empty;
-        }
-    }
-
-    // Helper class for event callback arguments
-    public class FormSubmitArgs
-    {
-        public Player PlayerData { get; set; } = new Player();
-        public string? EmailToLink { get; set; }
     }
 }

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Security.Claims;
 
 namespace GolfTrackerApp.Web.Services
 {
@@ -13,15 +14,32 @@ namespace GolfTrackerApp.Web.Services
         private readonly ApplicationDbContext _context;
         private readonly ILogger<PlayerService> _logger;
 
-        public PlayerService(ApplicationDbContext context,ILogger<PlayerService> logger)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public PlayerService(ApplicationDbContext context, ILogger<PlayerService> logger, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         // In GolfTrackerApp.Web/Services/PlayerService.cs
         public async Task<Player> AddPlayerAsync(Player player)
         {
+
+            // VVV --- AMENDMENT 1: Get the current user ID automatically --- VVV
+            var user = _httpContextAccessor.HttpContext?.User;
+            var currentUserId = user?.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (string.IsNullOrEmpty(currentUserId))
+            {
+                _logger.LogError("AddPlayerAsync: Cannot determine current user ID from HttpContext.");
+                throw new InvalidOperationException("User must be logged in to create a player.");
+            }
+
+            // VVV --- AMENDMENT 2: Always set the creator ID for any new player --- VVV
+            player.CreatedByApplicationUserId = currentUserId;
+
             // Ensure CreatedByApplicationUserId is set if it's a managed player
             if (string.IsNullOrEmpty(player.ApplicationUserId) && string.IsNullOrEmpty(player.CreatedByApplicationUserId))
             {

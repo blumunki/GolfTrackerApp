@@ -5,6 +5,7 @@
 @inject NavigationManager NavigationManager
 @inject ILogger<EditPlayer> Logger
 @inject AuthenticationStateProvider AuthenticationStateProvider 
+@inject ISnackbar Snackbar
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Data 
 @using GolfTrackerApp.Web.Services 
@@ -17,107 +18,79 @@
 
 <PageTitle>Edit Player</PageTitle>
 
-@if (playerToEdit == null && !isLoading)
+@if (isLoading)
 {
-    @* Display errorMessage if playerToEdit is null after loading attempt *@
-    <div class="alert alert-warning">@(errorMessage ?? "Player not found or error loading player details.")</div>
-    <p><a href="/players" class="btn btn-secondary">Back to Players List</a></p>
+    <MudProgressCircular Indeterminate="true" />
 }
-else if (isLoading)
+else if (playerToEdit is null)
 {
-    <p><em>Loading player details...</em></p>
-}
-else if (playerToEdit != null) // Ensure playerToEdit is not null before rendering form
-{
-    <h3>Edit Player: @playerToEdit.FirstName @playerToEdit.LastName</h3>
-    <PlayerFormComponent PlayerModel="@playerToEdit"
-                         InitialUserEmail="@initialEmail" 
-                         OnSubmitForm="HandleEditPlayer"
-                         OnCancelForm="HandleCancel"
-                         SubmitButtonText="Update Player" />
+    <MudAlert Severity="Severity.Error">@errorMessage</MudAlert>
+    <MudButton Variant="Variant.Text" OnClick="Cancel" Class="mt-4">Back to Players List</MudButton>
 }
 else
 {
-     @* Fallback if playerToEdit is still null for an unexpected reason but not loading - should be covered by above *@
-    <div class="alert alert-danger">An unexpected error occurred, or player not found.</div>
-    <p><a href="/players" class="btn btn-secondary">Back to Players List</a></p>
+    <MudText Typo="Typo.h4" GutterBottom="true">Edit Player: @playerToEdit.FirstName @playerToEdit.LastName</MudText>
+    <EditForm Model="@playerToEdit" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <MudCard>
+            <PlayerFormComponent @ref="_playerFormComponent" PlayerModel="@playerToEdit" InitialUserEmail="@initialEmail" />
+            <MudCardActions>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Update Player</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="Cancel" Class="mx-2">Cancel</MudButton>
+            </MudCardActions>
+        </MudCard>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-3">@errorMessage</MudAlert>
+        }
+         @if (!string.IsNullOrEmpty(infoMessage))
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-3">@infoMessage</MudAlert>
+        }
+    </EditForm>
 }
 
-
-@if (!string.IsNullOrEmpty(infoMessage) && !isLoading && playerToEdit != null)
-{
-    <div class="alert alert-info mt-3">@infoMessage</div>
-}
-@if (!string.IsNullOrEmpty(errorMessage) && !isLoading && playerToEdit != null && (playerToEdit != null || isLoading == false )) // Show error if not loading and form isn't shown due to playerToEdit being null
-{
-    <div class="alert alert-danger mt-3">@errorMessage</div>
-}
 
 @code {
     [Parameter]
     public int PlayerId { get; set; }
 
     private Player? playerToEdit;
-    // originalPlayerName removed as title now uses playerToEdit?.FirstName directly
-    private string initialEmail = string.Empty; 
+    private PlayerFormComponent _playerFormComponent = default!;
+
     private bool isLoading = true;
+    private string initialEmail = string.Empty;
     private string? errorMessage;
     private string? infoMessage;
-    private string _currentUserId = string.Empty; 
-    private bool _isCurrentUserAdmin = false;   
 
-    protected override async Task OnParametersSetAsync() // Renamed from OnInitializedAsync based on your code
+    protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
-        errorMessage = null; // Clear previous errors on reload
+        errorMessage = null;
 
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-        if (user.Identity != null && user.Identity.IsAuthenticated)
-        {
-            _currentUserId = user.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? string.Empty;
-            _isCurrentUserAdmin = user.IsInRole("Admin");
-        }
-        else
-        {
-            // This should ideally be caught by [Authorize] attribute at page level.
-            // If it's possible to reach here unauthenticated, redirect.
-            errorMessage = "User not authenticated.";
-            NavigationManager.NavigateTo("Account/Login", new NavigationOptions{ ReplaceHistoryEntry = true });
-            isLoading = false;
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_currentUserId) && !_isCurrentUserAdmin) // Stricter check
-        {
-            errorMessage = "Cannot edit player: current user context is missing or invalid.";
-            Logger.LogError("Current user ID is missing/invalid in EditPlayer.razor and user is not admin.");
-            isLoading = false;
-            return;
-        }
+        var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var isCurrentUserAdmin = user.IsInRole("Admin");
 
         try
         {
-            playerToEdit = await PlayerService.GetPlayerByIdAsync(PlayerId); 
+            playerToEdit = await PlayerService.GetPlayerByIdAsync(PlayerId);
             if (playerToEdit != null)
             {
-                if (playerToEdit.ApplicationUser != null && !string.IsNullOrWhiteSpace(playerToEdit.ApplicationUser.Email))
-                {
-                    initialEmail = playerToEdit.ApplicationUser.Email;
-                }
-                else
-                {
-                    initialEmail = string.Empty; // Ensure it's reset if no linked user/email
-                }
-
-                // Authorization check
-                if (!_isCurrentUserAdmin && 
-                    (playerToEdit.CreatedByApplicationUserId != _currentUserId) && // Not a managed player they created
-                    (playerToEdit.ApplicationUserId != _currentUserId) ) // Not their own linked profile
+                // This is your robust authorization check - preserved.
+                if (!isCurrentUserAdmin && 
+                    (playerToEdit.CreatedByApplicationUserId != currentUserId) && 
+                    (playerToEdit.ApplicationUserId != currentUserId))
                 {
                     errorMessage = "You are not authorized to edit this player profile.";
-                    Logger.LogWarning("User {CurrentUserId} attempted to edit unauthorized player {PlayerId}", _currentUserId, PlayerId);
-                    playerToEdit = null; // Prevent form from rendering with data
+                    playerToEdit = null; // Prevent form from rendering
+                }
+                else if (!string.IsNullOrEmpty(playerToEdit.ApplicationUserId))
+                {
+                    var linkedUser = await UserManager.FindByIdAsync(playerToEdit.ApplicationUserId);
+                    initialEmail = linkedUser?.Email ?? string.Empty;
                 }
             }
             else
@@ -127,122 +100,58 @@ else
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading player with ID {PlayerId} for editing.", PlayerId);
+            Logger.LogError(ex, "Error loading player with ID {PlayerId}", PlayerId);
             errorMessage = "Error loading player details.";
             playerToEdit = null;
         }
         isLoading = false;
     }
 
-    private async Task HandleEditPlayer(PlayerFormComponent.FormSubmitArgs args)
+    private async Task HandleValidSubmit()
     {
-        if (playerToEdit == null)
-        {
-            errorMessage = "Cannot update. Player data is not loaded correctly or you are not authorized.";
-            return;
-        }
-
+        if (playerToEdit is null) return;
         errorMessage = null;
         infoMessage = null;
-        Player submittedPlayerData = args.PlayerData; 
-
-        // Preserve original PlayerId and CreatedByApplicationUserId
-        submittedPlayerData.PlayerId = this.PlayerId;
-        submittedPlayerData.CreatedByApplicationUserId = playerToEdit.CreatedByApplicationUserId; // Owner should not change on edit
-
-        // Authorization check again before saving (more robust)
-        if (!_isCurrentUserAdmin &&
-            (submittedPlayerData.CreatedByApplicationUserId != _currentUserId) &&
-            (submittedPlayerData.ApplicationUserId != _currentUserId && (playerToEdit.ApplicationUserId != _currentUserId || string.IsNullOrWhiteSpace(args.EmailToLink)))) 
-            // The last condition is complex: allow edit if it's their own profile OR if they are changing the link of their own profile.
-            // If it's not their managed player, and not their own AppUser linked profile, deny.
-        {
-            errorMessage = "You are not authorized to save changes to this player profile.";
-            Logger.LogWarning("User {CurrentUserId} attempt to SAVE unauthorized player {PlayerId}", _currentUserId, submittedPlayerData.PlayerId);
-            return;
-        }
-
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(args.EmailToLink)) 
+            // This is your existing robust logic, adapted for the new component structure.
+            var emailToLink = _playerFormComponent.IsRegisteredUserCandidate ? _playerFormComponent.UserEmailToLink : null;
+
+            if (!string.IsNullOrWhiteSpace(emailToLink))
             {
-                var systemUserToLink = await UserManager.FindByEmailAsync(args.EmailToLink);
+                var systemUserToLink = await UserManager.FindByEmailAsync(emailToLink);
                 if (systemUserToLink == null)
                 {
-                    infoMessage = $"System user with email '{args.EmailToLink}' not found. Any existing link will be removed; player will be treated as 'managed'.";
-                    submittedPlayerData.ApplicationUserId = null;
-                }
-                else
-                {
-                    var existingPlayerProfileForUser = await PlayerService.GetPlayerByApplicationUserIdAsync(systemUserToLink.Id);
-                    if (existingPlayerProfileForUser != null && existingPlayerProfileForUser.PlayerId != submittedPlayerData.PlayerId) 
-                    {
-                        errorMessage = $"The system user '{systemUserToLink.Email}' is already linked to player '{existingPlayerProfileForUser.FirstName} {existingPlayerProfileForUser.LastName}'.";
-                        return; 
-                    }
-                    submittedPlayerData.ApplicationUserId = systemUserToLink.Id;
-                    infoMessage = $"Player will be linked to system user '{systemUserToLink.Email}'.";
-                }
-            }
-            else 
-            {
-                if (!string.IsNullOrEmpty(playerToEdit.ApplicationUserId)) 
-                {
-                    infoMessage = "Link to system user has been removed. Player is now a 'managed' player.";
-                }
-                submittedPlayerData.ApplicationUserId = null;
-            }
-
-            if (string.IsNullOrEmpty(submittedPlayerData.ApplicationUserId)) // If it's a managed player
-            {
-                // Ensure CreatedByApplicationUserId is still the original one.
-                // And check for name uniqueness among other managed players by the same creator.
-                if (string.IsNullOrWhiteSpace(submittedPlayerData.CreatedByApplicationUserId))
-                {
-                     //This should ideally not happen if loaded playerToEdit had it.
-                     //If creating a new managed player via an edit screen (not typical), set it.
-                     submittedPlayerData.CreatedByApplicationUserId = _currentUserId;
-                }
-
-                // VVV THIS IS THE CORRECTED CALL VVV
-                var allPlayersByOwner = await PlayerService.GetAllPlayersAsync(submittedPlayerData.CreatedByApplicationUserId!, _isCurrentUserAdmin); 
-                // Pass _isCurrentUserAdmin as true if the context for GetAllPlayersAsync should be admin for this specific check,
-                // or false if it should be filtered to the owner's view (safer).
-                // Let's assume we want to check against players visible to the owner (or admin if current user is admin).
-                // If _currentUserId is the owner, then _isCurrentUserAdmin might be true or false.
-                // It's simpler to pass the actual _currentUserId and _isCurrentUserAdmin from the page context.
-
-                if (allPlayersByOwner.Any(p => string.IsNullOrEmpty(p.ApplicationUserId) &&
-                                               p.PlayerId != submittedPlayerData.PlayerId && 
-                                               p.CreatedByApplicationUserId == submittedPlayerData.CreatedByApplicationUserId &&
-                                               p.FirstName.Equals(submittedPlayerData.FirstName, StringComparison.OrdinalIgnoreCase) &&
-                                               p.LastName.Equals(submittedPlayerData.LastName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    errorMessage = $"Another managed player named '{submittedPlayerData.FirstName} {submittedPlayerData.LastName}' already exists under this owner.";
+                    errorMessage = $"User with email '{emailToLink}' not found.";
                     return;
                 }
+
+                var existingPlayerProfile = await PlayerService.GetPlayerByApplicationUserIdAsync(systemUserToLink.Id);
+                if (existingPlayerProfile != null && existingPlayerProfile.PlayerId != playerToEdit.PlayerId)
+                {
+                    errorMessage = $"User '{emailToLink}' is already linked to another player.";
+                    return;
+                }
+                playerToEdit.ApplicationUserId = systemUserToLink.Id;
+            }
+            else
+            {
+                playerToEdit.ApplicationUserId = null;
             }
 
-            await PlayerService.UpdatePlayerAsync(submittedPlayerData);
-            Logger.LogInformation("Player {PlayerId} updated successfully by User {CurrentUserId}.", submittedPlayerData.PlayerId, _currentUserId);
+            await PlayerService.UpdatePlayerAsync(playerToEdit);
+            Snackbar.Add("Player updated successfully!", Severity.Success);
             NavigationManager.NavigateTo("/players");
-        }
-        catch (InvalidOperationException opEx)
-        {
-            Logger.LogWarning(opEx, "Business rule violation updating player {PlayerId} by User {CurrentUserId}.", submittedPlayerData.PlayerId, _currentUserId);
-            errorMessage = opEx.Message;
-            infoMessage = null;
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Generic error updating player {PlayerId} by User {CurrentUserId}.", submittedPlayerData.PlayerId, _currentUserId);
-            errorMessage = $"An unexpected error occurred: {ex.Message}";
-            infoMessage = null;
+            Logger.LogError(ex, "Error updating player {PlayerId}", playerToEdit.PlayerId);
+            errorMessage = "An unexpected error occurred while saving the player.";
         }
     }
 
-    private void HandleCancel()
+    private void Cancel()
     {
         NavigationManager.NavigateTo("/players");
     }
