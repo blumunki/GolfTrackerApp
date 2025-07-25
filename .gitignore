@@ -405,3 +405,5 @@ FodyWeavers.xsd
 *.db-shm
 *.db-wal
 GolfTrackerApp.Web/Data/Players.csv
+
+.DS_Store
