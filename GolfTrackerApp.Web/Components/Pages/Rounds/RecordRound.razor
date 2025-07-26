@@ -550,9 +550,34 @@ else // This case means isInitialized is false (still loading initial data)
         Logger.LogInformation("Scorecard structure initialized for {PlayerCount} players and {HoleCount} holes.", _roundEntryModel.SelectedPlayers.Count, _playedHolesOrdered.Count);
     }
 
-    private async Task OpenQuickAddPlayerDialogAsync() { /* ... placeholder with await Task.Yield() ... */
-        Snackbar.Add("Quick Add Player dialog to be implemented.", Severity.Info);
-        await Task.Yield();
+    private async Task OpenQuickAddPlayerDialogAsync()
+    {
+        var dialog = await DialogService.ShowAsync<QuickAddPlayerDialog>("Add Guest Player");
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is Player newPlayer)
+        {
+            try
+            {
+                // The PlayerService will automatically assign the CreatedByApplicationUserId
+                var createdPlayer = await PlayerService.AddPlayerAsync(newPlayer);
+
+                // Add the new player to our main list of available players
+                _availablePlayers.Add(createdPlayer);
+
+                // Add the new player to the list of selected players for this round
+                if (!_roundEntryModel.SelectedPlayers.Any(p => p.PlayerId == createdPlayer.PlayerId))
+                {
+                    _roundEntryModel.SelectedPlayers.Add(createdPlayer);
+                }
+
+                Snackbar.Add($"Guest player '{createdPlayer.FirstName} {createdPlayer.LastName}' added.", Severity.Success);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error adding guest player: {ex.Message}", Severity.Error);
+            }
+        }
     }
     private async Task SubmitRoundAndScoresAsync() { /* ... placeholder with await Task.Yield() ... */
         Snackbar.Add("Submitting round and scores logic to be implemented.", Severity.Info);
