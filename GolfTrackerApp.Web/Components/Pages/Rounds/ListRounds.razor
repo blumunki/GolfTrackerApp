@@ -4,10 +4,12 @@
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider // To get current user
 @inject ISnackbar Snackbar
+@using GolfTrackerApp.Web.Components.Shared
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
+@inject IDialogService DialogService
 @rendermode InteractiveServer
 
 <PageTitle>Golf Rounds</PageTitle>
@@ -40,6 +42,9 @@ else
                 <MudTooltip Text="View Details">
                     <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewRoundDetails(context.RoundId))" />
                 </MudTooltip>
+                <MudTooltip Text="Delete Round">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteRound(context))" />
+                </MudTooltip>
             </MudTd>
         </RowTemplate>
         <PagerContent>
@@ -55,6 +60,11 @@ else
     private bool _isCurrentUserAdmin = false;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadRounds();
+    }
+
+    private async Task LoadRounds()
     {
         isLoading = true;
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -81,5 +91,37 @@ else
     private void ViewRoundDetails(int roundId)
     {
         NavigationManager.NavigateTo($"/rounds/{roundId}");
+    }
+
+    private async Task PrepareDeleteRound(Round round)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete the round from {round.DatePlayed.ToShortDateString()}? This will delete all associated scores." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            await DeleteRoundConfirmed(round.RoundId);
+        }
+    }
+
+    private async Task DeleteRoundConfirmed(int roundId)
+    {
+        try
+        {
+            await RoundService.DeleteRoundAsync(roundId);
+            Snackbar.Add("Round deleted successfully.", Severity.Success);
+            await LoadRounds(); // Refresh the list
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting round: {ex.Message}", Severity.Error);
+        }
     }
 }
