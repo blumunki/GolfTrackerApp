@@ -71,15 +71,23 @@
 
                     <MudItem xs="12">
                         <MudText Typo="Typo.h6" GutterBottom="true">Players</MudText>
-                        <MudAutocomplete T="Player" Label="Search and Add Player" 
-                                        searchFuncWithCancellationToken="@(async (string val, CancellationToken ct) => await SearchPlayersAsync(val, ct))"
-                                        @bind-Value="_selectedPlayerForAutocomplete" 
-                                        ToStringFunc="@(p => p == null ? string.Empty : $"{p.FirstName} {p.LastName}")"
-                                        ShowProgressIndicator="true" DebounceInterval="300" 
-                                        onItemSelected="@((Player selectedPlayer) => PlayerSelectedFromAutocomplete(selectedPlayer))"
-                                        ResetValueOnEmptyText="true" CoerceValue="true" CoerceText="true" 
-                                        Placeholder="Type to search..." Variant="Variant.Outlined" Margin="Margin.Dense"/>
-                        
+                        <MudAutocomplete T="Player" 
+                            Label="Search and Add Player" 
+                            SearchFunc="@SearchPlayersAsync"
+                            Value="_selectedPlayerForAutocomplete"
+                            ValueChanged="@((Player p) => {
+                                _selectedPlayerForAutocomplete = p;
+                                PlayerSelectedFromAutocomplete(p);
+                            })"
+                            ToStringFunc="@(p => p == null ? string.Empty : $"{p.FirstName} {p.LastName}")"
+                            ShowProgressIndicator="true" 
+                            DebounceInterval="300" 
+                            ResetValueOnEmptyText="true" 
+                            CoerceValue="true" 
+                            CoerceText="true" 
+                            Placeholder="Type to search..." 
+                            Variant="Variant.Outlined" 
+                            Margin="Margin.Dense"/>
                         @if (_roundEntryModel.SelectedPlayers.Any())
                         {
                             <MudText Class="mt-2">Selected Players (@_roundEntryModel.SelectedPlayers.Count):</MudText>
@@ -309,6 +317,8 @@ else // This case means isInitialized is false (still loading initial data)
 
     private async Task<IEnumerable<Player>> SearchPlayersAsync(string value, CancellationToken token)
     {
+        Logger.LogInformation("SearchPlayersAsync: Searching for '{SearchValue}' with {Count} players available.", value, _availablePlayers.Count);
+
         await Task.Delay(50, token); // Minimal await for async search behavior
         if (token.IsCancellationRequested)
             return Enumerable.Empty<Player>();
