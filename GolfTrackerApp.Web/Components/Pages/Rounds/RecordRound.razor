@@ -44,9 +44,9 @@
 
                     <MudItem xs="12" sm="6">
                         <MudSelect T="int" Label="Golf Club" @bind-Value="_roundEntryModel.SelectedGolfClubId" 
-                                For="@(() => _roundEntryModel.SelectedGolfClubId)"
-                                Required="true" RequiredError="Golf Club is required!"
-                                onValueChanged="OnGolfClubSelectedAsync">
+                            @bind-Value:after="OnGolfClubSelectedAsync"
+                            For="@(() => _roundEntryModel.SelectedGolfClubId)"
+                            Required="true" RequiredError="Golf Club is required!">
                             <MudSelectItem T="int" Value="0">Select a Club</MudSelectItem>
                             @foreach (var club in _golfClubs)
                             {
@@ -250,8 +250,11 @@ else // This case means isInitialized is false (still loading initial data)
         // StateHasChanged(); // Usually not needed at the end of OnInitializedAsync unless there's complex conditional rendering logic based on early returns.
     }
 
-    private async Task OnGolfClubSelectedAsync(int selectedClubId) { /* Your existing logic */
-        _roundEntryModel.SelectedGolfClubId = selectedClubId;
+    private async Task OnGolfClubSelectedAsync()
+    {
+        // Get the value from the model property instead of a parameter
+    var selectedClubId = _roundEntryModel.SelectedGolfClubId;
+    
         _roundEntryModel.GolfCourseId = 0; 
         _golfCoursesForSelectedClub.Clear();
         _allHolesForSelectedCourse.Clear();
