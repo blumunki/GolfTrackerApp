@@ -143,23 +143,26 @@
                 <tbody>
                     @foreach (var player in _roundEntryModel.SelectedPlayers)
                     {
-                        <tr>
-                            <td><strong>@player.FirstName</strong></td>
-                            @foreach (var holeScore in _roundEntryModel.Scorecard[player.PlayerId])
-                            {
-                                <td>
-                                    <MudNumericField @bind-Value="holeScore.Strokes" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                        @if (_roundEntryModel.Scorecard.ContainsKey(player.PlayerId))
+                        {
+                            <tr>
+                                <td><strong>@player.FirstName</strong></td>
+                                @foreach (var holeScore in _roundEntryModel.Scorecard[player.PlayerId])
+                                {
+                                    <td>
+                                        <MudNumericField @bind-Value="holeScore.Strokes" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                                    </td>
+                                }
+                                <td class="text-center">
+                                    <strong>
+                                        @{
+                                            var totalStrokes = _roundEntryModel.Scorecard[player.PlayerId].Sum(s => s.Strokes);
+                                            @totalStrokes
+                                        }
+                                    </strong>
                                 </td>
-                            }
-                            <td class="text-center">
-                                <strong>
-                                    @{
-                                        var totalStrokes = _roundEntryModel.Scorecard[player.PlayerId].Sum(s => s.Strokes);
-                                        @totalStrokes
-                                    }
-                                </strong>
-                            </td>
-                        </tr>
+                            </tr>
+                        }
                     }
                 </tbody>
             </MudSimpleTable>
@@ -209,7 +212,7 @@ else // This case means isInitialized is false (still loading initial data)
         public Dictionary<int, List<HoleScoreEntryModel>> Scorecard { get; set; } = new Dictionary<int, List<HoleScoreEntryModel>>();
     }
 
-    public class HoleScoreEntryModel // Make public if used in markup directly for binding in complex scenarios
+    @* public class HoleScoreEntryModel // Make public if used in markup directly for binding in complex scenarios
     {
         public int HoleId { get; set; }
         public int HoleNumber { get; set; }
@@ -220,7 +223,7 @@ else // This case means isInitialized is false (still loading initial data)
         public int? Putts { get; set; }
         public bool? FairwayHit { get; set; }
         public int? ScoreVsPar => Strokes.HasValue && Par != 0 ? Strokes - Par : null; // Ensure Par is not 0
-    }
+    } *@
 
     // --- Page State & Data ---
     private UIRoundEntryModel _roundEntryModel = new();
@@ -581,6 +584,8 @@ else // This case means isInitialized is false (still loading initial data)
             _roundEntryModel.Scorecard.Add(player.PlayerId, scoresForPlayer);
         }
         Logger.LogInformation("Scorecard structure initialized for {PlayerCount} players and {HoleCount} holes.", _roundEntryModel.SelectedPlayers.Count, _playedHolesOrdered.Count);
+
+        StateHasChanged();
     }
 
     private async Task OpenQuickAddPlayerDialogAsync()
@@ -612,8 +617,26 @@ else // This case means isInitialized is false (still loading initial data)
             }
         }
     }
-    private async Task SubmitRoundAndScoresAsync() { /* ... placeholder with await Task.Yield() ... */
-        Snackbar.Add("Submitting round and scores logic to be implemented.", Severity.Info);
-        await Task.Yield();
+    private async Task SubmitRoundAndScoresAsync()
+    {
+        if (_currentDbRoundId == 0)
+        {
+            Snackbar.Add("Error: Round has not been saved yet. Please complete the setup step.", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            // Call our new service method to save everything
+            await ScoreService.SaveScorecardAsync(_currentDbRoundId, _roundEntryModel.Scorecard);
+
+            Snackbar.Add("Round and scores saved successfully!", Severity.Success);
+            NavigationManager.NavigateTo("/rounds"); // Navigate back to the list
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error submitting final scores for Round ID {RoundId}", _currentDbRoundId);
+            Snackbar.Add($"Error saving scores: {ex.Message}", Severity.Error);
+        }
     }
 }

@@ -78,5 +78,45 @@ namespace GolfTrackerApp.Web.Services
             await _context.SaveChangesAsync();
             return existingScore;
         }
+        public async Task SaveScorecardAsync(int roundId, Dictionary<int, List<HoleScoreEntryModel>> scorecard)
+        {
+            // First, remove any existing scores for this round to handle edits
+            var existingScores = _context.Scores.Where(s => s.RoundId == roundId);
+            _context.Scores.RemoveRange(existingScores);
+
+            // Create new score entities from the scorecard model
+            var newScores = new List<Score>();
+            foreach (var playerScores in scorecard)
+            {
+                var playerId = playerScores.Key;
+                foreach (var holeScore in playerScores.Value)
+                {
+                    if (holeScore.Strokes.HasValue) // Only save scores that have been entered
+                    {
+                        newScores.Add(new Score
+                        {
+                            RoundId = roundId,
+                            PlayerId = playerId,
+                            HoleId = holeScore.HoleId,
+                            Strokes = holeScore.Strokes.Value,
+                            Putts = holeScore.Putts,
+                            FairwayHit = holeScore.FairwayHit
+                        });
+                    }
+                }
+            }
+
+            await _context.Scores.AddRangeAsync(newScores);
+
+            // Finally, update the Round's status to Completed
+            var round = await _context.Rounds.FindAsync(roundId);
+            if (round != null)
+            {
+                round.Status = RoundCompletionStatus.Completed;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+        // Additional methods can be implemented as needed
     }
 }

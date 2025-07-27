@@ -14,5 +14,6 @@ namespace GolfTrackerApp.Web.Services
         Task<List<Score>> AddScoresAsync(IEnumerable<Score> scores); // For bulk
         Task<Score?> UpdateScoreAsync(Score score);
         Task<bool> DeleteScoreAsync(int id);
+        Task SaveScorecardAsync(int roundId, Dictionary<int, List<HoleScoreEntryModel>> scorecard);
     }
 }
