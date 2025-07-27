@@ -16,5 +16,7 @@ namespace GolfTrackerApp.Web.Services
         Task<bool> DeleteRoundAsync(int id);
         // GetRoundsForPlayerAsync might implicitly use requestingUserId if it's different from playerId parameter
         Task<List<Round>> GetRoundsForPlayerAsync(int playerId, string requestingUserId, bool isUserAdmin);
+        // In IRoundService.cs
+        Task<Round> CreateRoundWithPlayersAsync(Round round, List<int> playerIds);
     }
 }

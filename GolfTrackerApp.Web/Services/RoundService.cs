@@ -10,11 +10,14 @@ namespace GolfTrackerApp.Web.Services
 {
     public class RoundService : IRoundService
     {
-        private readonly ApplicationDbContext _context;
 
-        public RoundService(ApplicationDbContext context)
+        private readonly ApplicationDbContext _context;
+        private readonly ILogger<PlayerService> _logger;
+
+        public RoundService(ApplicationDbContext context, ILogger<PlayerService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         // In GolfTrackerApp.Web/Services/RoundService.cs
@@ -169,10 +172,10 @@ namespace GolfTrackerApp.Web.Services
 
             if (existingRound.GolfCourseId != round.GolfCourseId)
             {
-                 if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
-                 {
-                     throw new ArgumentException($"GolfCourse with ID {round.GolfCourseId} does not exist for update.");
-                 }
+                if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
+                {
+                    throw new ArgumentException($"GolfCourse with ID {round.GolfCourseId} does not exist for update.");
+                }
             }
 
             _context.Entry(existingRound).CurrentValues.SetValues(round);
@@ -196,6 +199,33 @@ namespace GolfTrackerApp.Web.Services
 
             await _context.SaveChangesAsync();
             return existingRound;
+        }
+        // In RoundService.cs
+        public async Task<Round> CreateRoundWithPlayersAsync(Round round, List<int> playerIds)
+        {
+            if (playerIds == null || !playerIds.Any())
+            {
+                throw new ArgumentException("A round must have at least one player.", nameof(playerIds));
+            }
+
+            // Add the new round to the context
+            _context.Rounds.Add(round);
+
+            // This will save the round and generate its RoundId
+            await _context.SaveChangesAsync();
+
+            // Now create the links in the RoundPlayers join table
+            foreach (var playerId in playerIds)
+            {
+                var roundPlayer = new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId };
+                _context.RoundPlayers.Add(roundPlayer);
+            }
+
+            // Save the player links
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created Round {RoundId} and linked {PlayerCount} players.", round.RoundId, playerIds.Count);
+
+            return round;
         }
     }
 }

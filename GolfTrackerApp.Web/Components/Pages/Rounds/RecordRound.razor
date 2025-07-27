@@ -129,7 +129,40 @@
         </MudStep>
 
         <MudStep content="2. Enter Scores">
-            <MudText>Score entry will appear here once Round Setup is complete.</MudText>
+            <MudSimpleTable Hover="true" Dense="true" Class="scorecard-table">
+                <thead>
+                    <tr>
+                        <th>Player</th>
+                        @foreach (var hole in _playedHolesOrdered)
+                        {
+                            <th class="text-center">@hole.HoleNumber<br /><small>Par @hole.Par</small></th>
+                        }
+                        <th class="text-center">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var player in _roundEntryModel.SelectedPlayers)
+                    {
+                        <tr>
+                            <td><strong>@player.FirstName</strong></td>
+                            @foreach (var holeScore in _roundEntryModel.Scorecard[player.PlayerId])
+                            {
+                                <td>
+                                    <MudNumericField @bind-Value="holeScore.Strokes" Variant="Variant.Outlined" Margin="Margin.Dense" Min="1" />
+                                </td>
+                            }
+                            <td class="text-center">
+                                <strong>
+                                    @{
+                                        var totalStrokes = _roundEntryModel.Scorecard[player.PlayerId].Sum(s => s.Strokes);
+                                        @totalStrokes
+                                    }
+                                </strong>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
         </MudStep>
 
         <MudStep content="3. Review & Save">
