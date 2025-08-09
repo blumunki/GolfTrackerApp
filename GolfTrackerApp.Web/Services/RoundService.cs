@@ -227,5 +227,23 @@ namespace GolfTrackerApp.Web.Services
 
             return round;
         }
+        public async Task<List<Round>> GetRecentRoundsAsync(string requestingUserId, bool isUserAdmin, int count)
+        {
+            IQueryable<Round> query = _context.Rounds
+                                        .Include(r => r.GolfCourse!)
+                                            .ThenInclude(gc => gc!.GolfClub);
+
+            if (!isUserAdmin)
+            {
+                query = query.Where(r =>
+                    r.CreatedByApplicationUserId == requestingUserId ||
+                    r.RoundPlayers.Any(rp => rp.Player != null && rp.Player.ApplicationUserId == requestingUserId)
+                );
+            }
+
+            return await query.OrderByDescending(r => r.DatePlayed)
+                            .Take(count)
+                            .ToListAsync();
+        }
     }
 }

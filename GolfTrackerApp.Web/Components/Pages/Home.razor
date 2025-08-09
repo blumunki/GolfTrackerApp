@@ -1,8 +1,77 @@
 ﻿@page "/"
+@attribute [Authorize]
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IRoundService RoundService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager NavigationManager
+
+@using System.Security.Claims
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Components.Shared
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+
 @rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard</PageTitle>
 
-<h1>Golf Tracking</h1>
+<MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
 
-Track your rounds and analyze your game with the Golf Tracker App.
+<MudCard Elevation="2">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">Recent Rounds</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" />
+        }
+        else if (recentRounds is null || !recentRounds.Any())
+        {
+            <MudText>No recent rounds found. Go record one!</MudText>
+        }
+        else
+        {
+            <MudList T="object" clickable="true">
+                @foreach (var round in recentRounds)
+                {
+                    <MudListItem T="object" OnClick="@(() => NavigateToRound(round.RoundId))">
+                        <div class="d-flex justify-space-between flex-grow-1">
+                            <span>@round.GolfCourse!.Name</span>
+                            <span>@round.DatePlayed.ToString("dd MMM yyyy")</span>
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        }
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/rounds">View All Rounds</MudButton>
+    </MudCardActions>
+</MudCard>
+
+@code {
+    private List<Round>? recentRounds;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        var isCurrentUserAdmin = user.IsInRole("Admin");
+
+        recentRounds = await RoundService.GetRecentRoundsAsync(currentUserId, isCurrentUserAdmin, 5); // Get the last 5 rounds
+        isLoading = false;
+    }
+
+    private void NavigateToRound(int roundId)
+    {
+        NavigationManager.NavigateTo($"/rounds/{roundId}");
+    }
+}
