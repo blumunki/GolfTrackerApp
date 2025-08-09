@@ -48,6 +48,9 @@ else
             <MudTd DataLabel="User Type">@(string.IsNullOrEmpty(context.ApplicationUserId) ? "Managed" : "Registered")</MudTd>
             <MudTd DataLabel="Registered Email">@(context.ApplicationUser?.Email ?? "N/A")</MudTd>
             <MudTd Style="text-align:right">
+                <MudTooltip Text="View Performance Report">
+                    <MudIconButton Icon="@Icons.Material.Filled.Timeline" Size="Size.Small" Color="Color.Info" Href="@($"/players/{context.PlayerId}/report")" />
+                </MudTooltip>
                 <MudTooltip Text="Edit Player">
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditPlayer(context.PlayerId))" />
                 </MudTooltip>

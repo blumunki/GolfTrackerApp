@@ -1,0 +1,74 @@
+@page "/players/{PlayerId:int}/report"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IReportService ReportService
+@inject IPlayerService PlayerService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using GolfTrackerApp.Web.Models
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@using GolfTrackerApp.Web.Services
+@using GolfTrackerApp.Web.Components.Shared
+
+<PageTitle>Player Performance Report</PageTitle>
+
+@if (player is null)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else
+{
+    <MudText Typo="Typo.h4">Performance Report: @player.FirstName @player.LastName</MudText>
+
+    @if (chartData is not null && chartData.Any())
+    {
+        <MudChart ChartType="ChartType.Line" ChartSeries="@_series" XAxisLabels="@_xAxisLabels" Width="100%" Height="350px"></MudChart>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">No completed rounds found for this player.</MudAlert>
+    }
+}
+
+@code {
+    [Parameter]
+    public int PlayerId { get; set; }
+
+    private Player? player;
+    private List<ChartDataPoint> chartData = new();
+
+    private List<ChartSeries> _series = new();
+    private string[] _xAxisLabels = Array.Empty<string>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            player = await PlayerService.GetPlayerByIdAsync(PlayerId);
+            if (player is not null)
+            {
+                chartData = await ReportService.GetPlayerPerformanceAsync(PlayerId);
+                PrepareChartData();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading report data: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void PrepareChartData()
+    {
+        if (chartData is null || !chartData.Any()) return;
+
+        _series = new List<ChartSeries>
+        {
+            new ChartSeries { Name = "Total Score", Data = chartData.Select(d => (double)d.TotalScore).ToArray() }
+        };
+
+        _xAxisLabels = chartData.Select(d => d.Date.ToString("dd MMM")).ToArray();
+    }
+}

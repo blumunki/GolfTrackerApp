@@ -53,6 +53,7 @@ builder.Services.AddScoped<IGolfClubService, GolfClubService>();
 builder.Services.AddScoped<IHoleService, HoleService>();
 builder.Services.AddScoped<IRoundService, RoundService>();
 builder.Services.AddScoped<IScoreService, ScoreService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 builder.Services.AddMudServices();
 
