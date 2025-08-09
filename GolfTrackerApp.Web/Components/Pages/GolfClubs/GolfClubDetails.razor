@@ -4,10 +4,13 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject ILogger<GolfClubDetails> Logger
+@inject IDialogService DialogService
+@inject IGolfCourseService GolfCourseService
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
 @using MudBlazor
+@using GolfTrackerApp.Web.Components.Shared // For ConfirmDialog
 
 @rendermode InteractiveServer
 
@@ -80,6 +83,7 @@ else
                              @* VVV Explicit T="object" added VVV *@
                              <MudListItem T="object" OnClick="@(() => ViewCourseDetails(course.GolfCourseId))" Icon="@Icons.Material.Filled.Visibility" IconColor="Color.Primary">View Holes / Details</MudListItem>
                              <MudListItem T="object" OnClick="@(() => EditThisCourse(course.GolfCourseId))" Icon="@Icons.Material.Filled.Edit" IconColor="Color.Secondary">Edit Course</MudListItem>
+                             <MudListItem T="object" OnClick="@(() => PrepareDeleteCourse(course))" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Delete Course</MudListItem>
                         </NestedList>
                     </MudListItem>
                     <MudDivider />
@@ -162,5 +166,31 @@ else
     private void GoBackToList()
     {
         NavigationManager.NavigateTo("/golfclubs");
+    }
+
+    private async Task PrepareDeleteCourse(GolfCourse courseToDelete)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete the course '{courseToDelete.Name}'? This will also delete all of its holes." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await GolfCourseService.DeleteGolfCourseAsync(courseToDelete.GolfCourseId);
+                Snackbar.Add("Course deleted successfully.", Severity.Success);
+                await OnParametersSetAsync(); // Refresh the club details
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting course: {ex.Message}", Severity.Error);
+            }
+        }
     }
 }

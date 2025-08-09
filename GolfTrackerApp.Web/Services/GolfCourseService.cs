@@ -32,12 +32,20 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<bool> DeleteGolfCourseAsync(int id)
         {
-            var golfCourse = await _context.GolfCourses.FindAsync(id);
+            // Include the related Holes when fetching the course
+            var golfCourse = await _context.GolfCourses
+                                        .Include(c => c.Holes)
+                                        .FirstOrDefaultAsync(c => c.GolfCourseId == id);
+
             if (golfCourse == null)
             {
                 return false;
             }
+
+            // By removing the course, EF Core will automatically handle deleting the
+            // associated holes due to the cascade delete relationship in the database.
             _context.GolfCourses.Remove(golfCourse);
+
             await _context.SaveChangesAsync();
             return true;
         }
