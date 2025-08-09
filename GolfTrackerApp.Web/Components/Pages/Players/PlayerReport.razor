@@ -10,6 +10,7 @@
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
+@using System.Globalization
 @using GolfTrackerApp.Web.Models
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
@@ -43,10 +44,10 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudDatePicker Label="Start Date" @bind-Date="StartDate" Clearable="true" />
+                <MudDatePicker Label="Start Date" @bind-Date="StartDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudDatePicker Label="End Date" @bind-Date="EndDate" Clearable="true" />
+                <MudDatePicker Label="End Date" @bind-Date="EndDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" />
             </MudItem>
             <MudItem xs="12">
                  <MudSwitch T="bool" @bind-checked="ShowScoreVsPar" Label="Show Score vs Par (otherwise Total Score)" Color="Color.Primary" />
@@ -58,7 +59,7 @@ else
     {
         <MudProgressLinear Indeterminate="true" Class="my-4" />
     }
-    else if (_series is not null && _series.Any())
+    else if (_series is not null && _series.Any() && _series[0].Data.Length > 0)
     {
         <MudChart ChartType="ChartType.Line" ChartSeries="@_series" XAxisLabels="@_xAxisLabels" Width="100%" Height="350px"></MudChart>
     }
@@ -75,6 +76,7 @@ else
     private Player? player;
     private List<GolfCourse> _allCourses = new();
     private bool isLoadingChart = true;
+    private CultureInfo _ukCulture = new("en-GB");
 
     // --- Filter Properties ---
     private int? _selectedCourseId;
@@ -82,7 +84,7 @@ else
 
     private int? _selectedHolesPlayed;
     public int? SelectedHolesPlayed { get => _selectedHolesPlayed; set { if (_selectedHolesPlayed != value) { _selectedHolesPlayed = value; _ = OnFilterChanged(); } } }
-
+    
     private DateTime? _startDate;
     public DateTime? StartDate { get => _startDate; set { if (_startDate != value) { _startDate = value; _ = OnFilterChanged(); } } }
 
@@ -91,7 +93,7 @@ else
 
     private bool _showScoreVsPar = true;
     public bool ShowScoreVsPar { get => _showScoreVsPar; set { if (_showScoreVsPar != value) { _showScoreVsPar = value; _ = OnFilterChanged(); } } }
-
+    
     // --- Chart Properties ---
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
@@ -129,39 +131,17 @@ else
             return;
         }
 
-        // This fixes the X-Axis issue by creating a common timeline for all series
-        var allDates = data.Select(d => d.Date).Distinct().OrderBy(d => d).ToList();
-        _xAxisLabels = allDates.Select(d => d.ToString("dd MMM")).ToArray();
+        string seriesName = ShowScoreVsPar ? "Score vs Par" : "Total Score";
+        var seriesData = ShowScoreVsPar
+            ? data.Select(d => (double)d.ScoreVsPar).ToArray()
+            : data.Select(d => (double)d.TotalScore).ToArray();
 
-        var seriesList = new List<ChartSeries>();
+        _series = new List<ChartSeries> { new() { Name = seriesName, Data = seriesData } };
 
-        // If no hole filter is applied, create separate series for 9 and 18 holes
-        if (_selectedHolesPlayed is null)
-        {
-            var data18 = data.Where(d => d.HolesPlayed == 18).ToDictionary(d => d.Date);
-            seriesList.Add(new ChartSeries
-            {
-                Name = "18 Hole Score",
-                Data = allDates.Select(date => data18.ContainsKey(date) ? (double?)(ShowScoreVsPar ? data18[date].ScoreVsPar : data18[date].TotalScore) : null).Select(d => d ?? 0).ToArray()
-            });
-
-            var data9 = data.Where(d => d.HolesPlayed == 9).ToDictionary(d => d.Date);
-            seriesList.Add(new ChartSeries
-            {
-                Name = "9 Hole Score",
-                Data = allDates.Select(date => data9.ContainsKey(date) ? (double?)(ShowScoreVsPar ? data9[date].ScoreVsPar : data9[date].TotalScore) : null).Select(d => d ?? 0).ToArray()
-            });
-        }
-        else // A filter is applied, show a single line
-        {
-            var dataFiltered = data.ToDictionary(d => d.Date);
-             seriesList.Add(new ChartSeries
-             {
-                Name = _showScoreVsPar ? "Score vs Par" : "Total Score",
-                Data = allDates.Select(date => dataFiltered.ContainsKey(date) ? (double?)(ShowScoreVsPar ? dataFiltered[date].ScoreVsPar : dataFiltered[date].TotalScore) : null).Select(d => d ?? 0).ToArray()
-            });
-        }
-
-        _series = seriesList;
+        // This fixes the squashed labels by intelligently skipping some
+        int labelInterval = Math.Max(1, data.Count / 15); // Show a maximum of ~15 labels
+        _xAxisLabels = data
+            .Select((d, i) => i % labelInterval == 0 ? d.Date.ToString("dd MMM") : "")
+            .ToArray();
     }
 }
