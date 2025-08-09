@@ -7,10 +7,12 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject ILogger<GolfCourseDetails> Logger
+@inject IDialogService DialogService
 
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
+@using GolfTrackerApp.Web.Components.Shared // For ConfirmDialog
 
 <PageTitle>@(course?.Name ?? "Course Details")</PageTitle>
 
@@ -32,7 +34,8 @@ else
                 <MudText Typo="Typo.h5">@course.Name</MudText>
                 <MudText Typo="Typo.body1">Par: @course.DefaultPar | Holes: @course.NumberOfHoles</MudText>
             </MudItem>
-            <MudItem Class="d-flex justify-content-end">
+            <MudItem Class="d-flex justify-content-end align-center gap-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="OpenAddHoleDialog" StartIcon="@Icons.Material.Filled.Add">Add Hole</MudButton>
                 <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => NavigationManager.NavigateTo($"/golfcourses/edit/{course.GolfCourseId}"))">Edit Course</MudButton>
             </MudItem>
         </MudGrid>
@@ -44,12 +47,21 @@ else
             <MudTh>Par</MudTh>
             <MudTh>Length (Yards)</MudTh>
             <MudTh>Stroke Index</MudTh>
+            <MudTh Style="text-align:right">Actions</MudTh>
         </HeaderContent>
         <RowTemplate>
             <MudTd DataLabel="Hole">@context.HoleNumber</MudTd>
             <MudTd DataLabel="Par">@context.Par</MudTd>
             <MudTd DataLabel="Length">@context.LengthYards</MudTd>
             <MudTd DataLabel="SI">@context.StrokeIndex</MudTd>
+            <MudTd Style="text-align:right">
+                <MudTooltip Text="Edit Hole">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditHoleDialog(context))" />
+                </MudTooltip>
+                <MudTooltip Text="Delete Hole">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteHole(context))" />
+                </MudTooltip>
+            </MudTd>
         </RowTemplate>
     </MudTable>
 
@@ -90,5 +102,69 @@ else
             Snackbar.Add("Error loading course details.", Severity.Error);
         }
         isLoading = false;
+    }
+    private async Task OpenAddHoleDialog()
+    {
+        if (course is null) return;
+        var newHole = new Hole { GolfCourseId = course.GolfCourseId };
+        var parameters = new DialogParameters<AddEditHoleDialog>
+        {
+            { x => x.HoleModel, newHole },
+            { x => x.Title, "Add New Hole" }
+        };
+        var dialog = await DialogService.ShowAsync<AddEditHoleDialog>("Add Hole", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await OnParametersSetAsync(); // Refresh the list
+        }
+    }
+
+    private async Task OpenEditHoleDialog(Hole holeToEdit)
+    {
+        var parameters = new DialogParameters<AddEditHoleDialog>
+        {
+            { x => x.HoleModel, holeToEdit },
+            { x => x.Title, $"Edit Hole {holeToEdit.HoleNumber}" }
+        };
+        var dialog = await DialogService.ShowAsync<AddEditHoleDialog>("Edit Hole", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await OnParametersSetAsync(); // Refresh the list
+        }
+    }
+    private async Task PrepareDeleteHole(Hole holeToDelete)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete Hole {holeToDelete.HoleNumber}?" },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            // VVV --- THIS IS THE UPDATED LOGIC --- VVV
+            try
+            {
+                bool deleted = await HoleService.DeleteHoleAsync(holeToDelete.HoleId);
+                if (deleted)
+                {
+                    Snackbar.Add("Hole deleted successfully.", Severity.Success);
+                    await OnParametersSetAsync(); // Refresh the list of holes
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete hole.", Severity.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting hole: {ex.Message}", Severity.Error);
+            }
+        }
     }
 }
