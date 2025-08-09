@@ -1,12 +1,15 @@
 @page "/players/{PlayerId:int}/report"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject IReportService ReportService
+
 @inject IPlayerService PlayerService
+@inject IReportService ReportService
+@inject IGolfCourseService CourseService
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthenticationStateProvider
+
 @using GolfTrackerApp.Web.Models
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
@@ -21,15 +24,44 @@
 }
 else
 {
-    <MudText Typo="Typo.h4">Performance Report: @player.FirstName @player.LastName</MudText>
+    <MudText Typo="Typo.h4" GutterBottom="true">Performance Report: @player.FirstName @player.LastName</MudText>
 
-    @if (chartData is not null && chartData.Any())
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="4">
+                <MudSelect T="int?" Label="Filter by Course" @bind-Value="SelectedCourseId" Clearable="true">
+                    @foreach (var course in _allCourses)
+                    {
+                        <MudSelectItem T="int?" Value="@course.GolfCourseId">@course.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="int?" Label="Filter by Holes Played" @bind-Value="SelectedHolesPlayed" Clearable="true">
+                    <MudSelectItem T="int?" Value="9">9 Holes</MudSelectItem>
+                    <MudSelectItem T="int?" Value="18">18 Holes</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudSelect T="RoundTypeOption?" Label="Filter by Round Type" @bind-Value="SelectedRoundType" Clearable="true">
+                    <MudSelectItem T="RoundTypeOption?" Value="RoundTypeOption.Friendly">Friendly</MudSelectItem>
+                    <MudSelectItem T="RoundTypeOption?" Value="RoundTypeOption.Competitive">Competitive</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (isLoadingChart)
+    {
+        <MudProgressLinear Indeterminate="true" Class="my-4" />
+    }
+    else if (_series is not null && _series.Any())
     {
         <MudChart ChartType="ChartType.Line" ChartSeries="@_series" XAxisLabels="@_xAxisLabels" Width="100%" Height="350px"></MudChart>
     }
     else
     {
-        <MudAlert Severity="Severity.Info" Class="mt-4">No completed rounds found for this player.</MudAlert>
+        <MudAlert Severity="Severity.Info" Class="mt-4">No completed rounds found for this player with the selected filters.</MudAlert>
     }
 }
 
@@ -38,37 +70,108 @@ else
     public int PlayerId { get; set; }
 
     private Player? player;
-    private List<ChartDataPoint> chartData = new();
+    private List<GolfCourse> _allCourses = new();
+    private bool isLoadingChart = true;
 
+    // Filter properties
+    private int? _selectedCourseId;
+    public int? SelectedCourseId
+    {
+        get => _selectedCourseId;
+        set {
+            if (_selectedCourseId != value) {
+                _selectedCourseId = value;
+                _ = OnFilterChanged();
+            }
+        }
+    }
+
+    private int? _selectedHolesPlayed;
+    public int? SelectedHolesPlayed
+    {
+        get => _selectedHolesPlayed;
+        set {
+            if (_selectedHolesPlayed != value) {
+                _selectedHolesPlayed = value;
+                _ = OnFilterChanged();
+            }
+        }
+    }
+
+    private RoundTypeOption? _selectedRoundType;
+    public RoundTypeOption? SelectedRoundType
+    {
+        get => _selectedRoundType;
+        set {
+            if (_selectedRoundType != value) {
+                _selectedRoundType = value;
+                _ = OnFilterChanged();
+            }
+        }
+    }
+
+    // Chart properties
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnInitializedAsync()
     {
+        player = await PlayerService.GetPlayerByIdAsync(PlayerId);
+        _allCourses = await CourseService.GetAllGolfCoursesAsync();
+        await LoadReportData();
+    }
+
+    private async Task LoadReportData()
+    {
+        isLoadingChart = true;
         try
         {
-            player = await PlayerService.GetPlayerByIdAsync(PlayerId);
-            if (player is not null)
-            {
-                chartData = await ReportService.GetPlayerPerformanceAsync(PlayerId);
-                PrepareChartData();
-            }
+            var performanceData = await ReportService.GetPlayerPerformanceAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType);
+            PrepareChartData(performanceData);
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Error loading report data: {ex.Message}", Severity.Error);
         }
+        isLoadingChart = false;
     }
 
-    private void PrepareChartData()
+    private void PrepareChartData(List<PlayerPerformanceDataPoint> data)
     {
-        if (chartData is null || !chartData.Any()) return;
-
-        _series = new List<ChartSeries>
+        if (data is null || !data.Any())
         {
-            new ChartSeries { Name = "Total Score", Data = chartData.Select(d => (double)d.TotalScore).ToArray() }
-        };
+            _series.Clear();
+            _xAxisLabels = Array.Empty<string>();
+            return;
+        }
 
-        _xAxisLabels = chartData.Select(d => d.Date.ToString("dd MMM")).ToArray();
+        // Create separate lines for 9 and 18 hole rounds if no filter is applied
+        var seriesList = new List<ChartSeries>();
+        if (_selectedHolesPlayed is null)
+        {
+            var data18holes = data.Where(d => d.HolesPlayed == 18).ToList();
+            if (data18holes.Any())
+            {
+                seriesList.Add(new ChartSeries { Name = "18 Hole Score", Data = data18holes.Select(d => (double)d.ScoreVsPar).ToArray() });
+            }
+            var data9holes = data.Where(d => d.HolesPlayed == 9).ToList();
+            if (data9holes.Any())
+            {
+                seriesList.Add(new ChartSeries { Name = "9 Hole Score", Data = data9holes.Select(d => (double)d.ScoreVsPar).ToArray() });
+            }
+        }
+        else // A filter is applied, show a single line
+        {
+            seriesList.Add(new ChartSeries { Name = "Score vs Par", Data = data.Select(d => (double)d.ScoreVsPar).ToArray() });
+        }
+
+        _series = seriesList;
+        _xAxisLabels = data.Select(d => d.Date.ToString("dd MMM")).ToArray();
+    }
+
+    // This method will be automatically called when a filter value changes
+    private async Task OnFilterChanged()
+    {
+        await LoadReportData();
     }
 }

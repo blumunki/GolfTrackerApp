@@ -4,5 +4,5 @@ namespace GolfTrackerApp.Web.Services;
 
 public interface IReportService
 {
-    Task<List<ChartDataPoint>> GetPlayerPerformanceAsync(int playerId);
+    Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType);
 }
