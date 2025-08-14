@@ -58,4 +58,90 @@ public class ReportService : IReportService
 
         return performanceData;
     }
+
+    public async Task<List<PlayingPartnerSummary>> GetPlayingPartnerSummaryAsync(string currentUserId, int count)
+    {
+        // Find the PlayerId for the current ApplicationUser
+        var currentPlayer = await _context.Players
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
+
+        if (currentPlayer is null)
+        {
+            return new List<PlayingPartnerSummary>();
+        }
+        var currentPlayerId = currentPlayer.PlayerId;
+
+        // Find all rounds the current player participated in
+        var userRoundIds = await _context.RoundPlayers
+            .AsNoTracking()
+            .Where(rp => rp.PlayerId == currentPlayerId)
+            .Select(rp => rp.RoundId)
+            .ToListAsync();
+
+        if (!userRoundIds.Any())
+        {
+            return new List<PlayingPartnerSummary>();
+        }
+
+        // Find all players who played in those same rounds (the partners)
+        var partners = await _context.RoundPlayers
+            .AsNoTracking()
+            .Where(rp => userRoundIds.Contains(rp.RoundId) && rp.PlayerId != currentPlayerId)
+            .Select(rp => rp.Player)
+            .Distinct()
+            .ToListAsync();
+
+        var summaryList = new List<PlayingPartnerSummary>();
+
+        foreach (var partner in partners)
+        {
+            // VVV --- THIS IS THE DEFINITIVE FIX --- VVV
+            // This explicit check guarantees to the compiler that 'partner' is not null for the rest of the loop.
+            if (partner is null)
+            {
+                continue;
+            }
+            // ^^^ ----------------------------------- ^^^
+
+            // Find all rounds played together
+            var roundsTogether = await _context.Rounds
+                .AsNoTracking()
+                .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == currentPlayerId) &&
+                            r.RoundPlayers.Any(rp => rp.PlayerId == partner.PlayerId)) // Now safe
+                .Include(r => r.Scores)
+                .ToListAsync();
+
+            if (!roundsTogether.Any()) continue;
+
+            int userWins = 0;
+            int partnerWins = 0;
+            int ties = 0;
+
+            foreach (var round in roundsTogether)
+            {
+                var userScore = round.Scores.Where(s => s.PlayerId == currentPlayerId).Sum(s => s.Strokes);
+                var partnerScore = round.Scores.Where(s => s.PlayerId == partner.PlayerId).Sum(s => s.Strokes); // Now safe
+
+                if (userScore > 0 && partnerScore > 0)
+                {
+                    if (userScore < partnerScore) userWins++;
+                    else if (partnerScore < userScore) partnerWins++;
+                    else ties++;
+                }
+            }
+
+            summaryList.Add(new PlayingPartnerSummary
+            {
+                PartnerId = partner.PlayerId, // Now safe
+                PartnerName = $"{partner.FirstName} {partner.LastName}",
+                LastPlayedDate = roundsTogether.Max(r => r.DatePlayed),
+                UserWins = userWins,
+                PartnerWins = partnerWins,
+                Ties = ties
+            });
+        }
+        
+        return summaryList.OrderByDescending(s => s.LastPlayedDate).Take(count).ToList();
+    }
 }
