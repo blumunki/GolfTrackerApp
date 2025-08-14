@@ -141,7 +141,32 @@ public class ReportService : IReportService
                 Ties = ties
             });
         }
-        
+
         return summaryList.OrderByDescending(s => s.LastPlayedDate).Take(count).ToList();
+    }
+
+    public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceSummaryAsync(string currentUserId, int roundCount)
+    {
+        var player = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
+        if (player is null)
+        {
+            return new List<PlayerPerformanceDataPoint>();
+        }
+
+        var performanceData = await _context.Rounds
+            .AsNoTracking()
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId) && r.Status == RoundCompletionStatus.Completed)
+            .OrderByDescending(r => r.DatePlayed)
+            .Take(roundCount)
+            .Select(r => new PlayerPerformanceDataPoint
+            {
+                Date = r.DatePlayed,
+                TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
+                TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par)
+            })
+            .OrderBy(d => d.Date) // Re-order by date ascending for the chart
+            .ToListAsync();
+
+        return performanceData;
     }
 }

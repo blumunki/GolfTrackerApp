@@ -5,10 +5,10 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IRoundService RoundService
 @inject IReportService ReportService
+@inject IPlayerService PlayerService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
-
 
 @using System.Security.Claims
 @using GolfTrackerApp.Web.Models
@@ -16,7 +16,6 @@
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
 @using MudBlazor
-
 
 
 <PageTitle>Dashboard</PageTitle>
@@ -38,10 +37,26 @@ else
         </MudItem>
 
         <MudItem xs="12" sm="6">
-            @* Placeholder for Performance Snapshot Card *@
-            <MudPaper Class="pa-4" Style="height: 100%;">
-                <MudText Typo="Typo.h6">My Recent Form</MudText>
-            </MudPaper>
+            <MudCard Elevation="2" Style="height: 100%;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">My Recent Form</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Launch" Href="@($"/players/{_currentPlayerId}/report")" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (_performanceSeries is not null && _performanceSeries.Any())
+                    {
+                        <MudChart ChartType="ChartType.Line" ChartSeries="@_performanceSeries" XAxisLabels="@_performanceXAxisLabels" Width="100%" Height="180px"></MudChart>
+                    }
+                    else
+                    {
+                        <MudText>Play some rounds to see your performance here.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
         </MudItem>
 
         <MudItem xs="12" sm="6">
@@ -52,7 +67,7 @@ else
         </MudItem>
 
         <MudItem xs="12" sm="6">
-            <MudCard Elevation="2">
+            <MudCard Elevation="2" Style="height: 100%;">
                 <MudCardHeader>
                     <CardHeaderContent>
                         <MudText Typo="Typo.h6">Playing Partners</MudText>
@@ -89,7 +104,14 @@ else
 
 @code {
     private bool isLoading = true;
+    private int _currentPlayerId;
+
+    // Data for Playing Partners card
     private List<PlayingPartnerSummary>? partnerSummary;
+
+    // Data for Performance Snapshot card
+    private List<ChartSeries> _performanceSeries = new();
+    private string[] _performanceXAxisLabels = Array.Empty<string>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -99,9 +121,33 @@ else
 
         if (currentUserId is not null)
         {
-            partnerSummary = await ReportService.GetPlayingPartnerSummaryAsync(currentUserId, 4); // Get top 4 partners
+            var player = await PlayerService.GetPlayerByApplicationUserIdAsync(currentUserId);
+            if (player is not null)
+            {
+                _currentPlayerId = player.PlayerId;
+
+                // Load data for both cards in parallel
+                var partnerTask = ReportService.GetPlayingPartnerSummaryAsync(currentUserId, 4);
+                var performanceTask = ReportService.GetPlayerPerformanceSummaryAsync(currentUserId, 7); // Get last 7 rounds for the chart
+
+                await Task.WhenAll(partnerTask, performanceTask);
+
+                partnerSummary = partnerTask.Result;
+                PreparePerformanceChart(performanceTask.Result);
+            }
         }
 
         isLoading = false;
+    }
+
+    private void PreparePerformanceChart(List<PlayerPerformanceDataPoint> data)
+    {
+        if (data is null || !data.Any()) return;
+
+        _performanceSeries = new List<ChartSeries>
+        {
+            new ChartSeries { Name = "Score vs Par", Data = data.Select(d => (double)d.ScoreVsPar).ToArray() }
+        };
+        _performanceXAxisLabels = data.Select(d => d.Date.ToString("dd MMM")).ToArray();
     }
 }
