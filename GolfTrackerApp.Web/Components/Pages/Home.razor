@@ -35,7 +35,6 @@ else
                 <MudText Typo="Typo.h6">Quick Actions</MudText>
             </MudPaper>
         </MudItem>
-
         <MudItem xs="12" sm="6">
             <MudCard Elevation="2" Style="height: 100%;">
                 <MudCardHeader>
@@ -58,14 +57,41 @@ else
                 </MudCardContent>
             </MudCard>
         </MudItem>
-
         <MudItem xs="12" sm="6">
-            @* Placeholder for Recent Rounds Card *@
-            <MudPaper Class="pa-4" Style="height: 100%;">
-                <MudText Typo="Typo.h6">Recent Rounds</MudText>
-            </MudPaper>
+            <MudCard Elevation="2" Style="height: 100%;">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">Recent Rounds</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Launch" Href="/rounds" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    @if (recentRounds is null || !recentRounds.Any())
+                    {
+                        <MudText>No recent rounds to display.</MudText>
+                    }
+                    else
+                    {
+                        <MudList clickable="true" T="object">
+                            @foreach (var round in recentRounds)
+                            {
+                                <MudListItem T="object" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
+                                    <div class="d-flex justify-space-between flex-grow-1">
+                                        <div class="d-flex flex-column">
+                                            <MudText>@($"{round.GolfCourse!.GolfClub!.Name} - {round.GolfCourse.Name}")</MudText>
+                                            <MudText Typo="Typo.caption">@round.DatePlayed.ToString("dd MMM yyyy")</MudText>
+                                        </div>
+                                        <MudText Typo="Typo.body2"><strong>@round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes)</strong></MudText>
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudCardContent>
+            </MudCard>
         </MudItem>
-
         <MudItem xs="12" sm="6">
             <MudCard Elevation="2" Style="height: 100%;">
                 <MudCardHeader>
@@ -100,18 +126,15 @@ else
         </MudItem>
     </MudGrid>
 }
-
-
 @code {
     private bool isLoading = true;
     private int _currentPlayerId;
 
-    // Data for Playing Partners card
+    // Data for cards
     private List<PlayingPartnerSummary>? partnerSummary;
-
-    // Data for Performance Snapshot card
     private List<ChartSeries> _performanceSeries = new();
     private string[] _performanceXAxisLabels = Array.Empty<string>();
+    private List<Round>? recentRounds; // <-- New field for this card
 
     protected override async Task OnInitializedAsync()
     {
@@ -125,15 +148,18 @@ else
             if (player is not null)
             {
                 _currentPlayerId = player.PlayerId;
+                var isAdmin = user.IsInRole("Admin");
 
-                // Load data for both cards in parallel
+                // Load data for all cards in parallel for efficiency
                 var partnerTask = ReportService.GetPlayingPartnerSummaryAsync(currentUserId, 4);
-                var performanceTask = ReportService.GetPlayerPerformanceSummaryAsync(currentUserId, 7); // Get last 7 rounds for the chart
+                var performanceTask = ReportService.GetPlayerPerformanceSummaryAsync(currentUserId, 7);
+                var recentRoundsTask = RoundService.GetRecentRoundsAsync(currentUserId, isAdmin, 4); // <-- New call
 
-                await Task.WhenAll(partnerTask, performanceTask);
+                await Task.WhenAll(partnerTask, performanceTask, recentRoundsTask);
 
                 partnerSummary = partnerTask.Result;
                 PreparePerformanceChart(performanceTask.Result);
+                recentRounds = recentRoundsTask.Result; // <-- Get result
             }
         }
 

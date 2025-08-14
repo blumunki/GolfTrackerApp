@@ -229,17 +229,25 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task<List<Round>> GetRecentRoundsAsync(string requestingUserId, bool isUserAdmin, int count)
         {
+            // Find the PlayerId for the current ApplicationUser
+            var currentPlayer = await _context.Players
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ApplicationUserId == requestingUserId);
+
+            // If the user doesn't have a player profile, they can't have played rounds.
+            if (currentPlayer is null)
+            {
+                return new List<Round>();
+            }
+
             IQueryable<Round> query = _context.Rounds
                                         .Include(r => r.GolfCourse!)
-                                            .ThenInclude(gc => gc!.GolfClub);
+                                            .ThenInclude(gc => gc!.GolfClub)
+                                        .Include(r => r.Scores);
 
-            if (!isUserAdmin)
-            {
-                query = query.Where(r =>
-                    r.CreatedByApplicationUserId == requestingUserId ||
-                    r.RoundPlayers.Any(rp => rp.Player != null && rp.Player.ApplicationUserId == requestingUserId)
-                );
-            }
+            // VVV --- THIS IS THE KEY CHANGE --- VVV
+            // The filter is now applied to EVERYONE, including admins.
+            query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == currentPlayer.PlayerId));
 
             return await query.OrderByDescending(r => r.DatePlayed)
                             .Take(count)
