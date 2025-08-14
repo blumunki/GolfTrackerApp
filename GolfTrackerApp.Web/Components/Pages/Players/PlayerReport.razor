@@ -44,13 +44,20 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
+                <MudSelect T="RoundTypeOption?" Label="Filter by Round Type" @bind-Value="SelectedRoundType" Clearable="true">
+                    <MudSelectItem T="RoundTypeOption?" Value="@RoundTypeOption.Friendly">Friendly</MudSelectItem>
+                    <MudSelectItem T="RoundTypeOption?" Value="@RoundTypeOption.Competitive">Competitive</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+
+            <MudItem xs="12" sm="6" md="3">
                 <MudDatePicker Label="Start Date" @bind-Date="StartDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
                 <MudDatePicker Label="End Date" @bind-Date="EndDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" />
             </MudItem>
-            <MudItem xs="12">
-                 <MudSwitch T="bool" @bind-checked="ShowScoreVsPar" Label="Show Score vs Par (otherwise Total Score)" Color="Color.Primary" />
+            <MudItem xs="12" sm="6" md="3">
+                <MudSwitch @bind-Value="ShowScoreVsPar" Label="Show Score vs Par" Color="Color.Primary"/>
             </MudItem>
         </MudGrid>
     </MudPaper>
@@ -85,6 +92,9 @@ else
     private int? _selectedHolesPlayed;
     public int? SelectedHolesPlayed { get => _selectedHolesPlayed; set { if (_selectedHolesPlayed != value) { _selectedHolesPlayed = value; _ = OnFilterChanged(); } } }
     
+    private RoundTypeOption? _selectedRoundType;
+    public RoundTypeOption? SelectedRoundType { get => _selectedRoundType; set { if (_selectedRoundType != value) { _selectedRoundType = value; _ = OnFilterChanged(); } } }
+    
     private DateTime? _startDate;
     public DateTime? StartDate { get => _startDate; set { if (_startDate != value) { _startDate = value; _ = OnFilterChanged(); } } }
 
@@ -92,8 +102,18 @@ else
     public DateTime? EndDate { get => _endDate; set { if (_endDate != value) { _endDate = value; _ = OnFilterChanged(); } } }
 
     private bool _showScoreVsPar = true;
-    public bool ShowScoreVsPar { get => _showScoreVsPar; set { if (_showScoreVsPar != value) { _showScoreVsPar = value; _ = OnFilterChanged(); } } }
-    
+    public bool ShowScoreVsPar 
+    { 
+        get => _showScoreVsPar; 
+        set 
+        { 
+            if (_showScoreVsPar != value)
+            {
+                _showScoreVsPar = value;
+                InvokeAsync(OnFilterChanged);
+            }
+        } 
+    }
     // --- Chart Properties ---
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
@@ -112,7 +132,7 @@ else
         isLoadingChart = true;
         try
         {
-            var performanceData = await ReportService.GetPlayerPerformanceAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, null, _startDate, _endDate);
+            var performanceData = await ReportService.GetPlayerPerformanceAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
             PrepareChartData(performanceData);
         }
         catch (Exception ex)
@@ -131,15 +151,14 @@ else
             return;
         }
 
-        string seriesName = ShowScoreVsPar ? "Score vs Par" : "Total Score";
-        var seriesData = ShowScoreVsPar
+        string seriesName = _showScoreVsPar ? "Score vs Par" : "Total Score";
+        var seriesData = _showScoreVsPar
             ? data.Select(d => (double)d.ScoreVsPar).ToArray()
             : data.Select(d => (double)d.TotalScore).ToArray();
 
         _series = new List<ChartSeries> { new() { Name = seriesName, Data = seriesData } };
 
-        // This fixes the squashed labels by intelligently skipping some
-        int labelInterval = Math.Max(1, data.Count / 15); // Show a maximum of ~15 labels
+        int labelInterval = Math.Max(1, data.Count / 15);
         _xAxisLabels = data
             .Select((d, i) => i % labelInterval == 0 ? d.Date.ToString("dd MMM") : "")
             .ToArray();
