@@ -13,19 +13,29 @@
 @rendermode InteractiveServer
 
 <PageTitle>Golf Rounds</PageTitle>
+
 <MudText Typo="Typo.h4" GutterBottom="true">Golf Rounds</MudText>
 
 @if (isLoading)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
-else if (rounds is null || !rounds.Any())
+else if (allRounds is null || !allRounds.Any())
 {
     <MudText>No rounds found. Use the "Record New Round" link in the menu to get started.</MudText>
 }
 else
 {
-    <MudTable Items="@rounds.OrderByDescending(r => r.DatePlayed)" Hover="true" Striped="true" Dense="true" Class="mt-4" Elevation="1">
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Filter by Course or Club..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Immediate="true" />
+    </MudPaper>
+
+    <MudTable Items="@FilteredRounds" Hover="true" Striped="true" Dense="true" Elevation="1">
         <HeaderContent>
             <MudTh>Date</MudTh>
             <MudTh>Course</MudTh>
@@ -54,8 +64,18 @@ else
 }
 
 @code {
-    private List<Round>? rounds;
+    private List<Round>? allRounds;
     private bool isLoading = true;
+    private string searchString = ""; // For the filter text field
+
+    private List<Round>? FilteredRounds =>
+        allRounds?.Where(r => 
+            string.IsNullOrWhiteSpace(searchString) ||
+            r.GolfCourse?.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true ||
+            r.GolfCourse?.GolfClub?.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true
+        ).ToList();
+
+    // Renamed 'rounds' to 'allRounds' to distinguish from the filtered list
     private string _currentUserId = string.Empty;
     private bool _isCurrentUserAdmin = false;
 
@@ -74,17 +94,17 @@ else
         {
             _currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
             _isCurrentUserAdmin = user.IsInRole("Admin");
-            
+
             try
             {
-                rounds = await RoundService.GetAllRoundsAsync(_currentUserId, _isCurrentUserAdmin);
+                allRounds = await RoundService.GetAllRoundsAsync(_currentUserId, _isCurrentUserAdmin);
             }
             catch (Exception ex)
             {
                 Snackbar.Add($"Error loading rounds: {ex.Message}", Severity.Error);
             }
         }
-        
+
         isLoading = false;
     }
 
