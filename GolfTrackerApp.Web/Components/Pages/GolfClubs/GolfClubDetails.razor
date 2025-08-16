@@ -27,6 +27,7 @@ else if (golfClub == null)
 }
 else
 {
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4"></MudBreadcrumbs>
     <MudPaper Class="pa-4 mb-4" Elevation="0">
         <MudGrid Spacing="2" Justify="Justify.SpaceBetween" alignItems="AlignItems.Center" Class="mb-2">
         @* <MudGrid Spacing="2" Justify="Justify.SpaceBetween" AlignItems="@MudBlazor.AlignItems.Center" Class="mb-2"> *@
@@ -107,6 +108,8 @@ else
     private bool isLoading = true;
     private string? errorMessage;
 
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
@@ -118,6 +121,14 @@ else
             {
                 errorMessage = $"Golf club with ID {ClubId} not found.";
                 Snackbar.Add(errorMessage, Severity.Warning);
+            }
+            else
+            {
+                _breadcrumbs = new List<BreadcrumbItem>
+                {
+                    new BreadcrumbItem("Clubs", href: "/golfclubs"),
+                    new BreadcrumbItem(golfClub.Name, href: null, disabled: true)
+                };
             }
         }
         catch (Exception ex)
