@@ -6,27 +6,42 @@
 @inject ISnackbar Snackbar
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
-@using GolfTrackerApp.Web.Components.Shared // For ConfirmDialog
+@using GolfTrackerApp.Web.Components.Shared
 @using Microsoft.AspNetCore.Authorization
 @rendermode InteractiveServer
 
+<PageTitle>Golf Clubs</PageTitle>
+
 <MudText Typo="Typo.h4" GutterBottom="true">Golf Clubs</MudText>
 
-<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="GoToAddGolfClubPage" StartIcon="@Icons.Material.Filled.Add" Class="mb-3">
+<MudButton Variant="Variant.Filled" 
+           Color="Color.Primary" 
+           OnClick="GoToAddGolfClubPage" 
+           StartIcon="@Icons.Material.Filled.Add" 
+           Class="mb-3">
     Add New Golf Club
 </MudButton>
 
-@if (isLoading) @* Added isLoading flag *@
+@if (isLoading)
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
-else if (golfClubs == null || !golfClubs.Any())
+else if (allGolfClubs is null || !allGolfClubs.Any())
 {
-    <MudText>No golf clubs found. Please add some.</MudText>
+    <MudText>No golf clubs found. Please add one to get started.</MudText>
 }
 else
 {
-    <MudTable Items="@golfClubs" Hover="true" Striped="true" Dense="true" Class="mt-4" Elevation="1">
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Filter by Name, City or Country..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Immediate="true" />
+    </MudPaper>
+
+    <MudTable Items="@FilteredGolfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
         <HeaderContent>
             <MudTh>Name</MudTh>
             <MudTh>City</MudTh>
@@ -41,7 +56,7 @@ else
             <MudTd DataLabel="Country">@context.Country</MudTd>
             <MudTd Style="text-align:right">
                 <MudTooltip Text="View Details">
-                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Color="Color.Default" OnClick="@(() => ViewClubDetails(context.GolfClubId))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewClubDetails(context.GolfClubId))" />
                 </MudTooltip>
                 <MudTooltip Text="Edit Club">
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditClub(context.GolfClubId))" />
@@ -58,85 +73,78 @@ else
 }
 
 @code {
-    private List<GolfClub>? golfClubs;
-    private bool isLoading = true; // Added
+    private List<GolfClub>? allGolfClubs;
+    private bool isLoading = true;
+    private string searchString = "";
 
-    protected override async Task OnInitializedAsync() // Changed to async and added isLoading
+    private List<GolfClub>? FilteredGolfClubs =>
+        allGolfClubs?.Where(c =>
+            string.IsNullOrWhiteSpace(searchString) ||
+            c.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true ||
+            (c.City?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true) ||
+            (c.Country?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
+        ).ToList();
+
+    protected override async Task OnInitializedAsync()
     {
-        isLoading = true;
         await LoadClubs();
-        isLoading = false;
     }
 
     private async Task LoadClubs()
     {
+        isLoading = true;
         try
         {
-            golfClubs = await GolfClubService.GetAllGolfClubsAsync();
+            allGolfClubs = await GolfClubService.GetAllGolfClubsAsync();
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Error loading golf clubs: {ex.Message}", Severity.Error);
         }
+        isLoading = false;
     }
 
-    private void GoToAddGolfClubPage()
-    {
-        NavigationManager.NavigateTo("/golfclubs/add");
-    }
+    private void GoToAddGolfClubPage() => NavigationManager.NavigateTo("/golfclubs/add");
+    
+    private void ViewClubDetails(int clubId) => NavigationManager.NavigateTo($"/golfclubs/{clubId}");
 
-    private void ViewClubDetails(int clubId)
-    {
-        NavigationManager.NavigateTo($"/golfclubs/{clubId}");
-    }
+    private void EditClub(int clubId) => NavigationManager.NavigateTo($"/golfclubs/edit/{clubId}");
 
-    private void EditClub(int clubId) // New method
+    private async Task PrepareDeleteClub(GolfClub club)
     {
-        NavigationManager.NavigateTo($"/golfclubs/edit/{clubId}");
-    }
-
-    private async Task PrepareDeleteClub(GolfClub club) // New method
-    {
-        if (club == null) return;
-
         var parameters = new DialogParameters<ConfirmDialog>
         {
             { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete {club.Name}? This cannot be undone." },
             { nameof(ConfirmDialog.ButtonText), "Delete" },
             { nameof(ConfirmDialog.Color), Color.Error }
         };
-        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
         var result = await dialog.Result;
 
-        if (result != null && !result.Canceled && result.Data is true)
+        if (result is not null && !result.Canceled && result.Data is true)
         {
             await DeleteClubConfirmed(club.GolfClubId);
         }
     }
-
-    private async Task DeleteClubConfirmed(int clubId) // New method
+    private async Task DeleteClubConfirmed(int clubId)
     {
         try
         {
-            // Important: Your GolfClubService.DeleteGolfClubAsync needs to handle
-            // deleting or disassociating related GolfCourses, or preventing delete if courses exist.
-            // For now, assuming a simple delete.
             bool deleted = await GolfClubService.DeleteGolfClubAsync(clubId);
-            if(deleted)
+            if (deleted)
             {
                 Snackbar.Add("Golf club deleted successfully.", Severity.Success);
-                await LoadClubs(); // Refresh list
+                await LoadClubs();
             }
             else
             {
-                Snackbar.Add("Failed to delete golf club. It might be in use or not found.", Severity.Warning);
+                Snackbar.Add("Failed to delete golf club.", Severity.Warning);
             }
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Error deleting golf club: {ex.Message}", Severity.Error);
         }
-        StateHasChanged();
+        StateHasChanged(); // Ensures UI always refreshes after operation
     }
 }
