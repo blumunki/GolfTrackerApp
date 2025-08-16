@@ -68,7 +68,11 @@ else
     }
     else if (_series is not null && _series.Any() && _series[0].Data.Length > 0)
     {
-        <MudChart ChartType="ChartType.Line" ChartSeries="@_series" XAxisLabels="@_xAxisLabels" Width="100%" Height="350px"></MudChart>
+        <MudPaper Class="pa-4 mt-4" Elevation="2">
+            <div style="aspect-ratio: 2 / 1;">
+                <MudChart ChartType="ChartType.Line" ChartSeries="@_series" XAxisLabels="@_xAxisLabels" Width="100%" Height="100%"></MudChart>
+            </div>
+        </MudPaper>
     }
     else
     {
