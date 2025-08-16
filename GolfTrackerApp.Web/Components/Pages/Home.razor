@@ -20,132 +20,139 @@
 
 <PageTitle>Dashboard</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
+<div class="dashboard-container">
+    <MudText Typo="Typo.h4" GutterBottom="true">Dashboard</MudText>
 
-@if (isLoading)
-{
-    <MudProgressCircular Indeterminate="true" />
-}
-else
-{
-    <MudGrid Spacing="3">
-        <MudItem xs="12" sm="6">
-            <MudCard Elevation="2" Style="height: 100%;">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Quick Actions</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent Class="d-flex flex-column justify-center align-center gap-4 pa-4">
-                    <MudButton Href="/rounds/record"
-                            Variant="Variant.Filled" 
-                            Color="Color.Primary" 
-                            StartIcon="@Icons.Material.Filled.EditNote"
-                            Style="width: 100%; height: 50px;">
-                        Record a Finished Round
-                    </MudButton>
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate="true" />
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="6">
+                <MudCard Elevation="2" Class="d-flex flex-column" Style="height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">Quick Actions</MudText>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent Class="d-flex flex-column justify-center align-center gap-4 pa-4 flex-grow-1">
+                        <MudButton Href="/rounds/record"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.EditNote"
+                                   Style="width: 100%; height: 50px;">
+                            Record a Finished Round
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Secondary"
+                                   StartIcon="@Icons.Material.Filled.RadioButtonChecked"
+                                   Style="width: 100%; height: 50px;"
+                                   Disabled="true">
+                            Start Live Scoring (Coming Soon)
+                        </MudButton>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <NavLink href="@($"/players/{_currentPlayerId}/report")" style="text-decoration: none; height: 100%;">
+                    <MudCard Elevation="2" Class="d-flex flex-column" Style="height: 100%;">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">My Recent Form</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent Class="flex-grow-1">
+                            @if (_performanceSeries is not null && _performanceSeries.Any())
+                            {
+                                <MudChart ChartType="ChartType.Line" ChartSeries="@_performanceSeries" XAxisLabels="@_performanceXAxisLabels" Width="100%" Height="100%"></MudChart>
+                            }
+                            else
+                            {
+                                <MudText>Play some rounds to see your performance here.</MudText>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </NavLink>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudLink Href="/rounds" Typo="Typo.h6" Underline="Underline.None" Color="Color.Inherit">Recent Rounds</MudLink>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (recentRounds is null || !recentRounds.Any())
+                        {
+                            <MudText>No recent rounds to display.</MudText>
+                        }
+                        else
+                        {
+                            <MudList clickable="true" T="object">
+                                @foreach (var round in recentRounds)
+                                {
+                                    <MudListItem T="object" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
+                                        <div class="d-flex justify-space-between flex-grow-1">
+                                            <div class="d-flex flex-column">
+                                                <MudText>@($"{round.GolfCourse!.GolfClub!.Name} - {round.GolfCourse.Name}")</MudText>
+                                                <MudText Typo="Typo.caption">@round.DatePlayed.ToString("dd MMM yyyy")</MudText>
+                                            </div>
+                                            <MudText Typo="Typo.body2"><strong>@round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes)</strong></MudText>
+                                        </div>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                             <MudLink Href="/players" Typo="Typo.h6" Underline="Underline.None" Color="Color.Inherit">Playing Partners</MudLink>
+                        </CardHeaderContent>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        @if (partnerSummary is null || !partnerSummary.Any())
+                        {
+                            <MudText>Play some rounds with friends to see stats here.</MudText>
+                        }
+                        else
+                        {
+                            <MudList clickable="true" T="object">
+                                @foreach (var partner in partnerSummary)
+                                {
+                                    <MudListItem T="object" Href="@($"/players/{partner.PartnerId}/report")">
+                                        <div class="d-flex justify-space-between flex-grow-1">
+                                            <div class="d-flex flex-column">
+                                                <MudText>@partner.PartnerName</MudText>
+                                                <MudText Typo="Typo.caption">Last played: @partner.LastPlayedDate.ToString("dd MMM yyyy")</MudText>
+                                            </div>
+                                            <MudText Typo="Typo.body2">Record: @partner.UserWins-@partner.PartnerWins-@partner.Ties</MudText>
+                                        </div>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+</div>
 
-                    <MudButton Variant="Variant.Outlined" 
-                            Color="Color.Secondary"
-                            StartIcon="@Icons.Material.Filled.RadioButtonChecked"
-                            Style="width: 100%; height: 50px;"
-                            Disabled="true">
-                        Start Live Scoring (Coming Soon)
-                    </MudButton>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6">
-            <MudCard Elevation="2" Style="height: 100%;">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">My Recent Form</MudText>
-                    </CardHeaderContent>
-                    <CardHeaderActions>
-                        <MudIconButton Icon="@Icons.Material.Filled.Launch" Href="@($"/players/{_currentPlayerId}/report")" />
-                    </CardHeaderActions>
-                </MudCardHeader>
-                <MudCardContent>
-                    @if (_performanceSeries is not null && _performanceSeries.Any())
-                    {
-                        <MudChart ChartType="ChartType.Line" ChartSeries="@_performanceSeries" XAxisLabels="@_performanceXAxisLabels" Width="100%" Height="180px"></MudChart>
-                    }
-                    else
-                    {
-                        <MudText>Play some rounds to see your performance here.</MudText>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6">
-            <MudCard Elevation="2" Style="height: 100%;">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Recent Rounds</MudText>
-                    </CardHeaderContent>
-                    <CardHeaderActions>
-                        <MudIconButton Icon="@Icons.Material.Filled.Launch" Href="/rounds" />
-                    </CardHeaderActions>
-                </MudCardHeader>
-                <MudCardContent>
-                    @if (recentRounds is null || !recentRounds.Any())
-                    {
-                        <MudText>No recent rounds to display.</MudText>
-                    }
-                    else
-                    {
-                        <MudList clickable="true" T="object">
-                            @foreach (var round in recentRounds)
-                            {
-                                <MudListItem T="object" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
-                                    <div class="d-flex justify-space-between flex-grow-1">
-                                        <div class="d-flex flex-column">
-                                            <MudText>@($"{round.GolfCourse!.GolfClub!.Name} - {round.GolfCourse.Name}")</MudText>
-                                            <MudText Typo="Typo.caption">@round.DatePlayed.ToString("dd MMM yyyy")</MudText>
-                                        </div>
-                                        <MudText Typo="Typo.body2"><strong>@round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes)</strong></MudText>
-                                    </div>
-                                </MudListItem>
-                            }
-                        </MudList>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6">
-            <MudCard Elevation="2" Style="height: 100%;">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">Playing Partners</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    @if (partnerSummary is null || !partnerSummary.Any())
-                    {
-                        <MudText>Play some rounds with friends to see stats here.</MudText>
-                    }
-                    else
-                    {
-                        <MudList clickable="true" T="object">
-                            @foreach (var partner in partnerSummary)
-                            {
-                                <MudListItem T="object" Href="@($"/players/{partner.PartnerId}/report")">
-                                    <div class="d-flex justify-space-between flex-grow-1">
-                                        <div class="d-flex flex-column">
-                                            <MudText>@partner.PartnerName</MudText>
-                                            <MudText Typo="Typo.caption">Last played: @partner.LastPlayedDate.ToString("dd MMM yyyy")</MudText>
-                                        </div>
-                                        <MudText Typo="Typo.body2">Record: @partner.UserWins-@partner.PartnerWins-@partner.Ties</MudText>
-                                    </div>
-                                </MudListItem>
-                            }
-                        </MudList>
-                    }
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
-}
+@* Add this style block to apply the background color *@
+<style>
+    .dashboard-container {
+        background-color: var(--mud-palette-background-grey);
+        padding: 24px;
+        margin: -24px; /* Counteract the default MudMainContent padding */
+    }
+</style>
+
 @code {
     private bool isLoading = true;
     private int _currentPlayerId;
@@ -154,7 +161,7 @@ else
     private List<PlayingPartnerSummary>? partnerSummary;
     private List<ChartSeries> _performanceSeries = new();
     private string[] _performanceXAxisLabels = Array.Empty<string>();
-    private List<Round>? recentRounds; // <-- New field for this card
+    private List<Round>? recentRounds;
 
     protected override async Task OnInitializedAsync()
     {
@@ -171,18 +178,18 @@ else
                 var isAdmin = user.IsInRole("Admin");
 
                 // Load data for all cards in parallel for efficiency
-                var partnerTask = ReportService.GetPlayingPartnerSummaryAsync(currentUserId, 4);
+                var partnerTask = ReportService.GetPlayingPartnerSummaryAsync(currentUserId, 5); // Fetches 5
                 var performanceTask = ReportService.GetPlayerPerformanceSummaryAsync(currentUserId, 7);
-                var recentRoundsTask = RoundService.GetRecentRoundsAsync(currentUserId, isAdmin, 4); // <-- New call
+                var recentRoundsTask = RoundService.GetRecentRoundsAsync(currentUserId, isAdmin, 5); // Fetches 5
 
                 await Task.WhenAll(partnerTask, performanceTask, recentRoundsTask);
 
                 partnerSummary = partnerTask.Result;
                 PreparePerformanceChart(performanceTask.Result);
-                recentRounds = recentRoundsTask.Result; // <-- Get result
+                recentRounds = recentRoundsTask.Result;
             }
         }
-
+        
         isLoading = false;
     }
 
