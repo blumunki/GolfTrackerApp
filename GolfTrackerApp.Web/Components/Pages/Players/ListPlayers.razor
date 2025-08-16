@@ -28,13 +28,22 @@
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
-else if (players is null || !players.Any())
+else if (allPlayers is null || !allPlayers.Any())
 {
     <MudText>No players found. Please add one to get started.</MudText>
 }
 else
 {
-    <MudTable Items="@players" Hover="true" Striped="true" Dense="true" Class="mt-4" Elevation="1">
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Filter by Name..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Immediate="true" />
+    </MudPaper>
+
+    <MudTable Items="@FilteredPlayers" Hover="true" Striped="true" Dense="true" Elevation="1">
         <HeaderContent>
             <MudTh>Name</MudTh>
             <MudTh>Handicap</MudTh>
@@ -66,8 +75,15 @@ else
 }
 
 @code {
-    private List<Player>? players;
+    private List<Player>? allPlayers;
     private bool isLoading = true;
+    private string searchString = "";
+
+    private List<Player>? FilteredPlayers =>
+        allPlayers?.Where(p =>
+            string.IsNullOrWhiteSpace(searchString) ||
+            $"{p.FirstName} {p.LastName}".Contains(searchString, StringComparison.OrdinalIgnoreCase) == true
+        ).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -84,7 +100,7 @@ else
             var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
             var isCurrentUserAdmin = user.IsInRole("Admin");
 
-            players = await PlayerService.GetAllPlayersAsync(currentUserId, isCurrentUserAdmin);
+            allPlayers = await PlayerService.GetAllPlayersAsync(currentUserId, isCurrentUserAdmin);
         }
         catch (Exception ex)
         {
@@ -93,15 +109,9 @@ else
         isLoading = false;
     }
 
-    private void GoToAddPlayerPage()
-    {
-        NavigationManager.NavigateTo("/players/add");
-    }
+    private void GoToAddPlayerPage() => NavigationManager.NavigateTo("/players/add");
 
-    private void EditPlayer(int playerId)
-    {
-        NavigationManager.NavigateTo($"/players/edit/{playerId}");
-    }
+    private void EditPlayer(int playerId) => NavigationManager.NavigateTo($"/players/edit/{playerId}");
 
     private async Task PrepareDeletePlayer(Player player)
     {
@@ -111,8 +121,7 @@ else
             { nameof(ConfirmDialog.ButtonText), "Delete" },
             { nameof(ConfirmDialog.Color), Color.Error }
         };
-        var options = new DialogOptions() { CloseButton = true, MaxWidth = MaxWidth.ExtraSmall };
-        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters, options);
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
         var result = await dialog.Result;
 
         if (result is not null && !result.Canceled && result.Data is true)
@@ -129,11 +138,11 @@ else
             if (deleted)
             {
                 Snackbar.Add("Player deleted successfully.", Severity.Success);
-                await LoadPlayers(); // Refresh list
+                await LoadPlayers();
             }
             else
             {
-                Snackbar.Add("Failed to delete player. They may be part of a round.", Severity.Warning);
+                Snackbar.Add("Failed to delete player.", Severity.Warning);
             }
         }
         catch (Exception ex)
