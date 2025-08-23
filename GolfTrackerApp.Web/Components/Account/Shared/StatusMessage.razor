@@ -1,29 +1,35 @@
-﻿@if (!string.IsNullOrEmpty(DisplayMessage))
+﻿@inject NavigationManager NavigationManager
+@inject IHttpContextAccessor HttpContextAccessor
+
+@if (!string.IsNullOrEmpty(Message))
 {
-    var statusMessageClass = DisplayMessage.StartsWith("Error") ? "danger" : "success";
-    <div class="alert alert-@statusMessageClass" role="alert">
-        @DisplayMessage
+    var statusMessageClass = Message.StartsWith("Error") ? "danger" : "success";
+    <div class="alert alert-@statusMessageClass alert-dismissible" role="alert">
+        <div>@Message</div>
+        <button type="button" class="btn-close" @onclick="@ClearMessage" aria-label="Close"></button>
     </div>
 }
 
 @code {
-    private string? messageFromCookie;
-
     [Parameter]
     public string? Message { get; set; }
 
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
-    private string? DisplayMessage => Message ?? messageFromCookie;
-
     protected override void OnInitialized()
     {
-        messageFromCookie = HttpContext.Request.Cookies[IdentityRedirectManager.StatusCookieName];
-
-        if (messageFromCookie is not null)
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext is not null)
         {
-            HttpContext.Response.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
+            if (httpContext.Request.Cookies.TryGetValue(IdentityRedirectManager.StatusCookieName, out var cookieMessage))
+            {
+                Message = cookieMessage;
+                httpContext.Response.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
+            }
         }
+    }
+
+    private void ClearMessage()
+    {
+        Message = null;
+        StateHasChanged();
     }
 }

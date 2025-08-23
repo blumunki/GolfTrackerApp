@@ -78,6 +78,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (HttpContext is null)
+        {
+            return;
+        }
+
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
             // Clear the existing external cookie to ensure a clean login process
@@ -87,6 +92,12 @@
 
     public async Task LoginUser()
     {
+        if (HttpContext is null)
+        {
+            errorMessage = "Error: Authentication context not available.";
+            return;
+        }
+        
         // This doesn't count login failures towards account lockout
         // To enable password failures to trigger account lockout, set lockoutOnFailure: true
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);

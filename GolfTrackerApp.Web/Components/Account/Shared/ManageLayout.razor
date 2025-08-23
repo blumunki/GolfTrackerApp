@@ -1,17 +1,27 @@
-﻿@inherits LayoutComponentBase
-@layout GolfTrackerApp.Web.Components.Layout.MainLayout
+﻿@using GolfTrackerApp.Web.Components.Layout
+@inherits LayoutComponentBase
+@layout MainLayout
 
-<h1>Manage your account</h1>
+<MudContainer Class="mt-4">
+    <MudText Typo="Typo.h4" GutterBottom="true">Manage your account</MudText>
 
-<div>
-    <h2>Change your account settings</h2>
-    <hr />
-    <div class="row">
-        <div class="col-lg-3">
-            <ManageNavMenu />
-        </div>
-        <div class="col-lg-9">
-            @Body
-        </div>
-    </div>
-</div>
+    <MudGrid>
+        <MudItem xs="12" sm="3">
+            <MudPaper Class="pa-3">
+                <MudNavMenu>
+                    <MudNavLink Href="Account/Manage" Match="NavLinkMatch.All">Profile</MudNavLink>
+                    <MudNavLink Href="Account/Manage/Email">Email</MudNavLink>
+                    <MudNavLink Href="Account/Manage/ChangePassword">Password</MudNavLink>
+                    <MudNavLink Href="Account/Manage/ExternalLogins">External logins</MudNavLink>
+                    <MudNavLink Href="Account/Manage/TwoFactorAuthentication">Two-factor authentication</MudNavLink>
+                    <MudNavLink Href="Account/Manage/PersonalData">Personal data</MudNavLink>
+                </MudNavMenu>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" sm="9">
+            <MudPaper Class="pa-4">
+                @Body
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
