@@ -10,8 +10,19 @@
 
 <PageTitle>Confirm email</PageTitle>
 
-<h1>Confirm email</h1>
-<StatusMessage Message="@statusMessage" />
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h4" Class="mb-4">Confirm email</MudText>
+        
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <MudAlert Severity="@(statusMessage.StartsWith("Error") ? Severity.Error : Severity.Success)"
+                     Class="mb-4">
+                @statusMessage
+            </MudAlert>
+        }
+    </MudPaper>
+</MudContainer>
 
 @code {
     private string? statusMessage;

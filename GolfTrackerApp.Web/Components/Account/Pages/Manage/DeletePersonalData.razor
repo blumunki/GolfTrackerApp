@@ -12,31 +12,47 @@
 
 <PageTitle>Delete Personal Data</PageTitle>
 
-<StatusMessage Message="@message" />
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4">
+        <MudText Typo="Typo.h4" Class="mb-4">Delete Personal Data</MudText>
 
-<h3>Delete Personal Data</h3>
-
-<div class="alert alert-warning" role="alert">
-    <p>
-        <strong>Deleting this data will permanently remove your account, and this cannot be recovered.</strong>
-    </p>
-</div>
-
-<div>
-    <EditForm Model="Input" FormName="delete-user" OnValidSubmit="OnValidSubmitAsync" method="post">
-        <DataAnnotationsValidator />
-        <ValidationSummary class="text-danger" role="alert" />
-        @if (requirePassword)
+        @if (!string.IsNullOrEmpty(message))
         {
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="Please enter your password." />
-                <label for="Input.Password" class="form-label">Password</label>
-                <ValidationMessage For="() => Input.Password" class="text-danger" />
-            </div>
+            <MudAlert Severity="Severity.Error" Class="mb-4">@message</MudAlert>
         }
-        <button class="w-100 btn btn-lg btn-danger" type="submit">Delete data and close my account</button>
-    </EditForm>
-</div>
+
+        <MudAlert Severity="Severity.Warning" Icon="@Icons.Material.Filled.Warning" Class="mb-4">
+            <MudText Typo="Typo.body1" Style="font-weight: 500">
+                Deleting this data will permanently remove your account, and this cannot be recovered.
+            </MudText>
+        </MudAlert>
+
+        <EditForm Model="Input" FormName="delete-user" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <DataAnnotationsValidator />
+
+            @if (requirePassword)
+            {
+                <MudTextField 
+                    @bind-Value="Input.Password"
+                    Label="Password"
+                    Variant="Variant.Outlined"
+                    InputType="InputType.Password"
+                    Class="mb-4"
+                    For="@(() => Input.Password)" />
+            }
+
+            <MudButton 
+                ButtonType="ButtonType.Submit" 
+                Variant="Variant.Filled" 
+                Color="Color.Error" 
+                Size="Size.Large"
+                StartIcon="@Icons.Material.Filled.DeleteForever"
+                FullWidth="true">
+                Delete data and close my account
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
 
 @code {
     private string? message;

@@ -11,24 +11,34 @@
 
 <PageTitle>Reset authenticator key</PageTitle>
 
-<StatusMessage />
-<h3>Reset authenticator key</h3>
-<div class="alert alert-warning" role="alert">
-    <p>
-        <span class="glyphicon glyphicon-warning-sign"></span>
-        <strong>If you reset your authenticator key your authenticator app will not work until you reconfigure it.</strong>
-    </p>
-    <p>
-        This process disables 2FA until you verify your authenticator app.
-        If you do not complete your authenticator app configuration you may lose access to your account.
-    </p>
-</div>
-<div>
-    <form @formname="reset-authenticator" @onsubmit="OnSubmitAsync" method="post">
-        <AntiforgeryToken />
-        <button class="btn btn-danger" type="submit">Reset authenticator key</button>
-    </form>
-</div>
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4">
+        <MudText Typo="Typo.h4" Class="mb-4">Reset authenticator key</MudText>
+
+        <StatusMessage />
+
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            <MudText Style="font-weight: 500" Class="mb-2">
+                If you reset your authenticator key your authenticator app will not work until you reconfigure it.
+            </MudText>
+            <MudText>
+                This process disables 2FA until you verify your authenticator app.
+                If you do not complete your authenticator app configuration you may lose access to your account.
+            </MudText>
+        </MudAlert>
+
+        <form @formname="reset-authenticator" @onsubmit="OnSubmitAsync" method="post">
+            <AntiforgeryToken />
+            <MudButton 
+                ButtonType="ButtonType.Submit"
+                Variant="Variant.Filled"
+                Color="Color.Error"
+                StartIcon="@Icons.Material.Filled.RestartAlt">
+                Reset authenticator key
+            </MudButton>
+        </form>
+    </MudPaper>
+</MudContainer>
 
 @code {
     [CascadingParameter]

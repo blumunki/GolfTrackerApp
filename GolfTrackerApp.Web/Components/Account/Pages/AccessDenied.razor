@@ -2,7 +2,11 @@
 
 <PageTitle>Access denied</PageTitle>
 
-<header>
-    <h1 class="text-danger">Access denied</h1>
-    <p class="text-danger">You do not have access to this resource.</p>
-</header>
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h4" Color="Color.Error" Class="mb-2">Access denied</MudText>
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+            You do not have access to this resource.
+        </MudAlert>
+    </MudPaper>
+</MudContainer>

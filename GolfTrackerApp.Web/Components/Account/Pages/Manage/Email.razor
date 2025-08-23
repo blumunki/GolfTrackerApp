@@ -14,44 +14,75 @@
 
 <PageTitle>Manage email</PageTitle>
 
-<h3>Manage email</h3>
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4">
+        <MudText Typo="Typo.h4" Class="mb-4">Manage email</MudText>
 
-<StatusMessage Message="@message"/>
-<div class="row">
-    <div class="col-xl-6">
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <MudAlert Severity="@(message.StartsWith("Error") ? Severity.Error : Severity.Success)" 
+                     Class="mb-4">
+                @message
+            </MudAlert>
+        }
+
         <form @onsubmit="OnSendEmailVerificationAsync" @formname="send-verification" id="send-verification-form" method="post">
             <AntiforgeryToken />
         </form>
+
         <EditForm Model="Input" FormName="change-email" OnValidSubmit="OnValidSubmitAsync" method="post">
             <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger" role="alert" />
+
             @if (isEmailConfirmed)
             {
-                <div class="form-floating mb-3 input-group">
-                    <input type="text" value="@email" id="email" class="form-control" placeholder="Enter your email" disabled />
-                    <div class="input-group-append">
-                        <span class="h-100 input-group-text text-success font-weight-bold">✓</span>
-                    </div>
-                    <label for="email" class="form-label">Email</label>
-                </div>
+                <MudTextField 
+                    Value="@email"
+                    Label="Current email"
+                    Variant="Variant.Outlined"
+                    Class="mb-3"
+                    Disabled="true"
+                    AdornmentIcon="@Icons.Material.Filled.CheckCircle"
+                    AdornmentColor="Color.Success"
+                    Adornment="Adornment.End" />
             }
             else
             {
-                <div class="form-floating mb-3">
-                    <input type="text" value="@email" id="email" class="form-control" placeholder="Enter your email" disabled />
-                    <label for="email" class="form-label">Email</label>
-                    <button type="submit" class="btn btn-link" form="send-verification-form">Send verification email</button>
+                <div class="d-flex align-center mb-3">
+                    <MudTextField 
+                        Value="@email"
+                        Label="Current email"
+                        Variant="Variant.Outlined"
+                        Class="flex-grow-1 me-3"
+                        Disabled="true" />
+                    <MudButton 
+                        ButtonType="ButtonType.Submit"
+                        form="send-verification-form"
+                        Variant="Variant.Text"
+                        Color="Color.Primary">
+                        Send verification email
+                    </MudButton>
                 </div>
             }
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.NewEmail" id="Input.NewEmail" class="form-control" autocomplete="email" aria-required="true" placeholder="Enter a new email" />
-                <label for="Input.NewEmail" class="form-label">New email</label>
-                <ValidationMessage For="() => Input.NewEmail" class="text-danger" />
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Change email</button>
+
+            <MudTextField 
+                @bind-Value="Input.NewEmail"
+                Label="New email"
+                Variant="Variant.Outlined"
+                Class="mb-4"
+                InputType="InputType.Email"
+                For="@(() => Input.NewEmail)" />
+
+            <MudButton 
+                ButtonType="ButtonType.Submit" 
+                Variant="Variant.Filled" 
+                Color="Color.Primary" 
+                Size="Size.Large"
+                FullWidth="true">
+                Change email
+            </MudButton>
         </EditForm>
-    </div>
-</div>
+    </MudPaper>
+</MudContainer>
 
 @code {
     private string? message;

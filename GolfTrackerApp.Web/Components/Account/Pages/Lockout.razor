@@ -2,7 +2,12 @@
 
 <PageTitle>Locked out</PageTitle>
 
-<header>
-    <h1 class="text-danger">Locked out</h1>
-    <p class="text-danger" role="alert">This account has been locked out, please try again later.</p>
-</header>
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h4" Color="Color.Error" Class="mb-4">Locked out</MudText>
+        
+        <MudAlert Severity="Severity.Error" Variant="Variant.Filled">
+            This account has been locked out, please try again later.
+        </MudAlert>
+    </MudPaper>
+</MudContainer>

@@ -2,6 +2,14 @@
 
 <PageTitle>Invalid user</PageTitle>
 
-<h3>Invalid user</h3>
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4">
+        <MudText Typo="Typo.h4" Class="mb-4">Invalid user</MudText>
 
-<StatusMessage />
+        <StatusMessage />
+
+        <MudAlert Severity="Severity.Error" Class="mt-4">
+            The requested user account is invalid or no longer exists.
+        </MudAlert>
+    </MudPaper>
+</MudContainer>

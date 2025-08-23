@@ -3,11 +3,13 @@
 
 @if (!string.IsNullOrEmpty(Message))
 {
-    var statusMessageClass = Message.StartsWith("Error") ? "danger" : "success";
-    <div class="alert alert-@statusMessageClass alert-dismissible" role="alert">
-        <div>@Message</div>
-        <button type="button" class="btn-close" @onclick="@ClearMessage" aria-label="Close"></button>
-    </div>
+    <MudAlert Severity="@(Message.StartsWith("Error") ? Severity.Error : Severity.Success)"
+              Variant="Variant.Filled"
+              Class="mb-4"
+              ShowCloseIcon="true"
+              CloseIconClicked="@ClearMessage">
+        @Message
+    </MudAlert>
 }
 
 @code {

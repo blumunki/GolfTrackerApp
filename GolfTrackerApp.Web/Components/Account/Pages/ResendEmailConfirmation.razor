@@ -14,24 +14,39 @@
 
 <PageTitle>Resend email confirmation</PageTitle>
 
-<h1>Resend email confirmation</h1>
-<h2>Enter your email.</h2>
-<hr />
-<StatusMessage Message="@message" />
-<div class="row">
-    <div class="col-md-4">
+<MudContainer MaxWidth="MaxWidth.Small">
+    <MudPaper Elevation="3" Class="pa-4 mt-4">
+        <MudText Typo="Typo.h4" Class="mb-2">Resend email confirmation</MudText>
+        <MudText Typo="Typo.subtitle1" Class="mb-4">Enter your email.</MudText>
+
+        @if (!string.IsNullOrEmpty(message))
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">@message</MudAlert>
+        }
+
         <EditForm Model="Input" FormName="resend-email-confirmation" OnValidSubmit="OnValidSubmitAsync" method="post">
             <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" aria-required="true" placeholder="name@example.com" />
-                <label for="Input.Email" class="form-label">Email</label>
-                <ValidationMessage For="() => Input.Email" class="text-danger" />
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Resend</button>
+
+            <MudTextField 
+                @bind-Value="Input.Email"
+                Label="Email"
+                Variant="Variant.Outlined"
+                Class="mb-4"
+                InputType="InputType.Email"
+                Immediate="true"
+                For="@(() => Input.Email)" />
+
+            <MudButton 
+                ButtonType="ButtonType.Submit" 
+                Variant="Variant.Filled" 
+                Color="Color.Primary" 
+                Size="Size.Large"
+                FullWidth="true">
+                Resend
+            </MudButton>
         </EditForm>
-    </div>
-</div>
+    </MudPaper>
+</MudContainer>
 
 @code {
     private string? message;
