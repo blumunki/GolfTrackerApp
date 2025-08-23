@@ -4,10 +4,12 @@
 @using Microsoft.AspNetCore.Identity
 @using GolfTrackerApp.Web.Data
 
-@inject UserManager<ApplicationUser> UserManager
+@* @inject UserManager<ApplicationUser> UserManager *@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityUserAccessor UserAccessor
 @inject IdentityRedirectManager RedirectManager
+
+@inherits AccountPageBase
 
 <PageTitle>Profile</PageTitle>
 
@@ -45,6 +47,19 @@
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
+
+    protected override async Task OnAuthenticatedInitializedAsync()
+    {
+        if (CurrentUser is null)
+        {
+            return;
+        }
+
+        username = await UserManager.GetUserNameAsync(CurrentUser);
+        phoneNumber = await UserManager.GetPhoneNumberAsync(CurrentUser);
+
+        Input.PhoneNumber ??= phoneNumber;
+    }
 
     protected override async Task OnInitializedAsync()
     {
