@@ -10,16 +10,33 @@ using GolfTrackerApp.Web.Components.Account.Pages;
 using GolfTrackerApp.Web.Components.Account.Pages.Manage;
 using GolfTrackerApp.Web.Data;
 
-namespace Microsoft.AspNetCore.Routing;
+namespace GolfTrackerApp.Web.Components.Account;
 
-internal static class IdentityComponentsEndpointRouteBuilderExtensions
+public static class IdentityComponentsEndpointRouteBuilderExtensions
 {
+    public const string LinkLoginCallbackAction = "/Account/Manage/LinkLoginCallback";
+    public const string ExternalLoginCallbackAction = "/Account/ExternalLogin/Callback";
+
     // These endpoints are required by the Identity Razor components defined in the /Components/Account/Pages directory of this project.
     public static IEndpointConventionBuilder MapAdditionalIdentityEndpoints(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
         var accountGroup = endpoints.MapGroup("/Account");
+
+        accountGroup.MapPost("/ExternalLogin/Callback", async (HttpContext context) =>
+        {
+            var signInManager = context.RequestServices
+                .GetRequiredService<SignInManager<ApplicationUser>>();
+                
+            var info = await signInManager.GetExternalLoginInfoAsync();
+            if (info is null)
+            {
+                throw new InvalidOperationException("Error loading external login info.");
+            }
+
+            return TypedResults.Redirect("/Account/ExternalLogins");
+        });
 
         accountGroup.MapPost("/PerformExternalLogin", (
             HttpContext context,
@@ -105,6 +122,21 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
 
             context.Response.Headers.TryAdd("Content-Disposition", "attachment; filename=PersonalData.json");
             return TypedResults.File(fileBytes, contentType: "application/json", fileDownloadName: "PersonalData.json");
+        });
+
+        // Add the LinkLoginCallback endpoint to the existing manage group
+        manageGroup.MapPost("/LinkLoginCallback", async (HttpContext context) =>
+        {
+            var signInManager = context.RequestServices
+                .GetRequiredService<SignInManager<ApplicationUser>>();
+                
+            var info = await signInManager.GetExternalLoginInfoAsync();
+            if (info is null)
+            {
+                throw new InvalidOperationException("Error loading external login info.");
+            }
+
+            return TypedResults.Redirect("/Account/Manage/ExternalLogins");
         });
 
         return accountGroup;

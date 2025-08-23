@@ -1,5 +1,4 @@
 ﻿@page "/Account/ExternalLogin"
-
 @using System.ComponentModel.DataAnnotations
 @using System.Security.Claims
 @using System.Text
@@ -7,6 +6,8 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using GolfTrackerApp.Web.Data
+
+@rendermode InteractiveServer
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
@@ -19,11 +20,12 @@
 <PageTitle>Register</PageTitle>
 
 <StatusMessage Message="@message" />
+
 <h1>Register</h1>
 <h2>Associate your @ProviderDisplayName account.</h2>
 <hr />
 
-<div  class="alert alert-info">
+<div class="alert alert-info">
     You've successfully authenticated with <strong>@ProviderDisplayName</strong>.
     Please enter an email address for this site below and click the Register button to finish
     logging in.
@@ -72,15 +74,15 @@
         if (RemoteError is not null)
         {
             RedirectManager.RedirectToWithStatus("Account/Login", $"Error from external provider: {RemoteError}", HttpContext);
+            return;
         }
 
-        var info = await SignInManager.GetExternalLoginInfoAsync();
-        if (info is null)
+        externalLoginInfo = await SignInManager.GetExternalLoginInfoAsync();
+        if (externalLoginInfo is null)
         {
             RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
+            return;
         }
-
-        externalLoginInfo = info;
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
@@ -90,8 +92,6 @@
                 return;
             }
 
-            // We should only reach this page via the login callback, so redirect back to
-            // the login page if we get here some other way.
             RedirectManager.RedirectTo("Account/Login");
         }
     }
@@ -101,9 +101,9 @@
         if (externalLoginInfo is null)
         {
             RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
+            return;
         }
 
-        // Sign in the user with this external login provider if the user already has a login.
         var result = await SignInManager.ExternalLoginSignInAsync(
             externalLoginInfo.LoginProvider,
             externalLoginInfo.ProviderKey,
@@ -117,13 +117,16 @@
                 externalLoginInfo.Principal.Identity?.Name,
                 externalLoginInfo.LoginProvider);
             RedirectManager.RedirectTo(ReturnUrl);
-        }
-        else if (result.IsLockedOut)
-        {
-            RedirectManager.RedirectTo("Account/Lockout");
+            return;
         }
 
-        // If the user does not have an account, then ask the user to create an account.
+        if (result.IsLockedOut)
+        {
+            RedirectManager.RedirectTo("Account/Lockout");
+            return;
+        }
+
+        // If the user does not have an account, try to get their email
         if (externalLoginInfo.Principal.HasClaim(c => c.Type == ClaimTypes.Email))
         {
             Input.Email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
@@ -135,6 +138,7 @@
         if (externalLoginInfo is null)
         {
             RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information during confirmation.", HttpContext);
+            return;
         }
 
         var emailStore = GetEmailStore();
@@ -158,16 +162,20 @@
                 var callbackUrl = NavigationManager.GetUriWithQueryParameters(
                     NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
                     new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
+                
                 await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
 
-                // If account confirmation is required, we need to show the link if we don't have a real email sender
                 if (UserManager.Options.SignIn.RequireConfirmedAccount)
                 {
-                    RedirectManager.RedirectTo("Account/RegisterConfirmation", new() { ["email"] = Input.Email });
+                    RedirectManager.RedirectTo(
+                        "Account/RegisterConfirmation", 
+                        new Dictionary<string, object?> { ["email"] = Input.Email });
+                    return;
                 }
 
                 await SignInManager.SignInAsync(user, isPersistent: false, externalLoginInfo.LoginProvider);
                 RedirectManager.RedirectTo(ReturnUrl);
+                return;
             }
         }
 

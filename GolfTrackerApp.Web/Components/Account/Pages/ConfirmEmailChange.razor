@@ -18,35 +18,41 @@
 @code {
     private string? message;
 
+    [Parameter, SupplyParameterFromQuery]
+    public string? UserId { get; set; }
+    
+    [Parameter, SupplyParameterFromQuery]
+    public string? Email { get; set; }
+    
+    [Parameter, SupplyParameterFromQuery]
+    public string? Code { get; set; }
+
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
-    [SupplyParameterFromQuery]
-    private string? UserId { get; set; }
-
-    [SupplyParameterFromQuery]
-    private string? Email { get; set; }
-
-    [SupplyParameterFromQuery]
-    private string? Code { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
-        if (UserId is null || Email is null || Code is null)
+        if (string.IsNullOrEmpty(UserId) || string.IsNullOrEmpty(Email) || string.IsNullOrEmpty(Code))
         {
-            RedirectManager.RedirectToWithStatus(
-                "Account/Login", "Error: Invalid email change confirmation link.", HttpContext);
+            RedirectManager.RedirectToWithStatus("Account/Manage/Email", 
+                "Error: Invalid email change confirmation link.", 
+                HttpContext);
+            return;
         }
 
         var user = await UserManager.FindByIdAsync(UserId);
         if (user is null)
         {
-            message = "Unable to find user with Id '{userId}'";
+            RedirectManager.RedirectToWithStatus("Account/Login", 
+                "Error: Unable to load user.", 
+                HttpContext);
             return;
         }
 
-        var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
-        var result = await UserManager.ChangeEmailAsync(user, Email, code);
+        var decodedCode = WebEncoders.Base64UrlDecode(Code);
+        var result = await UserManager.ChangeEmailAsync(user, Email, 
+            Encoding.UTF8.GetString(decodedCode));
         if (!result.Succeeded)
         {
             message = "Error changing email.";
