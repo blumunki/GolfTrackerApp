@@ -1,4 +1,3 @@
-// In GolfTrackerApp.Web/Services/PlayerService.cs
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
@@ -23,11 +22,8 @@ namespace GolfTrackerApp.Web.Services
             _httpContextAccessor = httpContextAccessor;
         }
 
-        // In GolfTrackerApp.Web/Services/PlayerService.cs
         public async Task<Player> AddPlayerAsync(Player player)
         {
-
-            // VVV --- AMENDMENT 1: Get the current user ID automatically --- VVV
             var user = _httpContextAccessor.HttpContext?.User;
             var currentUserId = user?.FindFirstValue(ClaimTypes.NameIdentifier);
 
@@ -37,7 +33,6 @@ namespace GolfTrackerApp.Web.Services
                 throw new InvalidOperationException("User must be logged in to create a player.");
             }
 
-            // VVV --- AMENDMENT 2: Always set the creator ID for any new player --- VVV
             player.CreatedByApplicationUserId = currentUserId;
 
             // Ensure CreatedByApplicationUserId is set if it's a managed player
@@ -106,7 +101,7 @@ namespace GolfTrackerApp.Web.Services
                 // 3. (Optional - add this if desired) All other registered system players (public profiles)
                 query = query.Where(p => (p.ApplicationUserId != null && p.ApplicationUserId == requestingUserId) || // Their own profile
                                         (p.ApplicationUserId == null && p.CreatedByApplicationUserId == requestingUserId) // Managed players they created
-                                        // || (p.ApplicationUserId != null) // Uncomment to show all registered players to everyone
+                                                                                                                          // || (p.ApplicationUserId != null) // Uncomment to show all registered players to everyone
                                         );
             }
             // Admins see all players (no additional filtering needed beyond the base query)
@@ -120,8 +115,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Player?> GetPlayerByApplicationUserIdAsync(string applicationUserId)
         {
-             return await _context.Players.Include(p => p.ApplicationUser)
-                                    .FirstOrDefaultAsync(p => p.ApplicationUserId == applicationUserId);
+            return await _context.Players.Include(p => p.ApplicationUser)
+                                   .FirstOrDefaultAsync(p => p.ApplicationUserId == applicationUserId);
         }
 
         public async Task<Player?> UpdatePlayerAsync(Player playerUpdateData) // playerUpdateData comes from the UI
@@ -154,7 +149,7 @@ namespace GolfTrackerApp.Web.Services
                 {
                     var anotherPlayerWithUser = await _context.Players
                                                     .AsNoTracking()
-                                                    .FirstOrDefaultAsync(p => p.PlayerId != playerUpdateData.PlayerId && 
+                                                    .FirstOrDefaultAsync(p => p.PlayerId != playerUpdateData.PlayerId &&
                                                                         p.ApplicationUserId == playerUpdateData.ApplicationUserId);
                     if (anotherPlayerWithUser != null)
                     {
@@ -172,7 +167,31 @@ namespace GolfTrackerApp.Web.Services
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Player {PlayerId} updated: {FirstName} {LastName}", existingPlayer.PlayerId, existingPlayer.FirstName, existingPlayer.LastName);
+
             return existingPlayer;
+        }
+        public async Task<List<Player>> SearchPlayersAsync(string requestingUserId, bool isUserAdmin, string searchTerm)
+        {
+            // Start with the same authorization query from GetAllPlayersAsync
+            IQueryable<Player> query = _context.Players.Include(p => p.ApplicationUser);
+
+            if (!isUserAdmin)
+            {
+                query = query.Where(p => (p.ApplicationUserId != null && p.ApplicationUserId == requestingUserId) ||
+                                        (p.ApplicationUserId == null && p.CreatedByApplicationUserId == requestingUserId));
+            }
+
+            // Now, add the search filter using the EF.Functions.Like pattern
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                string pattern = $"%{searchTerm}%";
+                query = query.Where(p => 
+                    EF.Functions.Like(p.FirstName, pattern) ||
+                    EF.Functions.Like(p.LastName, pattern)
+                );
+            }
+
+            return await query.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToListAsync();
         }
     }
 }
