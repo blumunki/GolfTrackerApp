@@ -26,51 +26,54 @@
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
-else if (golfClubs is null || !golfClubs.Any())
-{
-    <MudText>No golf clubs found. Please add one to get started.</MudText>
-}
 else
 {
     <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
         <MudTextField @bind-Value="searchString" 
-                    Label="Filter by Name, City or Country..." 
-                    Variant="Variant.Outlined" 
-                    Adornment="Adornment.Start" 
-                    AdornmentIcon="@Icons.Material.Filled.Search" 
-                    DebounceInterval="300" 
-                    OnDebounceIntervalElapsed="OnSearchTextChanged" />
+                      Label="Filter by Name, City or Country..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      DebounceInterval="300" 
+                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
     </MudPaper>
 
-    <MudTable Items="@golfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
-        <HeaderContent>
-            <MudTh>Name</MudTh>
-            <MudTh>City</MudTh>
-            <MudTh>Postcode</MudTh>
-            <MudTh>Country</MudTh>
-            <MudTh Style="text-align:right">Actions</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Name"><MudLink Href="@($"/golfclubs/{context.GolfClubId}")">@context.Name</MudLink></MudTd>
-            <MudTd DataLabel="City">@context.City</MudTd>
-            <MudTd DataLabel="Postcode">@context.Postcode</MudTd>
-            <MudTd DataLabel="Country">@context.Country</MudTd>
-            <MudTd Style="text-align:right">
-                <MudTooltip Text="View Details">
-                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewClubDetails(context.GolfClubId))" />
-                </MudTooltip>
-                <MudTooltip Text="Edit Club">
-                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditClub(context.GolfClubId))" />
-                </MudTooltip>
-                <MudTooltip Text="Delete Club">
-                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteClub(context))" />
-                </MudTooltip>
-            </MudTd>
-        </RowTemplate>
-        <PagerContent>
-            <MudTablePager />
-        </PagerContent>
-    </MudTable>
+    @if (golfClubs is null || !golfClubs.Any())
+    {
+        <MudText>No golf clubs found for your search criteria.</MudText>
+    }
+    else
+    {
+        <MudTable Items="@golfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>City</MudTh>
+                <MudTh>Postcode</MudTh>
+                <MudTh>Country</MudTh>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name"><MudLink Href="@($"/golfclubs/{context.GolfClubId}")">@context.Name</MudLink></MudTd>
+                <MudTd DataLabel="City">@context.City</MudTd>
+                <MudTd DataLabel="Postcode">@context.Postcode</MudTd>
+                <MudTd DataLabel="Country">@context.Country</MudTd>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="View Details">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewClubDetails(context.GolfClubId))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Edit Club">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditClub(context.GolfClubId))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete Club">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteClub(context))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
 }
 
 @code {

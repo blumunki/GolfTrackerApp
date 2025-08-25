@@ -8,6 +8,7 @@ namespace GolfTrackerApp.Web.Services
     public interface IGolfCourseService
     {
         Task<List<GolfCourse>> GetAllGolfCoursesAsync();
+        Task<List<GolfCourse>> SearchGolfCoursesAsync(string searchTerm);
         Task<GolfCourse?> GetGolfCourseByIdAsync(int id);
         Task<GolfCourse> AddGolfCourseAsync(GolfCourse golfCourse);
         Task<GolfCourse?> UpdateGolfCourseAsync(GolfCourse golfCourse);

@@ -1,70 +1,134 @@
 @page "/golfcourses"
-@inject IGolfCourseService GolfCourseService
-@using GolfTrackerApp.Web.Services
-@inject NavigationManager NavigationManager
+@attribute [Authorize]
 @rendermode InteractiveServer
+@inject IGolfCourseService GolfCourseService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@using GolfTrackerApp.Web.Services
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Components.Shared
+@using Microsoft.AspNetCore.Authorization
 
 <PageTitle>Golf Courses</PageTitle>
 
-<h1>Golf Courses</h1>
+<MudText Typo="Typo.h4" GutterBottom="true">Golf Courses</MudText>
 
-<p>
-    <button class="btn btn-primary" @onclick="GoToAddGolfCoursePage">Add New Golf Course</button>
-</p>
+<MudButton Variant="Variant.Filled" 
+           Color="Color.Primary" 
+           OnClick="GoToAddGolfCoursePage" 
+           StartIcon="@Icons.Material.Filled.Add" 
+           Class="mb-3">
+    Add New Course
+</MudButton>
 
-@if (golfCourses == null)
+@if (isLoading)
 {
-    <p><em>Loading...</em></p>
-}
-else if (!golfCourses.Any())
-{
-    <p><em>No golf courses found. Please add some.</em></p>
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Golf Club</th>
-                <th>Course Name</th>
-                <th>Number of Holes</th>
-                <th>Default Par</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var course in golfCourses)
-            {
-                <tr>
-                    <td>@(course.GolfClub?.Name ?? "N/A")</td>
-                    <td>@course.Name</td>
-                    <td>@course.NumberOfHoles</td>
-                    <td>@course.DefaultPar</td>
-                    <td>
-                        @* We'll add Edit/Delete buttons later *@
-                        @* <button class="btn btn-sm btn-info" @onclick="() => NavigateToEdit(course.GolfCourseId)">Edit</button> *@
-                        @* <button class="btn btn-sm btn-danger" @onclick="() => DeleteCourse(course.GolfCourseId)">Delete</button> *@
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Filter by Course or Club Name..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      DebounceInterval="300" 
+                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
+    </MudPaper>
+
+    @if (golfCourses is null || !golfCourses.Any())
+    {
+        <MudText>No golf courses found for your search criteria.</MudText>
+    }
+    else
+    {
+        <MudTable Items="@golfCourses" Hover="true" Striped="true" Dense="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Course Name</MudTh>
+                <MudTh>Club</MudTh>
+                <MudTh>Holes</MudTh>
+                <MudTh>Par</MudTh>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Course Name"><MudLink Href="@($"/golfcourses/{context.GolfCourseId}/details")">@context.Name</MudLink></MudTd>
+                <MudTd DataLabel="Club">@context.GolfClub?.Name</MudTd>
+                <MudTd DataLabel="Holes">@context.NumberOfHoles</MudTd>
+                <MudTd DataLabel="Par">@context.DefaultPar</MudTd>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="Edit Course">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditCourse(context.GolfCourseId))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete Course">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteCourse(context))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
 }
 
 @code {
-    private List<GolfTrackerApp.Web.Models.GolfCourse>? golfCourses;
-
+    private List<GolfCourse>? golfCourses;
+    private bool isLoading = true;
+    private string searchString = "";
     protected override async Task OnInitializedAsync()
     {
-        golfCourses = await GolfCourseService.GetAllGolfCoursesAsync();
+        await LoadCourses();
     }
 
-    private void GoToAddGolfCoursePage()
+    private async Task LoadCourses()
     {
-        NavigationManager.NavigateTo("/golfcourses/add");
+        isLoading = true;
+        try
+        {
+            golfCourses = await GolfCourseService.SearchGolfCoursesAsync(searchString);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading courses: {ex.Message}", Severity.Error);
+        }
+        isLoading = false;
     }
 
-    // Placeholder for future Edit/Delete functionality
-    // private void NavigateToEdit(int courseId) { NavigationManager.NavigateTo($"/golfcourses/edit/{courseId}"); }
-    // private async Task DeleteCourse(int courseId) { /* Implement delete logic here */ }
+    private async Task OnSearchTextChanged(string text)
+    {
+        searchString = text;
+        await LoadCourses();
+    }
+
+    private void GoToAddGolfCoursePage() => NavigationManager.NavigateTo("/golfcourses/add");
+
+    private void EditCourse(int courseId) => NavigationManager.NavigateTo($"/golfcourses/edit/{courseId}");
+
+    private async Task PrepareDeleteCourse(GolfCourse course)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete '{course.Name}'? This will also delete all of its holes." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await GolfCourseService.DeleteGolfCourseAsync(course.GolfCourseId);
+                Snackbar.Add("Course deleted successfully.", Severity.Success);
+                await LoadCourses();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting course: {ex.Message}", Severity.Error);
+            }
+        }
+    }
 }
