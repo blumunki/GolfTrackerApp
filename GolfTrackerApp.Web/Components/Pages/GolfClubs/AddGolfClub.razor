@@ -1,93 +1,52 @@
 @page "/golfclubs/add"
-@attribute [Authorize] // Or specific roles
+@attribute [Authorize]
+@rendermode InteractiveServer
 @inject IGolfClubService GolfClubService
 @inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
-@rendermode InteractiveServer
 
-<PageTitle>Add Golf Club</PageTitle>
+<PageTitle>Add New Golf Club</PageTitle>
 
-<h3>Add New Golf Club</h3>
+<MudText Typo="Typo.h4" GutterBottom="true">Add New Golf Club</MudText>
 
 <EditForm Model="@newGolfClub" OnValidSubmit="HandleValidSubmit">
     <DataAnnotationsValidator />
-    <ValidationSummary />
-
-    <div class="mb-3">
-        <label class="form-label">Club Name:</label>
-        <InputText @bind-Value="newGolfClub.Name" class="form-control" />
-        <ValidationMessage For="@(() => newGolfClub.Name)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Address Line 1:</label>
-        <InputText @bind-Value="newGolfClub.AddressLine1" class="form-control" />
-        <ValidationMessage For="@(() => newGolfClub.AddressLine1)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Address Line 2:</label>
-        <InputText @bind-Value="newGolfClub.AddressLine2" class="form-control" />
-        <ValidationMessage For="@(() => newGolfClub.AddressLine2)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">City:</label>
-        <InputText @bind-Value="newGolfClub.City" class="form-control" />
-         <ValidationMessage For="@(() => newGolfClub.City)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Postcode:</label>
-        <InputText @bind-Value="newGolfClub.Postcode" class="form-control" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">County/Region:</label>
-        <InputText @bind-Value="newGolfClub.CountyOrRegion" class="form-control" />
-        <ValidationMessage For="@(() => newGolfClub.CountyOrRegion)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Country:</label>
-        <InputText @bind-Value="newGolfClub.Country" class="form-control" />
-        <ValidationMessage For="@(() => newGolfClub.Country)" />
-    </div>
-    <div class="mb-3">
-        <label class="form-label">Website:</label>
-        <InputText @bind-Value="newGolfClub.Website" class="form-control" />
-        <ValidationMessage For="@(() => newGolfClub.Website)" />
-    </div>
-    @* Add other fields as necessary *@
-
-    <button type="submit" class="btn btn-success">Save Golf Club</button>
-    <button type="button" class="btn btn-secondary" @onclick="GoToListPage">Cancel</button>
+    <MudCard>
+        <MudCardContent>
+            <MudTextField @bind-Value="newGolfClub.Name" For="@(() => newGolfClub.Name)" Label="Club Name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Club name is required." />
+            <MudTextField @bind-Value="newGolfClub.AddressLine1" For="@(() => newGolfClub.AddressLine1)" Label="Address Line 1" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.AddressLine2" For="@(() => newGolfClub.AddressLine2)" Label="Address Line 2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.City" For="@(() => newGolfClub.City)" Label="City" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.CountyOrRegion" For="@(() => newGolfClub.CountyOrRegion)" Label="County / Region" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.Postcode" For="@(() => newGolfClub.Postcode)" Label="Postcode" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.Country" For="@(() => newGolfClub.Country)" Label="Country" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.Website" For="@(() => newGolfClub.Website)" Label="Website URL" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Url" />
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Create Club</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="GoToListPage" Class="mx-2">Cancel</MudButton>
+        </MudCardActions>
+    </MudCard>
+    <ValidationSummary class="mt-3" />
 </EditForm>
-
-@if (!string.IsNullOrEmpty(successMessage))
-{
-    <p class="text-success mt-3">@successMessage</p>
-}
-@if (!string.IsNullOrEmpty(errorMessage))
-{
-    <p class="text-danger mt-3">@errorMessage</p>
-}
 
 @code {
     private GolfClub newGolfClub = new();
-    private string? successMessage;
-    private string? errorMessage;
 
     private async Task HandleValidSubmit()
     {
-        successMessage = null;
-        errorMessage = null;
         try
         {
             await GolfClubService.AddGolfClubAsync(newGolfClub);
-            successMessage = "Golf club added successfully!";
-            newGolfClub = new(); // Reset form for another entry
-            // Optionally navigate: NavigationManager.NavigateTo("/golfclubs");
+            Snackbar.Add("Golf club added successfully!", Severity.Success);
+            NavigationManager.NavigateTo("/golfclubs");
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error adding golf club: {ex.Message}";
+            Snackbar.Add($"Error adding golf club: {ex.Message}", Severity.Error);
         }
     }
 
