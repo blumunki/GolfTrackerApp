@@ -26,7 +26,7 @@
 {
     <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
 }
-else if (allGolfClubs is null || !allGolfClubs.Any())
+else if (golfClubs is null || !golfClubs.Any())
 {
     <MudText>No golf clubs found. Please add one to get started.</MudText>
 }
@@ -42,7 +42,7 @@ else
                     OnDebounceIntervalElapsed="OnSearchTextChanged" />
     </MudPaper>
 
-    <MudTable Items="@FilteredGolfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
+    <MudTable Items="@golfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
         <HeaderContent>
             <MudTh>Name</MudTh>
             <MudTh>City</MudTh>
@@ -74,17 +74,9 @@ else
 }
 
 @code {
-    private List<GolfClub>? allGolfClubs;
+    private List<GolfClub>? golfClubs; // This will now hold the filtered list from the server
     private bool isLoading = true;
     private string searchString = "";
-
-    private List<GolfClub>? FilteredGolfClubs =>
-        allGolfClubs?.Where(c =>
-            string.IsNullOrWhiteSpace(searchString) ||
-            c.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true ||
-            (c.City?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true) ||
-            (c.Country?.Contains(searchString, StringComparison.OrdinalIgnoreCase) == true)
-        ).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -96,7 +88,7 @@ else
         isLoading = true;
         try
         {
-            allGolfClubs = await GolfClubService.GetAllGolfClubsAsync();
+            golfClubs = await GolfClubService.SearchGolfClubsAsync(searchString);
         }
         catch (Exception ex)
         {
@@ -105,11 +97,10 @@ else
         isLoading = false;
     }
 
-    // VVV --- THIS METHOD WAS MISSING --- VVV
-    private void OnSearchTextChanged(string text)
+    private async Task OnSearchTextChanged(string text)
     {
         searchString = text;
-        // The table automatically re-renders as FilteredGolfClubs changes.
+        await LoadClubs();
     }
 
     private void GoToAddGolfClubPage() => NavigationManager.NavigateTo("/golfclubs/add");
