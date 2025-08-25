@@ -1,4 +1,3 @@
-// In GolfTrackerApp.Web/Services/RoundService.cs
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +19,6 @@ namespace GolfTrackerApp.Web.Services
             _logger = logger;
         }
 
-        // In GolfTrackerApp.Web/Services/RoundService.cs
         public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
         {
             if (string.IsNullOrEmpty(round.CreatedByApplicationUserId))
@@ -77,7 +75,6 @@ namespace GolfTrackerApp.Web.Services
             return true;
         }
 
-        // In GolfTrackerApp.Web/Services/RoundService.cs
         public async Task<List<Round>> GetAllRoundsAsync(string requestingUserId, bool isUserAdmin)
         {
             IQueryable<Round> query = _context.Rounds
@@ -115,7 +112,6 @@ namespace GolfTrackerApp.Web.Services
                                 .FirstOrDefaultAsync(r => r.RoundId == id);
         }
 
-        // In GolfTrackerApp.Web/Services/RoundService.cs
         public async Task<List<Round>> GetRoundsForPlayerAsync(int playerId, string requestingUserId, bool isUserAdmin)
         {
             var playerToListRoundsFor = await _context.Players.FindAsync(playerId);
@@ -200,7 +196,6 @@ namespace GolfTrackerApp.Web.Services
             await _context.SaveChangesAsync();
             return existingRound;
         }
-        // In RoundService.cs
         public async Task<Round> CreateRoundWithPlayersAsync(Round round, List<int> playerIds)
         {
             if (playerIds == null || !playerIds.Any())
@@ -245,13 +240,41 @@ namespace GolfTrackerApp.Web.Services
                                             .ThenInclude(gc => gc!.GolfClub)
                                         .Include(r => r.Scores);
 
-            // VVV --- THIS IS THE KEY CHANGE --- VVV
             // The filter is now applied to EVERYONE, including admins.
             query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == currentPlayer.PlayerId));
 
             return await query.OrderByDescending(r => r.DatePlayed)
                             .Take(count)
                             .ToListAsync();
+        }
+        public async Task<List<Round>> SearchRoundsAsync(string requestingUserId, bool isUserAdmin, string searchTerm)
+        {
+            // Start with the same authorization query from GetAllRoundsAsync
+            IQueryable<Round> query = _context.Rounds
+                                        .Include(r => r.GolfCourse!)
+                                            .ThenInclude(gc => gc!.GolfClub)
+                                        .Include(r => r.RoundPlayers!)
+                                            .ThenInclude(rp => rp!.Player!);
+
+            if (!isUserAdmin)
+            {
+                query = query.Where(r =>
+                    r.CreatedByApplicationUserId == requestingUserId ||
+                    r.RoundPlayers.Any(rp => rp.Player != null && rp.Player.ApplicationUserId == requestingUserId)
+                );
+            }
+
+            // Now, add the search filter using the EF.Functions.Like pattern
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                string pattern = $"%{searchTerm}%";
+                query = query.Where(r =>
+                    (r.GolfCourse != null && EF.Functions.Like(r.GolfCourse.Name, pattern)) ||
+                    (r.GolfCourse != null && r.GolfCourse.GolfClub != null && EF.Functions.Like(r.GolfCourse.GolfClub.Name, pattern))
+                );
+            }
+
+            return await query.OrderByDescending(r => r.DatePlayed).ToListAsync();
         }
     }
 }

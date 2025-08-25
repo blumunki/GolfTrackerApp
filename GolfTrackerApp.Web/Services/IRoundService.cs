@@ -19,5 +19,6 @@ namespace GolfTrackerApp.Web.Services
         // In IRoundService.cs
         Task<Round> CreateRoundWithPlayersAsync(Round round, List<int> playerIds);
         Task<List<Round>> GetRecentRoundsAsync(string requestingUserId, bool isUserAdmin, int count);
+        Task<List<Round>> SearchRoundsAsync(string requestingUserId, bool isUserAdmin, string searchTerm); 
     }
 }
