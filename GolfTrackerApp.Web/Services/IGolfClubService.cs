@@ -12,5 +12,6 @@ namespace GolfTrackerApp.Web.Services
         Task<GolfClub> AddGolfClubAsync(GolfClub golfClub);
         Task<GolfClub?> UpdateGolfClubAsync(GolfClub golfClub);
         Task<bool> DeleteGolfClubAsync(int id);
+        Task<List<GolfClub>> SearchGolfClubsAsync(string searchTerm);
     }
 }

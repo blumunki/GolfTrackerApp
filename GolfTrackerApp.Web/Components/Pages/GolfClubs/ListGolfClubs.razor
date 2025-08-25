@@ -34,11 +34,12 @@ else
 {
     <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
         <MudTextField @bind-Value="searchString" 
-                      Label="Filter by Name, City or Country..." 
-                      Variant="Variant.Outlined" 
-                      Adornment="Adornment.Start" 
-                      AdornmentIcon="@Icons.Material.Filled.Search" 
-                      Immediate="true" />
+                    Label="Filter by Name, City or Country..." 
+                    Variant="Variant.Outlined" 
+                    Adornment="Adornment.Start" 
+                    AdornmentIcon="@Icons.Material.Filled.Search" 
+                    DebounceInterval="300" 
+                    OnDebounceIntervalElapsed="OnSearchTextChanged" />
     </MudPaper>
 
     <MudTable Items="@FilteredGolfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
@@ -104,6 +105,13 @@ else
         isLoading = false;
     }
 
+    // VVV --- THIS METHOD WAS MISSING --- VVV
+    private void OnSearchTextChanged(string text)
+    {
+        searchString = text;
+        // The table automatically re-renders as FilteredGolfClubs changes.
+    }
+
     private void GoToAddGolfClubPage() => NavigationManager.NavigateTo("/golfclubs/add");
     
     private void ViewClubDetails(int clubId) => NavigationManager.NavigateTo($"/golfclubs/{clubId}");
@@ -126,6 +134,7 @@ else
             await DeleteClubConfirmed(club.GolfClubId);
         }
     }
+
     private async Task DeleteClubConfirmed(int clubId)
     {
         try
@@ -145,6 +154,5 @@ else
         {
             Snackbar.Add($"Error deleting golf club: {ex.Message}", Severity.Error);
         }
-        StateHasChanged(); // Ensures UI always refreshes after operation
     }
 }

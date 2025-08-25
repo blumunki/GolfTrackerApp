@@ -60,5 +60,20 @@ namespace GolfTrackerApp.Web.Services
             await _context.SaveChangesAsync();
             return existingClub;
         }
+        public async Task<List<GolfClub>> SearchGolfClubsAsync(string searchTerm)
+        {
+            var query = _context.GolfClubs.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                string pattern = $"%{searchTerm}%";
+                query = query.Where(c => 
+                    EF.Functions.Like(c.Name, pattern) ||
+                    (c.City != null && EF.Functions.Like(c.City, pattern)) ||
+                    (c.Country != null && EF.Functions.Like(c.Country, pattern))
+                );
+            }
+            return await query.OrderBy(c => c.Name).ToListAsync();
+        }
     }
 }
