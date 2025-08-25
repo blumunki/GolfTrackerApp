@@ -1,105 +1,98 @@
 @page "/golfcourses/add"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
 @inject IGolfCourseService GolfCourseService
 @inject IGolfClubService GolfClubService
 @inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
-@rendermode InteractiveServer
+@using Microsoft.AspNetCore.WebUtilities
 
-<PageTitle>Add Golf Course</PageTitle>
 
-<h3>Add New Golf Course</h3>
+<PageTitle>Add New Golf Course</PageTitle>
 
-<EditForm Model="@newGolfCourse" OnValidSubmit="HandleValidSubmit">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+<MudText Typo="Typo.h4" GutterBottom="true">Add New Golf Course</MudText>
 
-    <div class="mb-3">
-        <label for="golfClubId" class="form-label">Golf Club:</label>
-        @if (golfClubs == null)
-        {
-            <p><em>Loading clubs...</em></p>
-        }
-        else
-        {
-            <InputSelect @bind-Value="newGolfCourse.GolfClubId" class="form-select">
-                <option value="0">-- Select Golf Club --</option>
-                @foreach (var club in golfClubs)
-                {
-                    <option value="@club.GolfClubId">@club.Name</option>
-                }
-            </InputSelect>
-        }
-        <ValidationMessage For="@(() => newGolfCourse.GolfClubId)" />
-    </div>
-
-    <div class="mb-3">
-        <label for="name" class="form-label">Course Name:</label>
-        <InputText id="name" @bind-Value="newGolfCourse.Name" class="form-control" />
-        <ValidationMessage For="@(() => newGolfCourse.Name)" />
-    </div>
-
-    <div class="mb-3">
-        <label for="numberOfHoles" class="form-label">Number of Holes:</label>
-        <InputNumber id="numberOfHoles" @bind-Value="newGolfCourse.NumberOfHoles" class="form-control" />
-        <ValidationMessage For="@(() => newGolfCourse.NumberOfHoles)" />
-    </div>
-
-    <div class="mb-3">
-        <label for="defaultPar" class="form-label">Default Par:</label>
-        <InputNumber id="defaultPar" @bind-Value="newGolfCourse.DefaultPar" class="form-control" />
-        <ValidationMessage For="@(() => newGolfCourse.DefaultPar)" />
-    </div>
-
-    <button type="submit" class="btn btn-success" disabled="@(newGolfCourse.GolfClubId == 0)">Save Golf Course</button>
-    <button type="button" class="btn btn-secondary" @onclick="GoToListPage">Cancel</button>
-</EditForm>
-
-@if (!string.IsNullOrEmpty(errorMessage))
+@if (_golfClubs is null)
 {
-    <p class="text-danger mt-3">@errorMessage</p>
+    <MudProgressCircular Indeterminate="true" />
 }
-@if (!string.IsNullOrEmpty(successMessage))
+else
 {
-    <p class="text-success mt-3">@successMessage</p>
+    <EditForm Model="@newGolfCourse" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <MudCard>
+            <MudCardContent>
+                <MudSelect T="int" @bind-Value="newGolfCourse.GolfClubId" For="@(() => newGolfCourse.GolfClubId)" Label="Golf Club" Required="true">
+                    <MudSelectItem T="int" Value="0">Select a Club</MudSelectItem>
+                    @foreach (var club in _golfClubs)
+                    {
+                        <MudSelectItem T="int" Value="@club.GolfClubId">@club.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="newGolfCourse.Name" For="@(() => newGolfCourse.Name)" Label="Course Name" Required="true" Class="mt-3" />
+                <MudNumericField @bind-Value="newGolfCourse.NumberOfHoles" For="@(() => newGolfCourse.NumberOfHoles)" Label="Number of Holes" Required="true" Min="1" Max="18" Class="mt-3" />
+                <MudNumericField @bind-Value="newGolfCourse.DefaultPar" For="@(() => newGolfCourse.DefaultPar)" Label="Default Par" Required="true" Min="27" Max="75" Class="mt-3" />
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto" Disabled="@(newGolfCourse.GolfClubId == 0)">Create Course</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="GoBack" Class="mx-2">Cancel</MudButton>
+            </MudCardActions>
+        </MudCard>
+        <ValidationSummary class="mt-3" />
+    </EditForm>
 }
 
 @code {
-    private GolfCourse newGolfCourse = new() { GolfClubId = 0 }; // Initialize GolfClubId to 0 for "Select"
-    private List<GolfClub>? golfClubs;
-    private string? errorMessage;
-    private string? successMessage;
+    private GolfCourse newGolfCourse = new() { GolfClubId = 0 };
+    private List<GolfClub>? _golfClubs;
+    private int _preselectedClubId;
 
     protected override async Task OnInitializedAsync()
     {
-        golfClubs = await GolfClubService.GetAllGolfClubsAsync();
+        // Check if a clubId was passed in the query string
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("clubId", out var clubId))
+        {
+            int.TryParse(clubId, out _preselectedClubId);
+            newGolfCourse.GolfClubId = _preselectedClubId;
+        }
+
+        _golfClubs = await GolfClubService.GetAllGolfClubsAsync();
     }
 
     private async Task HandleValidSubmit()
     {
-        if (newGolfCourse.GolfClubId == 0) // Basic validation for dropdown
+        if (newGolfCourse.GolfClubId == 0)
         {
-            errorMessage = "Please select a Golf Club.";
+            Snackbar.Add("Please select a Golf Club.", Severity.Warning);
             return;
         }
-        errorMessage = null;
-        successMessage = null;
+
         try
         {
             await GolfCourseService.AddGolfCourseAsync(newGolfCourse);
-            successMessage = "Golf course added successfully!";
-            newGolfCourse = new() { GolfClubId = 0 }; // Clear the form
+            Snackbar.Add("Golf course added successfully!", Severity.Success);
+            NavigationManager.NavigateTo($"/golfclubs/{newGolfCourse.GolfClubId}"); // Go back to the club's detail page
         }
         catch (Exception ex)
         {
-            errorMessage = $"Error adding golf course: {ex.Message}";
+            Snackbar.Add($"Error adding golf course: {ex.Message}", Severity.Error);
         }
     }
 
-    private void GoToListPage()
+    private void GoBack()
     {
-        NavigationManager.NavigateTo("/golfcourses");
+        // If we came from a specific club, go back there. Otherwise, go to the main clubs list.
+        if (_preselectedClubId > 0)
+        {
+            NavigationManager.NavigateTo($"/golfclubs/{_preselectedClubId}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/golfclubs");
+        }
     }
 }
