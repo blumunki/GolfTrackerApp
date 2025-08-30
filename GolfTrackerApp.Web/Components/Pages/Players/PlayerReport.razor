@@ -25,6 +25,7 @@
 }
 else
 {
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4"></MudBreadcrumbs>
     <MudText Typo="Typo.h4" GutterBottom="true">Performance Report: @_viewModel.Player?.FirstName @_viewModel.Player?.LastName</MudText>
 
     <MudPaper Elevation="2" Class="pa-4 mb-4">
@@ -112,6 +113,8 @@ else
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
 
+    private List<BreadcrumbItem> _breadcrumbs = new(); // <-- ADD THIS FIELD
+
     protected override async Task OnInitializedAsync()
     {
         await LoadReportData();
@@ -126,6 +129,17 @@ else
         {
             // One simple call to the service to get all data
             _viewModel = await ReportService.GetPlayerReportViewModelAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
+
+            // VVV --- THIS IS THE CORRECTED LOGIC --- VVV
+            if (_viewModel.Player is not null)
+            {
+                _breadcrumbs = new List<BreadcrumbItem>
+                {
+                    new BreadcrumbItem("Players", href: "/players"),
+                    new BreadcrumbItem($"{_viewModel.Player.FirstName} {_viewModel.Player.LastName}", href: null, disabled: true)
+                };
+            }
+
             PrepareChartData(_viewModel.PerformanceData);
         }
         catch (Exception ex)
