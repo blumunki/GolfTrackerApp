@@ -276,5 +276,60 @@ namespace GolfTrackerApp.Web.Services
 
             return await query.OrderByDescending(r => r.DatePlayed).ToListAsync();
         }
+
+        public async Task<Scorecard> PrepareScorecardAsync(int courseId, int startingHole, int holesPlayed, List<Player> players)
+        {
+            var allCourseHoles = await _context.Holes
+                .AsNoTracking()
+                .Where(h => h.GolfCourseId == courseId)
+                .OrderBy(h => h.HoleNumber)
+                .ToListAsync();
+
+            if (!allCourseHoles.Any())
+            {
+                throw new InvalidOperationException($"Course with ID {courseId} has no holes.");
+            }
+
+            // --- This is your logic, now centralized in the service ---
+            var playedHoles = new List<Hole>();
+            int currentHoleNum = startingHole;
+            int maxHoleNumOnCourse = allCourseHoles.Max(h => h.HoleNumber);
+
+            for (int i = 0; i < holesPlayed; i++)
+            {
+                var hole = allCourseHoles.FirstOrDefault(h => h.HoleNumber == currentHoleNum);
+                if (hole != null)
+                {
+                    playedHoles.Add(hole);
+                }
+                currentHoleNum++;
+                if (currentHoleNum > maxHoleNumOnCourse)
+                {
+                    currentHoleNum = 1;
+                }
+            }
+
+            var scores = new Dictionary<int, List<HoleScoreEntryModel>>();
+            foreach (var player in players)
+            {
+                var scoresForPlayer = playedHoles.Select(hole => new HoleScoreEntryModel
+                {
+                    HoleId = hole.HoleId,
+                    HoleNumber = hole.HoleNumber,
+                    Par = hole.Par,
+                    StrokeIndex = hole.StrokeIndex ?? 0,
+                    LengthYards = hole.LengthYards,
+                }).ToList();
+                scores.Add(player.PlayerId, scoresForPlayer);
+            }
+            // --- End of moved logic ---
+
+            return new Scorecard
+            {
+                Players = players,
+                PlayedHoles = playedHoles,
+                Scores = scores
+            };
+        }
     }
 }
