@@ -110,7 +110,7 @@ else
                 _breadcrumbs = new List<BreadcrumbItem>
                 {
                     new BreadcrumbItem("Rounds", href: "/rounds"),
-                    new BreadcrumbItem(round!.DatePlayed.ToShortDateString(), href: null, disabled: true)
+                    new BreadcrumbItem(round!.DatePlayed.ToString("dd/MM/yyyy"), href: null, disabled: true)
                 };
             }
         }
