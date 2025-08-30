@@ -297,7 +297,7 @@ else // This case means isInitialized is false (still loading initial data)
     private async Task OnGolfClubSelectedAsync()
     {
         // Get the value from the model property instead of a parameter
-    var selectedClubId = _roundEntryModel.SelectedGolfClubId;
+        var selectedClubId = _roundEntryModel.SelectedGolfClubId;
     
         _roundEntryModel.GolfCourseId = 0; 
         _golfCoursesForSelectedClub.Clear();
