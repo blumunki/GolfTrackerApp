@@ -71,20 +71,16 @@
 
                     <MudItem xs="12">
                         <MudText Typo="Typo.h6" GutterBottom="true">Players</MudText>
-                        <MudAutocomplete T="Player" 
+                        <MudAutocomplete T="Player" @ref="_playerAutocomplete"
                             Label="Search and Add Player" 
                             SearchFunc="@SearchPlayersAsync"
                             Value="_selectedPlayerForAutocomplete"
-                            ValueChanged="@((Player p) => {
-                                _selectedPlayerForAutocomplete = p;
-                                PlayerSelectedFromAutocomplete(p);
-                            })"
+                            ValueChanged="PlayerSelectedFromAutocomplete"
                             ToStringFunc="@(p => p == null ? string.Empty : $"{p.FirstName} {p.LastName}")"
                             ShowProgressIndicator="true" 
                             DebounceInterval="300" 
                             ResetValueOnEmptyText="true" 
-                            CoerceValue="true" 
-                            CoerceText="true" 
+                            CoerceValue="false" 
                             Placeholder="Type to search..." 
                             Variant="Variant.Outlined" 
                             Margin="Margin.Dense"/>
@@ -242,6 +238,7 @@ else // This case means isInitialized is false (still loading initial data)
     private List<GolfCourse> _golfCoursesForSelectedClub = new();
     private List<Player> _availablePlayers = new();
     private Player? _selectedPlayerForAutocomplete;
+    private MudAutocomplete<Player> _playerAutocomplete = null!;
     
     private List<Hole> _allHolesForSelectedCourse = new();
     private List<Hole> _playedHolesOrdered = new();
@@ -383,9 +380,12 @@ else // This case means isInitialized is false (still loading initial data)
             {
                 Logger.LogInformation("Player '{FirstName} {LastName}' is already selected.", player.FirstName, player.LastName);
             }
+            
+            // Clear the selected value and the text to reset the autocomplete
+            _selectedPlayerForAutocomplete = null;
+            _playerAutocomplete?.ClearAsync();
+            StateHasChanged();
         }
-        _selectedPlayerForAutocomplete = null; // Clear the autocomplete input
-        StateHasChanged();
     }
 
     private void RemovePlayerFromRound(MudChip<Player> chip) { /* Your existing logic for MudChip<Player> */
