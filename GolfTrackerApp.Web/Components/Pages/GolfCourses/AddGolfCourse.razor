@@ -25,7 +25,11 @@ else
         <DataAnnotationsValidator />
         <MudCard>
             <MudCardContent>
-                <MudSelect T="int" @bind-Value="newGolfCourse.GolfClubId" For="@(() => newGolfCourse.GolfClubId)" Label="Golf Club" Required="true">
+                <MudSelect T="int" @bind-Value="newGolfCourse.GolfClubId" 
+                           For="@(() => newGolfCourse.GolfClubId)" 
+                           Label="Golf Club" 
+                           Required="true"
+                           Disabled="@(_preselectedClubId > 0)">
                     <MudSelectItem T="int" Value="0">Select a Club</MudSelectItem>
                     @foreach (var club in _golfClubs)
                     {
