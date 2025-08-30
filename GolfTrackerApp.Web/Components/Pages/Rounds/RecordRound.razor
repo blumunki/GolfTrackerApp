@@ -57,10 +57,10 @@
                     <MudItem xs="12" sm="6">
                         <MudSelect T="int" Label="Golf Course" 
                                 @bind-Value="_roundEntryModel.GolfCourseId" 
+                                @bind-Value:after="OnGolfCourseSelected"
                                 For="@(() => _roundEntryModel.GolfCourseId)"
                                 Disabled="@(_roundEntryModel.SelectedGolfClubId == 0 || !_golfCoursesForSelectedClub.Any())"
-                                Required="true" RequiredError="Golf Course is required!"
-                                onValueChanged="OnGolfCourseSelectedAsync">
+                                Required="true" RequiredError="Golf Course is required!">
                             <MudSelectItem T="int" Value="0">@( _roundEntryModel.SelectedGolfClubId == 0 ? "Select a Club first" : (_golfCoursesForSelectedClub.Any() ? "Select a Course" : "No courses for this club"))</MudSelectItem>
                             @foreach (var course in _golfCoursesForSelectedClub)
                             {
@@ -101,9 +101,21 @@
                         <MudNumericField @bind-Value="_roundEntryModel.StartingHole" Label="Starting Hole" For="@(() => _roundEntryModel.StartingHole)" Min="1" Max="@_maxHolesForCourse" Required="true" />
                     </MudItem>
                     <MudItem xs="12" sm="4">
-                        <MudSelect T="int" @bind-Value="_roundEntryModel.HolesPlayed" Label="Holes Played" For="@(() => _roundEntryModel.HolesPlayed)" Required="true">
-                            <MudSelectItem T="int" Value="9">9 Holes</MudSelectItem>
-                            <MudSelectItem T="int" Value="18">18 Holes</MudSelectItem>
+                        <MudSelect T="int" @bind-Value="_roundEntryModel.HolesPlayed" Label="Holes Played" For="@(() => _roundEntryModel.HolesPlayed)" Required="true"
+                                  Disabled="@(_roundEntryModel.GolfCourseId == 0)"
+                                  HelperText="@GetHolesPlayedHelperText()">
+                            @if (_maxHolesForCourse >= 9)
+                            {
+                                <MudSelectItem T="int" Value="9">9 Holes</MudSelectItem>
+                            }
+                            @if (_maxHolesForCourse >= 18)
+                            {
+                                <MudSelectItem T="int" Value="18">18 Holes</MudSelectItem>
+                            }
+                            @if (_maxHolesForCourse > 0 && _maxHolesForCourse != 9 && _maxHolesForCourse != 18)
+                            {
+                                <MudSelectItem T="int" Value="_maxHolesForCourse">@_maxHolesForCourse Holes</MudSelectItem>
+                            }
                         </MudSelect>
                     </MudItem>
                     <MudItem xs="12" sm="4">
@@ -301,6 +313,8 @@ else // This case means isInitialized is false (still loading initial data)
         _allHolesForSelectedCourse.Clear();
         _playedHolesOrdered.Clear();
         _maxHolesForCourse = 18;
+        // Reset holes played to default when club changes
+        _roundEntryModel.HolesPlayed = 18;
         
         if (selectedClubId > 0)
         {
@@ -331,8 +345,9 @@ else // This case means isInitialized is false (still loading initial data)
         StateHasChanged();
     }
 
-    private async Task OnGolfCourseSelectedAsync(int selectedCourseId) { /* Your existing logic */
-        _roundEntryModel.GolfCourseId = selectedCourseId;
+    private async Task OnGolfCourseSelectedAsync() 
+    {
+        var selectedCourseId = _roundEntryModel.GolfCourseId;
         _allHolesForSelectedCourse.Clear();
         _playedHolesOrdered.Clear();
         _maxHolesForCourse = 18; 
@@ -343,9 +358,25 @@ else // This case means isInitialized is false (still loading initial data)
             {
                  // Ensure there's at least one hole before calling Max, or check GolfCourse.NumberOfHoles
                 _maxHolesForCourse = _allHolesForSelectedCourse.Max(h => h.HoleNumber); 
+                
+                // Adjust holes played if it exceeds the course's maximum
+                if (_roundEntryModel.HolesPlayed > _maxHolesForCourse)
+                {
+                    _roundEntryModel.HolesPlayed = _maxHolesForCourse;
+                }
             }
         }
+        else
+        {
+            // Reset to default when no course is selected
+            _roundEntryModel.HolesPlayed = 18;
+        }
          StateHasChanged();
+    }
+    
+    private void OnGolfCourseSelected()
+    {
+        _ = OnGolfCourseSelectedAsync();
     }
 
     private async Task<IEnumerable<Player>> SearchPlayersAsync(string value, CancellationToken token)
@@ -557,5 +588,20 @@ else // This case means isInitialized is false (still loading initial data)
             Logger.LogError(ex, "Error submitting final scores for Round ID {RoundId}", _currentDbRoundId);
             Snackbar.Add($"Error saving scores: {ex.Message}", Severity.Error);
         }
+    }
+    
+    private string GetHolesPlayedHelperText()
+    {
+        if (_roundEntryModel.GolfCourseId == 0)
+        {
+            return "Select a course first";
+        }
+        
+        if (_maxHolesForCourse < 18)
+        {
+            return $"This course has only {_maxHolesForCourse} holes (max detected: {_maxHolesForCourse})";
+        }
+        
+        return $"Course max holes: {_maxHolesForCourse}";
     }
 }
