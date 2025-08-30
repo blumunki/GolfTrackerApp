@@ -169,4 +169,21 @@ public class ReportService : IReportService
 
         return performanceData;
     }
+
+    public async Task<PlayerReportViewModel> GetPlayerReportViewModelAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    {
+        var playerTask = _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.PlayerId == playerId);
+        var coursesTask = _context.GolfCourses.AsNoTracking().Include(c => c.GolfClub).ToListAsync();
+
+        await Task.WhenAll(playerTask, coursesTask);
+
+        var performanceData = await GetPlayerPerformanceAsync(playerId, courseId, holesPlayed, roundType, startDate, endDate);
+
+        return new PlayerReportViewModel
+        {
+            Player = await playerTask,
+            FilterCourses = await coursesTask,
+            PerformanceData = performanceData
+        };
+    }
 }

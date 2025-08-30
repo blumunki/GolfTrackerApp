@@ -19,19 +19,19 @@
 
 <PageTitle>Player Performance Report</PageTitle>
 
-@if (player is null)
+@if (isLoading)
 {
     <MudProgressCircular Indeterminate="true" />
 }
 else
 {
-    <MudText Typo="Typo.h4" GutterBottom="true">Performance Report: @player.FirstName @player.LastName</MudText>
+    <MudText Typo="Typo.h4" GutterBottom="true">Performance Report: @_viewModel.Player?.FirstName @_viewModel.Player?.LastName</MudText>
 
     <MudPaper Elevation="2" Class="pa-4 mb-4">
         <MudGrid Spacing="2">
             <MudItem xs="12" sm="6" md="3">
                 <MudSelect T="int?" Label="Filter by Course" @bind-Value="SelectedCourseId" Clearable="true">
-                    @foreach (var course in _allCourses.OrderBy(c => c.GolfClub!.Name).ThenBy(c => c.Name))
+                    @foreach (var course in _viewModel.FilterCourses.OrderBy(c => c.GolfClub!.Name).ThenBy(c => c.Name))
                     {
                         <MudSelectItem T="int?" Value="@course.GolfCourseId">@($"{course.GolfClub!.Name} - {course.Name}")</MudSelectItem>
                     }
@@ -62,7 +62,7 @@ else
         </MudGrid>
     </MudPaper>
 
-    @if (isLoadingChart)
+    @if (isLoading)
     {
         <MudProgressLinear Indeterminate="true" Class="my-4" />
     }
@@ -84,21 +84,22 @@ else
     [Parameter]
     public int PlayerId { get; set; }
 
-    private Player? player;
-    private List<GolfCourse> _allCourses = new();
-    private bool isLoadingChart = true;
+    // The ViewModel holds all our data
+    private PlayerReportViewModel _viewModel = new();
+
+    private bool isLoading = true;
     private CultureInfo _ukCulture = new("en-GB");
 
-    // --- Filter Properties ---
+    // Filter properties remain here, as they are part of the UI state
     private int? _selectedCourseId;
     public int? SelectedCourseId { get => _selectedCourseId; set { if (_selectedCourseId != value) { _selectedCourseId = value; _ = OnFilterChanged(); } } }
 
     private int? _selectedHolesPlayed;
     public int? SelectedHolesPlayed { get => _selectedHolesPlayed; set { if (_selectedHolesPlayed != value) { _selectedHolesPlayed = value; _ = OnFilterChanged(); } } }
-    
+
     private RoundTypeOption? _selectedRoundType;
     public RoundTypeOption? SelectedRoundType { get => _selectedRoundType; set { if (_selectedRoundType != value) { _selectedRoundType = value; _ = OnFilterChanged(); } } }
-    
+
     private DateTime? _startDate;
     public DateTime? StartDate { get => _startDate; set { if (_startDate != value) { _startDate = value; _ = OnFilterChanged(); } } }
 
@@ -106,26 +107,13 @@ else
     public DateTime? EndDate { get => _endDate; set { if (_endDate != value) { _endDate = value; _ = OnFilterChanged(); } } }
 
     private bool _showScoreVsPar = true;
-    public bool ShowScoreVsPar 
-    { 
-        get => _showScoreVsPar; 
-        set 
-        { 
-            if (_showScoreVsPar != value)
-            {
-                _showScoreVsPar = value;
-                InvokeAsync(OnFilterChanged);
-            }
-        } 
-    }
-    // --- Chart Properties ---
+    public bool ShowScoreVsPar { get => _showScoreVsPar; set { if (_showScoreVsPar != value) { _showScoreVsPar = value; _ = OnFilterChanged(); } } }
+
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
 
     protected override async Task OnInitializedAsync()
     {
-        player = await PlayerService.GetPlayerByIdAsync(PlayerId);
-        _allCourses = await CourseService.GetAllGolfCoursesAsync();
         await LoadReportData();
     }
 
@@ -133,17 +121,18 @@ else
 
     private async Task LoadReportData()
     {
-        isLoadingChart = true;
+        isLoading = true;
         try
         {
-            var performanceData = await ReportService.GetPlayerPerformanceAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
-            PrepareChartData(performanceData);
+            // One simple call to the service to get all data
+            _viewModel = await ReportService.GetPlayerReportViewModelAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
+            PrepareChartData(_viewModel.PerformanceData);
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Error loading report data: {ex.Message}", Severity.Error);
         }
-        isLoadingChart = false;
+        isLoading = false;
     }
 
     private void PrepareChartData(List<PlayerPerformanceDataPoint> data)
