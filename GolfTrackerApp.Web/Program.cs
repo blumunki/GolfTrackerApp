@@ -72,6 +72,7 @@ builder.Services.AddScoped<IHoleService, HoleService>();
 builder.Services.AddScoped<IRoundService, RoundService>();
 builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IRoundWorkflowService, RoundWorkflowService>();
 
 builder.Services.AddMudServices();
 

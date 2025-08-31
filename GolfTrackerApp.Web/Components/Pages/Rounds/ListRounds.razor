@@ -55,6 +55,9 @@ else
                     <MudTooltip Text="View Details">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewRoundDetails(context.RoundId))" />
                     </MudTooltip>
+                    <MudTooltip Text="Edit Round">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditRound(context.RoundId))" />
+                    </MudTooltip>
                     <MudTooltip Text="Delete Round">
                         <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteRound(context))" />
                     </MudTooltip>
@@ -103,6 +106,8 @@ else
     }
 
     private void ViewRoundDetails(int roundId) => NavigationManager.NavigateTo($"/rounds/{roundId}");
+
+    private void EditRound(int roundId) => NavigationManager.NavigateTo($"/rounds/record/{roundId}");
 
     private async Task PrepareDeleteRound(Round round)
     {
