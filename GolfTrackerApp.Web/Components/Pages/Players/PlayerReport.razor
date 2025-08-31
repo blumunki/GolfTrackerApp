@@ -25,10 +25,10 @@
 }
 else
 {
-    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4"></MudBreadcrumbs>
-    <MudText Typo="Typo.h4" GutterBottom="true">Performance Report: @_viewModel.Player?.FirstName @_viewModel.Player?.LastName</MudText>
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-2"></MudBreadcrumbs>
+    <MudText Typo="Typo.h5" GutterBottom="false" Class="mb-3">Performance Report: @_viewModel.Player?.FirstName @_viewModel.Player?.LastName</MudText>
 
-    <MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudPaper Elevation="2" Class="pa-3 mb-3">
         <MudGrid Spacing="2">
             <MudItem xs="12" sm="6" md="3">
                 <MudSelect T="int?" Label="Filter by Course" @bind-Value="SelectedCourseId" Clearable="true">
@@ -71,7 +71,7 @@ else
     {
         <MudPaper Class="pa-4 mt-4" Elevation="2">
             <MudText Typo="Typo.h6" Class="mb-4">Performance Over Time</MudText>
-            <div style="height: 300px;">
+            <div style="height: 300px; padding: 0 10px 20px 10px;">
                 <MudChart ChartType="ChartType.Line" 
                           ChartSeries="@_series" 
                           XAxisLabels="@_xAxisLabels" 
@@ -83,101 +83,111 @@ else
         </MudPaper>
 
         <!-- New Charts Row -->
-        <MudGrid Spacing="2" Class="mt-4">
+        <MudGrid Spacing="2" Class="mt-3">
             <!-- Scoring Distribution Pie Chart -->
             <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Elevation="2">
+                <MudPaper Class="pa-4" Elevation="2" Style="height: 450px; display: flex; flex-direction: column;">
                     <MudText Typo="Typo.h6" Class="mb-4">Scoring Distribution</MudText>
                     @if (_scoringDistribution?.TotalHoles > 0)
                     {
-                        <div style="height: 300px;">
-                            <MudChart ChartType="ChartType.Pie" 
-                                      InputData="@_pieChartData" 
-                                      InputLabels="@_pieChartLabels" 
-                                      Width="100%" 
-                                      Height="100%"></MudChart>
+                        <div style="flex-grow: 1; display: flex; flex-direction: column;">
+                            <div style="flex-grow: 1; min-height: 300px; max-height: 350px; display: flex; justify-content: center; align-items: center;">
+                                <div style="width: 350px; height: 350px;">
+                                    <MudChart ChartType="ChartType.Pie" 
+                                              InputData="@_pieChartData" 
+                                              InputLabels="@_pieChartLabels" 
+                                              Width="100%" 
+                                              Height="100%"></MudChart>
+                                </div>
+                            </div>
+                            <MudText Typo="Typo.caption" Class="mt-2 text-center">Based on @_scoringDistribution.TotalHoles holes</MudText>
                         </div>
-                        <MudText Typo="Typo.caption" Class="mt-2">Based on @_scoringDistribution.TotalHoles holes</MudText>
                     }
                     else
                     {
-                        <MudAlert Severity="Severity.Info">No scoring data available for the selected filters.</MudAlert>
+                        <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+                            <MudAlert Severity="Severity.Info">No scoring data available for the selected filters.</MudAlert>
+                        </div>
                     }
                 </MudPaper>
             </MudItem>
 
-            <!-- Performance by Par Bar Chart -->
+            <!-- Performance by Par Cards -->
             <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Elevation="2">
+                <MudPaper Class="pa-4" Elevation="2" Style="height: 450px; display: flex; flex-direction: column;">
                     <MudText Typo="Typo.h6" Class="mb-4">Performance by Par</MudText>
                     @if (_performanceByPar?.HasValidData == true)
                     {
-                        <!-- Card-based visualization instead of problematic bar chart -->
-                        <MudGrid Spacing="2">
-                            @if (_performanceByPar.Par3Count > 0)
-                            {
-                                <MudItem xs="12" sm="4">
-                                    <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
-                                        <MudCardContent Class="text-center">
-                                            <MudText Typo="Typo.h6" Color="Color.Primary">Par 3</MudText>
-                                            <MudText Typo="Typo.h4" Class="mt-2">
-                                                @(_showScoreVsPar ? _performanceByPar.Par3RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par3Average.ToString("F2"))
-                                            </MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                @(_showScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par3Count holes
-                                            </MudText>
-                                        </MudCardContent>
-                                    </MudCard>
-                                </MudItem>
-                            }
-                            @if (_performanceByPar.Par4Count > 0)
-                            {
-                                <MudItem xs="12" sm="4">
-                                    <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
-                                        <MudCardContent Class="text-center">
-                                            <MudText Typo="Typo.h6" Color="Color.Primary">Par 4</MudText>
-                                            <MudText Typo="Typo.h4" Class="mt-2">
-                                                @(_showScoreVsPar ? _performanceByPar.Par4RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par4Average.ToString("F2"))
-                                            </MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                @(_showScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par4Count holes
-                                            </MudText>
-                                        </MudCardContent>
-                                    </MudCard>
-                                </MudItem>
-                            }
-                            @if (_performanceByPar.Par5Count > 0)
-                            {
-                                <MudItem xs="12" sm="4">
-                                    <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
-                                        <MudCardContent Class="text-center">
-                                            <MudText Typo="Typo.h6" Color="Color.Primary">Par 5</MudText>
-                                            <MudText Typo="Typo.h4" Class="mt-2">
-                                                @(_showScoreVsPar ? _performanceByPar.Par5RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par5Average.ToString("F2"))
-                                            </MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                @(_showScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par5Count holes
-                                            </MudText>
-                                        </MudCardContent>
-                                    </MudCard>
-                                </MudItem>
-                            }
-                        </MudGrid>
-                        
-                        <MudText Typo="Typo.caption" Class="mt-3">
-                            @if (ShowScoreVsPar)
-                            {
-                                <text>Performance relative to par (+ over par, - under par)</text>
-                            }
-                            else
-                            {
-                                <text>Average strokes per hole type</text>
-                            }
-                        </MudText>
+                        <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+                            <!-- Card-based visualization instead of problematic bar chart -->
+                            <MudGrid Spacing="2" Class="flex-grow-1">
+                                @if (_performanceByPar.Par3Count > 0)
+                                {
+                                    <MudItem xs="12" sm="4">
+                                        <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
+                                            <MudCardContent Class="text-center">
+                                                <MudText Typo="Typo.h6" Color="Color.Primary">Par 3</MudText>
+                                                <MudText Typo="Typo.h4" Class="mt-2">
+                                                    @(_showScoreVsPar ? _performanceByPar.Par3RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par3Average.ToString("F2"))
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @(_showScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par3Count holes
+                                                </MudText>
+                                            </MudCardContent>
+                                        </MudCard>
+                                    </MudItem>
+                                }
+                                @if (_performanceByPar.Par4Count > 0)
+                                {
+                                    <MudItem xs="12" sm="4">
+                                        <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
+                                            <MudCardContent Class="text-center">
+                                                <MudText Typo="Typo.h6" Color="Color.Primary">Par 4</MudText>
+                                                <MudText Typo="Typo.h4" Class="mt-2">
+                                                    @(_showScoreVsPar ? _performanceByPar.Par4RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par4Average.ToString("F2"))
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @(_showScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par4Count holes
+                                                </MudText>
+                                            </MudCardContent>
+                                        </MudCard>
+                                    </MudItem>
+                                }
+                                @if (_performanceByPar.Par5Count > 0)
+                                {
+                                    <MudItem xs="12" sm="4">
+                                        <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
+                                            <MudCardContent Class="text-center">
+                                                <MudText Typo="Typo.h6" Color="Color.Primary">Par 5</MudText>
+                                                <MudText Typo="Typo.h4" Class="mt-2">
+                                                    @(_showScoreVsPar ? _performanceByPar.Par5RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par5Average.ToString("F2"))
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @(_showScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par5Count holes
+                                                </MudText>
+                                            </MudCardContent>
+                                        </MudCard>
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                            
+                            <MudText Typo="Typo.caption" Class="mt-3 text-center">
+                                @if (ShowScoreVsPar)
+                                {
+                                    <text>Performance relative to par (+ over par, - under par)</text>
+                                }
+                                else
+                                {
+                                    <text>Average strokes per hole type</text>
+                                }
+                            </MudText>
+                        </div>
                     }
                     else
                     {
-                        <MudAlert Severity="Severity.Info">No par performance data available for the selected filters.</MudAlert>
+                        <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+                            <MudAlert Severity="Severity.Info">No par performance data available for the selected filters.</MudAlert>
+                        </div>
                     }
                 </MudPaper>
             </MudItem>
@@ -310,7 +320,7 @@ else
 
         _lineAxisChartOptions = new AxisChartOptions
         {
-            XAxisLabelRotation = 45,
+            XAxisLabelRotation = 30,  // Reduced from 45 to prevent cut-off
             MatchBoundsToSize = true
         };
     }
