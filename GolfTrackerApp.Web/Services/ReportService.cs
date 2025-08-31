@@ -186,4 +186,144 @@ public class ReportService : IReportService
             PerformanceData = performanceData
         };
     }
+
+    public async Task<ScoringDistribution> GetScoringDistributionAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    {
+        var query = _context.Rounds
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
+
+        // Apply filters (same as GetPlayerPerformanceAsync)
+        if (courseId.HasValue && courseId > 0)
+        {
+            query = query.Where(r => r.GolfCourseId == courseId.Value);
+        }
+        if (holesPlayed.HasValue && holesPlayed > 0)
+        {
+            query = query.Where(r => r.HolesPlayed == holesPlayed.Value);
+        }
+        if (roundType.HasValue)
+        {
+            query = query.Where(r => r.RoundType == roundType.Value);
+        }
+        if (startDate.HasValue)
+        {
+            query = query.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
+        }
+        if (endDate.HasValue)
+        {
+            query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
+        }
+
+        // Get all scores for the player in filtered rounds
+        var scores = await query
+            .SelectMany(r => r.Scores)
+            .Where(s => s.PlayerId == playerId && s.Strokes > 0) // Filter out invalid scores
+            .Include(s => s.Hole)
+            .Where(s => s.Hole != null && s.Hole.Par > 0) // Filter out holes with invalid par
+            .ToListAsync();
+
+        var distribution = new ScoringDistribution();
+
+        foreach (var score in scores)
+        {
+            var scoreToPar = score.Strokes - score.Hole!.Par;
+
+            switch (scoreToPar)
+            {
+                case <= -2: // Eagle or better
+                    distribution.EagleCount++;
+                    break;
+                case -1: // Birdie
+                    distribution.BirdieCount++;
+                    break;
+                case 0: // Par
+                    distribution.ParCount++;
+                    break;
+                case 1: // Bogey
+                    distribution.BogeyCount++;
+                    break;
+                case 2: // Double Bogey
+                    distribution.DoubleBogeyCount++;
+                    break;
+                default: // Triple Bogey or worse
+                    distribution.TripleBogeyOrWorseCount++;
+                    break;
+            }
+        }
+
+        return distribution;
+    }
+
+    public async Task<PerformanceByPar> GetPerformanceByParAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    {
+        // Start with base query for rounds this player participated in
+        var roundsQuery = _context.Rounds
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
+
+        // Apply filters
+        if (courseId.HasValue && courseId > 0)
+        {
+            roundsQuery = roundsQuery.Where(r => r.GolfCourseId == courseId.Value);
+        }
+        if (holesPlayed.HasValue && holesPlayed > 0)
+        {
+            roundsQuery = roundsQuery.Where(r => r.HolesPlayed == holesPlayed.Value);
+        }
+        if (roundType.HasValue)
+        {
+            roundsQuery = roundsQuery.Where(r => r.RoundType == roundType.Value);
+        }
+        if (startDate.HasValue)
+        {
+            roundsQuery = roundsQuery.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
+        }
+        if (endDate.HasValue)
+        {
+            roundsQuery = roundsQuery.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
+        }
+
+        // Get the round IDs first
+        var filteredRoundIds = await roundsQuery.Select(r => r.RoundId).ToListAsync();
+
+        if (!filteredRoundIds.Any())
+        {
+            return new PerformanceByPar();
+        }
+
+        // Now get all scores for this player in these rounds with hole data
+        var playerScores = await _context.Scores
+            .Where(s => s.PlayerId == playerId && 
+                       filteredRoundIds.Contains(s.RoundId) && 
+                       s.Strokes > 0)
+            .Include(s => s.Hole)
+            .Where(s => s.Hole != null && s.Hole.Par > 0 && s.Hole.Par <= 5)
+            .ToListAsync();
+
+        var performance = new PerformanceByPar();
+
+        // Group by par and calculate
+        var par3Scores = playerScores.Where(s => s.Hole!.Par == 3).Select(s => s.Strokes).ToList();
+        var par4Scores = playerScores.Where(s => s.Hole!.Par == 4).Select(s => s.Strokes).ToList();
+        var par5Scores = playerScores.Where(s => s.Hole!.Par == 5).Select(s => s.Strokes).ToList();
+
+        if (par3Scores.Any())
+        {
+            performance.Par3Average = par3Scores.Average();
+            performance.Par3Count = par3Scores.Count;
+        }
+
+        if (par4Scores.Any())
+        {
+            performance.Par4Average = par4Scores.Average();
+            performance.Par4Count = par4Scores.Count;
+        }
+
+        if (par5Scores.Any())
+        {
+            performance.Par5Average = par5Scores.Average();
+            performance.Par5Count = par5Scores.Count;
+        }
+
+        return performance;
+    }
 }
