@@ -71,8 +71,14 @@ else
     {
         <MudPaper Class="pa-4 mt-4" Elevation="2">
             <MudText Typo="Typo.h6" Class="mb-4">Performance Over Time</MudText>
-            <div style="aspect-ratio: 2 / 1;">
-                <MudChart ChartType="ChartType.Line" ChartSeries="@_series" XAxisLabels="@_xAxisLabels" Width="100%" Height="100%"></MudChart>
+            <div style="height: 300px;">
+                <MudChart ChartType="ChartType.Line" 
+                          ChartSeries="@_series" 
+                          XAxisLabels="@_xAxisLabels" 
+                          ChartOptions="@_lineChartOptions"
+                          AxisChartOptions="@_lineAxisChartOptions"
+                          Width="100%" 
+                          Height="100%"></MudChart>
             </div>
         </MudPaper>
 
@@ -214,6 +220,8 @@ else
 
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
+    private ChartOptions _lineChartOptions = new();
+    private AxisChartOptions _lineAxisChartOptions = new();
 
     // New chart data properties
     private ScoringDistribution? _scoringDistribution;
@@ -291,10 +299,58 @@ else
 
         _series = new List<ChartSeries> { new() { Name = seriesName, Data = seriesData } };
 
-        int labelInterval = Math.Max(1, data.Count / 15);
-        _xAxisLabels = data
-            .Select((d, i) => i % labelInterval == 0 ? d.Date.ToString("dd MMM") : "")
-            .ToArray();
+        // Improved X-axis labeling strategy
+        _xAxisLabels = GenerateXAxisLabels(data);
+
+        // Configure chart options for better appearance
+        _lineChartOptions = new ChartOptions
+        {
+            LineStrokeWidth = 2
+        };
+
+        _lineAxisChartOptions = new AxisChartOptions
+        {
+            XAxisLabelRotation = 45,
+            MatchBoundsToSize = true
+        };
+    }
+
+    private string[] GenerateXAxisLabels(List<PlayerPerformanceDataPoint> data)
+    {
+        if (data.Count <= 10)
+        {
+            // Show all labels for small datasets
+            return data.Select(d => d.Date.ToString("dd MMM")).ToArray();
+        }
+        else if (data.Count <= 25)
+        {
+            // Show every other label for medium datasets
+            return data.Select((d, i) => i % 2 == 0 ? d.Date.ToString("dd MMM") : "").ToArray();
+        }
+        else
+        {
+            // For large datasets, show strategic labels (first, last, and evenly spaced)
+            var labels = new string[data.Count];
+            for (int i = 0; i < data.Count; i++)
+            {
+                labels[i] = "";
+            }
+            
+            // Always show first and last
+            labels[0] = data[0].Date.ToString("dd MMM");
+            labels[data.Count - 1] = data[data.Count - 1].Date.ToString("dd MMM");
+            
+            // Show 6-8 evenly spaced labels in between
+            int labelCount = Math.Min(8, data.Count);
+            int step = Math.Max(1, data.Count / labelCount);
+            
+            for (int i = step; i < data.Count - 1; i += step)
+            {
+                labels[i] = data[i].Date.ToString("dd MMM");
+            }
+            
+            return labels;
+        }
     }
 
     private void PreparePieChartData(ScoringDistribution? distribution)
