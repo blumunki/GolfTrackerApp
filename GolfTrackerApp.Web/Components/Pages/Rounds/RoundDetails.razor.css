@@ -64,6 +64,23 @@
     border-bottom: 1px solid #e0e0e0 !important;
 }
 
+/* BUT preserve thick horizontal borders for total rows - these override the above rules */
+.total-row .scorecard-cell:not(.hole-number-cell):not(.par-column-cell):not(.total-label-cell):not(.total-par-cell) {
+    border-top: 2px solid #666 !important; /* Thick top border for player cells in total rows */
+}
+
+.front-nine-total .scorecard-cell:not(.hole-number-cell):not(.par-column-cell):not(.total-label-cell):not(.total-par-cell) {
+    border-top: 2px solid #666 !important; /* Thick top border for Out row */
+}
+
+.back-nine-total .scorecard-cell:not(.hole-number-cell):not(.par-column-cell):not(.total-label-cell):not(.total-par-cell) {
+    border-top: 2px solid #666 !important; /* Thick top border for In row */
+}
+
+.grand-total .scorecard-cell:not(.hole-number-cell):not(.par-column-cell):not(.total-label-cell):not(.total-par-cell) {
+    border-top: 3px solid #2c5530 !important; /* Extra thick top border for Total row */
+}
+
 .score-cell {
     display: flex;
     align-items: center;
