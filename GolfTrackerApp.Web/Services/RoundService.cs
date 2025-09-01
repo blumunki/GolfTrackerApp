@@ -331,5 +331,45 @@ namespace GolfTrackerApp.Web.Services
                 Scores = scores
             };
         }
+
+        public async Task<List<Round>> GetRecentRoundsForClubAsync(string requestingUserId, int clubId, int count)
+        {
+            // Get the player for this user
+            var player = await _context.Players
+                .FirstOrDefaultAsync(p => p.ApplicationUserId == requestingUserId);
+
+            if (player == null) return new List<Round>();
+
+            return await _context.Rounds
+                .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId)
+                           && r.Status == RoundCompletionStatus.Completed
+                           && r.GolfCourse!.GolfClubId == clubId)
+                .Include(r => r.GolfCourse)
+                .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.Scores)
+                .OrderByDescending(r => r.DatePlayed)
+                .Take(count)
+                .ToListAsync();
+        }
+
+        public async Task<List<Round>> GetRecentRoundsForCourseAsync(string requestingUserId, int courseId, int count)
+        {
+            // Get the player for this user
+            var player = await _context.Players
+                .FirstOrDefaultAsync(p => p.ApplicationUserId == requestingUserId);
+
+            if (player == null) return new List<Round>();
+
+            return await _context.Rounds
+                .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId)
+                           && r.Status == RoundCompletionStatus.Completed
+                           && r.GolfCourseId == courseId)
+                .Include(r => r.GolfCourse)
+                .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.Scores)
+                .OrderByDescending(r => r.DatePlayed)
+                .Take(count)
+                .ToListAsync();
+        }
     }
 }

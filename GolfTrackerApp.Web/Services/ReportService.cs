@@ -326,4 +326,66 @@ public class ReportService : IReportService
 
         return performance;
     }
+
+    public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceForClubAsync(string currentUserId, int clubId, int roundCount)
+    {
+        // Get the player for this user
+        var player = await _context.Players
+            .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
+
+        if (player == null) return new List<PlayerPerformanceDataPoint>();
+
+        var performanceData = await _context.Rounds
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId) 
+                       && r.Status == RoundCompletionStatus.Completed
+                       && r.GolfCourse!.GolfClubId == clubId)
+            .Include(r => r.Scores)
+            .ThenInclude(s => s.Hole)
+            .Include(r => r.GolfCourse)
+            .ThenInclude(gc => gc!.GolfClub)
+            .OrderByDescending(r => r.DatePlayed)
+            .Take(roundCount)
+            .Select(r => new PlayerPerformanceDataPoint
+            {
+                Date = r.DatePlayed,
+                TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
+                TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par),
+                CourseName = $"{r.GolfCourse!.GolfClub!.Name} - {r.GolfCourse.Name}",
+                HolesPlayed = r.HolesPlayed
+            })
+            .ToListAsync();
+
+        return performanceData.OrderBy(p => p.Date).ToList();
+    }
+
+    public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceForCourseAsync(string currentUserId, int courseId, int roundCount)
+    {
+        // Get the player for this user
+        var player = await _context.Players
+            .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
+
+        if (player == null) return new List<PlayerPerformanceDataPoint>();
+
+        var performanceData = await _context.Rounds
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId) 
+                       && r.Status == RoundCompletionStatus.Completed
+                       && r.GolfCourseId == courseId)
+            .Include(r => r.Scores)
+            .ThenInclude(s => s.Hole)
+            .Include(r => r.GolfCourse)
+            .ThenInclude(gc => gc!.GolfClub)
+            .OrderByDescending(r => r.DatePlayed)
+            .Take(roundCount)
+            .Select(r => new PlayerPerformanceDataPoint
+            {
+                Date = r.DatePlayed,
+                TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
+                TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par),
+                CourseName = $"{r.GolfCourse!.GolfClub!.Name} - {r.GolfCourse.Name}",
+                HolesPlayed = r.HolesPlayed
+            })
+            .ToListAsync();
+
+        return performanceData.OrderBy(p => p.Date).ToList();
+    }
 }

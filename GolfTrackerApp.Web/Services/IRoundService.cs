@@ -21,5 +21,9 @@ namespace GolfTrackerApp.Web.Services
         Task<List<Round>> GetRecentRoundsAsync(string requestingUserId, bool isUserAdmin, int count);
         Task<List<Round>> SearchRoundsAsync(string requestingUserId, bool isUserAdmin, string searchTerm); 
         Task<Scorecard> PrepareScorecardAsync(int courseId, int startingHole, int holesPlayed, List<Player> players);
+
+        // New methods for club/course specific recent rounds
+        Task<List<Round>> GetRecentRoundsForClubAsync(string requestingUserId, int clubId, int count);
+        Task<List<Round>> GetRecentRoundsForCourseAsync(string requestingUserId, int courseId, int count);
     }
 }
