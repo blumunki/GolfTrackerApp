@@ -3,6 +3,7 @@
     border-collapse: separate;
     border-spacing: 0;
     width: 100%;
+    border: 2px solid #2c5530; /* Thick outer border */
 }
 
 .scorecard-header {
@@ -17,16 +18,19 @@
 .hole-number-header, .par-header {
     background: linear-gradient(135deg, #1e3a20 0%, #2c5530 100%);
     min-width: 80px;
+    border-right: 2px solid #1e3a20; /* Thick border after par column */
 }
 
 .player-column-header {
     background: linear-gradient(135deg, #2c5530 0%, #3d7c3f 100%);
     min-width: 100px;
     max-width: 120px;
+    border-right: 1px solid #1e3a20; /* Normal thin border between players */
 }
 
 .scorecard-cell {
-    border: 1px solid #e0e0e0;
+    border-right: 1px solid #e0e0e0; /* Normal thin border between cells */
+    border-bottom: 1px solid #e0e0e0; /* Normal thin border between rows */
     text-align: center !important;
     padding: 8px 6px !important;
     background-color: #fafafa;
@@ -35,13 +39,13 @@
 .hole-number-cell, .par-cell {
     background-color: #f5f5f5;
     font-weight: 600;
-    border-left: 3px solid #2c5530;
+    border-right: 2px solid #2c5530; /* Thick border after hole/par columns */
 }
 
 .total-label-cell, .total-par-cell {
     background-color: #e8e8e8 !important;
     font-weight: bold;
-    border-left: 3px solid #666;
+    border-right: 2px solid #666; /* Thick border after total labels */
 }
 
 .score-cell {
@@ -69,7 +73,7 @@
 .total-row .scorecard-cell {
     background-color: #e8e8e8 !important;
     font-weight: bold;
-    border-top: 2px solid #666;
+    border-top: 2px solid #666; /* Thick border above total rows */
 }
 
 .front-nine-total .scorecard-cell {
@@ -82,11 +86,11 @@
 
 .grand-total .scorecard-cell {
     background-color: #d4edda !important;
-    border-top: 3px solid #2c5530;
+    border-top: 3px solid #2c5530; /* Extra thick border above grand total */
     font-size: 1.1rem;
 }
 
-/* Score-based coloring */
+/* Score-based coloring - no border changes */
 .eagle-cell {
     background-color: #e3f2fd !important;
     color: #0d47a1 !important;
@@ -120,7 +124,7 @@
 .total-cell {
     background-color: #e8e8e8 !important;
     font-weight: bold;
-    border-left: 2px solid #666;
+    /* Removed the extra border-left rule that was causing issues */
 }
 
 .score-under-par {
