@@ -1,3 +1,13 @@
+/* =============================================================================
+   GolfTrackerApp - Main Application Styles
+   
+   This file imports all component and page-specific CSS modules
+   ============================================================================= */
+
+/* Import Component Styles */
+@import url('./css/components/golf-scorecard.css');
+
+/* Global Base Styles */
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }

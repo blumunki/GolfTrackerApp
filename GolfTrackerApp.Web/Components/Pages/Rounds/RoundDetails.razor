@@ -40,18 +40,18 @@ else
 
     @* Golf Scorecard Style Table - Players as Columns, Holes as Rows *@
     <MudPaper Class="pa-2 mb-4" Elevation="2">
-        <table class="scorecard-table">
+        <table class="golf-scorecard">
             <thead>
                 <tr>
-                    <th class="scorecard-header hole-number-header">
+                    <th class="golf-scorecard-header golf-scorecard-hole-header">
                         <MudText Typo="Typo.body2" Style="font-weight: bold;">Hole</MudText>
                     </th>
-                    <th class="scorecard-header par-header">
+                    <th class="golf-scorecard-header golf-scorecard-par-header">
                         <MudText Typo="Typo.body2" Style="font-weight: bold;">Par</MudText>
                     </th>
                     @foreach (var player in GetPlayerRows())
                     {
-                        <th class="scorecard-header player-column-header">
+                        <th class="golf-scorecard-header golf-scorecard-player-header">
                             <MudText Typo="Typo.body2" Style="font-weight: bold; text-align: center;">@player.PlayerName</MudText>
                         </th>
                     }
@@ -61,16 +61,16 @@ else
                 @foreach (var hole in _playedHoles.OrderBy(h => h.HoleNumber))
                 {
                     var isBackNine = hole.HoleNumber > 9;
-                    var rowClass = isBackNine ? "back-nine-row" : "front-nine-row";
+                    var rowClass = isBackNine ? "golf-back-nine" : "golf-front-nine";
                     
                     <tr class="@rowClass">
                         <!-- Hole Number -->
-                        <td class="scorecard-cell hole-number-cell">
+                        <td class="golf-scorecard-cell golf-scorecard-hole-cell">
                             <MudText Typo="Typo.body2" Style="font-weight: bold;">@hole.HoleNumber</MudText>
                         </td>
                         
                         <!-- Par -->
-                        <td class="scorecard-cell par-column-cell">
+                        <td class="golf-scorecard-cell golf-scorecard-par-cell">
                             <MudText Typo="Typo.body2" Style="font-weight: bold;">@hole.Par</MudText>
                         </td>
                         
@@ -83,10 +83,10 @@ else
                             var cellClass = GetScoreCellClass(scoreToPar, isBackNine);
                             
                             <td class="@cellClass">
-                                <div class="score-cell">
+                                <div class="golf-score-cell">
                                     @if (scoreValue > 0)
                                     {
-                                        <span class="score-value">@scoreValue</span>
+                                        <span class="golf-score-value">@scoreValue</span>
                                     }
                                     else
                                     {
@@ -99,11 +99,11 @@ else
                 }
                 
                 <!-- Front 9 Total Row -->
-                <tr class="total-row front-nine-total">
-                    <td class="scorecard-cell total-label-cell">
+                <tr class="golf-total-row golf-front-nine-total">
+                    <td class="golf-scorecard-cell golf-scorecard-total-label">
                         <MudText Typo="Typo.body2" Style="font-weight: bold;">Out</MudText>
                     </td>
-                    <td class="scorecard-cell total-par-cell">
+                    <td class="golf-scorecard-cell golf-scorecard-total-par">
                         <MudText Typo="Typo.body2" Style="font-weight: bold;">
                             @_playedHoles.Where(h => h.HoleNumber <= 9).Sum(h => h.Par)
                         </MudText>
@@ -114,7 +114,7 @@ else
                         var frontNinePar = _playedHoles.Where(h => h.HoleNumber <= 9).Sum(h => h.Par);
                         var frontNineVsPar = frontNineTotal - frontNinePar;
                         
-                        <td class="scorecard-cell total-cell">
+                        <td class="golf-scorecard-cell">
                             <MudText Typo="Typo.body2" Style="font-weight: bold;">
                                 @if (frontNineTotal > 0)
                                 {
@@ -132,11 +132,11 @@ else
                 <!-- Back 9 Total Row (only if back 9 holes exist) -->
                 @if (_playedHoles.Any(h => h.HoleNumber > 9))
                 {
-                    <tr class="total-row back-nine-total">
-                        <td class="scorecard-cell total-label-cell">
+                    <tr class="golf-total-row golf-back-nine-total">
+                        <td class="golf-scorecard-cell golf-scorecard-total-label">
                             <MudText Typo="Typo.body2" Style="font-weight: bold;">In</MudText>
                         </td>
-                        <td class="scorecard-cell total-par-cell">
+                        <td class="golf-scorecard-cell golf-scorecard-total-par">
                             <MudText Typo="Typo.body2" Style="font-weight: bold;">
                                 @_playedHoles.Where(h => h.HoleNumber > 9).Sum(h => h.Par)
                             </MudText>
@@ -147,7 +147,7 @@ else
                             var backNinePar = _playedHoles.Where(h => h.HoleNumber > 9).Sum(h => h.Par);
                             var backNineVsPar = backNineTotal - backNinePar;
                             
-                            <td class="scorecard-cell total-cell">
+                            <td class="golf-scorecard-cell">
                                 <MudText Typo="Typo.body2" Style="font-weight: bold;">
                                     @if (backNineTotal > 0)
                                     {
@@ -164,11 +164,11 @@ else
                 }
                 
                 <!-- Grand Total Row -->
-                <tr class="total-row grand-total">
-                    <td class="scorecard-cell total-label-cell">
+                <tr class="golf-total-row golf-grand-total">
+                    <td class="golf-scorecard-cell golf-scorecard-total-label">
                         <MudText Typo="Typo.body2" Style="font-weight: bold;">Total</MudText>
                     </td>
-                    <td class="scorecard-cell total-par-cell">
+                    <td class="golf-scorecard-cell golf-scorecard-total-par">
                         <MudText Typo="Typo.body2" Style="font-weight: bold;">
                             @_playedHoles.Sum(h => h.Par)
                         </MudText>
@@ -179,7 +179,7 @@ else
                         var totalPar = _playedHoles.Sum(h => h.Par);
                         var totalVsPar = grandTotal - totalPar;
                         
-                        <td class="scorecard-cell total-cell">
+                        <td class="golf-scorecard-cell">
                             <MudText Typo="Typo.body2" Style="font-weight: bold;">
                                 @if (grandTotal > 0)
                                 {
@@ -298,29 +298,29 @@ else
 
     private string GetScoreCellClass(int scoreToPar, bool isBackNine)
     {
-        var baseClass = isBackNine ? "scorecard-cell back-nine-cell" : "scorecard-cell front-nine-cell";
+        var baseClass = "golf-scorecard-cell";
         
         if (scoreToPar <= -2)
-            return $"{baseClass} eagle-cell";
+            return $"{baseClass} golf-score-eagle";
         else if (scoreToPar == -1)
-            return $"{baseClass} birdie-cell";
+            return $"{baseClass} golf-score-birdie";
         else if (scoreToPar == 0)
-            return $"{baseClass} par-cell";
+            return $"{baseClass} golf-score-par";
         else if (scoreToPar == 1)
-            return $"{baseClass} bogey-cell";
+            return $"{baseClass} golf-score-bogey";
         else if (scoreToPar == 2)
-            return $"{baseClass} double-bogey-cell";
+            return $"{baseClass} golf-score-double-bogey";
         else
-            return $"{baseClass} bad-score-cell";
+            return $"{baseClass} golf-score-bad";
     }
 
     private string GetVsParClass(int scoreVsPar)
     {
         if (scoreVsPar < 0)
-            return "score-under-par";
+            return "golf-score-under-par";
         else if (scoreVsPar > 0)
-            return "score-over-par";
+            return "golf-score-over-par";
         else
-            return "score-even-par";
+            return "golf-score-even-par";
     }
 }
