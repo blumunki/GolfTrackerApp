@@ -1,0 +1,160 @@
+/* =============================================================================
+   Golf Theme Variables
+   
+   CSS custom properties (CSS variables) for consistent theming across
+   the Golf Tracker application. These variables provide a design system
+   foundation and enable easy theme customization.
+   ============================================================================= */
+
+:root {
+    /* Primary Golf Theme Colors */
+    --golf-primary: #3d7c3f;
+    --golf-primary-light: #5e9c61;
+    --golf-primary-dark: #2c5530;
+    --golf-primary-darker: #1e3a20;
+    
+    /* Secondary Colors */
+    --golf-secondary: #8bc34a;
+    --golf-secondary-light: #a5d76a;
+    --golf-secondary-dark: #5a7b2a;
+    
+    /* Background Colors */
+    --golf-background-primary: #ffffff;
+    --golf-background-secondary: #fafafa;
+    --golf-background-tertiary: #f5f5f5;
+    --golf-background-dark: #e8e8e8;
+    --golf-background-darker: #d0d0d0;
+    
+    /* Text Colors */
+    --golf-text-primary: #424242;
+    --golf-text-secondary: #666666;
+    --golf-text-light: #999999;
+    --golf-text-inverse: #ffffff;
+    
+    /* Border Colors */
+    --golf-border-light: #e0e0e0;
+    --golf-border-medium: #cccccc;
+    --golf-border-dark: #666666;
+    
+    /* Score-based Colors */
+    --golf-eagle: #e3f2fd;
+    --golf-eagle-text: #0d47a1;
+    --golf-birdie: #e8f5e8;
+    --golf-birdie-text: #2e7d32;
+    --golf-par: #ffffff;
+    --golf-par-text: #424242;
+    --golf-bogey: #fff3e0;
+    --golf-bogey-text: #ef6c00;
+    --golf-double-bogey: #fce4ec;
+    --golf-double-bogey-text: #c2185b;
+    --golf-bad-score: #ffebee;
+    --golf-bad-score-text: #d32f2f;
+    
+    /* Status Colors */
+    --golf-success: #4caf50;
+    --golf-success-light: #81c784;
+    --golf-success-dark: #388e3c;
+    --golf-warning: #ff9800;
+    --golf-warning-light: #ffb74d;
+    --golf-warning-dark: #f57c00;
+    --golf-error: #f44336;
+    --golf-error-light: #e57373;
+    --golf-error-dark: #d32f2f;
+    --golf-info: #2196f3;
+    --golf-info-light: #64b5f6;
+    --golf-info-dark: #1976d2;
+    
+    /* Spacing Scale */
+    --golf-spacing-xs: 4px;
+    --golf-spacing-sm: 8px;
+    --golf-spacing-md: 16px;
+    --golf-spacing-lg: 24px;
+    --golf-spacing-xl: 32px;
+    --golf-spacing-xxl: 48px;
+    
+    /* Typography Scale */
+    --golf-font-size-xs: 0.75rem;
+    --golf-font-size-sm: 0.875rem;
+    --golf-font-size-base: 1rem;
+    --golf-font-size-lg: 1.125rem;
+    --golf-font-size-xl: 1.25rem;
+    --golf-font-size-xxl: 1.5rem;
+    
+    /* Font Weights */
+    --golf-font-weight-light: 300;
+    --golf-font-weight-normal: 400;
+    --golf-font-weight-medium: 500;
+    --golf-font-weight-semibold: 600;
+    --golf-font-weight-bold: 700;
+    
+    /* Border Radius */
+    --golf-border-radius-sm: 4px;
+    --golf-border-radius-md: 8px;
+    --golf-border-radius-lg: 12px;
+    --golf-border-radius-xl: 16px;
+    
+    /* Shadows */
+    --golf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --golf-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --golf-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+    --golf-shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15);
+    
+    /* Transitions */
+    --golf-transition-fast: 0.15s ease-in-out;
+    --golf-transition-medium: 0.25s ease-in-out;
+    --golf-transition-slow: 0.4s ease-in-out;
+    
+    /* Z-index Scale */
+    --golf-z-dropdown: 1000;
+    --golf-z-sticky: 1020;
+    --golf-z-fixed: 1030;
+    --golf-z-modal: 1040;
+    --golf-z-popover: 1050;
+    --golf-z-tooltip: 1060;
+}
+
+/* Dark Theme Support (Future Enhancement) */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --golf-background-primary: #121212;
+        --golf-background-secondary: #1e1e1e;
+        --golf-background-tertiary: #2d2d2d;
+        --golf-background-dark: #3a3a3a;
+        --golf-background-darker: #4a4a4a;
+        
+        --golf-text-primary: #ffffff;
+        --golf-text-secondary: #b3b3b3;
+        --golf-text-light: #808080;
+        --golf-text-inverse: #121212;
+        
+        --golf-border-light: #404040;
+        --golf-border-medium: #555555;
+        --golf-border-dark: #808080;
+    }
+}
+
+/* Theme Utilities */
+.golf-theme-light {
+    color-scheme: light;
+}
+
+.golf-theme-dark {
+    color-scheme: dark;
+}
+
+/* Color Utility Classes */
+.golf-text-primary { color: var(--golf-text-primary); }
+.golf-text-secondary { color: var(--golf-text-secondary); }
+.golf-text-light { color: var(--golf-text-light); }
+.golf-text-success { color: var(--golf-success); }
+.golf-text-warning { color: var(--golf-warning); }
+.golf-text-error { color: var(--golf-error); }
+.golf-text-info { color: var(--golf-info); }
+
+.golf-bg-primary { background-color: var(--golf-background-primary); }
+.golf-bg-secondary { background-color: var(--golf-background-secondary); }
+.golf-bg-tertiary { background-color: var(--golf-background-tertiary); }
+.golf-bg-success { background-color: var(--golf-success); }
+.golf-bg-warning { background-color: var(--golf-warning); }
+.golf-bg-error { background-color: var(--golf-error); }
+.golf-bg-info { background-color: var(--golf-info); }

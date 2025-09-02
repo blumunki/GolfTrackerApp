@@ -1,18 +1,28 @@
-.page {
+/* =============================================================================
+   Main Layout Styles
+   
+   Application-wide layout structure including page container, sidebar,
+   top navigation bar, and responsive breakpoints.
+   ============================================================================= */
+
+/* Page Container */
+.golf-layout-page {
     position: relative;
     display: flex;
     flex-direction: column;
 }
 
-main {
+.golf-layout-main {
     flex: 1;
 }
 
-.sidebar {
+/* Sidebar */
+.golf-layout-sidebar {
     background-image: linear-gradient(180deg, rgb(5, 39, 103) 0%, #3a0647 70%);
 }
 
-.top-row {
+/* Top Navigation Bar */
+.golf-layout-top-row {
     background-color: #f7f7f7;
     border-bottom: 1px solid #d6d5d5;
     justify-content: flex-end;
@@ -21,61 +31,68 @@ main {
     align-items: center;
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
+    .golf-layout-top-row ::deep a, 
+    .golf-layout-top-row ::deep .btn-link {
         white-space: nowrap;
         margin-left: 1.5rem;
         text-decoration: none;
     }
 
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
+    .golf-layout-top-row ::deep a:hover, 
+    .golf-layout-top-row ::deep .btn-link:hover {
         text-decoration: underline;
     }
 
-    .top-row ::deep a:first-child {
+    .golf-layout-top-row ::deep a:first-child {
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
+/* Mobile Layout (up to 640px) */
 @media (max-width: 640.98px) {
-    .top-row {
+    .golf-layout-top-row {
         justify-content: space-between;
     }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
+    .golf-layout-top-row ::deep a, 
+    .golf-layout-top-row ::deep .btn-link {
         margin-left: 0;
     }
 }
 
+/* Desktop Layout (641px and up) */
 @media (min-width: 641px) {
-    .page {
+    .golf-layout-page {
         flex-direction: row;
     }
 
-    .sidebar {
+    .golf-layout-sidebar {
         width: 250px;
         height: 100vh;
         position: sticky;
         top: 0;
     }
 
-    .top-row {
+    .golf-layout-top-row {
         position: sticky;
         top: 0;
         z-index: 1;
     }
 
-    .top-row.auth ::deep a:first-child {
+    .golf-layout-top-row.auth ::deep a:first-child {
         flex: 1;
         text-align: right;
         width: 0;
     }
 
-    .top-row, article {
+    .golf-layout-top-row, 
+    .golf-layout-article {
         padding-left: 2rem !important;
         padding-right: 1.5rem !important;
     }
 }
 
+/* Blazor Error UI */
 #blazor-error-ui {
     color-scheme: light only;
     background: lightyellow;
@@ -96,3 +113,23 @@ main {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+/* Layout Utilities */
+.golf-layout-sticky {
+    position: sticky;
+    top: 0;
+}
+
+.golf-layout-full-height {
+    height: 100vh;
+}
+
+.golf-layout-flex-column {
+    display: flex;
+    flex-direction: column;
+}
+
+.golf-layout-flex-row {
+    display: flex;
+    flex-direction: row;
+}

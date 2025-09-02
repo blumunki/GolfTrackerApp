@@ -4,8 +4,18 @@
    This file imports all component and page-specific CSS modules
    ============================================================================= */
 
+/* Import Theme Variables First */
+@import url('./css/themes/golf-variables.css');
+
+/* Import Layout Styles */
+@import url('./css/layout/main-layout.css');
+@import url('./css/layout/navigation.css');
+
 /* Import Component Styles */
 @import url('./css/components/golf-scorecard.css');
+
+/* Import MudBlazor Overrides */
+@import url('./css/themes/mudblazor-overrides.css');
 
 /* Global Base Styles */
 html, body {
