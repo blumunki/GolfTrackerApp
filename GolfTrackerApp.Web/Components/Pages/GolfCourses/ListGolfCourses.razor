@@ -1,26 +1,44 @@
 @page "/golfcourses"
-@attribute [Authorize]
 @rendermode InteractiveServer
 @inject IGolfCourseService GolfCourseService
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @using GolfTrackerApp.Web.Services
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Components.Shared
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using System.Security.Claims
 
 <PageTitle>Golf Courses</PageTitle>
 
 <MudText Typo="Typo.h4" GutterBottom="true">Golf Courses</MudText>
 
-<MudButton Variant="Variant.Filled" 
-           Color="Color.Primary" 
-           OnClick="GoToAddGolfCoursePage" 
-           StartIcon="@Icons.Material.Filled.Add" 
-           Class="mb-3">
-    Add New Course
-</MudButton>
+<AuthorizeView>
+    <Authorized>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   OnClick="GoToAddGolfCoursePage" 
+                   StartIcon="@Icons.Material.Filled.Add" 
+                   Class="mb-3">
+            Add New Course
+        </MudButton>
+    </Authorized>
+    <NotAuthorized>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Browse our collection of golf courses. Join our community to add courses and track your performance.
+        </MudText>
+        <MudAlert Severity="Severity.Info" Class="mb-4" Icon="@Icons.Material.Filled.Info">
+            <MudText><strong>Want to manage courses or track your rounds?</strong></MudText>
+            <MudText>
+                <MudLink Href="/Account/Register">Register for free</MudLink> to add courses and access detailed round tracking.
+            </MudText>
+        </MudAlert>
+    </NotAuthorized>
+</AuthorizeView>
 
 @if (isLoading)
 {
@@ -41,6 +59,13 @@ else
     @if (golfCourses is null || !golfCourses.Any())
     {
         <MudText>No golf courses found for your search criteria.</MudText>
+        <AuthorizeView>
+            <NotAuthorized>
+                <MudText Class="mt-2">
+                    <MudLink Href="/Account/Register">Register</MudLink> to help us expand our course database!
+                </MudText>
+            </NotAuthorized>
+        </AuthorizeView>
     }
     else
     {
@@ -58,12 +83,21 @@ else
                 <MudTd DataLabel="Holes">@context.NumberOfHoles</MudTd>
                 <MudTd DataLabel="Par">@context.DefaultPar</MudTd>
                 <MudTd Style="text-align:right">
-                    <MudTooltip Text="Edit Course">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditCourse(context.GolfCourseId))" />
-                    </MudTooltip>
-                    <MudTooltip Text="Delete Course">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteCourse(context))" />
-                    </MudTooltip>
+                    <AuthorizeView>
+                        <Authorized Context="authContext">
+                            <MudTooltip Text="Edit Course">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditCourse(context.GolfCourseId))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Delete Course">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteCourse(context))" />
+                            </MudTooltip>
+                        </Authorized>
+                        <NotAuthorized Context="authContext">
+                            <MudTooltip Text="View Details">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/golfcourses/{context.GolfCourseId}/details"))" />
+                            </MudTooltip>
+                        </NotAuthorized>
+                    </AuthorizeView>
                 </MudTd>
             </RowTemplate>
             <PagerContent>
@@ -77,8 +111,14 @@ else
     private List<GolfCourse>? golfCourses;
     private bool isLoading = true;
     private string searchString = "";
+    private bool isAuthenticated = false;
+    
     protected override async Task OnInitializedAsync()
     {
+        // Check authentication status
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+        
         await LoadCourses();
     }
 
@@ -108,6 +148,9 @@ else
 
     private async Task PrepareDeleteCourse(GolfCourse course)
     {
+        // Only available to authenticated users
+        if (!isAuthenticated) return;
+        
         var parameters = new DialogParameters<ConfirmDialog>
         {
             { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete '{course.Name}'? This will also delete all of its holes." },
