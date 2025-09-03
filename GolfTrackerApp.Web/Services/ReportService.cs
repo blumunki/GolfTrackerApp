@@ -388,4 +388,89 @@ public class ReportService : IReportService
 
         return performanceData.OrderBy(p => p.Date).ToList();
     }
+
+    public async Task<DashboardStats> GetDashboardStatsAsync(string currentUserId)
+    {
+        var player = await _context.Players
+            .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
+
+        if (player == null)
+        {
+            return new DashboardStats();
+        }
+
+        var rounds = await _context.Rounds
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId) 
+                       && r.Status == RoundCompletionStatus.Completed)
+            .Include(r => r.Scores)
+            .ThenInclude(s => s.Hole)
+            .Include(r => r.GolfCourse)
+            .ThenInclude(gc => gc!.GolfClub)
+            .OrderBy(r => r.DatePlayed)
+            .ToListAsync();
+
+        if (!rounds.Any())
+        {
+            return new DashboardStats();
+        }
+
+        var stats = new DashboardStats
+        {
+            TotalRounds = rounds.Count,
+            LastRoundDate = rounds.Max(r => r.DatePlayed)
+        };
+
+        // Calculate scores and find best round
+        var roundScores = rounds.Select(r => new
+        {
+            Round = r,
+            TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
+            TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par)
+        }).Where(rs => rs.TotalScore > 0).ToList();
+
+        if (roundScores.Any())
+        {
+            var bestRound = roundScores.OrderBy(rs => rs.TotalScore).First();
+            stats.BestScore = bestRound.TotalScore;
+            stats.BestScoreCourseName = $"{bestRound.Round.GolfCourse!.GolfClub!.Name} - {bestRound.Round.GolfCourse.Name}";
+            stats.BestScoreDate = bestRound.Round.DatePlayed;
+
+            stats.AverageScore = roundScores.Average(rs => rs.TotalScore);
+            
+            var toPars = roundScores.Select(rs => rs.TotalScore - rs.TotalPar).ToList();
+            stats.AverageToPar = toPars.Average();
+            stats.LowestToPar = toPars.Min();
+
+            // Find most played course
+            var courseGroups = roundScores
+                .GroupBy(rs => rs.Round.GolfCourseId)
+                .OrderByDescending(g => g.Count())
+                .FirstOrDefault();
+
+            if (courseGroups != null)
+            {
+                var favoriteCourse = courseGroups.First().Round.GolfCourse;
+                stats.FavoriteCourseName = $"{favoriteCourse!.GolfClub!.Name} - {favoriteCourse.Name}";
+                stats.FavoriteCourseRounds = courseGroups.Count();
+            }
+
+            // Calculate improvement streak (last 5 rounds vs previous average)
+            if (roundScores.Count >= 5)
+            {
+                var recentRounds = roundScores.TakeLast(5).ToList();
+                var previousRounds = roundScores.Take(roundScores.Count - 5).ToList();
+                
+                if (previousRounds.Any())
+                {
+                    var recentAverage = recentRounds.Average(rs => rs.TotalScore - rs.TotalPar);
+                    var previousAverage = previousRounds.Average(rs => rs.TotalScore - rs.TotalPar);
+                    
+                    stats.IsImprovingStreak = recentAverage < previousAverage;
+                    stats.CurrentStreak = recentRounds.Count;
+                }
+            }
+        }
+
+        return stats;
+    }
 }

@@ -67,6 +67,13 @@
     /* Spacing Scale */
     --golf-spacing-xs: 4px;
     --golf-spacing-sm: 8px;
+    --golf-spacing-1: 4px;
+    --golf-spacing-2: 8px;
+    --golf-spacing-3: 12px;
+    --golf-spacing-4: 16px;
+    --golf-spacing-6: 24px;
+    --golf-spacing-8: 32px;
+    --golf-spacing-12: 48px;
     --golf-spacing-md: 16px;
     --golf-spacing-lg: 24px;
     --golf-spacing-xl: 32px;
@@ -78,6 +85,9 @@
     --golf-font-size-base: 1rem;
     --golf-font-size-lg: 1.125rem;
     --golf-font-size-xl: 1.25rem;
+    --golf-font-size-2xl: 1.5rem;
+    --golf-font-size-3xl: 1.875rem;
+    --golf-font-size-4xl: 2.25rem;
     --golf-font-size-xxl: 1.5rem;
     
     /* Font Weights */

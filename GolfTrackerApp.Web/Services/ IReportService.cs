@@ -19,4 +19,7 @@ public interface IReportService
     // New methods for club/course specific data
     Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceForClubAsync(string currentUserId, int clubId, int roundCount);
     Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceForCourseAsync(string currentUserId, int courseId, int roundCount);
+    
+    // Dashboard statistics
+    Task<DashboardStats> GetDashboardStatsAsync(string currentUserId);
 }

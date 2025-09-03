@@ -13,6 +13,7 @@
 
 /* Import Component Styles */
 @import url('./css/components/golf-scorecard.css');
+@import url('./css/components/golf-dashboard.css');
 
 /* Import MudBlazor Overrides */
 @import url('./css/themes/mudblazor-overrides.css');

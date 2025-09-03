@@ -1,0 +1,422 @@
+/* Dashboard specific styles */
+.golf-dashboard {
+    background: linear-gradient(135deg, var(--golf-primary-50) 0%, var(--golf-accent-50) 100%);
+    min-height: 100vh;
+    padding: var(--golf-spacing-6);
+    margin: calc(-1 * var(--golf-spacing-6));
+    animation: fadeIn 0.6s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.golf-dashboard-header {
+    text-align: center;
+    margin-bottom: var(--golf-spacing-8);
+    color: var(--golf-primary-800);
+    animation: slideDown 0.8s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.golf-dashboard-title {
+    font-size: var(--golf-font-size-4xl);
+    font-weight: var(--golf-font-weight-bold);
+    margin-bottom: var(--golf-spacing-2);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    color: var(--golf-primary-800);
+    /* Remove the gradient text effect that was making it hard to see */
+}
+
+.golf-dashboard-subtitle {
+    font-size: var(--golf-font-size-base);
+    color: var(--golf-primary-600);
+    opacity: 0.8;
+    margin-bottom: var(--golf-spacing-2);
+}
+
+/* Statistics Cards */
+.golf-stats-container {
+    margin-bottom: var(--golf-spacing-12);
+    animation: slideUp 0.8s ease-out 0.2s both;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes statCardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.golf-stat-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--golf-border-radius-lg);
+    padding: var(--golf-spacing-6);
+    text-align: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    animation: statCardSlideIn 0.6s ease-out both;
+}
+
+.golf-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--golf-primary-500), var(--golf-accent-500));
+    transition: height 0.3s ease;
+}
+
+.golf-stat-card:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+.golf-stat-card:hover::before {
+    height: 6px;
+}
+
+.golf-stat-icon {
+    font-size: var(--golf-font-size-2xl);
+    margin-bottom: var(--golf-spacing-3);
+    color: var(--golf-primary-500);
+    transition: transform 0.3s ease;
+}
+
+.golf-stat-card:hover .golf-stat-icon {
+    transform: scale(1.1);
+}
+
+.golf-stat-value {
+    font-size: var(--golf-font-size-2xl);
+    font-weight: var(--golf-font-weight-bold);
+    color: var(--golf-primary-700);
+    margin-bottom: var(--golf-spacing-1);
+    transition: color 0.3s ease;
+}
+
+.golf-stat-card:hover .golf-stat-value {
+    color: var(--golf-primary-600);
+}
+
+.golf-stat-label {
+    font-size: var(--golf-font-size-sm);
+    color: var(--golf-neutral-600);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: var(--golf-font-weight-medium);
+}
+
+.golf-stat-improvement {
+    color: var(--golf-success-600);
+    font-size: var(--golf-font-size-xs);
+    margin-top: var(--golf-spacing-1);
+    font-weight: var(--golf-font-weight-medium);
+}
+
+.golf-stat-decline {
+    color: var(--golf-warning-600);
+    font-size: var(--golf-font-size-xs);
+    margin-top: var(--golf-spacing-1);
+    font-weight: var(--golf-font-weight-medium);
+}
+
+/* Enhanced Cards */
+.golf-dashboard-card {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: var(--golf-border-radius-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+    animation: cardSlideIn 0.6s ease-out both;
+}
+
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.golf-dashboard-card:nth-child(1) { animation-delay: 0.1s; }
+.golf-dashboard-card:nth-child(2) { animation-delay: 0.2s; }
+.golf-dashboard-card:nth-child(3) { animation-delay: 0.3s; }
+.golf-dashboard-card:nth-child(4) { animation-delay: 0.4s; }
+
+.golf-dashboard-card:hover {
+    transform: translateY(-6px) scale(1.01);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+.golf-dashboard-card .mud-card-header {
+    background: linear-gradient(135deg, var(--golf-primary-50), var(--golf-accent-50));
+    border-bottom: 1px solid var(--golf-primary-100);
+    position: relative;
+}
+
+.golf-dashboard-card .mud-card-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--golf-primary-400), var(--golf-accent-400));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.golf-dashboard-card:hover .mud-card-header::after {
+    opacity: 1;
+}
+
+.golf-dashboard-card .mud-card-header .mud-typography {
+    color: var(--golf-primary-700);
+    font-weight: var(--golf-font-weight-semibold);
+}
+
+/* Quick Actions Enhancement */
+.golf-quick-actions {
+    background: linear-gradient(135deg, var(--golf-primary-600), var(--golf-primary-700));
+    color: white;
+    overflow: hidden;
+    position: relative;
+}
+
+.golf-quick-actions::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 50%);
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+}
+
+.golf-quick-actions:hover::before {
+    transform: rotate(45deg) scale(1.1);
+}
+
+.golf-quick-actions .mud-card-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
+}
+
+.golf-quick-actions .mud-typography {
+    color: white;
+}
+
+.golf-action-button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-weight: var(--golf-font-weight-semibold);
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    position: relative;
+    z-index: 1;
+}
+
+.golf-action-button:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+.golf-action-button:disabled {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Chart Enhancements */
+.golf-chart-container {
+    position: relative;
+    padding: var(--golf-spacing-2);
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: var(--golf-border-radius-md);
+    margin: 0;
+    border: 1px solid rgba(var(--golf-primary-500), 0.1);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+    height: 100%;
+    min-height: 200px;
+}
+
+/* List Enhancements */
+.golf-dashboard-list .mud-list-item {
+    border-radius: var(--golf-border-radius-md);
+    margin-bottom: var(--golf-spacing-2);
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.golf-dashboard-list .mud-list-item:hover {
+    background: var(--golf-primary-50);
+    transform: translateX(6px);
+    border-color: var(--golf-primary-200);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .golf-dashboard {
+        padding: var(--golf-spacing-4);
+        margin: calc(-1 * var(--golf-spacing-4));
+    }
+    
+    .golf-dashboard-title {
+        font-size: var(--golf-font-size-2xl);
+    }
+    
+    .golf-stat-card {
+        padding: var(--golf-spacing-4);
+    }
+    
+    .golf-stat-value {
+        font-size: var(--golf-font-size-xl);
+    }
+
+    .golf-dashboard-card:hover {
+        transform: translateY(-2px) scale(1.005);
+    }
+
+    .golf-stat-card:hover {
+        transform: translateY(-2px) scale(1.01);
+    }
+}
+
+/* Loading states */
+.golf-loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    color: var(--golf-primary-600);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Empty states */
+.golf-empty-state {
+    text-align: center;
+    padding: var(--golf-spacing-8);
+    color: var(--golf-neutral-500);
+    animation: fadeIn 0.5s ease-out;
+}
+
+.golf-empty-state-icon {
+    font-size: var(--golf-font-size-3xl);
+    margin-bottom: var(--golf-spacing-4);
+    opacity: 0.5;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+/* Welcome message for new users */
+.golf-welcome-container {
+    text-align: center;
+    padding: var(--golf-spacing-8);
+    background: linear-gradient(135deg, var(--golf-accent-50), var(--golf-primary-50));
+    border-radius: var(--golf-border-radius-lg);
+    margin-bottom: var(--golf-spacing-6);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    animation: welcomeSlideIn 1s ease-out;
+}
+
+@keyframes welcomeSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.golf-welcome-title {
+    font-size: var(--golf-font-size-2xl);
+    font-weight: var(--golf-font-weight-bold);
+    color: var(--golf-primary-700);
+    margin-bottom: var(--golf-spacing-3);
+    background: linear-gradient(135deg, var(--golf-primary-600), var(--golf-accent-500));
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.golf-welcome-message {
+    color: var(--golf-primary-600);
+    font-size: var(--golf-font-size-lg);
+    margin-bottom: var(--golf-spacing-4);
+    opacity: 0.9;
+}
