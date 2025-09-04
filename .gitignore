@@ -407,3 +407,10 @@ FodyWeavers.xsd
 GolfTrackerApp.Web/Data/Players.csv
 
 .DS_Store
+
+# Temporary documentation files - use structured docs/ directory instead
+*-IMPLEMENTATION.md
+*-SUMMARY.md
+*-MIGRATION*.md
+*-CONTAMINATION*.md
+*-ARCHITECTURE-PLAN.md
