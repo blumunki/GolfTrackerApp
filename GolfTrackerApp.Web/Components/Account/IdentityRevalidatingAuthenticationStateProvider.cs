@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Shared.Data;
 
 namespace GolfTrackerApp.Web.Components.Account;
 

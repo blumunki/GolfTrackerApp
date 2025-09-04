@@ -1,0 +1,41 @@
+@page "/home-test"
+@rendermode InteractiveServer
+@using MudBlazor
+@using GolfTrackerApp.Shared.Services
+@using GolfTrackerApp.Shared.Models
+
+<PageTitle>Home Test</PageTitle>
+
+<MudContainer>
+    <MudText Typo="Typo.h3">Shared Assembly Test</MudText>
+    <MudText>This page tests if we can access shared services and models.</MudText>
+    
+    @if (testPassed)
+    {
+        <MudAlert Severity="Severity.Success" Class="mt-4">
+            ✅ Shared assembly is accessible! The routing issue is elsewhere.
+        </MudAlert>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-4">
+            ❌ Cannot access shared assembly services.
+        </MudAlert>
+    }
+    
+    <MudButton Href="/test" Variant="Variant.Outlined" Color="Color.Secondary" Class="mt-4">
+        Back to Test Page
+    </MudButton>
+</MudContainer>
+
+@code {
+    [Inject] private IPlayerService? PlayerService { get; set; }
+    
+    private bool testPassed = false;
+    
+    protected override void OnInitialized()
+    {
+        // Test if we can inject shared services
+        testPassed = PlayerService != null;
+    }
+}

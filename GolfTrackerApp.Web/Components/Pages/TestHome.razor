@@ -1,0 +1,15 @@
+@page "/test"
+@rendermode InteractiveServer
+@using MudBlazor
+
+<PageTitle>Test Page</PageTitle>
+
+<MudContainer>
+    <MudText Typo="Typo.h3">Test Page - Web Project</MudText>
+    <MudText>If you can see this page, the Web project routing is working.</MudText>
+    <MudText>The issue is likely with the Shared assembly routing.</MudText>
+    
+    <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary" Class="mt-4">
+        Try Home Page (Shared Assembly)
+    </MudButton>
+</MudContainer>

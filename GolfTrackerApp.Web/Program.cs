@@ -3,8 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using GolfTrackerApp.Web.Components;
 using GolfTrackerApp.Web.Components.Account;
-using GolfTrackerApp.Web.Data;
-using GolfTrackerApp.Web.Services;
+using GolfTrackerApp.Shared.Data;
+using GolfTrackerApp.Shared.Services;
+using GolfTrackerApp.Shared.Components.Pages;
 using MudBlazor.Services;
 using Microsoft.AspNetCore.Components.Server;
 
@@ -119,7 +120,8 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(typeof(GolfTrackerApp.Shared.Components.Pages.Home).Assembly);
 
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();

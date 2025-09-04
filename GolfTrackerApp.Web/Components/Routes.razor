@@ -1,5 +1,13 @@
 ﻿@using GolfTrackerApp.Web.Components.Account.Shared
-<Router AppAssembly="typeof(Program).Assembly">
+@using System.Reflection
+@using GolfTrackerApp.Shared.Models
+@using GolfTrackerApp.Shared.Components.Pages
+
+@code {
+    private Assembly[] _additionalAssemblies = new[] { typeof(GolfTrackerApp.Shared.Components.Pages.Home).Assembly };
+}
+
+<Router AppAssembly="typeof(Program).Assembly" AdditionalAssemblies="_additionalAssemblies">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
             <NotAuthorized>
@@ -8,4 +16,18 @@
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <PageTitle>Golf Tracker - Not Found</PageTitle>
+        <LayoutView Layout="@typeof(Layout.MainLayout)">
+            <div class="mud-container mud-container-maxwidth-false pa-4 mt-4">
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Filled">
+                    <h3>Page Not Found (404)</h3>
+                    <p>Sorry, there's nothing at this address.</p>
+                    <p>Web and Shared assembly routes are now loaded...</p>
+                    <MudButton Href="/" Variant="Variant.Filled" Color="Color.Primary">Try Home</MudButton>
+                    <MudButton Href="/test" Variant="Variant.Outlined" Color="Color.Secondary" Class="ml-2">Test Page</MudButton>
+                </MudAlert>
+            </div>
+        </LayoutView>
+    </NotFound>
 </Router>

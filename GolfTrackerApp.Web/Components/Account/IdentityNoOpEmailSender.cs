@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
-using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Shared.Data;
 
 namespace GolfTrackerApp.Web.Components.Account;
 
