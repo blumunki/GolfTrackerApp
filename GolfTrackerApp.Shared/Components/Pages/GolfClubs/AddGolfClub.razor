@@ -1,0 +1,57 @@
+@page "/golfclubs/add"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IGolfClubService GolfClubService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@using GolfTrackerApp.Shared.Models
+@using GolfTrackerApp.Shared.Services
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Add New Golf Club</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Add New Golf Club</MudText>
+
+<EditForm Model="@newGolfClub" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <MudCard>
+        <MudCardContent>
+            <MudTextField @bind-Value="newGolfClub.Name" For="@(() => newGolfClub.Name)" Label="Club Name" Variant="Variant.Outlined" Margin="Margin.Dense" Required="true" RequiredError="Club name is required." />
+            <MudTextField @bind-Value="newGolfClub.AddressLine1" For="@(() => newGolfClub.AddressLine1)" Label="Address Line 1" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.AddressLine2" For="@(() => newGolfClub.AddressLine2)" Label="Address Line 2" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.City" For="@(() => newGolfClub.City)" Label="City" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.CountyOrRegion" For="@(() => newGolfClub.CountyOrRegion)" Label="County / Region" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.Postcode" For="@(() => newGolfClub.Postcode)" Label="Postcode" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.Country" For="@(() => newGolfClub.Country)" Label="Country" Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudTextField @bind-Value="newGolfClub.Website" For="@(() => newGolfClub.Website)" Label="Website URL" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Url" />
+        </MudCardContent>
+        <MudCardActions>
+            <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Create Club</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="GoToListPage" Class="mx-2">Cancel</MudButton>
+        </MudCardActions>
+    </MudCard>
+    <ValidationSummary class="mt-3" />
+</EditForm>
+
+@code {
+    private GolfClub newGolfClub = new();
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            await GolfClubService.AddGolfClubAsync(newGolfClub);
+            Snackbar.Add("Golf club added successfully!", Severity.Success);
+            NavigationManager.NavigateTo("/golfclubs");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error adding golf club: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void GoToListPage()
+    {
+        NavigationManager.NavigateTo("/golfclubs");
+    }
+}

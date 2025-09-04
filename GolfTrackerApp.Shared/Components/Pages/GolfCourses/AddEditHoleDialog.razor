@@ -1,0 +1,59 @@
+@inject IHoleService HoleService
+@inject ISnackbar Snackbar
+
+@using GolfTrackerApp.Shared.Models
+@using GolfTrackerApp.Shared.Services
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@HoleModel" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+            <MudNumericField @bind-Value="HoleModel.HoleNumber" For="@(() => HoleModel.HoleNumber)" Label="Hole Number" Required="true" Min="1" />
+            <MudNumericField @bind-Value="HoleModel.Par" For="@(() => HoleModel.Par)" Label="Par" Required="true" Min="3" Max="6" Class="mt-3" />
+            <MudNumericField @bind-Value="HoleModel.LengthYards" For="@(() => HoleModel.LengthYards)" Label="Length (Yards)" Class="mt-3" />
+            <MudNumericField @bind-Value="HoleModel.StrokeIndex" For="@(() => HoleModel.StrokeIndex)" Label="Stroke Index" Min="1" Max="18" Class="mt-3" />
+            <button type="submit" style="display:none;"></button>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">@ButtonText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public Hole HoleModel { get; set; } = new();
+    [Parameter] public string Title { get; set; } = "Add Hole";
+    [Parameter] public string ButtonText { get; set; } = "Save";
+
+    private async Task Submit()
+    {
+        try
+        {
+            if (HoleModel.HoleId == 0) // Adding a new hole
+            {
+                await HoleService.AddHoleAsync(HoleModel);
+                Snackbar.Add("Hole added successfully.", Severity.Success);
+            }
+            else // Editing an existing hole
+            {
+                await HoleService.UpdateHoleAsync(HoleModel);
+                Snackbar.Add("Hole updated successfully.", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+            MudDialog.Cancel();
+        }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

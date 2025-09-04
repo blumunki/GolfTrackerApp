@@ -5,6 +5,10 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GolfTrackerApp.Web", "GolfTrackerApp.Web\GolfTrackerApp.Web.csproj", "{C6D5ABA7-8E8E-453D-B3DB-40402DE231F6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GolfTrackerApp.Shared", "GolfTrackerApp.Shared\GolfTrackerApp.Shared.csproj", "{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GolfTrackerApp.Mobile", "GolfTrackerApp.Mobile\GolfTrackerApp.Mobile.csproj", "{7E44E15D-CA9D-434F-A58A-75EF30E4375E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +31,30 @@ Global
 		{C6D5ABA7-8E8E-453D-B3DB-40402DE231F6}.Release|x64.Build.0 = Release|Any CPU
 		{C6D5ABA7-8E8E-453D-B3DB-40402DE231F6}.Release|x86.ActiveCfg = Release|Any CPU
 		{C6D5ABA7-8E8E-453D-B3DB-40402DE231F6}.Release|x86.Build.0 = Release|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Debug|x64.Build.0 = Debug|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Debug|x86.Build.0 = Debug|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Release|x64.ActiveCfg = Release|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Release|x64.Build.0 = Release|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Release|x86.ActiveCfg = Release|Any CPU
+		{BE07B4F1-D0E5-4712-80E7-2E1AF4D05626}.Release|x86.Build.0 = Release|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Debug|x64.Build.0 = Debug|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Debug|x86.Build.0 = Debug|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Release|x64.ActiveCfg = Release|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Release|x64.Build.0 = Release|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Release|x86.ActiveCfg = Release|Any CPU
+		{7E44E15D-CA9D-434F-A58A-75EF30E4375E}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

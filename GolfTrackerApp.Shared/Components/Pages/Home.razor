@@ -1,0 +1,606 @@
+﻿@page "/"
+@* @attribute [Authorize] *@
+@rendermode InteractiveServer
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IRoundService RoundService
+@inject IReportService ReportService
+@inject IPlayerService PlayerService
+@inject IGolfClubService GolfClubService
+@inject IGolfCourseService GolfCourseService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@using System.Security.Claims
+@using GolfTrackerApp.Shared.Models
+@using GolfTrackerApp.Shared.Components.Shared
+@using GolfTrackerApp.Shared.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+
+<PageTitle>@(isAuthenticated ? "Golf Dashboard" : "Golf Tracker - Track Your Game")</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <!-- AUTHENTICATED USER DASHBOARD - Keep existing excellent UI -->
+        <div class="golf-dashboard">
+            @if (isLoading)
+            {
+                <div class="golf-loading-container">
+                    <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+                    <MudText Typo="Typo.body1" Style="margin-top: 16px;">Loading your golf dashboard...</MudText>
+                </div>
+            }
+            else
+            {
+                <div class="golf-dashboard-header">
+                    <h1 class="golf-dashboard-title">Your Golf Dashboard</h1>
+                    <p class="golf-dashboard-subtitle">Track your progress, celebrate your achievements</p>
+                </div>
+
+                @if (dashboardStats.TotalRounds == 0)
+                {
+                    <div class="golf-welcome-container">
+                        <h2 class="golf-welcome-title">Welcome to Your Golf Journey! 🏌️‍♂️</h2>
+                        <p class="golf-welcome-message">Ready to track your rounds and improve your game? Start by recording your first round!</p>
+                        <MudButton Href="/rounds/record"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Large"
+                                   StartIcon="@Icons.Material.Filled.AddCircle">
+                            Record Your First Round
+                        </MudButton>
+                    </div>
+                }
+                else
+                {
+                    <!-- Statistics Overview -->
+                    <div class="golf-stats-container">
+                        <MudGrid Spacing="3" Class="justify-center">
+                            <MudItem xs="6" sm="3" Style="animation-delay: 0.1s;">
+                                <div class="golf-stat-card">
+                                    <div class="golf-stat-icon">🏌️</div>
+                                    <div class="golf-stat-value">@dashboardStats.TotalRounds</div>
+                                    <div class="golf-stat-label">Rounds Played</div>
+                                    @if (dashboardStats.LastRoundDate.HasValue)
+                                    {
+                                        <div class="golf-stat-improvement">
+                                            Last: @dashboardStats.LastRoundDate.Value.ToString("MMM dd")
+                                        </div>
+                                    }
+                                </div>
+                            </MudItem>
+                            <MudItem xs="6" sm="3" Style="animation-delay: 0.2s;">
+                                <div class="golf-stat-card">
+                                    <div class="golf-stat-icon">🏆</div>
+                                    <div class="golf-stat-value">@(dashboardStats.BestScore?.ToString() ?? "-")</div>
+                                    <div class="golf-stat-label">Best Score</div>
+                                    @if (dashboardStats.LowestToPar.HasValue)
+                                    {
+                                        <div class="golf-stat-improvement">
+                                            @(dashboardStats.LowestToPar.Value >= 0 ? "+" : "")@dashboardStats.LowestToPar.Value to par
+                                        </div>
+                                    }
+                                </div>
+                            </MudItem>
+                            <MudItem xs="6" sm="3" Style="animation-delay: 0.3s;">
+                                <div class="golf-stat-card">
+                                    <div class="golf-stat-icon">📊</div>
+                                    <div class="golf-stat-value">@(dashboardStats.AverageToPar?.ToString("F1") ?? "-")</div>
+                                    <div class="golf-stat-label">Average to Par</div>
+                                    @if (dashboardStats.CurrentStreak > 0)
+                                    {
+                                        <div class="@(dashboardStats.IsImprovingStreak ? "golf-stat-improvement" : "golf-stat-decline")">
+                                            @(dashboardStats.IsImprovingStreak ? "↗️ Improving" : "📈 Recent form")
+                                        </div>
+                                    }
+                                </div>
+                            </MudItem>
+                            <MudItem xs="6" sm="3" Style="animation-delay: 0.4s;">
+                                <div class="golf-stat-card">
+                                    <div class="golf-stat-icon">⭐</div>
+                                    <div class="golf-stat-value">@dashboardStats.FavoriteCourseRounds</div>
+                                    <div class="golf-stat-label">Most Played</div>
+                                    @if (!string.IsNullOrEmpty(dashboardStats.FavoriteCourseName))
+                                    {
+                                        <div class="golf-stat-improvement" title="@dashboardStats.FavoriteCourseName">
+                                            @(dashboardStats.FavoriteCourseName.Length > 20 ? 
+                                              dashboardStats.FavoriteCourseName.Substring(0, 20) + "..." : 
+                                              dashboardStats.FavoriteCourseName)
+                                        </div>
+                                    }
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+                    </div>
+                }
+
+                <!-- Main Dashboard Grid -->
+                <MudGrid Spacing="4">
+                    <!-- Quick Actions -->
+                    <MudItem xs="12" md="6">
+                        <MudCard Elevation="3" Class="golf-dashboard-card golf-quick-actions" Style="height: 100%;">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">⚡ Quick Actions</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent Class="d-flex flex-column justify-center align-center gap-4 pa-6 flex-grow-1">
+                                <MudButton Href="/rounds/record"
+                                           Variant="Variant.Outlined"
+                                           Class="golf-action-button"
+                                           StartIcon="@Icons.Material.Filled.EditNote"
+                                           Style="width: 100%; height: 56px; font-size: 16px;">
+                                    📝 Record a Round
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined"
+                                           Class="golf-action-button"
+                                           StartIcon="@Icons.Material.Filled.RadioButtonChecked"
+                                           Style="width: 100%; height: 56px; font-size: 16px;"
+                                           Disabled="true">
+                                    🔴 Live Scoring (Coming Soon)
+                                </MudButton>
+                                <MudButton Href="@($"/players/{_currentPlayerId}/report")"
+                                           Variant="Variant.Outlined"
+                                           Class="golf-action-button"
+                                           StartIcon="@Icons.Material.Filled.Analytics"
+                                           Style="width: 100%; height: 56px; font-size: 16px;">
+                                    📈 View Full Report
+                                </MudButton>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <!-- Performance Chart -->
+                    <MudItem xs="12" md="6">
+                        <MudCard Elevation="3" Class="golf-dashboard-card" Style="height: 100%;">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">📈 Recent Form</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.TrendingUp" 
+                                                  Color="Color.Primary" 
+                                                  Href="@($"/players/{_currentPlayerId}/report")" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent Class="flex-grow-1 d-flex flex-column">
+                                @if (_performanceSeries is not null && _performanceSeries.Any())
+                                {
+                                    <div class="golf-chart-container flex-grow-1 d-flex flex-column">
+                                        <MudChart ChartType="ChartType.Line" 
+                                                 ChartSeries="@_performanceSeries" 
+                                                 XAxisLabels="@_performanceXAxisLabels" 
+                                                 Width="100%" 
+                                                 Height="250px"
+                                                 ChartOptions="@_chartOptions">
+                                        </MudChart>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="golf-empty-state">
+                                        <div class="golf-empty-state-icon">📊</div>
+                                        <MudText>Play a few rounds to see your performance trends here.</MudText>
+                                    </div>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <!-- Recent Rounds -->
+                    <MudItem xs="12" md="6">
+                        <MudCard Elevation="3" Class="golf-dashboard-card" Style="height: 100%;">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">🏌️ Recent Rounds</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.List" 
+                                                  Color="Color.Primary" 
+                                                  Href="/rounds" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (recentRounds is null || !recentRounds.Any())
+                                {
+                                    <div class="golf-empty-state">
+                                        <div class="golf-empty-state-icon">🏌️</div>
+                                        <MudText>No rounds recorded yet. Start tracking your game!</MudText>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <MudList Class="golf-dashboard-list" T="object">
+                                        @foreach (var round in recentRounds)
+                                        {
+                                            <MudListItem T="object" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
+                                                <div class="d-flex justify-space-between align-center flex-grow-1">
+                                                    <div class="d-flex flex-column">
+                                                        <MudText Typo="Typo.body1">
+                                                            <strong>@($"{round.GolfCourse!.GolfClub!.Name}")</strong>
+                                                        </MudText>
+                                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                            @round.GolfCourse?.Name
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                                            @round.DatePlayed.ToString("MMM dd, yyyy")
+                                                        </MudText>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <MudText Typo="Typo.h6" Color="Color.Primary">
+                                                            @round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes)
+                                                        </MudText>
+                                                        @{
+                                                            var totalPar = round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Hole!.Par);
+                                                            var totalScore = round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes);
+                                                            var toPar = totalScore - totalPar;
+                                                        }
+                                                        <MudText Typo="Typo.caption" Color="@(toPar < 0 ? Color.Success : toPar > 0 ? Color.Warning : Color.Info)">
+                                                            @(toPar >= 0 ? "+" : "")@toPar
+                                                        </MudText>
+                                                    </div>
+                                                </div>
+                                            </MudListItem>
+                                        }
+                                    </MudList>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+
+                    <!-- Playing Partners -->
+                    <MudItem xs="12" md="6">
+                        <MudCard Elevation="3" Class="golf-dashboard-card" Style="height: 100%;">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">👥 Playing Partners</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.People" 
+                                                  Color="Color.Primary" 
+                                                  Href="/players" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (partnerSummary is null || !partnerSummary.Any())
+                                {
+                                    <div class="golf-empty-state">
+                                        <div class="golf-empty-state-icon">👥</div>
+                                        <MudText>Invite friends to play and track your competitive records!</MudText>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <MudList Class="golf-dashboard-list" T="object">
+                                        @foreach (var partner in partnerSummary)
+                                        {
+                                            <MudListItem T="object" Href="@($"/players/{partner.PartnerId}/report")">
+                                                <div class="d-flex justify-space-between align-center flex-grow-1">
+                                                    <div class="d-flex flex-column">
+                                                        <MudText Typo="Typo.body1">
+                                                            <strong>@partner.PartnerName</strong>
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            Last played: @partner.LastPlayedDate.ToString("MMM dd, yyyy")
+                                                        </MudText>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <MudText Typo="Typo.body2" Color="@(partner.UserWins > partner.PartnerWins ? Color.Success : partner.UserWins < partner.PartnerWins ? Color.Warning : Color.Info)">
+                                                            <strong>@partner.UserWins-@partner.PartnerWins-@partner.Ties</strong>
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption">
+                                                            @(partner.UserWins > partner.PartnerWins ? "You lead!" : 
+                                                              partner.UserWins < partner.PartnerWins ? "You trail" : "It's tied!")
+                                                        </MudText>
+                                                    </div>
+                                                </div>
+                                            </MudListItem>
+                                        }
+                                    </MudList>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <!-- PUBLIC LANDING PAGE - New experience for non-authenticated users -->
+        <div class="golf-public-landing">
+            @if (isLoading)
+            {
+                <div class="golf-loading-container">
+                    <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
+                    <MudText Typo="Typo.body1" Style="margin-top: 16px;">Loading...</MudText>
+                </div>
+            }
+            else
+            {
+                <!-- Hero Section -->
+                <div class="golf-hero-section">
+                    <MudContainer MaxWidth="MaxWidth.Large" Class="text-center">
+                        <MudText Typo="Typo.h2" Class="golf-hero-title mb-4">
+                            🏌️ Track Your Golf Game Like a Pro
+                        </MudText>
+                        <MudText Typo="Typo.h5" Class="golf-hero-subtitle mb-6" Color="Color.Secondary">
+                            Join our community of golfers tracking rounds, analyzing performance, and improving their game
+                        </MudText>
+                        <MudGrid Spacing="3" Class="mb-6" Justify="Justify.Center">
+                            <MudItem xs="12" sm="6" md="4">
+                                <MudButton Variant="Variant.Filled" 
+                                           Color="Color.Primary" 
+                                           Size="Size.Large"
+                                           Href="/Account/Register"
+                                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                                           FullWidth="true"
+                                           Style="height: 56px; font-size: 18px;">
+                                    Start Tracking Free
+                                </MudButton>
+                            </MudItem>
+                            <MudItem xs="12" sm="6" md="4">
+                                <MudButton Variant="Variant.Outlined" 
+                                           Color="Color.Primary" 
+                                           Size="Size.Large"
+                                           Href="/Account/Login"
+                                           StartIcon="@Icons.Material.Filled.Login"
+                                           FullWidth="true"
+                                           Style="height: 56px; font-size: 18px;">
+                                    Already Have Account?
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+                    </MudContainer>
+                </div>
+
+                <!-- Network Stats Section -->
+                <MudPaper Class="golf-stats-section pa-8 mb-6" Elevation="2">
+                    <MudContainer MaxWidth="MaxWidth.Large">
+                        <MudText Typo="Typo.h4" Class="text-center mb-6">Our Growing Golf Community</MudText>
+                        <MudGrid Spacing="4" Justify="Justify.Center">
+                            <MudItem xs="6" sm="3">
+                                <div class="golf-public-stat-card text-center">
+                                    <MudText Typo="Typo.h3" Color="Color.Primary" Class="mb-2">@totalGolfClubs</MudText>
+                                    <MudText Typo="Typo.body1">Golf Clubs</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">In our network</MudText>
+                                </div>
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <div class="golf-public-stat-card text-center">
+                                    <MudText Typo="Typo.h3" Color="Color.Primary" Class="mb-2">@totalGolfCourses</MudText>
+                                    <MudText Typo="Typo.body1">Golf Courses</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Ready to track</MudText>
+                                </div>
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <div class="golf-public-stat-card text-center">
+                                    <MudText Typo="Typo.h3" Color="Color.Primary" Class="mb-2">@uniqueCountries</MudText>
+                                    <MudText Typo="Typo.body1">Countries</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Worldwide coverage</MudText>
+                                </div>
+                            </MudItem>
+                            <MudItem xs="6" sm="3">
+                                <div class="golf-public-stat-card text-center">
+                                    <MudText Typo="Typo.h3" Color="Color.Primary" Class="mb-2">FREE</MudText>
+                                    <MudText Typo="Typo.body1">To Join</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Always will be</MudText>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+                    </MudContainer>
+                </MudPaper>
+
+                <!-- Recently Added Clubs -->
+                @if (recentGolfClubs is not null && recentGolfClubs.Any())
+                {
+                    <MudContainer MaxWidth="MaxWidth.Large" Class="mb-6">
+                        <MudText Typo="Typo.h5" Class="mb-4">🆕 Recently Added Golf Clubs</MudText>
+                        <MudGrid Spacing="3">
+                            @foreach (var club in recentGolfClubs.Take(4))
+                            {
+                                <MudItem xs="12" sm="6" md="3">
+                                    <MudCard Elevation="2" Class="golf-public-club-card h-100">
+                                        <MudCardContent>
+                                            <MudText Typo="Typo.h6" Class="mb-2">@club.Name</MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                                                📍 @club.City@(!string.IsNullOrWhiteSpace(club.Country) ? $", {club.Country}" : "")
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                                @(club.GolfCourses?.Count ?? 0) course@(club.GolfCourses?.Count != 1 ? "s" : "")
+                                            </MudText>
+                                        </MudCardContent>
+                                        <MudCardActions>
+                                            <MudButton Size="Size.Small" 
+                                                       Color="Color.Primary" 
+                                                       Href="@($"/golfclubs/{club.GolfClubId}")"
+                                                       StartIcon="@Icons.Material.Filled.Visibility">
+                                                View Details
+                                            </MudButton>
+                                        </MudCardActions>
+                                    </MudCard>
+                                </MudItem>
+                            }
+                        </MudGrid>
+                        <div class="text-center mt-4">
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Primary" 
+                                       Href="/golfclubs"
+                                       StartIcon="@Icons.Material.Filled.Explore"
+                                       Size="Size.Large">
+                                Explore All Golf Clubs
+                            </MudButton>
+                        </div>
+                    </MudContainer>
+                }
+
+                <!-- Features Section -->
+                <MudPaper Class="golf-features-section pa-8 mb-6" Elevation="1">
+                    <MudContainer MaxWidth="MaxWidth.Large">
+                        <MudText Typo="Typo.h4" Class="text-center mb-6">What You Get When You Join</MudText>
+                        <MudGrid Spacing="4">
+                            <MudItem xs="12" md="4">
+                                <div class="golf-feature-card text-center">
+                                    <div class="golf-feature-icon mb-3">📈</div>
+                                    <MudText Typo="Typo.h6" Class="mb-2">Performance Tracking</MudText>
+                                    <MudText Typo="Typo.body2">
+                                        Track your rounds, analyze trends, and see your improvement over time with detailed statistics and charts.
+                                    </MudText>
+                                </div>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <div class="golf-feature-card text-center">
+                                    <div class="golf-feature-icon mb-3">🏌️</div>
+                                    <MudText Typo="Typo.h6" Class="mb-2">Round Recording</MudText>
+                                    <MudText Typo="Typo.body2">
+                                        Easy-to-use interface for recording rounds, managing scorecards, and tracking playing partners.
+                                    </MudText>
+                                </div>
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <div class="golf-feature-card text-center">
+                                    <div class="golf-feature-icon mb-3">🏆</div>
+                                    <MudText Typo="Typo.h6" Class="mb-2">Course Management</MudText>
+                                    <MudText Typo="Typo.body2">
+                                        Add your favorite courses, manage hole information, and contribute to our growing database.
+                                    </MudText>
+                                </div>
+                            </MudItem>
+                        </MudGrid>
+                    </MudContainer>
+                </MudPaper>
+
+                <!-- Call to Action -->
+                <div class="golf-cta-section text-center pa-8">
+                    <MudContainer MaxWidth="MaxWidth.Medium">
+                        <MudText Typo="Typo.h4" Class="mb-4">Ready to Improve Your Game?</MudText>
+                        <MudText Typo="Typo.body1" Class="mb-6" Color="Color.Secondary">
+                            Join thousands of golfers already tracking their performance and improving their game.
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary" 
+                                   Size="Size.Large"
+                                   Href="/Account/Register"
+                                   StartIcon="@Icons.Material.Filled.GolfCourse"
+                                   Style="height: 56px; font-size: 18px; padding: 0 32px;">
+                            Start Your Golf Journey Today
+                        </MudButton>
+                    </MudContainer>
+                </div>
+            }
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private bool isLoading = true;
+    private bool isAuthenticated = false;
+    private int _currentPlayerId;
+
+    // Data for authenticated dashboard
+    private DashboardStats dashboardStats = new();
+    private List<PlayingPartnerSummary>? partnerSummary;
+    private List<ChartSeries> _performanceSeries = new();
+    private string[] _performanceXAxisLabels = Array.Empty<string>();
+    private List<Round>? recentRounds;
+
+    // Data for public landing page
+    private int totalGolfClubs = 0;
+    private int totalGolfCourses = 0;
+    private int uniqueCountries = 0;
+    private List<GolfClub>? recentGolfClubs;
+
+    // Chart configuration
+    private ChartOptions _chartOptions = new()
+    {
+        YAxisTicks = 5,
+        MaxNumYAxisTicks = 5,
+        YAxisLines = true,
+        XAxisLines = true
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        isAuthenticated = user.Identity?.IsAuthenticated ?? false;
+        var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (isAuthenticated && currentUserId is not null)
+        {
+            // Load authenticated user dashboard data
+            var player = await PlayerService.GetPlayerByApplicationUserIdAsync(currentUserId);
+            if (player is not null)
+            {
+                _currentPlayerId = player.PlayerId;
+                var isAdmin = user.IsInRole("Admin");
+
+                // Load data for all cards in parallel for efficiency
+                var dashboardStatsTask = ReportService.GetDashboardStatsAsync(currentUserId);
+                var partnerTask = ReportService.GetPlayingPartnerSummaryAsync(currentUserId, 5);
+                var performanceTask = ReportService.GetPlayerPerformanceSummaryAsync(currentUserId, 7);
+                var recentRoundsTask = RoundService.GetRecentRoundsAsync(currentUserId, isAdmin, 5);
+
+                await Task.WhenAll(dashboardStatsTask, partnerTask, performanceTask, recentRoundsTask);
+
+                dashboardStats = dashboardStatsTask.Result;
+                partnerSummary = partnerTask.Result;
+                PreparePerformanceChart(performanceTask.Result);
+                recentRounds = recentRoundsTask.Result;
+            }
+        }
+        else
+        {
+            // Load public landing page data
+            await LoadPublicLandingPageData();
+        }
+        
+        isLoading = false;
+    }
+
+    private async Task LoadPublicLandingPageData()
+    {
+        try
+        {
+            // Load golf clubs and courses data for public stats
+            var allClubs = await GolfClubService.GetAllGolfClubsAsync();
+            var allCourses = await GolfCourseService.GetAllGolfCoursesAsync();
+
+            totalGolfClubs = allClubs.Count;
+            totalGolfCourses = allCourses.Count;
+            uniqueCountries = allClubs
+                .Where(c => !string.IsNullOrWhiteSpace(c.Country))
+                .Select(c => c.Country)
+                .Distinct()
+                .Count();
+
+            // Get recent clubs (simulate "recently added" by taking a sample)
+            recentGolfClubs = allClubs
+                .OrderBy(c => c.Name) // Since we don't have DateAdded, order by name for consistency
+                .Take(6)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            // Log error but don't fail the page load
+            Console.WriteLine($"Error loading public landing page data: {ex.Message}");
+            totalGolfClubs = 0;
+            totalGolfCourses = 0;
+            uniqueCountries = 0;
+            recentGolfClubs = new List<GolfClub>();
+        }
+    }
+
+    private void PreparePerformanceChart(List<PlayerPerformanceDataPoint> data)
+    {
+        if (data is null || !data.Any()) return;
+
+        _performanceSeries = new List<ChartSeries>
+        {
+            new ChartSeries { Name = "Score vs Par", Data = data.Select(d => (double)d.ScoreVsPar).ToArray() }
+        };
+        _performanceXAxisLabels = data.Select(d => d.Date.ToString("MMM dd")).ToArray();
+    }
+}

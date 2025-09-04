@@ -1,0 +1,257 @@
+@page "/golfclubs"
+@inject IGolfClubService GolfClubService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using GolfTrackerApp.Shared.Models
+@using GolfTrackerApp.Shared.Services
+@using GolfTrackerApp.Shared.Components.Shared
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using System.Security.Claims
+@rendermode InteractiveServer
+
+<PageTitle>Golf Clubs</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Golf Clubs</MudText>
+
+@* Show different content based on authentication status *@
+<AuthorizeView>
+    <Authorized>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   OnClick="GoToAddGolfClubPage" 
+                   StartIcon="@Icons.Material.Filled.Add" 
+                   Class="mb-3">
+            Add New Golf Club
+        </MudButton>
+    </Authorized>
+    <NotAuthorized>
+        <MudText Typo="Typo.body1" Class="mb-4">
+            Discover the golf clubs and courses in our network. Join our community to track your performance and access detailed statistics.
+        </MudText>
+        <MudAlert Severity="Severity.Info" Class="mb-4" Icon="@Icons.Material.Filled.Info">
+            <MudText><strong>Want to add your club or track your rounds?</strong></MudText>
+            <MudText>
+                <MudLink Href="/Account/Register">Register for free</MudLink> to add clubs, track your performance, and access detailed statistics.
+            </MudText>
+        </MudAlert>
+    </NotAuthorized>
+</AuthorizeView>
+
+@if (isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Filter by Name, City or Country..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      DebounceInterval="300" 
+                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
+    </MudPaper>
+
+    @if (golfClubs is null || !golfClubs.Any())
+    {
+        <MudText>No golf clubs found for your search criteria.</MudText>
+        <AuthorizeView>
+            <NotAuthorized>
+                <MudText Class="mt-2">
+                    <MudLink Href="/Account/Register">Register</MudLink> to help us build our database by adding your favorite clubs!
+                </MudText>
+            </NotAuthorized>
+        </AuthorizeView>
+    }
+    else
+    {
+        <MudTable Items="@golfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>City</MudTh>
+                <MudTh>Postcode</MudTh>
+                <MudTh>Country</MudTh>
+                <AuthorizeView>
+                    <NotAuthorized>
+                        <MudTh>Courses</MudTh>
+                    </NotAuthorized>
+                </AuthorizeView>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">
+                    <MudLink Href="@($"/golfclubs/{context.GolfClubId}")">@context.Name</MudLink>
+                </MudTd>
+                <MudTd DataLabel="City">@context.City</MudTd>
+                <MudTd DataLabel="Postcode">@context.Postcode</MudTd>
+                <MudTd DataLabel="Country">@context.Country</MudTd>
+                <AuthorizeView>
+                    <NotAuthorized Context="authContext">
+                        <MudTd DataLabel="Courses">@(context.GolfCourses?.Count ?? 0)</MudTd>
+                    </NotAuthorized>
+                </AuthorizeView>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="View Details">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                       Size="Size.Small" 
+                                       OnClick="@(() => ViewClubDetails(context.GolfClubId))" />
+                    </MudTooltip>
+                    
+                    @* Admin actions only for authenticated users *@
+                    <AuthorizeView>
+                        <Authorized Context="authContext">
+                            <MudTooltip Text="Edit Club">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                               Size="Size.Small" 
+                                               Color="Color.Primary" 
+                                               OnClick="@(() => EditClub(context.GolfClubId))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Delete Club">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                               Size="Size.Small" 
+                                               Color="Color.Error" 
+                                               OnClick="@(() => PrepareDeleteClub(context))" />
+                            </MudTooltip>
+                        </Authorized>
+                    </AuthorizeView>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+        
+        @* Summary stats - especially useful for public users *@
+        <AuthorizeView>
+            <NotAuthorized>
+                <MudPaper Class="pa-4 mt-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Network Overview</MudText>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@(golfClubs?.Count ?? 0)</MudText>
+                            <MudText Typo="Typo.body2">Golf Clubs</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@totalCourses</MudText>
+                            <MudText Typo="Typo.body2">Golf Courses</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@uniqueCountries</MudText>
+                            <MudText Typo="Typo.body2">Countries</MudText>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Success" 
+                                       Href="/Account/Register"
+                                       StartIcon="@Icons.Material.Filled.PersonAdd"
+                                       FullWidth="true">
+                                Join Our Community
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </NotAuthorized>
+        </AuthorizeView>
+    }
+}
+
+@code {
+    private List<GolfClub>? golfClubs;
+    private bool isLoading = true;
+    private string searchString = "";
+    private int totalCourses = 0;
+    private int uniqueCountries = 0;
+    private bool isAuthenticated = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check authentication status
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+        
+        await LoadClubs();
+    }
+
+    private async Task LoadClubs()
+    {
+        isLoading = true;
+        try
+        {
+            golfClubs = await GolfClubService.SearchGolfClubsAsync(searchString);
+            
+            // Calculate summary statistics for public users
+            if (golfClubs != null && !isAuthenticated)
+            {
+                totalCourses = golfClubs.Sum(c => c.GolfCourses?.Count ?? 0);
+                uniqueCountries = golfClubs
+                    .Where(c => !string.IsNullOrWhiteSpace(c.Country))
+                    .Select(c => c.Country)
+                    .Distinct()
+                    .Count();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading golf clubs: {ex.Message}", Severity.Error);
+        }
+        isLoading = false;
+    }
+
+    private async Task OnSearchTextChanged(string text)
+    {
+        searchString = text;
+        await LoadClubs();
+    }
+
+    private void GoToAddGolfClubPage() => NavigationManager.NavigateTo("/golfclubs/add");
+    
+    private void ViewClubDetails(int clubId) => NavigationManager.NavigateTo($"/golfclubs/{clubId}");
+
+    private void EditClub(int clubId) => NavigationManager.NavigateTo($"/golfclubs/edit/{clubId}");
+
+    private async Task PrepareDeleteClub(GolfClub club)
+    {
+        // Only available to authenticated users
+        if (!isAuthenticated) return;
+        
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete {club.Name}? This cannot be undone." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            await DeleteClubConfirmed(club.GolfClubId);
+        }
+    }
+
+    private async Task DeleteClubConfirmed(int clubId)
+    {
+        try
+        {
+            bool deleted = await GolfClubService.DeleteGolfClubAsync(clubId);
+            if (deleted)
+            {
+                Snackbar.Add("Golf club deleted successfully.", Severity.Success);
+                await LoadClubs();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete golf club.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting golf club: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,457 @@
+@page "/golfclubs/{ClubId:int}"
+@inject IGolfClubService GolfClubService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject ILogger<GolfClubDetails> Logger
+@inject IDialogService DialogService
+@inject IGolfCourseService GolfCourseService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IReportService ReportService
+@inject IRoundService RoundService
+@inject IPlayerService PlayerService
+@using GolfTrackerApp.Shared.Models
+@using GolfTrackerApp.Shared.Services
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using MudBlazor
+@using GolfTrackerApp.Shared.Components.Shared
+@using System.Security.Claims
+
+@rendermode InteractiveServer
+
+<PageTitle>@(golfClub?.Name ?? "Club Details")</PageTitle>
+
+@if (isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (golfClub == null)
+{
+    <MudAlert Severity="Severity.Error">@(errorMessage ?? "Golf club not found.")</MudAlert>
+    <MudButton Variant="Variant.Text" OnClick="@(() => NavigationManager.NavigateTo("/golfclubs"))" Class="mt-4">Back to Clubs List</MudButton>
+}
+else
+{
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4"></MudBreadcrumbs>
+    <MudPaper Class="pa-4 mb-4" Elevation="0">
+        <MudGrid Spacing="2" Justify="Justify.SpaceBetween" alignItems="AlignItems.Center" Class="mb-2">
+            <MudItem xs="12" sm="8" md="9">
+                <MudText Typo="Typo.h4">@golfClub.Name</MudText>
+            </MudItem>
+            <AuthorizeView>
+                <Authorized>
+                    <MudItem xs="12" sm="4" md="3" Class="d-flex justify-content-xs-start justify-content-sm-end">
+                        <MudButton Variant="Variant.Outlined" 
+                                   Color="Color.Primary" 
+                                   OnClick="@(() => EditThisClub(golfClub.GolfClubId))" 
+                                   StartIcon="@Icons.Material.Filled.Edit">Edit Club</MudButton>
+                    </MudItem>
+                </Authorized>
+                <NotAuthorized>
+                    <MudItem xs="12" sm="4" md="3" Class="d-flex justify-content-xs-start justify-content-sm-end">
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Success" 
+                                   Href="/Account/Register"
+                                   StartIcon="@Icons.Material.Filled.PersonAdd">
+                            Join to Manage
+                        </MudButton>
+                    </MudItem>
+                </NotAuthorized>
+            </AuthorizeView>
+        </MudGrid>
+    </MudPaper>
+    
+    <MudCard Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">Club Information</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudText><strong>Address:</strong> @FormatAddress(golfClub)</MudText>
+            @if (!string.IsNullOrWhiteSpace(golfClub.Website))
+            {
+                <MudText><strong>Website:</strong> <MudLink Href="@golfClub.Website" Target="_blank">@golfClub.Website</MudLink></MudText>
+            }
+        </MudCardContent>
+    </MudCard>
+
+    <MudPaper Class="pa-4 mt-4" Elevation="0">
+        <MudGrid Spacing="2" Justify="Justify.SpaceBetween" alignItems="AlignItems.Center" Class="mb-2">
+            <MudItem>
+                <MudText Typo="Typo.h5">Courses at this Club</MudText>
+            </MudItem>
+            <AuthorizeView>
+                <Authorized>
+                    <MudItem Class="d-flex justify-content-end">
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Success" 
+                                   OnClick="@(() => AddCourseToThisClub(golfClub.GolfClubId))" 
+                                   StartIcon="@Icons.Material.Filled.Add">Add New Course</MudButton>
+                    </MudItem>
+                </Authorized>
+                <NotAuthorized>
+                    <MudItem Class="d-flex justify-content-end">
+                        <MudText Typo="Typo.body2" Class="mt-2">
+                            <MudLink Href="/Account/Register">Register</MudLink> to add courses and track your rounds
+                        </MudText>
+                    </MudItem>
+                </NotAuthorized>
+            </AuthorizeView>
+        </MudGrid>
+
+        @if (golfClub.GolfCourses != null && golfClub.GolfCourses.Any())
+        {
+            <MudList Dense="true" T="object">
+                @foreach (var course in golfClub.GolfCourses.OrderBy(c => c.Name))
+                {
+                    <MudListItem T="object" OnClick="@(() => ViewCourseDetails(course.GolfCourseId))" Text="@($"{course.Name} (Par: {course.DefaultPar}, Holes: {course.NumberOfHoles})")">
+                        <NestedList>
+                            <MudListItem T="object" OnClick="@(() => ViewCourseDetails(course.GolfCourseId))" Icon="@Icons.Material.Filled.Visibility" IconColor="Color.Primary">View Holes / Details</MudListItem>
+                            <AuthorizeView>
+                                <Authorized>
+                                    <MudListItem T="object" OnClick="@(() => EditThisCourse(course.GolfCourseId))" Icon="@Icons.Material.Filled.Edit" IconColor="Color.Secondary">Edit Course</MudListItem>
+                                    <MudListItem T="object" OnClick="@(() => PrepareDeleteCourse(course))" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Delete Course</MudListItem>
+                                </Authorized>
+                            </AuthorizeView>
+                        </NestedList>
+                    </MudListItem>
+                    <MudDivider />
+                }
+            </MudList>
+        }
+        else
+        {
+            <AuthorizeView>
+                <Authorized>
+                    <MudText><em>No courses listed for this club yet. You can add one using the button above.</em></MudText>
+                </Authorized>
+                <NotAuthorized>
+                    <MudText><em>No courses listed for this club yet.</em></MudText>
+                    <MudText Class="mt-2">
+                        <MudLink Href="/Account/Register">Register</MudLink> to help expand our database by adding courses!
+                    </MudText>
+                </NotAuthorized>
+            </AuthorizeView>
+        }
+    </MudPaper>
+
+    @* Personal Performance Section - Only show for logged-in users *@
+    <AuthorizeView>
+        <Authorized>
+            @if (currentUserId is not null && (_scoringDistribution is not null || recentRounds.Any()))
+            {
+                <MudText Typo="Typo.h5" Class="mt-4 mb-3">Your Performance at @golfClub.Name</MudText>
+                
+                <MudGrid Spacing="3" Class="mb-4">
+                    @if (_scoringDistribution is not null && _scoringDistribution.TotalHoles > 0)
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudCard Elevation="2" Class="d-flex flex-column" Style="height: 100%;">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">Scoring Distribution</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent Class="flex-grow-1">
+                                    <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
+                                        <div style="width: 300px; height: 300px;">
+                                            <MudChart ChartType="ChartType.Pie" 
+                                                      InputData="@_pieChartData" 
+                                                      InputLabels="@_pieChartLabels" 
+                                                      Width="100%" 
+                                                      Height="100%"></MudChart>
+                                        </div>
+                                    </div>
+                                    <MudText Typo="Typo.caption" Class="mt-2 text-center">Based on @_scoringDistribution.TotalHoles holes</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                    
+                    @if (recentRounds.Any())
+                    {
+                        <MudItem xs="12" md="6">
+                            <MudCard Elevation="2" Style="height: 100%;">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">Recent Rounds</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudList clickable="true" T="object">
+                                        @foreach (var round in recentRounds)
+                                        {
+                                            <MudListItem T="object" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
+                                                <div class="d-flex justify-space-between flex-grow-1">
+                                                    <div class="d-flex flex-column">
+                                                        <MudText Typo="Typo.body1">@round.DatePlayed.ToString("dd MMM yyyy")</MudText>
+                                                        <MudText Typo="Typo.caption">@round.GolfCourse?.Name</MudText>
+                                                    </div>
+                                                    <MudText Typo="Typo.body1">View Round</MudText>
+                                                </div>
+                                            </MudListItem>
+                                        }
+                                    </MudList>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </Authorized>
+        <NotAuthorized>
+            @* Show call-to-action for non-authenticated users *@
+            @if (golfClub.GolfCourses != null && golfClub.GolfCourses.Any())
+            {
+                <MudPaper Class="pa-4 mt-4" Elevation="1">
+                    <MudText Typo="Typo.h6" Class="mb-3">Track Your Performance</MudText>
+                    <MudText Typo="Typo.body1" Class="mb-3">
+                        Join our community to track your rounds at @golfClub.Name and access detailed performance analytics.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               Href="/Account/Register"
+                               StartIcon="@Icons.Material.Filled.TrendingUp">
+                        Start Tracking Your Golf
+                    </MudButton>
+                </MudPaper>
+            }
+        </NotAuthorized>
+    </AuthorizeView>
+    
+    <MudButton Variant="Variant.Text" OnClick="GoBackToList" Class="mt-4">Back to Clubs List</MudButton>
+}
+
+@code {
+    [Parameter]
+    public int ClubId { get; set; }
+
+    private GolfClub? golfClub;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    // Performance data properties (only for authenticated users)
+    private string? currentUserId;
+    private int _currentPlayerId;
+    private List<ChartSeries> _performanceSeries = new();
+    private string[] _performanceXAxisLabels = Array.Empty<string>();
+    private List<Round> recentRounds = new();
+    
+    // Scoring distribution properties (only for authenticated users)
+    private ScoringDistribution? _scoringDistribution;
+    private double[] _pieChartData = Array.Empty<double>();
+    private string[] _pieChartLabels = Array.Empty<string>();
+    
+    private bool isAuthenticated = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        
+        // Check authentication status
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+        
+        try
+        {
+            golfClub = await GolfClubService.GetGolfClubByIdAsync(ClubId);
+            if (golfClub == null)
+            {
+                errorMessage = $"Golf club with ID {ClubId} not found.";
+                Snackbar.Add(errorMessage, Severity.Warning);
+            }
+            else
+            {
+                _breadcrumbs = new List<BreadcrumbItem>
+                {
+                    new BreadcrumbItem("Clubs", href: "/golfclubs"),
+                    new BreadcrumbItem(golfClub.Name, href: null, disabled: true)
+                };
+
+                // Load personal performance data only if user is authenticated
+                if (isAuthenticated)
+                {
+                    await LoadPersonalPerformanceData();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading club details for ClubId {ClubId}", ClubId);
+            errorMessage = $"Error loading club details: {ex.Message}";
+            Snackbar.Add(errorMessage, Severity.Error);
+        }
+        isLoading = false;
+    }
+
+    private async Task LoadPersonalPerformanceData()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (currentUserId is not null)
+            {
+                var player = await PlayerService.GetPlayerByApplicationUserIdAsync(currentUserId);
+                if (player is not null)
+                {
+                    _currentPlayerId = player.PlayerId;
+
+                    // Load performance data and recent rounds in parallel
+                    var performanceTask = ReportService.GetPlayerPerformanceForClubAsync(currentUserId, ClubId, 10);
+                    var recentRoundsTask = RoundService.GetRecentRoundsForClubAsync(currentUserId, ClubId, 5);
+                    var scoringDistributionTask = ReportService.GetScoringDistributionAsync(player.PlayerId, null, null, null, null, null);
+
+                    await Task.WhenAll(performanceTask, recentRoundsTask, scoringDistributionTask);
+
+                    var performanceData = await performanceTask;
+                    recentRounds = await recentRoundsTask;
+                    _scoringDistribution = await scoringDistributionTask;
+
+                    PreparePerformanceChart(performanceData);
+                    PreparePieChartData(_scoringDistribution);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error loading personal performance data for club {ClubId}", ClubId);
+            // Don't show error to user, just log it - performance data is optional
+        }
+    }
+
+    private void PreparePerformanceChart(List<PlayerPerformanceDataPoint> data)
+    {
+        if (data is null || !data.Any()) 
+        {
+            _performanceSeries.Clear();
+            _performanceXAxisLabels = Array.Empty<string>();
+            return;
+        }
+
+        _performanceSeries = new List<ChartSeries>
+        {
+            new ChartSeries { Name = "Score vs Par", Data = data.Select(d => (double)d.ScoreVsPar).ToArray() }
+        };
+        _performanceXAxisLabels = data.Select(d => d.Date.ToString("dd MMM")).ToArray();
+    }
+
+    private void PreparePieChartData(ScoringDistribution? distribution)
+    {
+        if (distribution is null || distribution.TotalHoles == 0)
+        {
+            _pieChartData = Array.Empty<double>();
+            _pieChartLabels = Array.Empty<string>();
+            return;
+        }
+
+        var data = new List<double>();
+        var labels = new List<string>();
+
+        if (distribution.EagleCount > 0)
+        {
+            data.Add(distribution.EagleCount);
+            labels.Add($"Eagle ({distribution.EagleCount})");
+        }
+        
+        if (distribution.BirdieCount > 0)
+        {
+            data.Add(distribution.BirdieCount);
+            labels.Add($"Birdie ({distribution.BirdieCount})");
+        }
+        
+        data.Add(distribution.ParCount);
+        labels.Add($"Par ({distribution.ParCount})");
+        
+        data.Add(distribution.BogeyCount);
+        labels.Add($"Bogey ({distribution.BogeyCount})");
+        
+        if (distribution.DoubleBogeyCount > 0)
+        {
+            data.Add(distribution.DoubleBogeyCount);
+            labels.Add($"Double Bogey ({distribution.DoubleBogeyCount})");
+        }
+        
+        if (distribution.TripleBogeyOrWorseCount > 0)
+        {
+            data.Add(distribution.TripleBogeyOrWorseCount);
+            labels.Add($"Triple+ ({distribution.TripleBogeyOrWorseCount})");
+        }
+
+        _pieChartData = data.ToArray();
+        _pieChartLabels = labels.ToArray();
+    }
+
+    private string FormatAddress(GolfClub club)
+    {
+        var addressParts = new List<string?>
+        {
+            club.AddressLine1,
+            club.AddressLine2,
+            club.City,
+            club.CountyOrRegion,
+            club.Postcode,
+            club.Country
+        };
+        return string.Join(", ", addressParts.Where(part => !string.IsNullOrWhiteSpace(part)));
+    }
+
+    private void ViewCourseDetails(int courseId)
+    {
+        NavigationManager.NavigateTo($"/golfcourses/{courseId}/details");
+    }
+
+    private void EditThisClub(int clubIdToEdit)
+    {
+        NavigationManager.NavigateTo($"/golfclubs/edit/{clubIdToEdit}");
+    }
+
+    private void AddCourseToThisClub(int clubIdForNewCourse)
+    {
+        NavigationManager.NavigateTo($"/golfcourses/add?clubId={clubIdForNewCourse}");
+    }
+
+    private void EditThisCourse(int courseIdToEdit)
+    {
+        NavigationManager.NavigateTo($"/golfcourses/edit/{courseIdToEdit}");
+    }
+
+    private void GoBackToList()
+    {
+        NavigationManager.NavigateTo("/golfclubs");
+    }
+
+    private async Task PrepareDeleteCourse(GolfCourse courseToDelete)
+    {
+        // Only available to authenticated users
+        if (!isAuthenticated) return;
+        
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete the course '{courseToDelete.Name}'? This will also delete all of its holes." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await GolfCourseService.DeleteGolfCourseAsync(courseToDelete.GolfCourseId);
+                Snackbar.Add("Course deleted successfully.", Severity.Success);
+                await OnParametersSetAsync(); // Refresh the club details
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting course: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

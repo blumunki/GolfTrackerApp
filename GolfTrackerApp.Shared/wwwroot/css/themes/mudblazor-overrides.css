@@ -1,0 +1,95 @@
+/* =============================================================================
+   MudBlazor Component Overrides - MINIMAL & TARGETED
+   
+   ONLY specific component overrides that don't interfere with main app theme.
+   All overrides require explicit CSS classes to prevent contamination.
+   ============================================================================= */
+
+/* Golf-Specific Button Styling - Only applied when .golf-primary/.golf-secondary class is used */
+.mud-button.golf-primary {
+    background-color: var(--golf-primary) !important;
+    color: var(--golf-text-inverse) !important;
+}
+
+.mud-button.golf-primary:hover {
+    background-color: var(--golf-primary-dark) !important;
+}
+
+.mud-button.golf-secondary {
+    background-color: var(--golf-secondary) !important;
+    color: var(--golf-text-inverse) !important;
+}
+
+.mud-button.golf-secondary:hover {
+    background-color: var(--golf-secondary-dark) !important;
+}
+
+/* Golf-Specific Card Styling - Only applied when .golf-scorecard/.golf-player-summary class is used */
+.mud-card.golf-scorecard {
+    border: 2px solid var(--golf-primary-dark);
+    border-radius: var(--golf-border-radius-md);
+    box-shadow: var(--golf-shadow-md);
+}
+
+.mud-card.golf-player-summary {
+    border-left: 4px solid var(--golf-primary);
+    transition: var(--golf-transition-medium);
+}
+
+.mud-card.golf-player-summary:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--golf-shadow-lg);
+}
+
+/* Golf-Specific Paper Styling - Only applied when .golf-background class is used */
+.mud-paper.golf-background {
+    background: linear-gradient(135deg, var(--golf-background-secondary) 0%, var(--golf-background-tertiary) 100%);
+}
+
+/* Golf-Specific Table Styling - Only applied when .golf-scorecard class is used */
+.mud-table.golf-scorecard .mud-table-head {
+    background: linear-gradient(135deg, var(--golf-primary-dark) 0%, var(--golf-primary) 100%);
+}
+
+.mud-table.golf-scorecard .mud-table-head .mud-table-cell {
+    color: var(--golf-text-inverse) !important;
+    font-weight: var(--golf-font-weight-semibold);
+    border-bottom: 2px solid var(--golf-primary-darker);
+}
+
+.mud-table.golf-scorecard .mud-table-row:nth-child(even) {
+    background-color: var(--golf-background-secondary);
+}
+
+.mud-table.golf-scorecard .mud-table-row:hover {
+    background-color: var(--golf-background-tertiary) !important;
+}
+
+/* Golf-Specific Chip Styling - Only applied when .golf-chip-score-* classes are used */
+.mud-chip.golf-chip-score-eagle {
+    background-color: var(--golf-eagle);
+    color: var(--golf-eagle-text);
+}
+
+.mud-chip.golf-chip-score-birdie {
+    background-color: var(--golf-birdie);
+    color: var(--golf-birdie-text);
+}
+
+.mud-chip.golf-chip-score-par {
+    background-color: var(--golf-par);
+    color: var(--golf-par-text);
+    border: 1px solid var(--golf-border-medium);
+}
+
+.mud-chip.golf-chip-score-bogey {
+    background-color: var(--golf-bogey);
+    color: var(--golf-bogey-text);
+}
+
+.mud-chip.golf-chip-score-double-bogey {
+    background-color: var(--golf-double-bogey);
+    color: var(--golf-double-bogey-text);
+}
+
+/* NO GLOBAL MUDBLAZOR OVERRIDES - All styling must use explicit golf-* classes */

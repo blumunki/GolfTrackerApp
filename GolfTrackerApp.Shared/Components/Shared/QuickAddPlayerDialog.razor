@@ -1,0 +1,39 @@
+@using MudBlazor
+@using GolfTrackerApp.Shared.Models
+@using GolfTrackerApp.Shared.Components.Shared
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">Add Guest Player</MudText>
+    </TitleContent>
+    <DialogContent>
+        <EditForm Model="@_newPlayer" OnValidSubmit="Submit">
+            <DataAnnotationsValidator />
+            <MudTextField @bind-Value="_newPlayer.FirstName" For="@(() => _newPlayer.FirstName)" Label="First Name" Required="true" />
+            <MudTextField @bind-Value="_newPlayer.LastName" For="@(() => _newPlayer.LastName)" Label="Last Name" Required="true" Class="mt-3" />
+            <button type="submit" style="display:none;"></button>
+        </EditForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Add Player</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] MudBlazor.IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private Player _newPlayer = new();
+
+    private void Submit()
+    {
+        // Validate the form before closing
+        if (string.IsNullOrWhiteSpace(_newPlayer.FirstName) || string.IsNullOrWhiteSpace(_newPlayer.LastName))
+        {
+            return;
+        }
+        MudDialog.Close(MudBlazor.DialogResult.Ok(_newPlayer));
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}
