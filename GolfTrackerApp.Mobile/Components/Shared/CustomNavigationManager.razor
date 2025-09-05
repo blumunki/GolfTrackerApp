@@ -13,23 +13,69 @@
             case "home":
             case "":
                 <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
-                    🏠 Home
+                    🏠 Dashboard
                 </MudText>
                 <MudText Typo="Typo.body1" GutterBottom="true">
                     Welcome to Golf Tracker Mobile!
                 </MudText>
                 
-                <MudButton Variant="Variant.Filled" 
-                          Color="Color.Primary" 
-                          StartIcon="@Icons.Material.Filled.Api"
-                          OnClick="@(() => OnNavigate.InvokeAsync("test-api"))"
-                          Class="mt-4">
-                    Test API Connection
-                </MudButton>
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudCard Class="cursor-pointer" @onclick="@(() => OnNavigate.InvokeAsync("golf-clubs"))">
+                            <MudCardContent Class="text-center">
+                                <MudIcon Icon="@Icons.Material.Filled.SportsTennis" Size="Size.Large" Color="Color.Primary" />
+                                <MudText Typo="Typo.h6" Class="mt-2">Golf Clubs</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                    
+                    <MudItem xs="6">
+                        <MudCard Class="cursor-pointer" @onclick="@(() => OnNavigate.InvokeAsync("players"))">
+                            <MudCardContent Class="text-center">
+                                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Primary" />
+                                <MudText Typo="Typo.h6" Class="mt-2">Players</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                    
+                    <MudItem xs="6">
+                        <MudCard Class="cursor-pointer" @onclick="@(() => OnNavigate.InvokeAsync("rounds"))">
+                            <MudCardContent Class="text-center">
+                                <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Large" Color="Color.Primary" />
+                                <MudText Typo="Typo.h6" Class="mt-2">Rounds</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                    
+                    <MudItem xs="6">
+                        <MudCard Class="cursor-pointer" @onclick="@(() => OnNavigate.InvokeAsync("dashboard"))">
+                            <MudCardContent Class="text-center">
+                                <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Large" Color="Color.Primary" />
+                                <MudText Typo="Typo.h6" Class="mt-2">Analytics</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                </MudGrid>
                 
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-4">
                     Current time: @DateTime.Now.ToString("HH:mm:ss")
                 </MudText>
+                break;
+                
+            case "golf-clubs":
+                <GolfClubsPage />
+                break;
+                
+            case "players":
+                <PlayersPage />
+                break;
+                
+            case "rounds":
+                <RoundsPage />
+                break;
+                
+            case "dashboard":
+                <DashboardPage />
                 break;
                 
             case "test-api":
@@ -90,21 +136,50 @@
     
     <!-- Bottom Navigation -->
     <MudPaper Square="true" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;" Elevation="3">
-        <div class="d-flex justify-center pa-2">
+        <div class="d-flex justify-center pa-1" style="overflow-x: auto;">
             <MudButton Color="@(CurrentPage == "home" ? Color.Primary : Color.Default)"
                       Variant="@(CurrentPage == "home" ? Variant.Filled : Variant.Text)"
                       StartIcon="@Icons.Material.Filled.Home"
                       OnClick="@(() => OnNavigate.InvokeAsync("home"))"
-                      Class="mx-2">
+                      Size="Size.Small"
+                      Class="mx-1">
                 Home
             </MudButton>
             
-            <MudButton Color="@(CurrentPage == "test-api" ? Color.Primary : Color.Default)"
-                      Variant="@(CurrentPage == "test-api" ? Variant.Filled : Variant.Text)"
-                      StartIcon="@Icons.Material.Filled.Api"
-                      OnClick="@(() => OnNavigate.InvokeAsync("test-api"))"
-                      Class="mx-2">
-                API Test
+            <MudButton Color="@(CurrentPage == "golf-clubs" ? Color.Primary : Color.Default)"
+                      Variant="@(CurrentPage == "golf-clubs" ? Variant.Filled : Variant.Text)"
+                      StartIcon="@Icons.Material.Filled.SportsTennis"
+                      OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))"
+                      Size="Size.Small"
+                      Class="mx-1">
+                Clubs
+            </MudButton>
+            
+            <MudButton Color="@(CurrentPage == "players" ? Color.Primary : Color.Default)"
+                      Variant="@(CurrentPage == "players" ? Variant.Filled : Variant.Text)"
+                      StartIcon="@Icons.Material.Filled.People"
+                      OnClick="@(() => OnNavigate.InvokeAsync("players"))"
+                      Size="Size.Small"
+                      Class="mx-1">
+                Players
+            </MudButton>
+            
+            <MudButton Color="@(CurrentPage == "rounds" ? Color.Primary : Color.Default)"
+                      Variant="@(CurrentPage == "rounds" ? Variant.Filled : Variant.Text)"
+                      StartIcon="@Icons.Material.Filled.Timeline"
+                      OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
+                      Size="Size.Small"
+                      Class="mx-1">
+                Rounds
+            </MudButton>
+            
+            <MudButton Color="@(CurrentPage == "dashboard" ? Color.Primary : Color.Default)"
+                      Variant="@(CurrentPage == "dashboard" ? Variant.Filled : Variant.Text)"
+                      StartIcon="@Icons.Material.Filled.Analytics"
+                      OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))"
+                      Size="Size.Small"
+                      Class="mx-1">
+                Stats
             </MudButton>
         </div>
     </MudPaper>

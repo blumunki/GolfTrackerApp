@@ -1,0 +1,301 @@
+@page "/rounds"
+@using GolfTrackerApp.Mobile.Models
+@using System.Text.Json
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<MudContainer Class="pa-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Round History</MudText>
+    
+    @if (loading)
+    {
+        <MudProgressCircular Size="Size.Large" Indeterminate="true" Class="ma-4" />
+    }
+    else if (rounds?.Any() == true)
+    {
+        <MudGrid>
+            @foreach (var round in rounds)
+            {
+                <MudItem xs="12" md="6">
+                    <MudCard Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">@round.CourseName</MudText>
+                                <MudText Typo="Typo.caption">@round.ClubName</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudIconButton Icon="Icons.Material.Filled.Visibility" Color="Color.Primary" 
+                                             OnClick="@(() => ShowRoundDetails(round))" />
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Date:</strong> @round.DatePlayed.ToString("MMM dd, yyyy")
+                            </MudText>
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Score:</strong> @round.TotalScore (@FormatScoreToPar(round.TotalScore, round.Par))
+                            </MudText>
+                            <MudText Typo="Typo.body2" Class="mb-2">
+                                <strong>Course Par:</strong> @round.Par | <strong>Holes:</strong> @round.Holes
+                            </MudText>
+                            @if (round.PlayingPartners?.Any() == true)
+                            {
+                                <MudText Typo="Typo.caption">
+                                    <strong>Played with:</strong> @string.Join(", ", round.PlayingPartners)
+                                </MudText>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            No rounds recorded yet. Get out there and play some golf!
+        </MudAlert>
+    }
+</MudContainer>
+
+<!-- Round Details Dialog -->
+<MudDialog @bind-Visible="showDetailsDialog" Options="dialogOptions">
+    <DialogContent>
+        @if (selectedRound != null)
+        {
+            <MudText Typo="Typo.h5" Class="mb-4">@selectedRound.CourseName</MudText>
+            
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6" Class="mb-3">Round Summary</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Club:</strong> @selectedRound.ClubName
+                            </MudText>
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Date:</strong> @selectedRound.DatePlayed.ToString("MMMM dd, yyyy")
+                            </MudText>
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Final Score:</strong> @selectedRound.TotalScore
+                            </MudText>
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>To Par:</strong> @FormatScoreToPar(selectedRound.TotalScore, selectedRound.Par)
+                            </MudText>
+                            <MudText Typo="Typo.body1" Class="mb-2">
+                                <strong>Weather:</strong> @(selectedRound.Weather ?? "Not recorded")
+                            </MudText>
+                            
+                            @if (selectedRound.PlayingPartners?.Any() == true)
+                            {
+                                <MudText Typo="Typo.body1" Class="mb-2">
+                                    <strong>Playing Partners:</strong>
+                                </MudText>
+                                <MudList T="string">
+                                    @foreach (var partner in selectedRound.PlayingPartners)
+                                    {
+                                        <MudListItem T="string" Icon="Icons.Material.Filled.Person" Text="@partner" />
+                                    }
+                                </MudList>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6" Class="mb-3">Notes</MudText>
+                            @if (!string.IsNullOrEmpty(selectedRound.Notes))
+                            {
+                                <MudText Typo="Typo.body2">@selectedRound.Notes</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">No notes recorded for this round.</MudText>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                    
+                    @if (scores?.Any() == true)
+                    {
+                        <MudCard Elevation="2" Class="mt-4">
+                            <MudCardContent>
+                                <MudText Typo="Typo.h6" Class="mb-3">Scorecard</MudText>
+                                <MudSimpleTable Elevation="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Hole</th>
+                                            <th>Par</th>
+                                            <th>Score</th>
+                                            <th>+/-</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var score in scores.Take(9))
+                                        {
+                                            <tr>
+                                                <td>@score.HoleNumber</td>
+                                                <td>@score.Par</td>
+                                                <td>@score.Strokes</td>
+                                                <td>@FormatHoleScore(score.Strokes - score.Par)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="CloseDetailsDialog">Close</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="EditRound">Edit Round</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Round>? rounds;
+    private List<Score>? scores;
+    private bool loading = true;
+    private bool showDetailsDialog = false;
+    private Round? selectedRound;
+    
+    private DialogOptions dialogOptions = new() 
+    { 
+        MaxWidth = MaxWidth.Large, 
+        FullWidth = true 
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRounds();
+    }
+
+    private async Task LoadRounds()
+    {
+        try
+    {
+            loading = true;
+            // For now, using mock data since we need to implement the rounds API
+            await Task.Delay(1000); // Simulate API call
+            
+            rounds = new List<Round>
+            {
+                new Round 
+                { 
+                    Id = 1, 
+                    CourseName = "Pebble Beach Golf Links", 
+                    ClubName = "Pebble Beach",
+                    DatePlayed = DateTime.Now.AddDays(-7),
+                    TotalScore = 89,
+                    Par = 72,
+                    Holes = 18,
+                    PlayingPartners = new List<string> { "John Smith", "Mike Johnson" },
+                    Weather = "Sunny, 75°F",
+                    Notes = "Great day on the course! Finally broke 90."
+                },
+                new Round 
+                { 
+                    Id = 2, 
+                    CourseName = "Augusta National Golf Club", 
+                    ClubName = "Augusta National",
+                    DatePlayed = DateTime.Now.AddDays(-14),
+                    TotalScore = 95,
+                    Par = 72,
+                    Holes = 18,
+                    PlayingPartners = new List<string> { "Sarah Wilson" },
+                    Weather = "Overcast, 68°F",
+                    Notes = "Tough course but amazing experience."
+                },
+                new Round 
+                { 
+                    Id = 3, 
+                    CourseName = "St. Andrews Old Course", 
+                    ClubName = "The R&A",
+                    DatePlayed = DateTime.Now.AddDays(-21),
+                    TotalScore = 82,
+                    Par = 72,
+                    Holes = 18,
+                    PlayingPartners = new List<string> { "David Brown", "Tom Davis", "Chris Miller" },
+                    Weather = "Windy, 62°F",
+                    Notes = "Historic course, challenging conditions with the wind."
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading rounds: {ex.Message}");
+            rounds = new List<Round>();
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowRoundDetails(Round round)
+    {
+        selectedRound = round;
+        await LoadRoundScores(round.Id);
+        showDetailsDialog = true;
+    }
+
+    private async Task LoadRoundScores(int roundId)
+    {
+        try
+        {
+            // Mock scorecard data
+            scores = new List<Score>();
+            for (int i = 1; i <= 18; i++)
+            {
+                var par = i <= 6 ? (i % 3 == 0 ? 5 : 4) : (i % 4 == 0 ? 3 : 4);
+                var strokes = par + new Random().Next(-1, 3); // Random score around par
+                scores.Add(new Score
+                {
+                    Id = i,
+                    RoundId = roundId,
+                    HoleNumber = i,
+                    Par = par,
+                    Strokes = strokes
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading scores: {ex.Message}");
+            scores = new List<Score>();
+        }
+    }
+
+    private void CloseDetailsDialog()
+    {
+        showDetailsDialog = false;
+        selectedRound = null;
+        scores = null;
+    }
+
+    private async Task EditRound()
+    {
+        if (selectedRound != null)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Edit functionality coming soon for round at {selectedRound.CourseName}!");
+        }
+    }
+
+    private string FormatScoreToPar(int score, int par)
+    {
+        var diff = score - par;
+        if (diff == 0) return "E";
+        return diff > 0 ? $"+{diff}" : diff.ToString();
+    }
+
+    private string FormatHoleScore(int diff)
+    {
+        if (diff == 0) return "E";
+        return diff > 0 ? $"+{diff}" : diff.ToString();
+    }
+}

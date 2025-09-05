@@ -1,0 +1,188 @@
+@page "/players"
+@using GolfTrackerApp.Mobile.Models
+@using System.Text.Json
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<MudContainer Class="pa-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Playing Partners</MudText>
+    
+    @if (loading)
+    {
+        <MudProgressCircular Size="Size.Large" Indeterminate="true" Class="ma-4" />
+    }
+    else if (players?.Any() == true)
+    {
+        <MudGrid>
+            @foreach (var player in players)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Class="mb-4" Style="height: 100%;">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudAvatar Color="Color.Primary" Class="mb-2">
+                                    @player.FirstName?.Substring(0, 1)@player.LastName?.Substring(0, 1)
+                                </MudAvatar>
+                                <MudText Typo="Typo.h6">@player.FirstName @player.LastName</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudIconButton Icon="Icons.Material.Filled.Info" Color="Color.Primary" 
+                                             OnClick="@(() => ShowPlayerDetails(player))" />
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudText Typo="Typo.body2" Class="mb-1">Email: @player.Email</MudText>
+                            <MudText Typo="Typo.body2" Class="mb-1">Phone: @player.Phone</MudText>
+                            <MudDivider Class="my-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Primary">
+                                Handicap: @(player.Handicap?.ToString("F1") ?? "N/A")
+                            </MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            No playing partners found yet. Play some rounds to build your network!
+        </MudAlert>
+    }
+</MudContainer>
+
+<!-- Player Details Dialog -->
+<MudDialog @bind-Visible="showDetailsDialog" Options="dialogOptions">
+    <DialogContent>
+        @if (selectedPlayer != null)
+        {
+            <div class="d-flex align-center mb-4">
+                <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-4">
+                    @selectedPlayer.FirstName?.Substring(0, 1)@selectedPlayer.LastName?.Substring(0, 1)
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5">@selectedPlayer.FirstName @selectedPlayer.LastName</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">Handicap: @(selectedPlayer.Handicap?.ToString("F1") ?? "N/A")</MudText>
+                </div>
+            </div>
+            
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6" Class="mb-2">Contact Information</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Email:</strong> @selectedPlayer.Email</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Phone:</strong> @selectedPlayer.Phone</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Date of Birth:</strong> @selectedPlayer.DateOfBirth?.ToString("MMM dd, yyyy")</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6" Class="mb-2">Playing Statistics</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Rounds Played:</strong> @roundsPlayedTogether</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Average Score:</strong> @(averageScore?.ToString("F1") ?? "N/A")</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Best Score:</strong> @(bestScore?.ToString() ?? "N/A")</MudText>
+                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Last Played:</strong> @(lastPlayedDate?.ToString("MMM dd, yyyy") ?? "N/A")</MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="CloseDetailsDialog">Close</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="InviteToRound">Invite to Round</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<Player>? players;
+    private bool loading = true;
+    private bool showDetailsDialog = false;
+    private Player? selectedPlayer;
+    
+    // Player statistics
+    private int roundsPlayedTogether = 0;
+    private decimal? averageScore;
+    private int? bestScore;
+    private DateTime? lastPlayedDate;
+    
+    private DialogOptions dialogOptions = new() 
+    { 
+        MaxWidth = MaxWidth.Medium, 
+        FullWidth = true 
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlayers();
+    }
+
+    private async Task LoadPlayers()
+    {
+        try
+        {
+            loading = true;
+            var response = await Http.GetStringAsync("https://localhost:7295/api/players");
+            players = JsonSerializer.Deserialize<List<Player>>(response, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading players: {ex.Message}");
+            players = new List<Player>();
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowPlayerDetails(Player player)
+    {
+        selectedPlayer = player;
+        await LoadPlayerStatistics(player.Id);
+        showDetailsDialog = true;
+    }
+
+    private async Task LoadPlayerStatistics(int playerId)
+    {
+        try
+        {
+            // These would be real API calls to get player statistics
+            // For now, using mock data
+            roundsPlayedTogether = new Random().Next(1, 25);
+            averageScore = (decimal)(new Random().NextDouble() * 20 + 75);
+            bestScore = new Random().Next(68, 95);
+            lastPlayedDate = DateTime.Now.AddDays(-new Random().Next(1, 90));
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading player statistics: {ex.Message}");
+        }
+    }
+
+    private void CloseDetailsDialog()
+    {
+        showDetailsDialog = false;
+        selectedPlayer = null;
+        roundsPlayedTogether = 0;
+        averageScore = null;
+        bestScore = null;
+        lastPlayedDate = null;
+    }
+
+    private async Task InviteToRound()
+    {
+        if (selectedPlayer != null)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Invite feature coming soon! Will invite {selectedPlayer.FirstName} {selectedPlayer.LastName} to play.");
+        }
+    }
+}
