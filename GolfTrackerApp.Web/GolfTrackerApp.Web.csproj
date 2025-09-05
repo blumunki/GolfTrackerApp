@@ -24,8 +24,4 @@
     <PackageReference Include="MudBlazor" Version="8.10.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\GolfTrackerApp.Shared\GolfTrackerApp.Shared.csproj" />
-  </ItemGroup>
-
 </Project>

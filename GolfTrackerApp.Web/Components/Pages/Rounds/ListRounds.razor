@@ -1,0 +1,143 @@
+@page "/rounds"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IRoundService RoundService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using GolfTrackerApp.Web.Components.Shared
+
+<PageTitle>Golf Rounds</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Golf Rounds</MudText>
+
+@if (isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Filter by Course or Club..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      DebounceInterval="300" 
+                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
+    </MudPaper>
+
+    @if (rounds is null || !rounds.Any())
+    {
+        <MudText>No rounds found for your search criteria.</MudText>
+    }
+    else
+    {
+        <MudTable Items="@rounds" Hover="true" Striped="true" Dense="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Date</MudTh>
+                <MudTh>Course</MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Players</MudTh>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Date">@context.DatePlayed.ToString("dd/MM/yyyy")</MudTd>
+                <MudTd DataLabel="Course">@($"{context.GolfCourse?.GolfClub?.Name} - {context.GolfCourse?.Name}")</MudTd>
+                <MudTd DataLabel="Type">@context.RoundType</MudTd>
+                <MudTd DataLabel="Players">@context.RoundPlayers.Count</MudTd>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="View Details">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewRoundDetails(context.RoundId))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Edit Round">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditRound(context.RoundId))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete Round">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteRound(context))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
+}
+
+@code {
+    private List<Round>? rounds;
+    private bool isLoading = true;
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRounds();
+    }
+
+    private async Task LoadRounds()
+    {
+        isLoading = true;
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+            var isCurrentUserAdmin = user.IsInRole("Admin");
+
+            rounds = await RoundService.SearchRoundsAsync(currentUserId, isCurrentUserAdmin, searchString);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading rounds: {ex.Message}", Severity.Error);
+        }
+        isLoading = false;
+    }
+
+    private async Task OnSearchTextChanged(string text)
+    {
+        searchString = text;
+        await LoadRounds();
+    }
+
+    private void ViewRoundDetails(int roundId) => NavigationManager.NavigateTo($"/rounds/{roundId}");
+
+    private void EditRound(int roundId) => NavigationManager.NavigateTo($"/rounds/record/{roundId}");
+
+    private async Task PrepareDeleteRound(Round round)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete the round from {round.DatePlayed.ToShortDateString()}? This will delete all associated scores." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            await DeleteRoundConfirmed(round.RoundId);
+        }
+    }
+
+    private async Task DeleteRoundConfirmed(int roundId)
+    {
+        try
+        {
+            await RoundService.DeleteRoundAsync(roundId);
+            Snackbar.Add("Round deleted successfully.", Severity.Success);
+            await LoadRounds(); // Refresh the list
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting round: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,44 @@
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+
+<MudContainer>
+    <MudAlert Severity="Severity.Error" Class="my-4">
+        <MudText Typo="Typo.h6" GutterBottom="true">
+            <MudIcon Icon="@Icons.Material.Filled.Error" Class="mr-2"/>
+            Something went wrong
+        </MudText>
+        
+        <MudText Typo="Typo.body2" Class="mb-3">
+            An unexpected error occurred. You can try refreshing the page or going back to the home screen.
+        </MudText>
+        
+        <MudButtonGroup>
+            <MudButton Color="Color.Primary" 
+                      StartIcon="@Icons.Material.Filled.Home" 
+                      Href="/">
+                Go Home
+            </MudButton>
+            <MudButton Color="Color.Secondary" 
+                      StartIcon="@Icons.Material.Filled.Refresh"
+                      OnClick="@(() => NavigationManager.NavigateTo(NavigationManager.Uri, forceLoad: true))">
+                Refresh Page
+            </MudButton>
+        </MudButtonGroup>
+    </MudAlert>
+
+    @if (!string.IsNullOrEmpty(ErrorDetails))
+    {
+        <MudExpansionPanels Class="mt-4">
+            <MudExpansionPanel Text="Error Details (Developer Info)">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                    @ErrorDetails
+                </MudText>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public string? ErrorDetails { get; set; }
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+}

@@ -1,0 +1,156 @@
+<div class="mobile-app">
+    <!-- Header -->
+    <MudAppBar Color="Color.Primary" Fixed="true" Style="background: linear-gradient(135deg, #2c5530 0%, #3d7c3f 100%);">
+        <MudText Typo="Typo.h5" Style="font-weight: 600;">
+            🏌️ Golf Tracker Mobile
+        </MudText>
+    </MudAppBar>
+    
+    <!-- Content Area -->
+    <MudContainer MaxWidth="MaxWidth.False" Style="margin-top: 80px; margin-bottom: 80px; padding: 16px; min-height: calc(100vh - 160px);">
+        @switch (CurrentPage.ToLower())
+        {
+            case "home":
+            case "":
+                <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
+                    🏠 Home
+                </MudText>
+                <MudText Typo="Typo.body1" GutterBottom="true">
+                    Welcome to Golf Tracker Mobile!
+                </MudText>
+                
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary" 
+                          StartIcon="@Icons.Material.Filled.Api"
+                          OnClick="@(() => OnNavigate.InvokeAsync("test-api"))"
+                          Class="mt-4">
+                    Test API Connection
+                </MudButton>
+                
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-4">
+                    Current time: @DateTime.Now.ToString("HH:mm:ss")
+                </MudText>
+                break;
+                
+            case "test-api":
+                <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
+                    🔌 API Test
+                </MudText>
+                
+                <MudCard Class="mb-4">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6" GutterBottom="true">API Connection Test</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Testing connection to Golf Tracker Web API at https://localhost:7295
+                        </MudText>
+                        
+                        <MudButton Variant="Variant.Filled" 
+                                  Color="Color.Success" 
+                                  StartIcon="@Icons.Material.Filled.PlayArrow"
+                                  OnClick="@TestApiConnection"
+                                  Disabled="@isTestingApi"
+                                  Class="mt-3">
+                            @(isTestingApi ? "Testing..." : "Run API Test")
+                        </MudButton>
+                        
+                        @if (!string.IsNullOrEmpty(apiTestResult))
+                        {
+                            <MudAlert Severity="@(apiTestSuccess ? Severity.Success : Severity.Error)" Class="mt-3">
+                                @apiTestResult
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+                
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Secondary" 
+                          StartIcon="@Icons.Material.Filled.ArrowBack"
+                          OnClick="@(() => OnNavigate.InvokeAsync("home"))">
+                    Back to Home
+                </MudButton>
+                break;
+                
+            default:
+                <div class="text-center mt-8">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h4" Class="mt-4">Page Not Found</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                        The page '@CurrentPage' doesn't exist.
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" 
+                              Color="Color.Primary" 
+                              StartIcon="@Icons.Material.Filled.Home"
+                              OnClick="@(() => OnNavigate.InvokeAsync("home"))">
+                        Go Home
+                    </MudButton>
+                </div>
+                break;
+        }
+    </MudContainer>
+    
+    <!-- Bottom Navigation -->
+    <MudPaper Square="true" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;" Elevation="3">
+        <div class="d-flex justify-center pa-2">
+            <MudButton Color="@(CurrentPage == "home" ? Color.Primary : Color.Default)"
+                      Variant="@(CurrentPage == "home" ? Variant.Filled : Variant.Text)"
+                      StartIcon="@Icons.Material.Filled.Home"
+                      OnClick="@(() => OnNavigate.InvokeAsync("home"))"
+                      Class="mx-2">
+                Home
+            </MudButton>
+            
+            <MudButton Color="@(CurrentPage == "test-api" ? Color.Primary : Color.Default)"
+                      Variant="@(CurrentPage == "test-api" ? Variant.Filled : Variant.Text)"
+                      StartIcon="@Icons.Material.Filled.Api"
+                      OnClick="@(() => OnNavigate.InvokeAsync("test-api"))"
+                      Class="mx-2">
+                API Test
+            </MudButton>
+        </div>
+    </MudPaper>
+</div>
+
+@code {
+    [Parameter] public string CurrentPage { get; set; } = "home";
+    [Parameter] public EventCallback<string> OnNavigate { get; set; }
+    
+    [Inject] private HttpClient HttpClient { get; set; } = default!;
+    
+    private bool isTestingApi = false;
+    private string apiTestResult = "";
+    private bool apiTestSuccess = false;
+    
+    private async Task TestApiConnection()
+    {
+        isTestingApi = true;
+        apiTestResult = "";
+        StateHasChanged();
+        
+        try
+        {
+            var response = await HttpClient.GetAsync("https://localhost:7295/api/golfclubs");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                apiTestResult = $"✅ API connection successful! Received {content.Length} characters of data.";
+                apiTestSuccess = true;
+            }
+            else
+            {
+                apiTestResult = $"❌ API returned status: {response.StatusCode}";
+                apiTestSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            apiTestResult = $"❌ Connection failed: {ex.Message}";
+            apiTestSuccess = false;
+        }
+        finally
+        {
+            isTestingApi = false;
+            StateHasChanged();
+        }
+    }
+}

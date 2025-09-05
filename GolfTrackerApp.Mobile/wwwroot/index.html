@@ -3,11 +3,14 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>GolfTrackerApp.Mobile</title>
+    <title>Golf Tracker</title>
     <base href="/" />
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
-    <link rel="stylesheet" href="css/app.css" />
-    <link rel="stylesheet" href="GolfTrackerApp.Mobile.styles.css" />
+    
+    <!-- MudBlazor CSS -->
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    
+    <!-- Mobile-specific CSS -->
+    <link rel="stylesheet" href="css/mobile.css" />
     <link rel="icon" href="data:,">
 </head>
 
@@ -15,7 +18,13 @@
 
     <div class="status-bar-safe-area"></div>
 
-    <div id="app">Loading...</div>
+    <div id="app">
+        <div class="loading-container">
+            <div class="loading-spinner"></div>
+            <h3>Golf Tracker</h3>
+            <p>Loading your golf app...</p>
+        </div>
+    </div>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.
@@ -24,6 +33,25 @@
     </div>
 
     <script src="_framework/blazor.webview.js" autostart="false"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    
+    <script>
+        window.addEventListener('DOMContentLoaded', function () {
+            console.log('DOM Content Loaded');
+            
+            window.addEventListener('blazor:error', function (event) {
+                console.error('Blazor error:', event.detail);
+            });
+            
+            // Start Blazor manually with error handling
+            try {
+                Blazor.start();
+                console.log('Blazor started successfully');
+            } catch (error) {
+                console.error('Failed to start Blazor:', error);
+            }
+        });
+    </script>
 
 </body>
 

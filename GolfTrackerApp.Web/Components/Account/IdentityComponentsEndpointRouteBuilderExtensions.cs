@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 using GolfTrackerApp.Web.Components.Account.Pages;
 using GolfTrackerApp.Web.Components.Account.Pages.Manage;
-using GolfTrackerApp.Shared.Data;
+using GolfTrackerApp.Web.Data;
 
 namespace GolfTrackerApp.Web.Components.Account;
 

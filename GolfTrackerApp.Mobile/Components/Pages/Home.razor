@@ -1,5 +1,16 @@
 ﻿@page "/"
 
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
+<div>
+    <h2 style="color: #2c5530;">Home Page</h2>
+    <p>Welcome to Golf Tracker Mobile!</p>
+    
+    <div style="margin: 20px 0;">
+        <a href="/test-api" style="background: #2c5530; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+            Test API Connection
+        </a>
+    </div>
+    
+    <p style="font-size: 0.9em; color: #666;">
+        Current time: @DateTime.Now.ToString("HH:mm:ss")
+    </p>
+</div>

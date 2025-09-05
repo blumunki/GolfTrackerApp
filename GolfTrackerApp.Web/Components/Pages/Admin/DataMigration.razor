@@ -1,0 +1,1215 @@
+@page "/admin/datamigration"
+@attribute [Authorize(Roles = "Admin")] // Only Admins can access this page
+@inject NavigationManager NavigationManager
+@inject IServiceScopeFactory ServiceScopeFactory // For resolving services in a long-running task
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@using System.IO
+@using System.Globalization
+@using CsvHelper
+@using CsvHelper.Configuration
+@using GolfTrackerApp.Web.Data
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims // For ClaimTypes
+
+@rendermode InteractiveServer
+
+<PageTitle>Data Migration</PageTitle>
+
+<h1>Data Migration Utility</h1>
+
+<p><strong>Important:</strong> Upload files in the specified order. Ensure CSV files are UTF-8 encoded.</p>
+
+<div class="migration-section mb-4">
+    <h4>1. Import Golf Clubs</h4>
+    <p>CSV Format: Name, AddressLine1, AddressLine2, City, CountyOrRegion, Postcode, Country, Website</p>
+    <InputFile OnChange="HandleGolfClubsUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessGolfClubs" disabled="@(golfClubsFile == null || isProcessingGolfClubs)">
+        @if (isProcessingGolfClubs) { <span>Processing...</span> } else { <span>Import Golf Clubs</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(golfClubsImportLog))
+    {
+        <pre class="log-output">@golfClubsImportLog</pre>
+    }
+</div>
+
+@* --- Import Golf Courses --- *@
+<div class="migration-section mb-4">
+    <h4>2. Import Golf Courses</h4>
+    <p>CSV Format: ClubName (must match an already imported club's name), CourseName, DefaultPar, NumberOfHoles</p>
+    <InputFile OnChange="HandleGolfCoursesUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessGolfCourses" disabled="@(golfCoursesFile == null || isProcessingGolfCourses || isProcessingGolfClubs)">
+        @if (isProcessingGolfCourses) { <span>Processing...</span> } else { <span>Import Golf Courses</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(golfCoursesImportLog))
+    {
+        <pre class="log-output">@golfCoursesImportLog</pre>
+    }
+</div>
+
+
+@* --- Import Players --- *@
+<div class="migration-section mb-4">
+    <h4>3. Import Players</h4>
+    <p>CSV Format: FirstName, LastName, Email (optional; if provided, attempts to link/create system user), Handicap (optional)</p>
+    <InputFile OnChange="HandlePlayersUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessPlayers" disabled="@(playersFile == null || isProcessingPlayers || isProcessingGolfClubs || isProcessingGolfCourses)">
+        @if (isProcessingPlayers) { <span>Processing...</span> } else { <span>Import Players</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(playersImportLog))
+    {
+        <pre class="log-output">@playersImportLog</pre>
+    }
+</div>
+
+@* --- Import Holes --- *@
+<div class="migration-section mb-4">
+    <h4>4. Import Holes</h4>
+    <p>CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex (optional), LengthYards (optional)</p>
+    <InputFile OnChange="HandleHolesUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessHoles" disabled="@(holesFile == null || isProcessingHoles || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers)">
+        @if (isProcessingHoles) { <span>Processing...</span> } else { <span>Import Holes</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(holesImportLog))
+    {
+        <pre class="log-output">@holesImportLog</pre>
+    }
+</div>
+
+@* --- Import Rounds --- *@
+<div class="migration-section mb-4">
+    <h4>5. Import Rounds</h4>
+    @* VVV UPDATE THIS LINE VVV *@
+    <p>CSV Format: Date (dd/mm/yyyy), PlayerName, ClubName, ActualCourseName, HolesPlayed, StartingHole, RoundType, RoundText (Spreadsheet Key), Notes (optional)</p>
+    <InputFile OnChange="HandleRoundsUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessRounds" disabled="@(roundsFile == null || isProcessingRounds || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers || isProcessingHoles)">
+        @if (isProcessingRounds) { <span>Processing...</span> } else { <span>Import Rounds</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(roundsImportLog))
+    {
+        <pre class="log-output">@roundsImportLog</pre>
+    }
+</div>
+
+@* --- Import Scores --- *@
+<div class="migration-section mb-4">
+    <h4>6. Import Scores (Final Step)</h4>
+    <p>CSV Format: RoundText (from original spreadsheet), HoleNumber, Strokes</p>
+    <InputFile OnChange="HandleScoresUpload" accept=".csv" />
+    <button class="btn btn-primary mt-2" @onclick="ProcessScores" disabled="@(scoresFile == null || isProcessingScores || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers || isProcessingHoles || isProcessingRounds)">
+        @if (isProcessingScores) { <span>Processing...</span> } else { <span>Import Scores</span> }
+    </button>
+    @if (!string.IsNullOrEmpty(scoresImportLog))
+    {
+        <pre class="log-output">@scoresImportLog</pre>
+    }
+</div>
+
+@* --- Further placeholders for Holes, Rounds, Scores --- *@
+
+
+<style>
+    .migration-section {
+        border: 1px solid #ccc;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+    }
+    .log-output {
+        background-color: #f5f5f5;
+        border: 1px solid #eee;
+        padding: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        margin-top:10px;
+    }
+</style>
+
+@code {
+    private IBrowserFile? golfClubsFile;
+    private string golfClubsImportLog = string.Empty;
+    private bool isProcessingGolfClubs = false;
+
+    private string _migrationAdminUserId = string.Empty;
+    private bool _isMigrationAdmin = true; // Since page is [Authorize(Roles="Admin")]
+
+    public class GolfClubCsvRecord
+    {
+        public string? Name { get; set; }
+        public string? AddressLine1 { get; set; }
+        public string? AddressLine2 { get; set; }
+        public string? City { get; set; }
+        public string? CountyOrRegion { get; set; }
+        public string? Postcode { get; set; }
+        public string? Country { get; set; }
+        public string? Website { get; set; }
+    }
+
+    public class GolfCourseCsvRecord
+    {
+        public string? ClubName { get; set; } // To look up GolfClubId
+        public string? CourseName { get; set; }
+        public int DefaultPar { get; set; }
+        public int NumberOfHoles { get; set; } = 18; // Default if not in CSV
+    }
+
+    private IBrowserFile? golfCoursesFile;
+    private string golfCoursesImportLog = string.Empty;
+    private bool isProcessingGolfCourses = false;
+
+    public class PlayerCsvRecord
+    {
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Email { get; set; } // Optional
+        public double? Handicap { get; set; }
+    }
+
+    private IBrowserFile? playersFile;
+    private string playersImportLog = string.Empty;
+    private bool isProcessingPlayers = false;
+
+    // Add to @code block in DataMigration.razor
+    public class HoleCsvRecord
+    {
+        public string? ClubName { get; set; }     // To help identify the course
+        public string? CourseName { get; set; }   // Primary identifier for the course within a club
+        public int HoleNumber { get; set; }
+        public int Par { get; set; }
+        public int? StrokeIndex { get; set; } // Nullable if not always present
+        public int? LengthYards { get; set; } // Nullable if not always present
+    }
+
+    private IBrowserFile? holesFile;
+    private string holesImportLog = string.Empty;
+    private bool isProcessingHoles = false;
+
+    // In @code block of DataMigration.razor
+    public class RoundCsvRecord
+    {
+        public string? Date { get; set; }         // Expecting dd/mm/yyyy string
+        public string? PlayerName { get; set; }   // Player's full name from CSV for lookup
+        public string? ClubName { get; set; }     // Extracted/Separate Club Name
+        public string? ActualCourseName { get; set; } // Extracted/Separate Course Name
+        public int HolesPlayed { get; set; }
+        public int StartingHole { get; set; }
+        public string? RoundType { get; set; }    // "Friendly" or "Competitive" from CSV
+        public string? RoundText { get; set; }    // Original RoundText from spreadsheet for reference/grouping
+    }
+
+    private IBrowserFile? roundsFile; // You should already have this
+    private string roundsImportLog = string.Empty; // And this
+    private bool isProcessingRounds = false; // And this
+
+    public class ScoreCsvRecord
+    {
+        public string? RoundText { get; set; } // The unique key from your spreadsheet linking to a player's round
+        public int HoleNumber { get; set; }
+        public int Strokes { get; set; }
+    }
+
+    private IBrowserFile? scoresFile;
+    private string scoresImportLog = string.Empty;
+    private bool isProcessingScores = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Fetch the admin user's ID once when the component initializes
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null && user.Identity.IsAuthenticated && user.IsInRole("Admin"))
+        {
+            _migrationAdminUserId = user.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier) ?? string.Empty;
+            if (string.IsNullOrEmpty(_migrationAdminUserId))
+            {
+                // Handle error: Admin ID could not be retrieved.
+                // This would prevent imports from correctly assigning CreatedByApplicationUserId.
+                // For calls to GetAllPlayersAsync, we might pass a dummy ID or handle differently if this occurs.
+                // For now, assume it's found.
+                Console.WriteLine("CRITICAL: Migration Admin User ID not found!"); // Log this
+            }
+        }
+        else
+        {
+            // Not an admin or not authenticated - should be caught by [Authorize] but good to check.
+            NavigationManager.NavigateTo("/"); // Or an error page
+        }
+    }
+
+    // --- Golf Clubs Import Logic ---
+    private void HandleGolfClubsUpload(InputFileChangeEventArgs e)
+    {
+        golfClubsFile = e.File;
+        golfClubsImportLog = $"Selected file: {golfClubsFile.Name}";
+    }
+
+    private async Task ProcessGolfClubs()
+    {
+        if (golfClubsFile == null)
+        {
+            golfClubsImportLog = "Please select a file first.";
+            return;
+        }
+
+        isProcessingGolfClubs = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Golf Clubs import from {golfClubsFile.Name}...");
+        StateHasChanged(); // Update UI to show processing
+
+        // Use IServiceScopeFactory for long-running operations or when services have a shorter lifetime
+        // than the component. For EF Core DbContext, this is good practice.
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var golfClubService = scope.ServiceProvider.GetRequiredService<IGolfClubService>();
+        var existingClubNames = (await golfClubService.GetAllGolfClubsAsync()).Select(gc => gc.Name.ToLowerInvariant()).ToHashSet();
+        int successCount = 0;
+        int skippedCount = 0;
+
+        try
+        {
+            // Max file size (e.g., 5MB). Adjust as needed.
+            await using var stream = golfClubsFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true, // Assuming your CSV has a header row
+                MissingFieldFound = null, // Handle missing fields gracefully if needed
+                HeaderValidated = null, // Handle header validation if needed
+            });
+
+
+            await foreach (var record in csv.GetRecordsAsync<GolfClubCsvRecord>())
+            {
+                try
+                {
+                    var clubName = record.Name;
+                    if (string.IsNullOrWhiteSpace(clubName))
+                    {
+                        log.AppendLine("Skipped row: Club Name is missing.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    if (existingClubNames.Contains(clubName.ToLowerInvariant()))
+                    {
+                        log.AppendLine($"Skipped: Golf Club '{clubName}' already exists.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newClub = new GolfClub
+                    {
+                        Name = clubName,
+                        AddressLine1 = record.AddressLine1,
+                        AddressLine2 = record.AddressLine2,
+                        City = record.City,
+                        CountyOrRegion = record.CountyOrRegion,
+                        Postcode = record.Postcode,
+                        Country = record.Country,
+                        Website = record.Website
+                    };
+                    await golfClubService.AddGolfClubAsync(newClub);
+                    existingClubNames.Add(newClub.Name.ToLowerInvariant()); // Add to local cache
+                    successCount++;
+                    log.AppendLine($"Added: {newClub.Name}");
+                }
+                catch (Exception rowEx)
+                {
+                    //log.AppendLine($"Error processing row: {rowEx.Message}. Row data: {string.Join(",", csv.Context.Parser.Record ?? Array.Empty<string>())}");
+                    log.AppendLine($"Error processing record (Name: {record?.Name ?? "N/A"}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nImport complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+        }
+        catch (CsvHelperException csvEx) // Specifically catch CsvHelper exceptions for better diagnostics
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null)
+            {
+                log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'");
+            }
+        }
+        catch (Exception ex) // Catches other exceptions (e.g., DB errors, file stream issues not caught by CsvHelperException)
+        {
+            log.AppendLine($"\nFATAL ERROR during import: {ex.Message}");
+        }
+        finally
+        {
+            golfClubsImportLog = log.ToString();
+            isProcessingGolfClubs = false;
+            golfClubsFile = null; // Reset file input
+            StateHasChanged(); // Update UI
+        }
+    }
+    
+    private void HandleGolfCoursesUpload(InputFileChangeEventArgs e)
+    {
+        golfCoursesFile = e.File;
+        golfCoursesImportLog = $"Selected file: {golfCoursesFile.Name}";
+    }
+
+    private async Task ProcessGolfCourses()
+    {
+        if (golfCoursesFile == null)
+        {
+            golfCoursesImportLog = "Please select a Golf Courses CSV file first.";
+            return;
+        }
+
+        isProcessingGolfCourses = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Golf Courses import from {golfCoursesFile.Name}...");
+        StateHasChanged();
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var golfCourseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+        var golfClubService = scope.ServiceProvider.GetRequiredService<IGolfClubService>(); // To look up Club IDs
+
+        // Create a lookup for GolfClubId by ClubName
+        var clubNameToIdLookup = (await golfClubService.GetAllGolfClubsAsync())
+                                    .ToDictionary(gc => gc.Name.ToLowerInvariant(), gc => gc.GolfClubId);
+
+        var existingCourseNames = (await golfCourseService.GetAllGolfCoursesAsync())
+                                     .Select(course => $"{course.GolfClubId}_{course.Name.ToLowerInvariant()}")
+                                     .ToHashSet(); // Check for course name uniqueness within a club
+
+        int successCount = 0;
+        int skippedCount = 0;
+
+        try
+        {
+            await using var stream = golfCoursesFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                HeaderValidated = null,
+            });
+
+            await foreach (var record in csv.GetRecordsAsync<GolfCourseCsvRecord>())
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName))
+                    {
+                        log.AppendLine("Skipped row: Course Name or Club Name is missing.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    if (!clubNameToIdLookup.TryGetValue(record.ClubName.ToLowerInvariant(), out var golfClubId))
+                    {
+                        log.AppendLine($"Skipped: Golf Club '{record.ClubName}' not found for course '{record.CourseName}'. Please import clubs first.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var uniqueCourseKey = $"{golfClubId}_{record.CourseName.ToLowerInvariant()}";
+                    if (existingCourseNames.Contains(uniqueCourseKey))
+                    {
+                        log.AppendLine($"Skipped: Golf Course '{record.CourseName}' already exists for club '{record.ClubName}'.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newCourse = new GolfCourse
+                    {
+                        GolfClubId = golfClubId,
+                        Name = record.CourseName,
+                        DefaultPar = record.DefaultPar,
+                        NumberOfHoles = record.NumberOfHoles <= 0 ? 18 : record.NumberOfHoles // Basic validation/default for NumberOfHoles
+                    };
+
+                    await golfCourseService.AddGolfCourseAsync(newCourse);
+                    existingCourseNames.Add(uniqueCourseKey); // Add to local cache
+                    successCount++;
+                    log.AppendLine($"Added Course: {newCourse.Name} (Club: {record.ClubName})");
+                }
+                catch (Exception rowEx)
+                {
+                    log.AppendLine($"Error processing course record (CourseName: {record?.CourseName ?? "N/A"}, ClubName: {record?.ClubName ?? "N/A"}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nGolf Courses import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Golf Courses import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null)
+            {
+                log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Golf Courses import: {ex.Message}");
+        }
+        finally
+        {
+            golfCoursesImportLog = log.ToString();
+            isProcessingGolfCourses = false;
+            golfCoursesFile = null; // Reset file input
+            StateHasChanged();
+        }
+    }
+
+
+    private void HandlePlayersUpload(InputFileChangeEventArgs e)
+    {
+        playersFile = e.File;
+        playersImportLog = $"Selected file: {playersFile.Name}";
+    }
+
+    private async Task ProcessPlayers()
+    {
+        if (playersFile == null)
+        {
+            playersImportLog = "Please select a Players CSV file first.";
+            return;
+        }
+
+        isProcessingPlayers = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Players import from {playersFile.Name}...");
+        StateHasChanged();
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userPrincipal = authState.User;
+        if (userPrincipal.Identity is null || !userPrincipal.Identity.IsAuthenticated)
+        {
+            log.AppendLine("FATAL ERROR: You must be logged in to import data.");
+            playersImportLog = log.ToString();
+            isProcessingPlayers = false;
+            return;
+        }
+        var currentUserId = userPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            log.AppendLine("FATAL ERROR: Could not determine the current user's ID.");
+            playersImportLog = log.ToString();
+            isProcessingPlayers = false;
+            return;
+        }
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var playerService = scope.ServiceProvider.GetRequiredService<IPlayerService>();
+        //var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>(); // For ApplicationUser
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(); // Changed to ApplicationUser
+
+        // Cache existing players to help avoid duplicates
+        // For registered players, check by ApplicationUserId
+        // For managed players, check by FirstName + LastName (case-insensitive)
+       // VVV UPDATE THIS CALL VVV
+        var allPlayersForCache = await playerService.GetAllPlayersAsync(_migrationAdminUserId, _isMigrationAdmin); // Call ONCE
+
+        var existingRegisteredPlayerUserIds = allPlayersForCache
+                                            .Where(p => !string.IsNullOrEmpty(p.ApplicationUserId))
+                                            .Select(p => p.ApplicationUserId)
+                                            .ToHashSet();
+        var existingManagedPlayerNames = allPlayersForCache
+                                        .Where(p => string.IsNullOrEmpty(p.ApplicationUserId))
+                                         // Key needs to be unique for managed player: Name + Creator
+                                        .Select(p => $"{p.FirstName?.ToLowerInvariant()}_{p.LastName?.ToLowerInvariant()}_{p.CreatedByApplicationUserId}")
+                                        .ToHashSet();
+
+        int successCount = 0;
+        int skippedCount = 0;
+        int usersCreatedCount = 0;
+
+        try
+        {
+            await using var stream = playersFile.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true });
+
+            await foreach (var record in csv.GetRecordsAsync<PlayerCsvRecord>())
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(record.FirstName) || string.IsNullOrWhiteSpace(record.LastName))
+                    {
+                        log.AppendLine("Skipped row: FirstName or LastName is missing.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    string? appUserId = null;
+                    bool isRegisteredPlayer = !string.IsNullOrWhiteSpace(record.Email);
+
+                    if (isRegisteredPlayer)
+                    {
+                        var user = await userManager.FindByEmailAsync(record.Email!);
+                        if (user == null)
+                        {
+                            // Create new ApplicationUser
+                            //user = new IdentityUser { UserName = record.Email, Email = record.Email, EmailConfirmed = true }; // Auto-confirm for simplicity
+                            user = new ApplicationUser { UserName = record.Email, Email = record.Email, EmailConfirmed = true }; // Changed to ApplicationUser, Auto-confirm for simplicity
+                            var createUserResult = await userManager.CreateAsync(user, $"DefaultP@ssw0rd{DateTime.Now.Ticks}"); // Generate a complex default password
+                            if (!createUserResult.Succeeded)
+                            {
+                                log.AppendLine($"Failed to create user for {record.Email}: {string.Join(", ", createUserResult.Errors.Select(e => e.Description))}");
+                                skippedCount++;
+                                continue;
+                            }
+                            // Optionally add to "User" role
+                            await userManager.AddToRoleAsync(user, "User");
+                            log.AppendLine($"Created new system user for email: {record.Email}");
+                            usersCreatedCount++;
+                        }
+                        appUserId = user.Id;
+
+                        if (existingRegisteredPlayerUserIds.Contains(appUserId))
+                        {
+                            log.AppendLine($"Skipped: Player profile for user {record.Email} already exists.");
+                            skippedCount++;
+                            continue;
+                        }
+                    }
+                    else // Managed player
+                    {
+                        // New managed players will be created by the _migrationAdminUserId
+                        //var managedPlayerKey = $"{record.FirstName!.ToLowerInvariant()}_{record.LastName!.ToLowerInvariant()}_{_migrationAdminUserId}";
+                        var managedPlayerKey = $"{record.FirstName!.ToLowerInvariant()}_{record.LastName!.ToLowerInvariant()}_{currentUserId}";
+                        if (existingManagedPlayerNames.Contains(managedPlayerKey))
+                        {
+                            log.AppendLine($"Skipped: Managed player '{record.FirstName} {record.LastName}' already exists for this admin.");
+                            skippedCount++;
+                            continue;
+                        }
+                    }
+
+                    var newPlayer = new Player
+                    {
+                        FirstName = record.FirstName,
+                        LastName = record.LastName,
+                        // // Store email on Player model if you added it, useful even for managed players
+                        Handicap = record.Handicap,
+                        ApplicationUserId = appUserId,
+                        CreatedByApplicationUserId = currentUserId
+                    };
+
+                    await playerService.AddPlayerAsync(newPlayer);
+
+                    if (isRegisteredPlayer && appUserId != null)
+                    {
+                        existingRegisteredPlayerUserIds.Add(appUserId);
+                    }
+                    else
+                    {
+                        //existingManagedPlayerNames.Add($"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}");
+                        existingManagedPlayerNames.Add($"{record.FirstName.ToLowerInvariant()}_{record.LastName.ToLowerInvariant()}_{currentUserId}");
+                    }
+                    successCount++;
+                    log.AppendLine($"Added Player: {newPlayer.FirstName} {newPlayer.LastName} {(isRegisteredPlayer ? $"(User: {record.Email})" : "(Managed)")}");
+                }
+                catch (Exception rowEx)
+                {
+                    log.AppendLine($"Error processing player record (Name: {record?.FirstName} {record?.LastName}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nPlayers import complete. Added: {successCount}, Skipped/Errors: {skippedCount}, New System Users Created: {usersCreatedCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Players import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null) { log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'"); }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Players import: {ex.Message}");
+        }
+        finally
+        {
+            playersImportLog = log.ToString();
+            isProcessingPlayers = false;
+            playersFile = null; // Reset file input
+            StateHasChanged();
+        }
+    }
+
+    private void HandleHolesUpload(InputFileChangeEventArgs e)
+    {
+        holesFile = e.File;
+        holesImportLog = $"Selected file: {holesFile.Name}";
+    }
+
+    private async Task ProcessHoles()
+    {
+        if (holesFile == null)
+        {
+            holesImportLog = "Please select a Holes CSV file first.";
+            return;
+        }
+
+        isProcessingHoles = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Holes import from {holesFile.Name}...");
+        StateHasChanged();
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var holeService = scope.ServiceProvider.GetRequiredService<IHoleService>();
+        var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+
+        // Create a lookup for GolfCourseId by a composite key (e.g., "clubname_coursename")
+        // Ensure GolfClub is included to get ClubName if your GolfCourse model doesn't store it directly
+        var courses = await courseService.GetAllGolfCoursesAsync(); // Assumes this includes GolfClub
+        var courseLookup = courses.ToDictionary(
+            // Ensure GolfClub is not null; might need to adjust if GolfClub can be null or if Name is nullable
+            // This key assumes that course names are unique within a club.
+            course => $"{(course.GolfClub?.Name ?? "UNKNOWN_CLUB").ToLowerInvariant()}_{course.Name.ToLowerInvariant()}",
+            course => course.GolfCourseId
+        );
+
+        // Cache existing holes to prevent duplicates for a course (HoleNumber should be unique per course)
+        // Key: "CourseId_HoleNumber"
+        var existingHolesLookup = new HashSet<string>();
+        foreach(var course in courses)
+        {
+            var holesForCourse = await holeService.GetHolesForCourseAsync(course.GolfCourseId);
+            foreach(var hole in holesForCourse)
+            {
+                existingHolesLookup.Add($"{hole.GolfCourseId}_{hole.HoleNumber}");
+            }
+        }
+
+
+        int successCount = 0;
+        int skippedCount = 0;
+
+        try
+        {
+            await using var stream = holesFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024); // Increased size a bit for hole data
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                HeaderValidated = null,
+            });
+
+            await foreach (var record in csv.GetRecordsAsync<HoleCsvRecord>())
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName) || record.HoleNumber <= 0 || record.Par <= 0)
+                    {
+                        log.AppendLine($"Skipped row: CourseName, ClubName, valid HoleNumber, or Par is missing. Club: '{record.ClubName}', Course: '{record.CourseName}', Hole: {record.HoleNumber}");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var courseLookupKey = $"{record.ClubName.ToLowerInvariant()}_{record.CourseName.ToLowerInvariant()}";
+                    if (!courseLookup.TryGetValue(courseLookupKey, out var golfCourseId))
+                    {
+                        log.AppendLine($"Skipped Hole {record.HoleNumber} for '{record.CourseName}' (Club: {record.ClubName}): Golf Course not found. Please import courses first.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var holeLookupKey = $"{golfCourseId}_{record.HoleNumber}";
+                    if (existingHolesLookup.Contains(holeLookupKey))
+                    {
+                        log.AppendLine($"Skipped: Hole number {record.HoleNumber} already exists for course '{record.CourseName}' (Club: {record.ClubName}).");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newHole = new Hole
+                    {
+                        GolfCourseId = golfCourseId,
+                        HoleNumber = record.HoleNumber,
+                        Par = record.Par,
+                        StrokeIndex = record.StrokeIndex,
+                        LengthYards = record.LengthYards
+                    };
+
+                    await holeService.AddHoleAsync(newHole);
+                    existingHolesLookup.Add(holeLookupKey); // Add to local cache
+                    successCount++;
+                    log.AppendLine($"Added: Hole {newHole.HoleNumber} for {record.CourseName} (Club: {record.ClubName})");
+                }
+                catch (Exception rowEx)
+                {
+                    log.AppendLine($"Error processing hole record (Course: {record?.CourseName ?? "N/A"}, Hole: {record?.HoleNumber}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            log.AppendLine($"\nHoles import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Holes import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null)
+            {
+                log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Holes import: {ex.Message}");
+        }
+        finally
+        {
+            holesImportLog = log.ToString();
+            isProcessingHoles = false;
+            holesFile = null; // Reset file input
+            StateHasChanged();
+        }
+    }
+
+    private void HandleRoundsUpload(InputFileChangeEventArgs e)
+    {
+        roundsFile = e.File;
+        roundsImportLog = $"Selected file: {roundsFile.Name}";
+    }
+
+    private async Task ProcessRounds()
+    {
+        if (roundsFile == null)
+        {
+            roundsImportLog = "Please select a Rounds CSV file first.";
+            return;
+        }
+
+        isProcessingRounds = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Rounds import from {roundsFile.Name}...");
+        StateHasChanged(); // Update UI to show processing
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userPrincipal = authState.User;
+        var currentUserId = userPrincipal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            log.AppendLine("FATAL ERROR: You must be logged in to import data.");
+            roundsImportLog = log.ToString();
+            isProcessingRounds = false;
+            return;
+        }
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var roundService = scope.ServiceProvider.GetRequiredService<IRoundService>();
+        var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+        var playerService = scope.ServiceProvider.GetRequiredService<IPlayerService>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        // --- Lookups ---
+        var coursesFromDb = await courseService.GetAllGolfCoursesAsync(); // Assumes this includes GolfClub
+        var courseLookup = coursesFromDb.ToDictionary(
+            course => $"{(course.GolfClub?.Name ?? "UNKNOWN_CLUB").ToLowerInvariant()}_{(course.Name ?? "UNKNOWN_COURSE").ToLowerInvariant()}",
+            course => course.GolfCourseId
+        );
+
+        var playersFromDb = await playerService.GetAllPlayersAsync(currentUserId, true); // Assuming admin context
+        var playerLookup = playersFromDb.ToDictionary(
+            player => $"{player.FirstName?.ToLowerInvariant()} {player.LastName?.ToLowerInvariant()}".Trim(),
+            player => player.PlayerId
+        );
+
+        @* // VVV UPDATE THIS CALL VVV
+        var playersFromDb = await playerService.GetAllPlayersAsync(_migrationAdminUserId, _isMigrationAdmin);
+        // IMPORTANT: Adjust this playerLookup key based on how PlayerName in CSV matches your Player data.
+        // This assumes PlayerName in CSV is "FirstName LastName".
+        var playerLookup = playersFromDb.ToDictionary(
+            player => $"{player.FirstName?.ToLowerInvariant()} {player.LastName?.ToLowerInvariant()}".Trim(),
+            player => player.PlayerId
+        ); *@
+        // If PlayerName in CSV is just FirstName (and LastName was empty/default during player import):
+        // var playerLookup = playersFromDb.ToDictionary(
+        //     player => player.FirstName.ToLowerInvariant(),
+        //     player => player.PlayerId
+        // );
+
+        // Key: The grouping key from CSV. Value: The newly created database RoundID
+        var processedSharedRoundsLookup = new Dictionary<string, int>();
+        int successRoundPlayerCount = 0;
+        int newSharedRoundsCreatedCount = 0;
+        int skippedRowCount = 0;
+
+        try
+        {
+            var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                HeaderValidated = null,
+                PrepareHeaderForMatch = args => args.Header.ToLower().Replace(" ", "").Replace("_", ""),
+            };
+
+            List<RoundCsvRecord> allCsvRows = new List<RoundCsvRecord>();
+            await using (var stream = roundsFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024))
+            using (var reader = new StreamReader(stream))
+            using (var csv = new CsvReader(reader, csvConfig))
+            {
+                // Asynchronously iterate and add to list
+                await foreach (var record in csv.GetRecordsAsync<RoundCsvRecord>()) // <--- Use GetRecordsAsync
+                {
+                    allCsvRows.Add(record);
+                }
+            }
+
+            var groupedBySharedRound = allCsvRows.GroupBy(row =>
+            {
+                var dateParsed = DateTime.TryParseExact(row.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt) ? dt.ToShortDateString() : row.Date;
+                // Grouping key based on distinct fields from CSV
+                return $"{row.ClubName?.ToLowerInvariant()}_{row.ActualCourseName?.ToLowerInvariant()}_{dateParsed}_{row.RoundType?.ToLowerInvariant()}_{row.StartingHole}_{row.HolesPlayed}";
+            });
+
+            foreach (var group in groupedBySharedRound)
+            {
+                var firstRecordInGroup = group.First();
+                string sharedRoundLogKey = $"Club: '{firstRecordInGroup.ClubName}', Course: '{firstRecordInGroup.ActualCourseName}', Date: {firstRecordInGroup.Date}, Type: {firstRecordInGroup.RoundType}, StartHole: {firstRecordInGroup.StartingHole}, HolesPlayed: {firstRecordInGroup.HolesPlayed}";
+
+                int currentDbRoundId;
+                string groupKeyForDbLookup = group.Key;
+
+                if (processedSharedRoundsLookup.TryGetValue(groupKeyForDbLookup, out var existingDbRoundIdInSession))
+                {
+                    currentDbRoundId = existingDbRoundIdInSession;
+                }
+                else
+                {
+                    // This 'else' block is for when the shared round hasn't been processed in *this current import session*.
+                    // We still need to check if an identical round exists in the database from a *previous* import run.
+
+                    string courseLookupKey = $"{(firstRecordInGroup.ClubName ?? "UNKNOWN_CLUB").ToLowerInvariant()}_{(firstRecordInGroup.ActualCourseName ?? "UNKNOWN_COURSE").ToLowerInvariant()}";
+                    if (!courseLookup.TryGetValue(courseLookupKey, out var golfCourseId))
+                    {
+                        log.AppendLine($"Skipped group ({sharedRoundLogKey}): Golf Course combination not found. Club: '{firstRecordInGroup.ClubName}', Course: '{firstRecordInGroup.ActualCourseName}'.");
+                        skippedRowCount += group.Count();
+                        continue;
+                    }
+
+                    if (!DateTime.TryParseExact(firstRecordInGroup.Date, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var roundDate))
+                    {
+                        log.AppendLine($"Skipped group ({sharedRoundLogKey}): Invalid date format '{firstRecordInGroup.Date}'. Expected dd/mm/yyyy.");
+                        skippedRowCount += group.Count();
+                        continue;
+                    }
+
+                    if (!Enum.TryParse<RoundTypeOption>(firstRecordInGroup.RoundType, true, out var roundTypeEnum))
+                    {
+                        log.AppendLine($"Skipped group ({sharedRoundLogKey}): Invalid RoundType '{firstRecordInGroup.RoundType}'. Cannot parse to enum. CSV Value: '{firstRecordInGroup.RoundType}'");
+                        skippedRowCount += group.Count();
+                        continue;
+                    }
+
+                    // Check if an identical Round already exists in the DB from a previous import run
+                    var identicalExistingRoundInDb = await dbContext.Rounds
+                        .FirstOrDefaultAsync(r => r.GolfCourseId == golfCourseId &&
+                                             r.DatePlayed == roundDate &&
+                                             r.StartingHole == firstRecordInGroup.StartingHole &&
+                                             r.HolesPlayed == firstRecordInGroup.HolesPlayed &&
+                                             r.RoundType == roundTypeEnum); // Match enum directly
+
+                    if (identicalExistingRoundInDb != null)
+                    {
+                        currentDbRoundId = identicalExistingRoundInDb.RoundId;
+                        log.AppendLine($"Found existing shared Round ID in DB: {currentDbRoundId} for {sharedRoundLogKey}");
+                        processedSharedRoundsLookup.TryAdd(groupKeyForDbLookup, currentDbRoundId); // Add to session lookup
+                    }
+                    else
+                    {
+                        var newDbRound = new Round
+                        {
+                            GolfCourseId = golfCourseId,
+                            DatePlayed = roundDate,
+                            StartingHole = firstRecordInGroup.StartingHole,
+                            HolesPlayed = firstRecordInGroup.HolesPlayed,
+                            RoundType = roundTypeEnum, // Assign the enum directly
+                            Notes = null,
+                            CreatedByApplicationUserId = currentUserId,
+                            Status = RoundCompletionStatus.Completed // Default status for imported rounds
+                        };
+                        dbContext.Rounds.Add(newDbRound);
+                        await dbContext.SaveChangesAsync(); // Save to get newDbRound.RoundId
+                        currentDbRoundId = newDbRound.RoundId;
+                        processedSharedRoundsLookup.Add(groupKeyForDbLookup, currentDbRoundId);
+                        newSharedRoundsCreatedCount++;
+                        log.AppendLine($"Created shared Round ID: {currentDbRoundId} for {sharedRoundLogKey}");
+                    }
+                } // End of creating/finding shared Round (currentDbRoundId is set)
+
+                // 2. Add players to this Round via RoundPlayer entries for the current group
+                foreach (var playerRecordInGroup in group)
+                {
+                    string playerFullNameCsv = playerRecordInGroup.PlayerName ?? "";
+                    // Ensure the playerLookup key matches how PlayerName is formatted in CSV and how keys were generated for playerLookup
+                    if (!playerLookup.TryGetValue(playerFullNameCsv.ToLowerInvariant().Trim(), out var playerId))
+                    {
+                        log.AppendLine($"Skipped player '{playerFullNameCsv}' for round ID {currentDbRoundId} ({sharedRoundLogKey}): Player not found in lookup.");
+                        skippedRowCount++; // This specific player in this group is skipped
+                        continue;
+                    }
+
+                    // Check if this player is already added to this specific round (idempotency for RoundPlayer)
+                    bool alreadyLinked = await dbContext.RoundPlayers
+                                             .AnyAsync(rp => rp.RoundId == currentDbRoundId && rp.PlayerId == playerId);
+                    if (alreadyLinked)
+                    {
+                        log.AppendLine($"Player '{playerFullNameCsv}' already linked to round ID {currentDbRoundId}. Skipping duplicate RoundPlayer entry.");
+                        continue;
+                    }
+
+                    var roundPlayerEntry = new RoundPlayer
+                    {
+                        RoundId = currentDbRoundId,
+                        PlayerId = playerId
+                        // ShotScore and ParScore are not set here as they will be calculated
+                    };
+                    dbContext.RoundPlayers.Add(roundPlayerEntry);
+                    successRoundPlayerCount++; // Counts individual player links to rounds
+                    log.AppendLine($"Linked Player '{playerFullNameCsv}' to Round ID {currentDbRoundId}");
+                }
+                await dbContext.SaveChangesAsync(); // Save all RoundPlayer entries for this group
+            } // End foreach group
+
+            log.AppendLine($"\nRounds import complete. New Shared Rounds Created: {newSharedRoundsCreatedCount}, Player Links to Rounds Processed: {successRoundPlayerCount}, Skipped CSV Rows/Entries: {skippedRowCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Rounds import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null)
+            {
+                log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Rounds import: {ex.Message} \nStackTrace: {ex.StackTrace}");
+        }
+        finally
+        {
+            roundsImportLog = log.ToString();
+            isProcessingRounds = false;
+            roundsFile = null; // Reset file input
+            StateHasChanged();
+        }
+    } // End ProcessRounds
+
+    private void HandleScoresUpload(InputFileChangeEventArgs e)
+    {
+        scoresFile = e.File;
+        scoresImportLog = $"Selected file: {scoresFile.Name}";
+    }
+
+    private async Task ProcessScores()
+    {
+        if (scoresFile == null)
+        {
+            scoresImportLog = "Please select a Scores CSV file first.";
+            return;
+        }
+
+        isProcessingScores = true;
+        var log = new System.Text.StringBuilder();
+        log.AppendLine($"Starting Scores import from {scoresFile.Name}...");
+        StateHasChanged();
+
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var scoreService = scope.ServiceProvider.GetRequiredService<IScoreService>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(); // For direct lookups
+
+        // --- Lookups ---
+        // We need to map RoundText to a composite key of (Database RoundId, Database PlayerId)
+        // And HoleNumber + CourseId (from Round) to Database HoleId
+
+        // 1. Create a lookup for PlayerId by their name (assuming "firstname lastname")
+        var allPlayers = await dbContext.Players.AsNoTracking().ToListAsync();
+        var playerLookup = allPlayers.ToDictionary(
+            p => $"{p.FirstName?.ToLowerInvariant()} {p.LastName?.ToLowerInvariant()}".Trim(),
+            p => p.PlayerId
+        );
+
+        // 2. Create a lookup for RoundId AND PlayerId using parts of RoundText or other identifiers.
+        // RoundText format: ClubName - CourseName - PlayerName - RoundType - DD/MM/YYYY
+        // We need to find the DB RoundID and DB PlayerID that correspond to this RoundText.
+        var allRoundsWithDetails = await dbContext.Rounds
+            .AsNoTracking()
+            .Include(r => r.GolfCourse!.GolfClub) // For ClubName and CourseName
+            .Include(r => r.RoundPlayers!)
+                .ThenInclude(rp => rp.Player) // For PlayerName
+            .ToListAsync();
+
+        // Key: A string representation similar to RoundText but using DB entity names/IDs for lookup
+        // Value: new { RoundId, PlayerId }
+        // This lookup is complex because RoundText includes player name.
+        // A simpler approach might be to fetch RoundPlayers directly and build a lookup from there.
+        var roundPlayerLookup = new Dictionary<string, (int RoundId, int PlayerId)>();
+        foreach (var r in allRoundsWithDetails)
+        {
+            foreach (var rp in r.RoundPlayers!)
+            {
+                if (rp.Player == null || r.GolfCourse == null || r.GolfCourse.GolfClub == null) continue;
+
+                // Reconstruct a key similar to RoundText but from DB entities
+                // This must EXACTLY match how RoundText is formed in your CSV or how you parse it.
+                string dateStr = r.DatePlayed.ToString("dd/MM/yyyy");
+                string playerFullName = $"{rp.Player.FirstName} {rp.Player.LastName}".Trim();
+                // Note: RoundType in DB is enum, in RoundText it's string.
+                string roundTypeStr = r.RoundType.ToString(); // Assumes RoundType in DB is enum and can be ToString()'d to match CSV
+                
+                // Example key construction (ADAPT THIS TO YOUR CSV RoundText AND DTO PARSING)
+                string lookupKey = $"{r.GolfCourse.GolfClub.Name} - {r.GolfCourse.Name} - {playerFullName} - {roundTypeStr} - {dateStr}".ToLowerInvariant();
+                
+                if (!roundPlayerLookup.ContainsKey(lookupKey)) // Avoid duplicates if any (shouldn't happen with good data)
+                {
+                     roundPlayerLookup.Add(lookupKey, (r.RoundId, rp.PlayerId));
+                }
+            }
+        }
+
+        // 3. Create a lookup for HoleId by (GolfCourseId, HoleNumber)
+        var allHoles = await dbContext.Holes.AsNoTracking().ToListAsync();
+        var holeLookup = allHoles.ToDictionary(
+            h => (h.GolfCourseId, h.HoleNumber), // Composite key
+            h => h.HoleId
+        );
+
+        // Cache for existing scores to prevent duplicates (RoundId, PlayerId, HoleId)
+        var existingScoresLookup = (await dbContext.Scores.AsNoTracking().Select(s => new {s.RoundId, s.PlayerId, s.HoleId}).ToListAsync())
+                                   .Select(s => (s.RoundId, s.PlayerId, s.HoleId))
+                                   .ToHashSet();
+
+
+        int successCount = 0;
+        int skippedCount = 0;
+
+        try
+        {
+            var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture) { HasHeaderRecord = true, MissingFieldFound = null, HeaderValidated = null, PrepareHeaderForMatch = args => args.Header.ToLower().Replace(" ", "").Replace("_","") }; // Ensure your config is here
+
+            List<ScoreCsvRecord> allScoreCsvRows = new List<ScoreCsvRecord>(); // Initialize the list
+            await using (var stream = scoresFile.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024)) // Ensure scoresFile is not null
+            using (var reader = new StreamReader(stream))
+            using (var csv = new CsvReader(reader, csvConfig))
+            {
+                // Asynchronously iterate and add to list
+                await foreach (var record in csv.GetRecordsAsync<ScoreCsvRecord>()) // <--- Use GetRecordsAsync
+                {
+                    allScoreCsvRows.Add(record);
+                }
+            }
+
+            foreach (var record in allScoreCsvRows)
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(record.RoundText) || record.HoleNumber <= 0)
+                    {
+                        log.AppendLine($"Skipped score row: RoundText or valid HoleNumber is missing. RoundText: '{record.RoundText}', Hole: {record.HoleNumber}");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    // Attempt to parse RoundText from CSV to match the key format used for roundPlayerLookup
+                    // This parsing needs to be robust and match your CSV's RoundText format!
+                    // Example parsing: "Club Name - Course Name - Player Name - RoundType - DD/MM/YYYY"
+                    var rtParts = record.RoundText.Split(new[] { " - " }, StringSplitOptions.None);
+                    if (rtParts.Length < 5) { // Basic validation for parts
+                        log.AppendLine($"Skipped score: Invalid RoundText format '{record.RoundText}'. Could not parse enough parts.");
+                        skippedCount++;
+                        continue;
+                    }
+                    // This reconstruction needs to be IDENTICAL to how lookupKey was built for roundPlayerLookup
+                    string parsedClubNameFromRT = rtParts[0];
+                    string parsedCourseNameFromRT = rtParts[1];
+                    string parsedPlayerNameFromRT = rtParts[2];
+                    string parsedRoundTypeFromRT = rtParts[3];
+                    string parsedDateFromRT = rtParts[4];
+                    
+                    string lookupKeyFromCsv = $"{parsedClubNameFromRT} - {parsedCourseNameFromRT} - {parsedPlayerNameFromRT} - {parsedRoundTypeFromRT} - {parsedDateFromRT}".ToLowerInvariant();
+
+                    if (!roundPlayerLookup.TryGetValue(lookupKeyFromCsv, out var roundPlayerIds))
+                    {
+                        log.AppendLine($"Skipped score for Hole {record.HoleNumber} (RoundText: '{record.RoundText}'): Corresponding Round/Player combination not found in database lookup.");
+                        skippedCount++;
+                        continue;
+                    }
+                    int currentRoundId = roundPlayerIds.RoundId;
+                    int currentPlayerId = roundPlayerIds.PlayerId;
+
+                    // Find GolfCourseId for this RoundId to use in Hole lookup
+                    var roundForHoleLookup = allRoundsWithDetails.FirstOrDefault(r => r.RoundId == currentRoundId);
+                    if (roundForHoleLookup == null || roundForHoleLookup.GolfCourseId == 0) {
+                        log.AppendLine($"Skipped score for Hole {record.HoleNumber} (RoundText: '{record.RoundText}'): Could not determine GolfCourseId for RoundId {currentRoundId}.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    if (!holeLookup.TryGetValue((roundForHoleLookup.GolfCourseId, record.HoleNumber), out var holeId))
+                    {
+                        log.AppendLine($"Skipped score (RoundText: '{record.RoundText}'): Hole number {record.HoleNumber} not found for course ID {roundForHoleLookup.GolfCourseId}.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    if (existingScoresLookup.Contains((currentRoundId, currentPlayerId, holeId)))
+                    {
+                        log.AppendLine($"Skipped score for Hole {record.HoleNumber} (RoundText: '{record.RoundText}'): Score already exists for this player, round, and hole.");
+                        skippedCount++;
+                        continue;
+                    }
+
+                    var newScore = new Score
+                    {
+                        RoundId = currentRoundId,
+                        PlayerId = currentPlayerId,
+                        HoleId = holeId,
+                        Strokes = record.Strokes
+                    };
+
+                    dbContext.Scores.Add(newScore);
+                    // Add to local cache to prevent duplicate additions within this session if CSV has repeats
+                    existingScoresLookup.Add((currentRoundId, currentPlayerId, holeId));
+                    successCount++;
+                    // Log less frequently for scores to avoid massive logs, or log every Nth record
+                    if (successCount % 100 == 0) {
+                        log.AppendLine($"Processed {successCount} scores...");
+                        StateHasChanged(); // Allow UI to update periodically for very long imports
+                    }
+                }
+                catch (Exception rowEx)
+                {
+                    log.AppendLine($"Error processing score row (RoundText: {record?.RoundText ?? "N/A"}, Hole: {record?.HoleNumber}): {rowEx.Message}");
+                    skippedCount++;
+                }
+            }
+            await dbContext.SaveChangesAsync(); // Save all successfully processed scores at the end
+            log.AppendLine($"\nScores import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+        }
+        catch (CsvHelperException csvEx)
+        {
+            log.AppendLine($"\nCSV PARSING ERROR during Scores import: {csvEx.Message}");
+            if (csvEx.Context?.Parser != null) { log.AppendLine($"Error occurred near Row: {csvEx.Context.Parser.Row}, Raw Record: '{csvEx.Context.Parser.RawRecord?.TrimEnd()}'"); }
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\nFATAL ERROR during Scores import: {ex.Message} \nStackTrace: {ex.StackTrace}");
+        }
+        finally
+        {
+            scoresImportLog = log.ToString();
+            isProcessingScores = false;
+            scoresFile = null;
+            StateHasChanged();
+        }
+    }
+
+
+    // --- Placeholder for other entity import logic (GolfCourses, Players, etc.) ---
+    // private IBrowserFile? golfCoursesFile;
+    // private string golfCoursesImportLog = string.Empty;
+    // private bool isProcessingGolfCourses = false;
+    // ... and so on for other types
+}

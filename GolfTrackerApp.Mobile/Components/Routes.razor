@@ -1,6 +1,26 @@
-﻿<Router AppAssembly="@typeof(MauiProgram).Assembly">
+﻿@using MudBlazor
+
+<Router AppAssembly="@typeof(Routes).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MobileLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
+    <NotFound>
+        <PageTitle>Not found</PageTitle>
+        <LayoutView Layout="@typeof(Layout.MobileLayout)">
+            <div class="text-center mt-8">
+                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+                <MudText Typo="Typo.h5" Class="mt-4">Page Not Found</MudText>
+                <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                    The page you're looking for doesn't exist.
+                </MudText>
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary" 
+                          Href="/"
+                          StartIcon="@Icons.Material.Filled.Home">
+                    Go Home
+                </MudButton>
+            </div>
+        </LayoutView>
+    </NotFound>
 </Router>

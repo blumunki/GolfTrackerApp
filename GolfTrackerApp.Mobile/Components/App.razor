@@ -1,0 +1,54 @@
+@using MudBlazor
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<div style="background: white; min-height: 100vh;">
+    <CustomNavigationManager CurrentPage="@currentPage" OnNavigate="@HandleNavigation" />
+</div>
+
+@code {
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    
+    private string currentPage = "home";
+    
+    protected override void OnInitialized()
+    {
+        // Parse the current URL to determine the page
+        var uri = NavigationManager.Uri;
+        var path = new Uri(uri).AbsolutePath.Trim('/');
+        currentPage = string.IsNullOrEmpty(path) ? "home" : path;
+        
+        Console.WriteLine($"Custom navigation initialized. Current page: {currentPage}");
+        
+        // Listen for navigation changes
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+    
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        var path = new Uri(e.Location).AbsolutePath.Trim('/');
+        var newPage = string.IsNullOrEmpty(path) ? "home" : path;
+        
+        if (newPage != currentPage)
+        {
+            currentPage = newPage;
+            StateHasChanged();
+        }
+    }
+    
+    private void HandleNavigation(string page)
+    {
+        currentPage = page;
+        var url = page == "home" ? "/" : $"/{page}";
+        NavigationManager.NavigateTo(url, false);
+        StateHasChanged();
+    }
+    
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}

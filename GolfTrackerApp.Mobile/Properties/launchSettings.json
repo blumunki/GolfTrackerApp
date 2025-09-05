@@ -3,6 +3,10 @@
     "Windows Machine": {
       "commandName": "Project",
       "nativeDebugging": false
+    },
+    "macOS": {
+      "commandName": "Project",
+      "nativeDebugging": false
     }
   }
 }

@@ -1,0 +1,37 @@
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Data // Assuming ApplicationUser is here
+@using Microsoft.AspNetCore.Identity
+
+<MudCardContent>
+    <MudTextField @bind-Value="PlayerModel.FirstName" For="@(() => PlayerModel.FirstName)" Label="First Name" Required="true" RequiredError="First name is required." Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudTextField @bind-Value="PlayerModel.LastName" For="@(() => PlayerModel.LastName)" Label="Last Name" Required="true" RequiredError="Last name is required." Variant="Variant.Outlined" Margin="Margin.Dense" />
+    <MudNumericField @bind-Value="PlayerModel.Handicap" For="@(() => PlayerModel.Handicap)" Label="Handicap" Format="N1" Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+    <MudSwitch @bind-checked="IsRegisteredUserCandidate" Color="Color.Primary" Label="Link to a registered system user?" T="bool" />
+
+    @if (IsRegisteredUserCandidate)
+    {
+        <MudTextField @bind-Value="UserEmailToLink" Label="Registered User Email" HelperText="The system will link this player to an existing user with this email." Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Email" />
+    }
+</MudCardContent>
+
+@code {
+    [Parameter]
+    public Player PlayerModel { get; set; } = new();
+
+    [Parameter]
+    public string InitialUserEmail { get; set; } = string.Empty;
+
+    public bool IsRegisteredUserCandidate { get; set; }
+    public string UserEmailToLink { get; set; } = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        // Pre-populate the form state when editing an existing player
+        if (!string.IsNullOrEmpty(PlayerModel.ApplicationUserId) || !string.IsNullOrEmpty(InitialUserEmail))
+        {
+            IsRegisteredUserCandidate = true;
+            UserEmailToLink = InitialUserEmail;
+        }
+    }
+}

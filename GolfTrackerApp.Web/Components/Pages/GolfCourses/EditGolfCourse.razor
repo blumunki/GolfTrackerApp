@@ -1,0 +1,97 @@
+@page "/golfcourses/edit/{CourseId:int}"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+
+@inject IGolfCourseService GolfCourseService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject ILogger<EditGolfCourse> Logger
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Edit Golf Course</PageTitle>
+
+@if (isLoading)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+else if (courseToEdit is null)
+{
+    <MudAlert Severity="Severity.Error">Golf course not found.</MudAlert>
+}
+else
+{
+    <MudText Typo="Typo.h4" GutterBottom="true">Edit: @originalCourseName</MudText>
+    <EditForm Model="@courseToEdit" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <MudCard>
+            <MudCardContent>
+                <MudTextField @bind-Value="courseToEdit.Name" For="@(() => courseToEdit.Name)" Label="Course Name" Required="true" />
+                <MudNumericField @bind-Value="courseToEdit.NumberOfHoles" For="@(() => courseToEdit.NumberOfHoles)" Label="Number of Holes" Required="true" Min="1" Max="18" />
+                <MudNumericField @bind-Value="courseToEdit.DefaultPar" For="@(() => courseToEdit.DefaultPar)" Label="Default Par" Required="true" Min="27" Max="75" />
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Update Course</MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="Cancel" Class="mx-2">Cancel</MudButton>
+            </MudCardActions>
+        </MudCard>
+        <ValidationSummary class="mt-3" />
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public int CourseId { get; set; }
+
+    private GolfCourse? courseToEdit;
+    private string originalCourseName = string.Empty;
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            courseToEdit = await GolfCourseService.GetGolfCourseByIdAsync(CourseId);
+            if (courseToEdit is not null)
+            {
+                originalCourseName = courseToEdit.Name;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading course with ID {CourseId}", CourseId);
+            Snackbar.Add("Error loading course details.", Severity.Error);
+        }
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (courseToEdit is null) return;
+
+        try
+        {
+            await GolfCourseService.UpdateGolfCourseAsync(courseToEdit);
+            Snackbar.Add("Course updated successfully!", Severity.Success);
+            NavigationManager.NavigateTo($"/golfclubs/{courseToEdit.GolfClubId}"); // Navigate back to the parent club
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating course: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        if (courseToEdit is not null)
+        {
+            NavigationManager.NavigateTo($"/golfclubs/{courseToEdit.GolfClubId}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/golfclubs");
+        }
+    }
+}

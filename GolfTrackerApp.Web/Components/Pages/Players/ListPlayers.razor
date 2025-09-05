@@ -1,0 +1,157 @@
+@page "/players"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IPlayerService PlayerService
+@inject NavigationManager NavigationManager
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@using System.Security.Claims
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Components.Shared
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+
+<PageTitle>Players</PageTitle>
+
+<MudText Typo="Typo.h4" GutterBottom="true">Players</MudText>
+
+<MudButton Variant="Variant.Filled" 
+           Color="Color.Primary" 
+           OnClick="GoToAddPlayerPage" 
+           StartIcon="@Icons.Material.Filled.PersonAdd" 
+           Class="mb-3">
+    Add New Player
+</MudButton>
+
+@if (isLoading)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Filter by Name..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      DebounceInterval="300" 
+                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
+    </MudPaper>
+
+    @if (players is null || !players.Any())
+    {
+        <MudText>No players found for your search criteria.</MudText>
+    }
+    else
+    {
+        <MudTable Items="@players" Hover="true" Striped="true" Dense="true" Elevation="1">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Handicap</MudTh>
+                <MudTh>User Type</MudTh>
+                <MudTh>Registered Email</MudTh>
+                <MudTh Style="text-align:right">Actions</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.FirstName @context.LastName</MudTd>
+                <MudTd DataLabel="Handicap">@(context.Handicap.HasValue ? context.Handicap.Value.ToString("N1") : "N/A")</MudTd>
+                <MudTd DataLabel="User Type">@(string.IsNullOrEmpty(context.ApplicationUserId) ? "Managed" : "Registered")</MudTd>
+                <MudTd DataLabel="Registered Email">@(context.ApplicationUser?.Email ?? "N/A")</MudTd>
+                <MudTd Style="text-align:right">
+                    <MudTooltip Text="View Performance Report">
+                        <MudIconButton Icon="@Icons.Material.Filled.Timeline" Size="Size.Small" Color="Color.Info" Href="@($"/players/{context.PlayerId}/report")" />
+                    </MudTooltip>
+                    <MudTooltip Text="Edit Player">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditPlayer(context.PlayerId))" />
+                    </MudTooltip>
+                    <MudTooltip Text="Delete Player">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeletePlayer(context))" />
+                    </MudTooltip>
+                </MudTd>
+            </RowTemplate>
+            <PagerContent>
+                <MudTablePager />
+            </PagerContent>
+        </MudTable>
+    }
+}
+
+@code {
+    private List<Player>? players;
+    private bool isLoading = true;
+    private string searchString = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlayers();
+    }
+
+    private async Task LoadPlayers()
+    {
+        isLoading = true;
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+            var isCurrentUserAdmin = user.IsInRole("Admin");
+
+            players = await PlayerService.SearchPlayersAsync(currentUserId, isCurrentUserAdmin, searchString);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading players: {ex.Message}", Severity.Error);
+        }
+        isLoading = false;
+    }
+
+    private async Task OnSearchTextChanged(string text)
+    {
+        searchString = text;
+        await LoadPlayers();
+    }
+
+    private void GoToAddPlayerPage() => NavigationManager.NavigateTo("/players/add");
+
+    private void EditPlayer(int playerId) => NavigationManager.NavigateTo($"/players/edit/{playerId}");
+
+    private async Task PrepareDeletePlayer(Player player)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Are you sure you want to delete {player.FirstName} {player.LastName}? This cannot be undone." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            await DeletePlayerConfirmed(player.PlayerId);
+        }
+    }
+
+    private async Task DeletePlayerConfirmed(int playerId)
+    {
+        try
+        {
+            bool deleted = await PlayerService.DeletePlayerAsync(playerId);
+            if (deleted)
+            {
+                Snackbar.Add("Player deleted successfully.", Severity.Success);
+                await LoadPlayers();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete player.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting player: {ex.Message}", Severity.Error);
+        }
+    }
+}

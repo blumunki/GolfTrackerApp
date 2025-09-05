@@ -1,0 +1,59 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+@inject NavigationManager Navigation
+
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <!-- Top App Bar -->
+    <MudAppBar Elevation="1" Class="mobile-header">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                      Color="Color.Inherit" 
+                      OnClick="@ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="mobile-title">Golf Tracker</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Text" 
+                  Color="Color.Inherit" 
+                  OnClick="@(() => Navigation.NavigateTo("/login"))">
+            Login
+        </MudButton>
+    </MudAppBar>
+
+    <!-- Side Navigation Drawer -->
+    <MudDrawer @bind-Open="@_drawerOpen" 
+               Elevation="2" 
+               ClipMode="DrawerClipMode.Always"
+               Overlay="true">
+        <MudDrawerHeader>
+            <MudText Typo="Typo.h6">Golf Tracker</MudText>
+        </MudDrawerHeader>
+        <MudNavMenu>
+            <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
+            <MudNavLink Href="/login" Icon="@Icons.Material.Filled.Login">Login</MudNavLink>
+            
+            <!-- Debug/Development Tools -->
+            <MudDivider Class="my-2"/>
+            <MudText Typo="Typo.caption" Class="px-4">Debug Tools</MudText>
+            <MudNavLink Href="/test-api" Icon="@Icons.Material.Filled.Api">Test API</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <!-- Main Content -->
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    private bool _drawerOpen = false;
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+}

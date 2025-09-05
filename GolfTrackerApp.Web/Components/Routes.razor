@@ -1,10 +1,10 @@
 ﻿@using GolfTrackerApp.Web.Components.Account.Shared
 @using System.Reflection
-@using GolfTrackerApp.Shared.Models
-@using GolfTrackerApp.Shared.Components.Pages
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Components.Pages
 
 @code {
-    private Assembly[] _additionalAssemblies = new[] { typeof(GolfTrackerApp.Shared.Components.Pages.Home).Assembly };
+    private Assembly[] _additionalAssemblies = new[] { typeof(Program).Assembly };
 }
 
 <Router AppAssembly="typeof(Program).Assembly" AdditionalAssemblies="_additionalAssemblies">
