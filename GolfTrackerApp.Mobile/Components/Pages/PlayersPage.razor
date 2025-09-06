@@ -1,7 +1,9 @@
 @page "/players"
 @using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services.Api
 @using System.Text.Json
 @inject HttpClient Http
+@inject IPlayerApiService PlayerApiService
 @inject IJSRuntime JSRuntime
 
 <MudContainer Class="pa-4">
@@ -126,11 +128,7 @@
         try
         {
             loading = true;
-            var response = await Http.GetStringAsync("https://localhost:7295/api/players");
-            players = JsonSerializer.Deserialize<List<Player>>(response, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            players = await PlayerApiService.GetAllPlayersAsync();
         }
         catch (Exception ex)
         {

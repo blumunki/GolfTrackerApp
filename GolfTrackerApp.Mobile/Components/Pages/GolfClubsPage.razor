@@ -1,0 +1,126 @@
+@page "/golf-clubs"
+@using GolfTrackerApp.Mobile.Models
+@using System.Text.Json
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+
+<MudContainer Class="pa-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Golf Clubs</MudText>
+    
+    @if (loading)
+    {
+        <MudProgressCircular Size="Size.Large" Indeterminate="true" Class="ma-4" />
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Loading golf clubs...</MudText>
+    }
+    else if (golfClubs?.Any() == true)
+    {
+        <MudGrid>
+            @foreach (var club in golfClubs)
+            {
+                <MudItem xs="12" sm="6" md="4">
+                    <MudCard Class="mb-4" Style="height: 100%; cursor: pointer;" @onclick="@(() => ShowClubDetails(club))">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">@club.Name</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@GetClubLocation(club)</MudText>
+                            </CardHeaderContent>
+                            <CardHeaderActions>
+                                <MudIconButton Icon="Icons.Material.Filled.Info" Color="Color.Primary" Size="Size.Small" />
+                            </CardHeaderActions>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudText Typo="Typo.body2" Class="mb-1">@club.AddressLine1</MudText>
+                            @if (!string.IsNullOrEmpty(club.AddressLine2))
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-1">@club.AddressLine2</MudText>
+                            }
+                            <MudText Typo="Typo.body2" Class="mb-2">@club.City, @club.Postcode</MudText>
+                            
+                            @if (!string.IsNullOrEmpty(club.Website))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Primary">@club.Website</MudText>
+                            }
+                            
+                            <MudDivider Class="my-2" />
+                            <MudText Typo="Typo.body2" Color="Color.Info">
+                                Golf Club
+                            </MudText>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (!loading && golfClubs != null)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">
+            No golf clubs found.
+        </MudAlert>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-4">
+            <MudText Typo="Typo.body1">Failed to load golf clubs.</MudText>
+            <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="LoadGolfClubs" Class="mt-2">
+                Try Again
+            </MudButton>
+        </MudAlert>
+    }
+</MudContainer>
+
+@code {
+    private List<GolfClub>? golfClubs;
+    private bool loading = true;
+    private bool showDetailsDialog = false;
+    private GolfClub? selectedClub;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadGolfClubs();
+    }
+
+    private async Task LoadGolfClubs()
+    {
+        try
+        {
+            loading = true;
+            StateHasChanged();
+            
+            var response = await Http.GetStringAsync("https://localhost:7295/api/golfclubs");
+            golfClubs = JsonSerializer.Deserialize<List<GolfClub>>(response, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading golf clubs: {ex.Message}");
+            golfClubs = null; // Set to null to show error state
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetClubLocation(GolfClub club)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(club.City)) parts.Add(club.City);
+        if (!string.IsNullOrEmpty(club.CountyOrRegion)) parts.Add(club.CountyOrRegion);
+        return string.Join(", ", parts);
+    }
+
+    private void ShowClubDetails(GolfClub club)
+    {
+        selectedClub = club;
+        showDetailsDialog = true;
+    }
+
+    private void CloseDetailsDialog()
+    {
+        showDetailsDialog = false;
+        selectedClub = null;
+    }
+}

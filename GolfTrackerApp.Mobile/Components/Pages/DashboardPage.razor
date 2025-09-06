@@ -1,7 +1,9 @@
 @page "/dashboard"
 @using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services.Api
 @using System.Text.Json
 @inject HttpClient Http
+@inject IDashboardApiService DashboardApiService
 @inject IJSRuntime JSRuntime
 
 <MudContainer Class="pa-4">
@@ -19,7 +21,7 @@
                 <MudCard Class="text-center">
                     <MudCardContent>
                         <MudIcon Icon="Icons.Material.Filled.GolfCourse" Color="Color.Primary" Size="Size.Large" Class="mb-2" />
-                        <MudText Typo="Typo.h4" Color="Color.Primary">@stats.TotalRounds</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Primary">@(stats?.TotalRounds ?? 0)</MudText>
                         <MudText Typo="Typo.body2">Total Rounds</MudText>
                     </MudCardContent>
                 </MudCard>
@@ -29,7 +31,7 @@
                 <MudCard Class="text-center">
                     <MudCardContent>
                         <MudIcon Icon="Icons.Material.Filled.TrendingDown" Color="Color.Success" Size="Size.Large" Class="mb-2" />
-                        <MudText Typo="Typo.h4" Color="Color.Success">@stats.AverageScore?.ToString("F1")</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Success">@((stats?.AverageScore ?? 0).ToString("F1"))</MudText>
                         <MudText Typo="Typo.body2">Average Score</MudText>
                     </MudCardContent>
                 </MudCard>
@@ -39,7 +41,7 @@
                 <MudCard Class="text-center">
                     <MudCardContent>
                         <MudIcon Icon="Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Large" Class="mb-2" />
-                        <MudText Typo="Typo.h4" Color="Color.Warning">@stats.BestScore</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Warning">@(stats?.BestScore ?? 0)</MudText>
                         <MudText Typo="Typo.body2">Best Score</MudText>
                     </MudCardContent>
                 </MudCard>
@@ -49,8 +51,8 @@
                 <MudCard Class="text-center">
                     <MudCardContent>
                         <MudIcon Icon="Icons.Material.Filled.Flag" Color="Color.Info" Size="Size.Large" Class="mb-2" />
-                        <MudText Typo="Typo.h4" Color="Color.Info">@stats.CoursesPlayed</MudText>
-                        <MudText Typo="Typo.body2">Courses Played</MudText>
+                        <MudText Typo="Typo.h4" Color="Color.Info">@(stats?.TotalPlayingPartners ?? 0)</MudText>
+                        <MudText Typo="Typo.body2">Playing Partners</MudText>
                     </MudCardContent>
                 </MudCard>
             </MudItem>
@@ -113,7 +115,7 @@
                             @foreach (var item in scoreDistribution)
                             {
                                 <div class="d-flex align-center justify-space-between mb-2">
-                                    <MudText Typo="Typo.body2">@item.Range</MudText>
+                                    <MudText Typo="Typo.body2">@item.ScoreRange</MudText>
                                     <div class="d-flex align-center">
                                         <MudProgressLinear Value="@item.Percentage" Color="Color.Primary" Class="mr-2" Style="width: 100px;" />
                                         <MudText Typo="Typo.caption">@item.Count rounds</MudText>
@@ -145,12 +147,12 @@
                                     <MudListItem T="string">
                                         <div class="d-flex align-center justify-space-between">
                                             <div>
-                                                <MudText Typo="Typo.body1">@course.Name</MudText>
-                                                <MudText Typo="Typo.caption">@course.Location</MudText>
+                                                <MudText Typo="Typo.body1">@course.CourseName</MudText>
+                                                <MudText Typo="Typo.caption">@course.ClubName</MudText>
                                             </div>
                                             <div class="text-right">
-                                                <MudText Typo="Typo.body2" Color="Color.Primary">@course.RoundsPlayed rounds</MudText>
-                                                <MudText Typo="Typo.caption">Avg: @course.AverageScore?.ToString("F1")</MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Primary">@course.PlayCount rounds</MudText>
+                                                <MudText Typo="Typo.caption">Avg: @course.AverageScore.ToString("F1")</MudText>
                                             </div>
                                         </div>
                                     </MudListItem>
@@ -170,10 +172,10 @@
 
 @code {
     private bool loading = true;
-    private DashboardStats stats = new();
+    private Services.Api.DashboardStats? stats;
     private List<Round>? recentRounds;
-    private List<ScoreDistribution>? scoreDistribution;
-    private List<FavoriteCourse>? favoriteCourses;
+    private List<Services.Api.ScoreDistribution>? scoreDistribution;
+    private List<Services.Api.FavoriteCourse>? favoriteCourses;
 
     protected override async Task OnInitializedAsync()
     {
@@ -185,45 +187,26 @@
         try
         {
             loading = true;
-            await Task.Delay(1000); // Simulate API call
+            StateHasChanged();
             
-            // Mock dashboard data
-            stats = new DashboardStats
-            {
-                TotalRounds = 47,
-                AverageScore = 86.3m,
-                BestScore = 78,
-                CoursesPlayed = 12
-            };
-
-            recentRounds = new List<Round>
-            {
-                new Round { CourseName = "Pebble Beach Golf Links", ClubName = "Pebble Beach", DatePlayed = DateTime.Now.AddDays(-3), TotalScore = 89, Par = 72 },
-                new Round { CourseName = "Augusta National", ClubName = "Augusta National", DatePlayed = DateTime.Now.AddDays(-10), TotalScore = 95, Par = 72 },
-                new Round { CourseName = "St. Andrews Old Course", ClubName = "The R&A", DatePlayed = DateTime.Now.AddDays(-17), TotalScore = 82, Par = 72 },
-                new Round { CourseName = "Pinehurst No. 2", ClubName = "Pinehurst Resort", DatePlayed = DateTime.Now.AddDays(-24), TotalScore = 88, Par = 72 },
-                new Round { CourseName = "Bethpage Black", ClubName = "Bethpage State Park", DatePlayed = DateTime.Now.AddDays(-31), TotalScore = 93, Par = 72 }
-            };
-
-            scoreDistribution = new List<ScoreDistribution>
-            {
-                new ScoreDistribution { Range = "Under 80", Count = 3, Percentage = 6.4 },
-                new ScoreDistribution { Range = "80-89", Count = 18, Percentage = 38.3 },
-                new ScoreDistribution { Range = "90-99", Count = 21, Percentage = 44.7 },
-                new ScoreDistribution { Range = "100+", Count = 5, Percentage = 10.6 }
-            };
-
-            favoriteCourses = new List<FavoriteCourse>
-            {
-                new FavoriteCourse { Name = "TPC Scottsdale", Location = "Scottsdale, AZ", RoundsPlayed = 8, AverageScore = 85.2m },
-                new FavoriteCourse { Name = "Pebble Beach Golf Links", Location = "Pebble Beach, CA", RoundsPlayed = 5, AverageScore = 91.4m },
-                new FavoriteCourse { Name = "Pinehurst No. 2", Location = "Pinehurst, NC", RoundsPlayed = 4, AverageScore = 87.8m },
-                new FavoriteCourse { Name = "Whistling Straits", Location = "Kohler, WI", RoundsPlayed = 3, AverageScore = 92.7m }
-            };
+            // Load real dashboard data from API
+            stats = await DashboardApiService.GetDashboardStatsAsync();
+            scoreDistribution = await DashboardApiService.GetScoreDistributionAsync();
+            favoriteCourses = await DashboardApiService.GetFavoriteCoursesAsync(4);
+            
+            // For recent rounds, we would need to get this from the rounds API
+            // For now, we'll just leave it empty or use a mock
+            recentRounds = new List<Round>();
         }
         catch (Exception ex)
         {
             await JSRuntime.InvokeVoidAsync("console.error", $"Error loading dashboard data: {ex.Message}");
+            
+            // Set defaults on error
+            stats = null;
+            recentRounds = new List<Round>();
+            scoreDistribution = new List<Services.Api.ScoreDistribution>();
+            favoriteCourses = new List<Services.Api.FavoriteCourse>();
         }
         finally
         {
@@ -251,26 +234,4 @@
         return diff > 0 ? $"+{diff}" : diff.ToString();
     }
 
-    public class DashboardStats
-    {
-        public int TotalRounds { get; set; }
-        public decimal? AverageScore { get; set; }
-        public int BestScore { get; set; }
-        public int CoursesPlayed { get; set; }
-    }
-
-    public class ScoreDistribution
-    {
-        public string Range { get; set; } = string.Empty;
-        public int Count { get; set; }
-        public double Percentage { get; set; }
-    }
-
-    public class FavoriteCourse
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Location { get; set; } = string.Empty;
-        public int RoundsPlayed { get; set; }
-        public decimal? AverageScore { get; set; }
-    }
 }

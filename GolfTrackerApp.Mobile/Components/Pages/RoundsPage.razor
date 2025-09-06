@@ -1,7 +1,9 @@
 @page "/rounds"
 @using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services.Api
 @using System.Text.Json
 @inject HttpClient Http
+@inject IRoundApiService RoundApiService
 @inject IJSRuntime JSRuntime
 
 <MudContainer Class="pa-4">
@@ -177,53 +179,26 @@
     private async Task LoadRounds()
     {
         try
-    {
+        {
             loading = true;
-            // For now, using mock data since we need to implement the rounds API
-            await Task.Delay(1000); // Simulate API call
             
-            rounds = new List<Round>
+            // Get rounds from API service
+            var roundResponses = await RoundApiService.GetRoundsAsync(1, 20);
+            
+            // Convert API responses to Round model for UI
+            rounds = roundResponses.Select(r => new Round
             {
-                new Round 
-                { 
-                    Id = 1, 
-                    CourseName = "Pebble Beach Golf Links", 
-                    ClubName = "Pebble Beach",
-                    DatePlayed = DateTime.Now.AddDays(-7),
-                    TotalScore = 89,
-                    Par = 72,
-                    Holes = 18,
-                    PlayingPartners = new List<string> { "John Smith", "Mike Johnson" },
-                    Weather = "Sunny, 75°F",
-                    Notes = "Great day on the course! Finally broke 90."
-                },
-                new Round 
-                { 
-                    Id = 2, 
-                    CourseName = "Augusta National Golf Club", 
-                    ClubName = "Augusta National",
-                    DatePlayed = DateTime.Now.AddDays(-14),
-                    TotalScore = 95,
-                    Par = 72,
-                    Holes = 18,
-                    PlayingPartners = new List<string> { "Sarah Wilson" },
-                    Weather = "Overcast, 68°F",
-                    Notes = "Tough course but amazing experience."
-                },
-                new Round 
-                { 
-                    Id = 3, 
-                    CourseName = "St. Andrews Old Course", 
-                    ClubName = "The R&A",
-                    DatePlayed = DateTime.Now.AddDays(-21),
-                    TotalScore = 82,
-                    Par = 72,
-                    Holes = 18,
-                    PlayingPartners = new List<string> { "David Brown", "Tom Davis", "Chris Miller" },
-                    Weather = "Windy, 62°F",
-                    Notes = "Historic course, challenging conditions with the wind."
-                }
-            };
+                Id = r.RoundId,
+                CourseName = r.CourseName,
+                ClubName = r.ClubName,
+                DatePlayed = r.DatePlayed,
+                TotalScore = r.TotalScore,
+                Par = r.TotalPar,
+                Holes = r.HolesPlayed,
+                Notes = r.Notes ?? string.Empty,
+                PlayingPartners = new List<string>(), // Would need separate API call for playing partners
+                Weather = "N/A" // Would need to add weather field to API
+            }).ToList();
         }
         catch (Exception ex)
         {

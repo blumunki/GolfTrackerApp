@@ -22,23 +22,48 @@ public static class MauiProgram
 		// Add MudBlazor services
 		builder.Services.AddMudServices();
 
-		// Configure HTTP client for API calls to web server
-		builder.Services.AddHttpClient<IGolfClubApiService, GolfClubApiService>(client =>
+		// Configure base HTTP client settings
+		var httpClientBuilder = new Action<HttpClient>(client =>
 		{
 			// TODO: Make this configurable for different environments
 			client.BaseAddress = new Uri("https://localhost:7295/");
 			client.DefaultRequestHeaders.Add("Accept", "application/json");
-		})
+		});
+
 #if DEBUG
-		.ConfigurePrimaryHttpMessageHandler(() =>
+		var httpMessageHandlerFactory = new Func<HttpMessageHandler>(() =>
 		{
 			var handler = new HttpClientHandler();
 			// Allow self-signed certificates in development
 			handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
 			return handler;
-		})
+		});
 #endif
-		;
+
+		// Configure HTTP clients for API services
+		builder.Services.AddHttpClient<IGolfClubApiService, GolfClubApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
+		builder.Services.AddHttpClient<IPlayerApiService, PlayerApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
+		builder.Services.AddHttpClient<IRoundApiService, RoundApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
+		builder.Services.AddHttpClient<IDashboardApiService, DashboardApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
 
 #if DEBUG
 		builder.Services.AddBlazorWebViewDeveloperTools();
