@@ -7,10 +7,9 @@ namespace GolfTrackerApp.Mobile.Services.Api;
 public class DashboardStats
 {
     public int TotalRounds { get; set; }
-    public decimal AverageScore { get; set; }
+    public double AverageScore { get; set; }
     public int BestScore { get; set; }
-    public decimal CurrentHandicap { get; set; }
-    public int TotalPlayingPartners { get; set; }
+    public int CoursesPlayed { get; set; }
 }
 
 public class RecentActivity

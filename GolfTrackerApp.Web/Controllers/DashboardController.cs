@@ -24,17 +24,13 @@ public class DashboardController : ControllerBase
         {
             var totalRounds = await _context.Rounds.CountAsync();
             
-            var averageScore = await _context.Scores
+            var roundScores = await _context.Scores
                 .GroupBy(s => s.RoundId)
                 .Select(g => g.Sum(s => s.Strokes))
-                .DefaultIfEmpty(0)
-                .AverageAsync();
+                .ToListAsync();
 
-            var bestScore = totalRounds > 0 ? 
-                await _context.Scores
-                    .GroupBy(s => s.RoundId)
-                    .Select(g => g.Sum(s => s.Strokes))
-                    .MinAsync() : 0;
+            var averageScore = roundScores.Any() ? roundScores.Average() : 0.0;
+            var bestScore = roundScores.Any() ? roundScores.Min() : 0;
 
             var coursesPlayed = await _context.Rounds
                 .Select(r => r.GolfCourseId)
@@ -65,7 +61,7 @@ public class DashboardController : ControllerBase
         {
             var recentRounds = await _context.Rounds
                 .Include(r => r.GolfCourse)
-                .ThenInclude(gc => gc!.GolfClub)
+                .ThenInclude(gc => gc!.GolfClub!)
                 .OrderByDescending(r => r.DatePlayed)
                 .Take(5)
                 .Select(r => $"Played {(r.GolfCourse != null ? r.GolfCourse.Name : "Unknown Course")} on {r.DatePlayed:MMM dd}")
@@ -131,7 +127,7 @@ public class DashboardController : ControllerBase
         {
             var favoriteCourses = await _context.Rounds
                 .Include(r => r.GolfCourse)
-                .ThenInclude(gc => gc!.GolfClub)
+                .ThenInclude(gc => gc!.GolfClub!)
                 .GroupBy(r => new { r.GolfCourseId, CourseName = r.GolfCourse!.Name, ClubName = r.GolfCourse.GolfClub!.Name })
                 .Select(g => new
                 {
