@@ -1,4 +1,9 @@
 @using MudBlazor
+@using GolfTrackerApp.Mobile.Services
+@using GolfTrackerApp.Mobile.Components.Pages
+@using GolfTrackerApp.Mobile.Components.Shared
+@inject AuthenticationStateService AuthState
+@inject NavigationManager Navigation
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -6,25 +11,73 @@
 <MudSnackbarProvider />
 
 <div style="background: white; min-height: 100vh;">
-    <CustomNavigationManager CurrentPage="@currentPage" OnNavigate="@HandleNavigation" />
+    @if (isCheckingAuth)
+    {
+        <div class="d-flex justify-center align-center" style="min-height: 100vh;">
+            <div class="text-center">
+                <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.h6" Class="mt-4">Loading...</MudText>
+            </div>
+        </div>
+    }
+    else if (currentPage == "login" || !AuthState.IsAuthenticated)
+    {
+        <!-- Show login page -->
+        <LoginPage />
+    }
+    else
+    {
+        <!-- Main application with navigation -->
+        <CustomNavigationManager CurrentPage="@currentPage" OnNavigate="@HandleNavigation" />
+    }
 </div>
 
 @code {
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     
     private string currentPage = "home";
+    private bool isCheckingAuth = true;
     
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        // Check authentication state
+        await AuthState.LoadTokenFromSecureStorageAsync();
+        
         // Parse the current URL to determine the page
         var uri = NavigationManager.Uri;
         var path = new Uri(uri).AbsolutePath.Trim('/');
         currentPage = string.IsNullOrEmpty(path) ? "home" : path;
         
         Console.WriteLine($"Custom navigation initialized. Current page: {currentPage}");
+        Console.WriteLine($"Is authenticated: {AuthState.IsAuthenticated}");
         
         // Listen for navigation changes
         NavigationManager.LocationChanged += OnLocationChanged;
+        AuthState.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        
+        isCheckingAuth = false;
+        
+        // If not authenticated and not on login page, redirect to login
+        if (!AuthState.IsAuthenticated && currentPage != "login")
+        {
+            NavigationManager.NavigateTo("/login", replace: true);
+        }
+        
+        StateHasChanged();
+    }
+    
+    private void OnAuthenticationStateChanged()
+    {
+        // When authentication state changes, re-evaluate routing
+        if (!AuthState.IsAuthenticated && currentPage != "login")
+        {
+            NavigationManager.NavigateTo("/login", replace: true);
+        }
+        else if (AuthState.IsAuthenticated && currentPage == "login")
+        {
+            NavigationManager.NavigateTo("/", replace: true);
+        }
+        StateHasChanged();
     }
     
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -50,5 +103,6 @@
     public void Dispose()
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
+        AuthState.AuthenticationStateChanged -= OnAuthenticationStateChanged;
     }
 }

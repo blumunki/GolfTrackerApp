@@ -7,9 +7,8 @@ using GolfTrackerApp.Web.Data;
 
 namespace GolfTrackerApp.Web.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class PlayersController : ControllerBase
+public class PlayersController : BaseApiController
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<PlayersController> _logger;
@@ -25,7 +24,10 @@ public class PlayersController : ControllerBase
     {
         try
         {
+            var userId = GetCurrentUserId();
+            
             var players = await _context.Players
+                .Where(p => p.CreatedByApplicationUserId == userId)
                 .OrderBy(p => p.LastName)
                 .ThenBy(p => p.FirstName)
                 .ToListAsync();

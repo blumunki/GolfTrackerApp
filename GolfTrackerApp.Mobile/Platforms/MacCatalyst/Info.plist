@@ -35,6 +35,19 @@
     <key>XSAppIconAssets</key>
     <string>Assets.xcassets/appicon.appiconset</string>
     
+    <!-- URL Schemes for OAuth redirect -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>Golf Tracker OAuth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>golftracker</string>
+            </array>
+        </dict>
+    </array>
+    
     <!-- Allow HTTP connections for development -->
     <key>NSAppTransportSecurity</key>
     <dict>

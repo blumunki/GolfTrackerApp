@@ -1,0 +1,80 @@
+@page "/test"
+@layout SimpleLayout
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+@inject ILogger<TestPage> Logger
+
+<h3>Configuration Test</h3>
+
+<p>
+    <strong>Client ID configured:</strong> @clientIdConfigured
+</p>
+<p>
+    <strong>Client Secret configured:</strong> @clientSecretConfigured
+</p>
+<p>
+    <strong>Client ID (first 20 chars):</strong> @clientIdPreview
+</p>
+
+<button class="btn btn-primary" @onclick="TestConfiguration">Test Configuration</button>
+
+@if (!string.IsNullOrEmpty(testResult))
+{
+    <div class="alert alert-info mt-3">
+        @testResult
+    </div>
+}
+
+@code {
+    private bool clientIdConfigured = false;
+    private bool clientSecretConfigured = false;
+    private string clientIdPreview = "";
+    private string testResult = "";
+
+    protected override void OnInitialized()
+    {
+        try
+        {
+            var clientId = Configuration["Authentication:Google:ClientId"];
+            var clientSecret = Configuration["Authentication:Google:ClientSecret"];
+
+            clientIdConfigured = !string.IsNullOrEmpty(clientId);
+            clientSecretConfigured = !string.IsNullOrEmpty(clientSecret);
+            clientIdPreview = clientId?.Substring(0, Math.Min(20, clientId.Length)) ?? "";
+
+            Logger.LogInformation($"Configuration loaded - ClientId: {clientIdConfigured}, ClientSecret: {clientSecretConfigured}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading configuration");
+            testResult = $"Error: {ex.Message}";
+        }
+    }
+
+    private void TestConfiguration()
+    {
+        try
+        {
+            var allConfig = new Dictionary<string, string>();
+            foreach (var item in Configuration.AsEnumerable())
+            {
+                allConfig[item.Key] = item.Value ?? "";
+            }
+
+            var authKeys = allConfig.Where(x => x.Key.Contains("Authentication")).ToList();
+            
+            testResult = $"Found {authKeys.Count} authentication config keys:\n";
+            foreach (var key in authKeys)
+            {
+                testResult += $"- {key.Key}: {(string.IsNullOrEmpty(key.Value) ? "[EMPTY]" : "[SET]")}\n";
+            }
+
+            Logger.LogInformation(testResult);
+        }
+        catch (Exception ex)
+        {
+            testResult = $"Test failed: {ex.Message}";
+            Logger.LogError(ex, "Configuration test failed");
+        }
+    }
+}

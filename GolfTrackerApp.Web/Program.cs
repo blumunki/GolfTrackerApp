@@ -8,6 +8,9 @@ using GolfTrackerApp.Web.Services;
 using GolfTrackerApp.Web.Models;
 using MudBlazor.Services;
 using Microsoft.AspNetCore.Components.Server;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +37,26 @@ builder.Services.AddAuthentication()
     {
         googleOptions.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
         googleOptions.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
+    });
+
+// Add JWT Authentication for mobile app API
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "your-super-secret-jwt-key-that-is-at-least-32-characters-long";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GolfTrackerApp";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "GolfTrackerApp";
+
+builder.Services.AddAuthentication()
+    .AddJwtBearer("ApiAuth", options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
     });
 
 builder.Services.ConfigureApplicationCookie(options =>

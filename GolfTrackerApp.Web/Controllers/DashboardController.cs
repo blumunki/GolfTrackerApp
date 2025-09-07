@@ -4,9 +4,8 @@ using GolfTrackerApp.Web.Data;
 
 namespace GolfTrackerApp.Web.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class DashboardController : ControllerBase
+public class DashboardController : BaseApiController
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<DashboardController> _logger;
@@ -22,9 +21,14 @@ public class DashboardController : ControllerBase
     {
         try
         {
-            var totalRounds = await _context.Rounds.CountAsync();
+            var userId = GetCurrentUserId();
+            
+            var totalRounds = await _context.Rounds
+                .Where(r => r.CreatedByApplicationUserId == userId)
+                .CountAsync();
             
             var roundScores = await _context.Scores
+                .Where(s => s.Round != null && s.Round.CreatedByApplicationUserId == userId)
                 .GroupBy(s => s.RoundId)
                 .Select(g => g.Sum(s => s.Strokes))
                 .ToListAsync();
@@ -33,6 +37,7 @@ public class DashboardController : ControllerBase
             var bestScore = roundScores.Any() ? roundScores.Min() : 0;
 
             var coursesPlayed = await _context.Rounds
+                .Where(r => r.CreatedByApplicationUserId == userId)
                 .Select(r => r.GolfCourseId)
                 .Distinct()
                 .CountAsync();
@@ -59,9 +64,12 @@ public class DashboardController : ControllerBase
     {
         try
         {
+            var userId = GetCurrentUserId();
+            
             var recentRounds = await _context.Rounds
                 .Include(r => r.GolfCourse)
                 .ThenInclude(gc => gc!.GolfClub!)
+                .Where(r => r.CreatedByApplicationUserId == userId)
                 .OrderByDescending(r => r.DatePlayed)
                 .Take(5)
                 .Select(r => $"Played {(r.GolfCourse != null ? r.GolfCourse.Name : "Unknown Course")} on {r.DatePlayed:MMM dd}")
@@ -91,7 +99,10 @@ public class DashboardController : ControllerBase
     {
         try
         {
+            var userId = GetCurrentUserId();
+            
             var roundScores = await _context.Scores
+                .Where(s => s.Round != null && s.Round.CreatedByApplicationUserId == userId)
                 .GroupBy(s => s.RoundId)
                 .Select(g => g.Sum(s => s.Strokes))
                 .ToListAsync();
@@ -125,9 +136,12 @@ public class DashboardController : ControllerBase
     {
         try
         {
+            var userId = GetCurrentUserId();
+            
             var favoriteCourses = await _context.Rounds
                 .Include(r => r.GolfCourse)
                 .ThenInclude(gc => gc!.GolfClub!)
+                .Where(r => r.CreatedByApplicationUserId == userId)
                 .GroupBy(r => new { r.GolfCourseId, CourseName = r.GolfCourse!.Name, ClubName = r.GolfCourse.GolfClub!.Name })
                 .Select(g => new
                 {
