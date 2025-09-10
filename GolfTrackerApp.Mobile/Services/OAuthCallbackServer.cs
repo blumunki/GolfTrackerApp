@@ -28,8 +28,6 @@ public class OAuthCallbackServer : IDisposable
             _listener.Prefixes.Add($"http://localhost:{_port}{_callbackPath}/");
             _listener.Start();
 
-            Console.WriteLine($"DEBUG: OAuth callback server started on http://localhost:{_port}{_callbackPath}");
-
             // Start listening for requests
             _ = Task.Run(async () =>
             {
@@ -43,11 +41,10 @@ public class OAuthCallbackServer : IDisposable
                 }
                 catch (Exception ex) when (ex is ObjectDisposedException || ex is HttpListenerException)
                 {
-                    Console.WriteLine($"DEBUG: Callback server stopped: {ex.Message}");
+                    // Callback server stopped
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"DEBUG: Callback server error: {ex.Message}");
                     _authCodeCompletionSource?.TrySetException(ex);
                 }
             }, _cancellationTokenSource.Token);
@@ -58,9 +55,8 @@ public class OAuthCallbackServer : IDisposable
                 return await _authCodeCompletionSource.Task;
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine($"DEBUG: Failed to start OAuth callback server: {ex.Message}");
             return null;
         }
         finally
@@ -75,8 +71,6 @@ public class OAuthCallbackServer : IDisposable
         {
             var request = context.Request;
             var response = context.Response;
-
-            Console.WriteLine($"DEBUG: Callback received: {request.Url}");
 
             // Extract authorization code from query parameters
             var query = request.Url?.Query;
@@ -116,14 +110,11 @@ public class OAuthCallbackServer : IDisposable
             await response.OutputStream.WriteAsync(buffer, 0, buffer.Length);
             response.OutputStream.Close();
 
-            Console.WriteLine($"DEBUG: Auth code extracted: {authCode?.Substring(0, Math.Min(10, authCode?.Length ?? 0))}...");
-
             // Complete the task with the auth code
             _authCodeCompletionSource?.TrySetResult(authCode);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"DEBUG: Error handling callback: {ex.Message}");
             _authCodeCompletionSource?.TrySetException(ex);
         }
     }
@@ -136,9 +127,9 @@ public class OAuthCallbackServer : IDisposable
             _listener?.Stop();
             _listener?.Close();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine($"DEBUG: Error stopping OAuth callback server: {ex.Message}");
+            // Error stopping OAuth callback server
         }
     }
 

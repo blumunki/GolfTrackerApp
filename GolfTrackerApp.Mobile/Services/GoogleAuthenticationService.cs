@@ -9,29 +9,24 @@ public class GoogleAuthenticationService
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly ILogger<GoogleAuthenticationService> _logger;
     private readonly AuthenticationStateService _authenticationStateService;
 
     public GoogleAuthenticationService(
         HttpClient httpClient, 
-        IConfiguration configuration, 
+        IConfiguration configuration,
+        ConfigurationService configService,
         ILogger<GoogleAuthenticationService> logger,
         AuthenticationStateService authenticationStateService)
     {
         _httpClient = httpClient;
         _configuration = configuration;
+        _configService = configService;
         _logger = logger;
         _authenticationStateService = authenticationStateService;
         
-        // Debug logging to see if configuration is available
         _logger.LogInformation("GoogleAuthenticationService initialized");
-        Console.WriteLine("DEBUG: GoogleAuthenticationService initialized");
-        var clientId = _configuration["Authentication:Google:ClientId"];
-        var clientSecret = _configuration["Authentication:Google:ClientSecret"];
-        _logger.LogInformation($"Client ID configured: {!string.IsNullOrEmpty(clientId)}");
-        _logger.LogInformation($"Client Secret configured: {!string.IsNullOrEmpty(clientSecret)}");
-        Console.WriteLine($"DEBUG: Client ID configured: {!string.IsNullOrEmpty(clientId)}");
-        Console.WriteLine($"DEBUG: Client Secret configured: {!string.IsNullOrEmpty(clientSecret)}");
     }
 
     public async Task<bool> GoogleSignInAsync()
@@ -39,11 +34,10 @@ public class GoogleAuthenticationService
         try
         {
             _logger.LogInformation("Starting Google Sign-In process");
-            Console.WriteLine("DEBUG: Starting Google Sign-In process");
             
             // Get Google OAuth configuration
-            var clientId = _configuration["Authentication:Google:ClientId"];
-            var clientSecret = _configuration["Authentication:Google:ClientSecret"];
+            var clientId = _configuration["Authentication:Google:ClientId"] ?? _configService.GoogleClientId;
+            var clientSecret = _configuration["Authentication:Google:ClientSecret"] ?? _configService.GoogleClientSecret;
 
             _logger.LogInformation($"Client ID configured: {!string.IsNullOrEmpty(clientId)}");
             _logger.LogInformation($"Client Secret configured: {!string.IsNullOrEmpty(clientSecret)}");
@@ -89,7 +83,6 @@ public class GoogleAuthenticationService
             string? authCode = null;
             try
             {
-                Console.WriteLine("DEBUG: Starting OAuth callback server");
                 _logger.LogInformation("Starting OAuth callback server");
                 
                 // Start the callback server to handle the OAuth redirect
@@ -98,7 +91,6 @@ public class GoogleAuthenticationService
                 // Start server and get auth code (with timeout)
                 var serverTask = callbackServer.StartAndWaitForCallbackAsync(TimeSpan.FromMinutes(5));
                 
-                Console.WriteLine("DEBUG: About to call WebAuthenticator.AuthenticateAsync");
                 _logger.LogInformation("About to call WebAuthenticator.AuthenticateAsync");
                 
                 // Use WebAuthenticator to open the browser - must be called on main UI thread
@@ -114,26 +106,22 @@ public class GoogleAuthenticationService
                                 PrefersEphemeralWebBrowserSession = false
                             });
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
-                        Console.WriteLine($"DEBUG: WebAuthenticator failed (expected): {ex.Message}");
                         return null; // This is expected since user will cancel Safari
                     }
                 });
 
                 // Wait for the callback server to get the authorization code
                 // The WebAuthenticator will likely fail when user presses Cancel, but that's OK
-                Console.WriteLine("DEBUG: Waiting for authorization code from callback server...");
                 authCode = await serverTask;
                 
                 if (!string.IsNullOrEmpty(authCode))
                 {
-                    Console.WriteLine($"DEBUG: Authorization code received from callback server: {authCode?.Substring(0, 10)}...");
                     _logger.LogInformation("Authorization code received from callback server");
                 }
                 else
                 {
-                    Console.WriteLine("DEBUG: No authorization code received from callback server");
                     _logger.LogError("No authorization code received from callback server");
                     
                     // Try to get result from WebAuthenticator as fallback
@@ -142,25 +130,23 @@ public class GoogleAuthenticationService
                         var authResult = await authTask;
                         if (authResult?.Properties.TryGetValue("code", out authCode) == true)
                         {
-                            Console.WriteLine($"DEBUG: Got authorization code from WebAuthenticator fallback: {authCode?.Substring(0, 10)}...");
+                            _logger.LogInformation("Got authorization code from WebAuthenticator fallback");
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
-                        Console.WriteLine($"DEBUG: WebAuthenticator also failed: {ex.Message}");
+                        // WebAuthenticator failed as backup too
                     }
                 }
 
                 if (string.IsNullOrEmpty(authCode))
                 {
-                    Console.WriteLine("DEBUG: No authorization code received from either method");
                     _logger.LogError("No authorization code received");
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"DEBUG: WebAuthenticator failed with exception: {ex.GetType().Name}: {ex.Message}");
                 _logger.LogError($"WebAuthenticator failed: {ex.Message}");
                 _logger.LogError($"WebAuthenticator exception type: {ex.GetType().Name}");
                 _logger.LogError($"WebAuthenticator stack trace: {ex.StackTrace}");
@@ -168,7 +154,6 @@ public class GoogleAuthenticationService
                 // Check if it was user cancellation
                 if (ex is TaskCanceledException || ex.Message.Contains("canceled") || ex.Message.Contains("cancelled"))
                 {
-                    Console.WriteLine("DEBUG: User canceled the authentication process");
                     _logger.LogInformation("User canceled the authentication process");
                     return false;
                 }
@@ -195,7 +180,6 @@ public class GoogleAuthenticationService
 
             var tokenContent = new FormUrlEncodedContent(tokenData);
             
-            Console.WriteLine("DEBUG: Exchanging authorization code for access token");
             _logger.LogInformation("Exchanging authorization code for access token");
             
             var tokenResponse = await _httpClient.PostAsync("https://oauth2.googleapis.com/token", tokenContent);
@@ -203,7 +187,6 @@ public class GoogleAuthenticationService
             if (!tokenResponse.IsSuccessStatusCode)
             {
                 var errorContent = await tokenResponse.Content.ReadAsStringAsync();
-                Console.WriteLine($"DEBUG: Token exchange failed with status {tokenResponse.StatusCode}: {errorContent}");
                 _logger.LogError($"Token exchange failed with status {tokenResponse.StatusCode}: {errorContent}");
                 return false;
             }
