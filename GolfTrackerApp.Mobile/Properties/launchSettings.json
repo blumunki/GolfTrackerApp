@@ -7,6 +7,16 @@
     "macOS": {
       "commandName": "Project",
       "nativeDebugging": false
+    },
+    "iOS": {
+      "commandName": "Project",
+      "nativeDebugging": false,
+      "deviceId": "iPhone 16"
+    },
+    "iOS Simulator": {
+      "commandName": "Project",
+      "nativeDebugging": false,
+      "deviceName": "iPhone 16"
     }
   }
 }

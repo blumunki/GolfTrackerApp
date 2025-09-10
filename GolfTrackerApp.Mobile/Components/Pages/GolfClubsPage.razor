@@ -1,8 +1,9 @@
 @page "/golf-clubs"
+@page "/golfclubs"
 @using GolfTrackerApp.Mobile.Models
-@using System.Text.Json
-@inject HttpClient Http
-@inject IJSRuntime JSRuntime
+@using GolfTrackerApp.Mobile.Services.Api
+@inject IGolfClubApiService GolfClubApi
+@inject ILogger<GolfClubsPage> Logger
 
 <MudContainer Class="pa-4">
     <MudText Typo="Typo.h4" Class="mb-4">Golf Clubs</MudText>
@@ -136,15 +137,13 @@
             loading = true;
             StateHasChanged();
             
-            var response = await Http.GetStringAsync("https://localhost:7295/api/golfclubs");
-            golfClubs = JsonSerializer.Deserialize<List<GolfClub>>(response, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            Logger.LogInformation("Loading golf clubs from API...");
+            golfClubs = await GolfClubApi.GetAllGolfClubsAsync();
+            Logger.LogInformation("Successfully loaded {Count} golf clubs", golfClubs?.Count ?? 0);
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading golf clubs: {ex.Message}");
+            Logger.LogError(ex, "Error loading golf clubs");
             golfClubs = null; // Set to null to show error state
         }
         finally
