@@ -5,199 +5,190 @@
 @using MudBlazor
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.Extensions.Configuration
-@* @inject AuthenticationService AuthService *@
 @inject GoogleAuthenticationService GoogleAuthService
-@* @inject AuthenticationStateService AuthState *@
 @inject NavigationManager Navigation
 @inject ILogger<LoginPage> Logger
-@inject IConfiguration Configuration
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16 px-8">
-    <MudPaper Elevation="2" Class="pa-8">
-        <div class="text-center mb-6">
-            <MudIcon Icon="Icons.Material.Filled.GolfCourse" Color="Color.Primary" Size="Size.Large" />
-            <MudText Typo="Typo.h4" Color="Color.Primary" Class="mt-2">Golf Tracker</MudText>
-            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">Sign in to continue</MudText>
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8 px-4">
+    <MudPaper Elevation="8" Class="pa-8" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+        <div class="text-center mb-8">
+            <MudIcon Icon="Icons.Material.Filled.GolfCourse" Color="Color.Surface" Size="Size.Large" Style="font-size: 4rem;" />
+            <MudText Typo="Typo.h3" Color="Color.Surface" Class="mt-4 mb-2" Style="font-weight: 600;">
+                Golf Tracker
+            </MudText>
+            <MudText Typo="Typo.h6" Color="Color.Surface" Style="opacity: 0.9;">
+                Track your game, improve your score
+            </MudText>
         </div>
 
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <MudAlert Severity="Severity.Error" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="ClearError">
+            <MudAlert Severity="Severity.Error" Class="mb-6" ShowCloseIcon="true" CloseIconClicked="ClearError" Style="border-radius: 12px;">
                 @errorMessage
             </MudAlert>
         }
 
-        <!-- Configuration Debug Info -->
-        <MudAlert Severity="Severity.Info" Class="mb-4">
-            <MudText><strong>Configuration Debug:</strong></MudText>
-            <MudText>Client ID configured: @clientIdConfigured</MudText>
-            <MudText>Client ID preview: @clientIdPreview</MudText>
-            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="TestConfiguration">Test Config</MudButton>
-        </MudAlert>
-
-        @if (!string.IsNullOrEmpty(configTestResult))
-        {
-            <MudAlert Severity="Severity.Warning" Class="mb-4">
-                <pre style="white-space: pre-wrap; font-size: 0.8em;">@configTestResult</pre>
-            </MudAlert>
-        }
-
-        <MudForm @ref="form" @bind-IsValid="@isFormValid">
-            <MudTextField @bind-Value="email" 
-                         Label="Email" 
-                         Variant="Variant.Outlined" 
-                         Required="true"
-                         RequiredError="Email is required"
-                         Validation="@(new EmailAddressAttribute())"
-                         Class="mb-4" />
-            
-            <MudTextField @bind-Value="password" 
-                         Label="Password" 
-                         Variant="Variant.Outlined" 
-                         InputType="InputType.Password"
-                         Required="true"
-                         RequiredError="Password is required"
-                         Class="mb-6" />
-            
-            <MudButton ButtonType="ButtonType.Submit" 
-                      Variant="Variant.Filled" 
-                      Color="Color.Primary" 
-                      Size="Size.Large"
-                      FullWidth="true"
-                      OnClick="HandleLogin"
-                      Disabled="@(!isFormValid || isLoading)"
-                      Class="mb-4">
-                @if (isLoading)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                    <MudText Class="ml-2">Signing in...</MudText>
-                }
-                else
-                {
-                    <MudText>Sign In</MudText>
-                }
-            </MudButton>
-
-            <MudButton Variant="Variant.Outlined" 
-                      Color="Color.Default" 
-                      Size="Size.Large"
-                      FullWidth="true"
-                      OnClick="HandleGoogleSignIn"
-                      Disabled="@isLoading"
-                      Class="mb-4"
-                      StartIcon="@Icons.Custom.Brands.Google">
-                @if (isGoogleSigningIn)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                    <MudText Class="ml-2">Signing in with Google...</MudText>
-                }
-                else
-                {
-                    <MudText>Sign in with Google</MudText>
-                }
-            </MudButton>
-
-            <MudDivider Class="my-4" />
-            
-            <MudText Align="Align.Center" Class="mb-2">Don't have an account?</MudText>
-            <MudButton Variant="Variant.Text" 
-                      Color="Color.Primary" 
-                      Size="Size.Large"
-                      FullWidth="true"
-                      OnClick="ShowRegisterForm"
-                      Disabled="@isLoading">
-                Create Account
-            </MudButton>
-            
-            <!-- Debug Navigation -->
-            <MudDivider Class="my-4" />
-            <MudText Align="Align.Center" Class="mb-2">Debug Navigation</MudText>
-            <MudButton Variant="Variant.Text" 
-                      Color="Color.Secondary" 
-                      Size="Size.Large"
-                      FullWidth="true"
-                      Href="/test">
-                Config Test Page
-            </MudButton>
-            <MudButton Variant="Variant.Text" 
-                      Color="Color.Secondary" 
-                      Size="Size.Large"
-                      FullWidth="true"
-                      Href="/simple">
-                Simple Test Page
-            </MudButton>
-            <MudButton Variant="Variant.Text" 
-                      Color="Color.Secondary" 
-                      Size="Size.Large"
-                      FullWidth="true"
-                      Href="/">
-                Home Page
-            </MudButton>
-        </MudForm>
-
-        <!-- Register Form -->
-        <MudDialog @bind-Visible="showRegisterDialog" Options="@(new DialogOptions() { FullWidth = true, MaxWidth = MaxWidth.Small })">
-            <TitleContent>
-                <MudText Typo="Typo.h6">
-                    <MudIcon Icon="Icons.Material.Filled.PersonAdd" Style="margin-right: 8px;" />
-                    Create Account
+        <MudCard Elevation="0" Style="background: white; border-radius: 12px; padding: 2rem;">
+            <MudCardContent>
+                <MudText Typo="Typo.h5" Align="Align.Center" Color="Color.Primary" Class="mb-6" Style="font-weight: 500;">
+                    Welcome Back
                 </MudText>
-            </TitleContent>
-            <DialogContent>
-                @if (!string.IsNullOrEmpty(registerErrorMessage))
-                {
-                    <MudAlert Severity="Severity.Error" Class="mb-4">
-                        @registerErrorMessage
-                    </MudAlert>
-                }
 
-                <MudForm @ref="registerForm" @bind-IsValid="@isRegisterFormValid">
-                    <MudTextField @bind-Value="registerEmail" 
-                                 Label="Email" 
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Primary" 
+                          Size="Size.Large"
+                          FullWidth="true"
+                          OnClick="HandleGoogleSignIn"
+                          Disabled="@isGoogleSigningIn"
+                          Class="mb-6"
+                          Style="height: 56px; border: 2px solid; border-radius: 12px; font-weight: 500;"
+                          StartIcon="@Icons.Custom.Brands.Google">
+                    @if (isGoogleSigningIn)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                        <MudText>Signing you in...</MudText>
+                    }
+                    else
+                    {
+                        <MudText>Continue with Google</MudText>
+                    }
+                </MudButton>
+
+                <div class="d-flex align-center my-6">
+                    <MudDivider Class="flex-grow-1" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mx-4">or</MudText>
+                    <MudDivider Class="flex-grow-1" />
+                </div>
+
+                <MudForm @ref="form" @bind-IsValid="@isFormValid">
+                    <MudTextField @bind-Value="email" 
+                                 Label="Email address" 
                                  Variant="Variant.Outlined" 
                                  Required="true"
                                  RequiredError="Email is required"
                                  Validation="@(new EmailAddressAttribute())"
-                                 Class="mb-4" />
+                                 Class="mb-4"
+                                 Style="border-radius: 8px;" />
                     
-                    <MudTextField @bind-Value="registerPassword" 
+                    <MudTextField @bind-Value="password" 
                                  Label="Password" 
                                  Variant="Variant.Outlined" 
                                  InputType="InputType.Password"
                                  Required="true"
                                  RequiredError="Password is required"
-                                 Class="mb-4" />
+                                 Class="mb-6"
+                                 Style="border-radius: 8px;" />
                     
-                    <MudTextField @bind-Value="confirmPassword" 
-                                 Label="Confirm Password" 
-                                 Variant="Variant.Outlined" 
-                                 InputType="InputType.Password"
-                                 Required="true"
-                                 RequiredError="Please confirm your password"
-                                 Validation="@(new Func<string, string>(ValidatePasswordMatch))"
-                                 Class="mb-4" />
+                    <MudButton ButtonType="ButtonType.Submit" 
+                              Variant="Variant.Filled" 
+                              Color="Color.Primary" 
+                              Size="Size.Large"
+                              FullWidth="true"
+                              OnClick="HandleLogin"
+                              Disabled="@(!isFormValid || isLoading)"
+                              Class="mb-4"
+                              Style="height: 56px; border-radius: 12px; font-weight: 500; box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);">
+                        @if (isLoading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <MudText>Signing in...</MudText>
+                        }
+                        else
+                        {
+                            <MudText>Sign In</MudText>
+                        }
+                    </MudButton>
                 </MudForm>
-            </DialogContent>
-            <DialogActions>
-                <MudButton OnClick="CloseRegisterDialog" Disabled="@isRegistering">Cancel</MudButton>
-                <MudButton Color="Color.Primary" 
-                          Variant="Variant.Filled" 
-                          OnClick="HandleRegister"
-                          Disabled="@(!isRegisterFormValid || isRegistering)">
-                    @if (isRegistering)
-                    {
-                        <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                        <MudText Class="ml-2">Creating...</MudText>
-                    }
-                    else
-                    {
-                        <MudText>Create Account</MudText>
-                    }
-                </MudButton>
-            </DialogActions>
-        </MudDialog>
+
+                <MudDivider Class="my-6" />
+                
+                <div class="text-center">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        New to Golf Tracker?
+                    </MudText>
+                    <MudButton Variant="Variant.Text" 
+                              Color="Color.Primary" 
+                              Size="Size.Large"
+                              OnClick="ShowRegisterForm"
+                              Disabled="@(isLoading || isGoogleSigningIn)"
+                              Style="font-weight: 500;">
+                        Create your account
+                    </MudButton>
+                </div>
+            </MudCardContent>
+        </MudCard>
     </MudPaper>
 </MudContainer>
+
+<!-- Register Form Dialog -->
+<MudDialog @bind-Visible="showRegisterDialog" Options="@(new DialogOptions() { FullWidth = true, MaxWidth = MaxWidth.Small })">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="Icons.Material.Filled.PersonAdd" Class="mr-3" />
+            <MudText Typo="Typo.h6">Create Your Account</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrEmpty(registerErrorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4" Style="border-radius: 8px;">
+                @registerErrorMessage
+            </MudAlert>
+        }
+
+        <MudForm @ref="registerForm" @bind-IsValid="@isRegisterFormValid">
+            <MudTextField @bind-Value="registerEmail" 
+                         Label="Email address" 
+                         Variant="Variant.Outlined" 
+                         Required="true"
+                         RequiredError="Email is required"
+                         Validation="@(new EmailAddressAttribute())"
+                         Class="mb-4"
+                         Style="border-radius: 8px;" />
+            
+            <MudTextField @bind-Value="registerPassword" 
+                         Label="Password" 
+                         Variant="Variant.Outlined" 
+                         InputType="InputType.Password"
+                         Required="true"
+                         RequiredError="Password is required"
+                         Class="mb-4"
+                         Style="border-radius: 8px;" />
+            
+            <MudTextField @bind-Value="confirmPassword" 
+                         Label="Confirm Password" 
+                         Variant="Variant.Outlined" 
+                         InputType="InputType.Password"
+                         Required="true"
+                         RequiredError="Please confirm your password"
+                         Validation="@(new Func<string, string>(ValidatePasswordMatch))"
+                         Class="mb-4"
+                         Style="border-radius: 8px;" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseRegisterDialog" 
+                  Disabled="@isRegistering"
+                  Variant="Variant.Text">
+            Cancel
+        </MudButton>
+        <MudButton Color="Color.Primary" 
+                  Variant="Variant.Filled" 
+                  OnClick="HandleRegister"
+                  Disabled="@(!isRegisterFormValid || isRegistering)"
+                  Style="border-radius: 8px;">
+            @if (isRegistering)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <MudText>Creating...</MudText>
+            }
+            else
+            {
+                <MudText>Create Account</MudText>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
 @code {
     private MudForm form = null!;
@@ -215,73 +206,10 @@
     private string confirmPassword = string.Empty;
     private string errorMessage = string.Empty;
     private string registerErrorMessage = string.Empty;
-    
-    // Configuration testing
-    private bool clientIdConfigured = false;
-    private string clientIdPreview = "";
-    private string configTestResult = "";
 
     protected override void OnInitialized()
     {
-        // Temporarily disabled for debugging
         Logger.LogInformation("LoginPage initialized");
-        
-        // Test configuration loading
-        TestConfigurationOnLoad();
-        
-        /*
-        // Check if user is already authenticated
-        await AuthState.LoadTokenFromSecureStorageAsync();
-        if (AuthState.IsAuthenticated)
-        {
-            Navigation.NavigateTo("/", replace: true);
-        }
-        */
-    }
-
-    private void TestConfigurationOnLoad()
-    {
-        try
-        {
-            var clientId = Configuration["Authentication:Google:ClientId"];
-
-            clientIdConfigured = !string.IsNullOrEmpty(clientId);
-            clientIdPreview = clientId?.Substring(0, Math.Min(20, clientId.Length)) ?? "[NOT SET]";
-
-            Logger.LogInformation($"Configuration loaded - ClientId: {clientIdConfigured}");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading configuration");
-            configTestResult = $"Error loading config: {ex.Message}";
-        }
-    }
-
-    private void TestConfiguration()
-    {
-        try
-        {
-            var allConfig = new Dictionary<string, string>();
-            foreach (var item in Configuration.AsEnumerable())
-            {
-                allConfig[item.Key] = item.Value ?? "";
-            }
-
-            var authKeys = allConfig.Where(x => x.Key.Contains("Authentication")).ToList();
-            
-            configTestResult = $"Found {authKeys.Count} authentication config keys:\n";
-            foreach (var key in authKeys)
-            {
-                configTestResult += $"- {key.Key}: {(string.IsNullOrEmpty(key.Value) ? "[EMPTY]" : "[HAS VALUE]")}\n";
-            }
-
-            Logger.LogInformation(configTestResult);
-        }
-        catch (Exception ex)
-        {
-            configTestResult = $"Test failed: {ex.Message}";
-            Logger.LogError(ex, "Configuration test failed");
-        }
     }
 
     private async Task HandleLogin()
@@ -294,25 +222,9 @@
 
         try
         {
-            // Temporarily disabled for debugging
-            Logger.LogInformation("Login temporarily disabled for debugging");
-            await Task.Delay(500);
-            errorMessage = "Login temporarily disabled for debugging";
-            
-            /*
-            var result = await AuthService.LoginAsync(email, password);
-            
-            if (result.IsSuccess)
-            {
-                AuthState.SetAuthenticationState(result.Token, result.UserId, result.Email, result.UserName);
-                await AuthState.SaveTokenSecurelyAsync();
-                Navigation.NavigateTo("/", replace: true);
-            }
-            else
-            {
-                errorMessage = result.ErrorMessage;
-            }
-            */
+            // TODO: Implement standard email/password authentication
+            await Task.Delay(500); // Simulate API call
+            errorMessage = "Standard login coming soon. Please use Google sign-in for now.";
         }
         catch (Exception ex)
         {
@@ -334,11 +246,8 @@
 
         try
         {
-            Logger.LogInformation("HandleGoogleSignIn button clicked - starting authentication process");
-            Console.WriteLine("DEBUG: HandleGoogleSignIn button clicked - starting authentication process");
+            Logger.LogInformation("Starting Google authentication");
             var result = await GoogleAuthService.GoogleSignInAsync();
-            
-            Logger.LogInformation($"Google sign-in result: {result}");
             
             if (result)
             {
@@ -346,18 +255,18 @@
             }
             else
             {
-                errorMessage = "Google sign-in failed. This might be due to WebAuthenticator redirect issues in iOS Simulator. Check the console logs in Xcode for detailed error information.";
+                errorMessage = "Google sign-in failed. Please try again or contact support if the issue persists.";
             }
         }
         catch (TaskCanceledException)
         {
             Logger.LogInformation("User canceled Google sign-in");
-            errorMessage = "Google sign-in was canceled by user.";
+            // Don't show error message for user cancellation
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Google sign-in error");
-            errorMessage = $"OAuth Error: {ex.Message}. For iOS Simulator, WebAuthenticator may have issues with localhost redirects. Check Xcode console for details.";
+            errorMessage = "An error occurred during Google sign-in. Please try again.";
         }
         finally
         {
@@ -376,26 +285,9 @@
 
         try
         {
-            // Temporarily disabled for debugging
-            Logger.LogInformation("Register temporarily disabled for debugging");
-            await Task.Delay(500);
-            registerErrorMessage = "Register temporarily disabled for debugging";
-            
-            /*
-            var result = await AuthService.RegisterAsync(registerEmail, registerPassword);
-            
-            if (result.IsSuccess)
-            {
-                AuthState.SetAuthenticationState(result.Token, result.UserId, result.Email, result.UserName);
-                await AuthState.SaveTokenSecurelyAsync();
-                showRegisterDialog = false;
-                Navigation.NavigateTo("/", replace: true);
-            }
-            else
-            {
-                registerErrorMessage = result.ErrorMessage;
-            }
-            */
+            // TODO: Implement user registration
+            await Task.Delay(500); // Simulate API call
+            registerErrorMessage = "Registration coming soon. Please use Google sign-in for now.";
         }
         catch (Exception ex)
         {

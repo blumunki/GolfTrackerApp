@@ -1,29 +1,130 @@
 ﻿@page "/"
 @layout SimpleLayout
 
-<div>
-    <h2 style="color: #2c5530;">Simple Home Page</h2>
-    <p>Welcome to Golf Tracker Mobile! (Debug Mode)</p>
-    
-    <p style="font-size: 0.9em; color: #666;">
-        Current time: @DateTime.Now.ToString("HH:mm:ss")
-    </p>
-
-    <div style="margin: 20px 0;">
-        <a href="/simple" style="background: #2c5530; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
-            Simple Test Page
-        </a>
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8 px-4">
+    <div class="text-center mb-8">
+        <MudIcon Icon="Icons.Material.Filled.GolfCourse" 
+                 Color="Color.Primary" 
+                 Size="Size.Large" 
+                 Style="font-size: 5rem;" />
+        <MudText Typo="Typo.h3" Color="Color.Primary" Class="mt-4 mb-2" Style="font-weight: 600;">
+            Golf Tracker Mobile
+        </MudText>
+        <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mb-6">
+            Track your rounds, improve your game
+        </MudText>
     </div>
 
-    <div style="margin: 20px 0;">
-        <a href="/test" style="background: #666; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
-            Config Test
-        </a>
+    <MudGrid Justify="Justify.Center" Spacing="4">
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="4" Style="height: 200px; border-radius: 12px;">
+                <MudCardContent Class="d-flex flex-column justify-center align-center text-center" Style="height: 100%;">
+                    <MudIcon Icon="Icons.Material.Filled.Login" 
+                             Color="Color.Primary" 
+                             Size="Size.Large" 
+                             Class="mb-4" />
+                    <MudText Typo="Typo.h6" Class="mb-2">Get Started</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        Sign in to access your golf data
+                    </MudText>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               Href="/login"
+                               Style="border-radius: 8px;">
+                        Sign In
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="4" Style="height: 200px; border-radius: 12px;">
+                <MudCardContent Class="d-flex flex-column justify-center align-center text-center" Style="height: 100%;">
+                    <MudIcon Icon="Icons.Material.Filled.Dashboard" 
+                             Color="Color.Secondary" 
+                             Size="Size.Large" 
+                             Class="mb-4" />
+                    <MudText Typo="Typo.h6" Class="mb-2">Dashboard</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        View your golf statistics
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Secondary" 
+                               Href="/dashboard"
+                               Style="border-radius: 8px;">
+                        View Dashboard
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="4" Style="height: 200px; border-radius: 12px;">
+                <MudCardContent Class="d-flex flex-column justify-center align-center text-center" Style="height: 100%;">
+                    <MudIcon Icon="Icons.Material.Filled.SportsGolf" 
+                             Color="Color.Tertiary" 
+                             Size="Size.Large" 
+                             Class="mb-4" />
+                    <MudText Typo="Typo.h6" Class="mb-2">Rounds</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        Track your golf rounds
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Tertiary" 
+                               Href="/rounds"
+                               Style="border-radius: 8px;">
+                        View Rounds
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="4" Style="height: 200px; border-radius: 12px;">
+                <MudCardContent Class="d-flex flex-column justify-center align-center text-center" Style="height: 100%;">
+                    <MudIcon Icon="Icons.Material.Filled.Place" 
+                             Color="Color.Success" 
+                             Size="Size.Large" 
+                             Class="mb-4" />
+                    <MudText Typo="Typo.h6" Class="mb-2">Golf Clubs</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        Explore golf courses
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Success" 
+                               Href="/golfclubs"
+                               Style="border-radius: 8px;">
+                        Browse Clubs
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudCard Elevation="4" Style="height: 200px; border-radius: 12px;">
+                <MudCardContent Class="d-flex flex-column justify-center align-center text-center" Style="height: 100%;">
+                    <MudIcon Icon="Icons.Material.Filled.Group" 
+                             Color="Color.Info" 
+                             Size="Size.Large" 
+                             Class="mb-4" />
+                    <MudText Typo="Typo.h6" Class="mb-2">Players</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+                        Manage player profiles
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Info" 
+                               Href="/players"
+                               Style="border-radius: 8px;">
+                        View Players
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <div class="text-center mt-8">
+        <MudText Typo="Typo.body2" Color="Color.Secondary">
+            Welcome to Golf Tracker - Your personal golf companion
+        </MudText>
     </div>
-    
-    <div style="margin: 20px 0;">
-        <a href="/login" style="background: #a00; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">
-            Login (Debug)
-        </a>
-    </div>
-</div>
+</MudContainer>
