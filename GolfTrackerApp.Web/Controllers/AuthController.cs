@@ -109,12 +109,29 @@ public class AuthController : ControllerBase
     {
         try
         {
+            _logger.LogInformation($"Google sign-in request received for email: {request.Email}");
+            
+            // Validate the request
+            if (string.IsNullOrEmpty(request.Email))
+            {
+                _logger.LogWarning("Google sign-in request missing email");
+                return BadRequest(new { message = "Email is required" });
+            }
+            
+            if (string.IsNullOrEmpty(request.GoogleId))
+            {
+                _logger.LogWarning("Google sign-in request missing GoogleId");
+                return BadRequest(new { message = "Google ID is required" });
+            }
+            
             // For mobile app, we'll trust the Google ID token and create/login the user
             // In production, you should verify the ID token with Google
             
             var user = await _userManager.FindByEmailAsync(request.Email);
             if (user == null)
             {
+                _logger.LogInformation($"Creating new user for Google sign-in: {request.Email}");
+                
                 // Create new user
                 user = new ApplicationUser
                 {
@@ -126,11 +143,20 @@ public class AuthController : ControllerBase
                 var result = await _userManager.CreateAsync(user);
                 if (!result.Succeeded)
                 {
+                    _logger.LogError($"Failed to create user for Google sign-in: {string.Join(", ", result.Errors.Select(e => e.Description))}");
                     return BadRequest(new { message = "Failed to create user account", errors = result.Errors });
                 }
+                
+                _logger.LogInformation($"Successfully created new user: {user.Id}");
+            }
+            else
+            {
+                _logger.LogInformation($"Existing user found for Google sign-in: {user.Id}");
             }
 
             var token = await GenerateJwtToken(user);
+            
+            _logger.LogInformation($"Successfully generated JWT token for user: {user.Id}");
             
             return Ok(new LoginResponse
             {
@@ -193,7 +219,8 @@ public class GoogleSignInRequest
 {
     public string Email { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string IdToken { get; set; } = string.Empty;
+    public string GoogleId { get; set; } = string.Empty;
+    public string AccessToken { get; set; } = string.Empty;
 }
 
 public class LoginResponse

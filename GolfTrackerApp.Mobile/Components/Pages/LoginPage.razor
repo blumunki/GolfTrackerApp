@@ -257,11 +257,13 @@
             
             if (result)
             {
+                Logger.LogInformation("Google authentication successful, navigating to home");
                 Navigation.NavigateTo("/", replace: true);
             }
             else
             {
-                errorMessage = "Google sign-in failed. Please try again or contact support if the issue persists.";
+                Logger.LogWarning("Google authentication failed");
+                errorMessage = "Google sign-in failed. Please ensure you have an internet connection and try again.";
             }
         }
         catch (TaskCanceledException)
@@ -269,10 +271,20 @@
             Logger.LogInformation("User canceled Google sign-in");
             // Don't show error message for user cancellation
         }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogError(ex, "Configuration error during Google sign-in");
+            errorMessage = $"Configuration error: {ex.Message}";
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogError(ex, "Network error during Google sign-in");
+            errorMessage = "Network error occurred. Please check your internet connection and try again.";
+        }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Google sign-in error");
-            errorMessage = "An error occurred during Google sign-in. Please try again.";
+            Logger.LogError(ex, "Unexpected error during Google sign-in");
+            errorMessage = $"An error occurred during Google sign-in: {ex.Message}";
         }
         finally
         {

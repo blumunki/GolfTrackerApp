@@ -184,6 +184,69 @@
                     Back to Home
                 </MudButton>
                 break;
+
+            case "account":
+                <!-- Account Management Page -->
+                <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
+                    👤 Account
+                </MudText>
+                
+                <MudCard Class="mb-4">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-3">
+                            User Information
+                        </MudText>
+                        
+                        @if (AuthState.IsAuthenticated)
+                        {
+                            <MudGrid>
+                                <MudItem xs="12">
+                                    <MudTextField Label="Email" Value="@AuthState.Email" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                <MudItem xs="12">
+                                    <MudTextField Label="User ID" Value="@AuthState.UserId" ReadOnly="true" Variant="Variant.Outlined" />
+                                </MudItem>
+                                @if (!string.IsNullOrEmpty(AuthState.UserName))
+                                {
+                                    <MudItem xs="12">
+                                        <MudTextField Label="Username" Value="@AuthState.UserName" ReadOnly="true" Variant="Variant.Outlined" />
+                                    </MudItem>
+                                }
+                            </MudGrid>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Warning">
+                                Not authenticated
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+                
+                <MudCard Class="mb-4">
+                    <MudCardContent>
+                        <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-3">
+                            Account Actions
+                        </MudText>
+                        
+                        <MudButton Variant="Variant.Filled" 
+                                  Color="Color.Error" 
+                                  StartIcon="@Icons.Material.Filled.Logout"
+                                  OnClick="@HandleLogout"
+                                  Disabled="@isLoggingOut"
+                                  Class="mb-2">
+                            @(isLoggingOut ? "Logging out..." : "Logout")
+                        </MudButton>
+                        
+                        @if (!string.IsNullOrEmpty(logoutMessage))
+                        {
+                            <MudAlert Severity="@(logoutSuccess ? Severity.Success : Severity.Error)" Class="mt-3">
+                                @logoutMessage
+                            </MudAlert>
+                        }
+                    </MudCardContent>
+                </MudCard>
+                break;
                 
             default:
                 <div class="text-center mt-8">
@@ -250,6 +313,15 @@
                       Class="mx-1">
                 Stats
             </MudButton>
+            
+            <MudButton Color="@(CurrentPage == "account" ? Color.Primary : Color.Default)"
+                      Variant="@(CurrentPage == "account" ? Variant.Filled : Variant.Text)"
+                      StartIcon="@Icons.Material.Filled.AccountCircle"
+                      OnClick="@(() => OnNavigate.InvokeAsync("account"))"
+                      Size="Size.Small"
+                      Class="mx-1">
+                Account
+            </MudButton>
         </div>
     </MudPaper>
 </div>
@@ -260,10 +332,16 @@
     
     [Inject] private HttpClient HttpClient { get; set; } = default!;
     [Inject] private IDashboardApiService DashboardApiService { get; set; } = default!;
+    [Inject] private AuthenticationStateService AuthState { get; set; } = default!;
     
     private bool isTestingApi = false;
     private string apiTestResult = "";
     private bool apiTestSuccess = false;
+    
+    // Logout functionality
+    private bool isLoggingOut = false;
+    private string logoutMessage = "";
+    private bool logoutSuccess = false;
     
     // Dashboard data
     private bool loadingDashboard = true;
@@ -353,6 +431,35 @@
         finally
         {
             isTestingApi = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        isLoggingOut = true;
+        logoutMessage = "";
+        StateHasChanged();
+        
+        try
+        {
+            await AuthState.LogoutAsync();
+            logoutMessage = "Successfully logged out!";
+            logoutSuccess = true;
+            
+            // Navigate back to login after a short delay
+            await Task.Delay(1500);
+            await OnNavigate.InvokeAsync("login");
+        }
+        catch (Exception ex)
+        {
+            logoutMessage = $"Error during logout: {ex.Message}";
+            logoutSuccess = false;
+            Console.WriteLine($"[CustomNavigationManager] Logout error: {ex.Message}");
+        }
+        finally
+        {
+            isLoggingOut = false;
             StateHasChanged();
         }
     }
