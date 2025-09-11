@@ -9,56 +9,62 @@
 @inject NavigationManager Navigation
 @inject ILogger<LoginPage> Logger
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8 px-4">
-    <MudPaper Elevation="8" Class="pa-8" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
-        <div class="text-center mb-8">
-            <MudIcon Icon="Icons.Material.Filled.GolfCourse" Color="Color.Surface" Size="Size.Large" Style="font-size: 4rem;" />
-            <MudText Typo="Typo.h3" Color="Color.Surface" Class="mt-4 mb-2" Style="font-weight: 600;">
+<MudContainer MaxWidth="MaxWidth.Small" Class="px-4" Style="height: 100vh; display: flex; flex-direction: column; justify-content: center;">
+    <MudPaper Elevation="8" Class="pa-6" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+        <div class="text-center mb-4">
+            <MudIcon Icon="Icons.Material.Filled.GolfCourse" Color="Color.Surface" Size="Size.Medium" Style="font-size: 2.5rem;" />
+            <MudText Typo="Typo.h5" Color="Color.Surface" Class="mt-2 mb-1" Style="font-weight: 600;">
                 Golf Tracker
             </MudText>
-            <MudText Typo="Typo.h6" Color="Color.Surface" Style="opacity: 0.9;">
+            <MudText Typo="Typo.body2" Color="Color.Surface" Style="opacity: 0.9; font-size: 0.875rem;">
                 Track your game, improve your score
             </MudText>
         </div>
 
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <MudAlert Severity="Severity.Error" Class="mb-6" ShowCloseIcon="true" CloseIconClicked="ClearError" Style="border-radius: 12px;">
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true" CloseIconClicked="ClearError" Style="border-radius: 12px;">
                 @errorMessage
             </MudAlert>
         }
 
-        <MudCard Elevation="0" Style="background: white; border-radius: 12px; padding: 2rem;">
+        <MudCard Elevation="0" Style="background: white; border-radius: 12px; padding: 1.5rem;">
             <MudCardContent>
-                <MudText Typo="Typo.h5" Align="Align.Center" Color="Color.Primary" Class="mb-6" Style="font-weight: 500;">
+                <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="mb-4" Style="font-weight: 500;">
                     Welcome Back
                 </MudText>
 
                 <MudButton Variant="Variant.Outlined" 
                           Color="Color.Primary" 
-                          Size="Size.Large"
+                          Size="Size.Medium"
                           FullWidth="true"
                           OnClick="HandleGoogleSignIn"
                           Disabled="@isGoogleSigningIn"
-                          Class="mb-6"
-                          Style="height: 56px; border: 2px solid; border-radius: 12px; font-weight: 500;"
+                          Class="mb-4"
+                          Style="height: 48px; border: 2px solid; border-radius: 12px; font-weight: 500;"
                           StartIcon="@Icons.Custom.Brands.Google">
                     @if (isGoogleSigningIn)
                     {
                         <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                        <MudText>Signing you in...</MudText>
+                        <MudText Style="font-size: 0.875rem;">Signing you in...</MudText>
                     }
                     else
                     {
-                        <MudText>Continue with Google</MudText>
+                        <MudText Style="font-size: 0.875rem;">Continue with Google</MudText>
                     }
                 </MudButton>
 
-                <div class="d-flex align-center my-6">
-                    <MudDivider Class="flex-grow-1" />
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mx-4">or</MudText>
-                    <MudDivider Class="flex-grow-1" />
-                </div>
+                <MudGrid Class="my-4">
+                    <MudItem xs="5">
+                        <MudDivider />
+                    </MudItem>
+                    <MudItem xs="2" Class="text-center">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Style="font-size: 0.8rem;">or</MudText>
+                    </MudItem>
+                    <MudItem xs="5">
+                        <MudDivider />
+                    </MudItem>
+                </MudGrid>
 
                 <MudForm @ref="form" @bind-IsValid="@isFormValid">
                     <MudTextField @bind-Value="email" 
@@ -67,7 +73,7 @@
                                  Required="true"
                                  RequiredError="Email is required"
                                  Validation="@(new EmailAddressAttribute())"
-                                 Class="mb-4"
+                                 Class="mb-3"
                                  Style="border-radius: 8px;" />
                     
                     <MudTextField @bind-Value="password" 
@@ -76,42 +82,42 @@
                                  InputType="InputType.Password"
                                  Required="true"
                                  RequiredError="Password is required"
-                                 Class="mb-6"
+                                 Class="mb-4"
                                  Style="border-radius: 8px;" />
                     
                     <MudButton ButtonType="ButtonType.Submit" 
                               Variant="Variant.Filled" 
                               Color="Color.Primary" 
-                              Size="Size.Large"
+                              Size="Size.Medium"
                               FullWidth="true"
                               OnClick="HandleLogin"
                               Disabled="@(!isFormValid || isLoading)"
-                              Class="mb-4"
-                              Style="height: 56px; border-radius: 12px; font-weight: 500; box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);">
+                              Class="mb-3"
+                              Style="height: 48px; border-radius: 12px; font-weight: 500; box-shadow: 0 4px 12px rgba(103, 58, 183, 0.3);">
                         @if (isLoading)
                         {
                             <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                            <MudText>Signing in...</MudText>
+                            <MudText Style="font-size: 0.875rem;">Signing in...</MudText>
                         }
                         else
                         {
-                            <MudText>Sign In</MudText>
+                            <MudText Style="font-size: 0.875rem;">Sign In</MudText>
                         }
                     </MudButton>
                 </MudForm>
 
-                <MudDivider Class="my-6" />
+                <MudDivider Class="my-4" />
                 
                 <div class="text-center">
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2" Style="font-size: 0.8rem;">
                         New to Golf Tracker?
                     </MudText>
                     <MudButton Variant="Variant.Text" 
                               Color="Color.Primary" 
-                              Size="Size.Large"
+                              Size="Size.Medium"
                               OnClick="ShowRegisterForm"
                               Disabled="@(isLoading || isGoogleSigningIn)"
-                              Style="font-weight: 500;">
+                              Style="font-weight: 500; font-size: 0.875rem;">
                         Create your account
                     </MudButton>
                 </div>

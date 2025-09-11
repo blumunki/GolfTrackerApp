@@ -409,7 +409,6 @@ GolfTrackerApp.Web/Data/Players.csv
 .DS_Store
 
 # Local configuration files with secrets
-appsettings.Local.json
 DevConfiguration.generated.cs
 
 # Temporary documentation files - use structured docs/ directory instead
