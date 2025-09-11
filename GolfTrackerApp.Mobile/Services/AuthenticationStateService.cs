@@ -1,18 +1,21 @@
 using System.Net.Http.Headers;
+using Microsoft.Extensions.Logging;
 
 namespace GolfTrackerApp.Mobile.Services;
 
 public class AuthenticationStateService
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<AuthenticationStateService>? _logger;
     private string? _token;
     private string? _userId;
     private string? _email;
     private string? _userName;
 
-    public AuthenticationStateService(HttpClient httpClient)
+    public AuthenticationStateService(HttpClient httpClient, ILogger<AuthenticationStateService>? logger = null)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public bool IsAuthenticated => !string.IsNullOrEmpty(_token);
@@ -49,48 +52,126 @@ public class AuthenticationStateService
         AuthenticationStateChanged?.Invoke();
     }
 
-    // For future use with secure storage
-    public async Task SaveTokenSecurelyAsync()
+    public Task SaveTokenSecurelyAsync()
     {
-        // TODO: Implement secure token storage using Microsoft.Maui.Authentication.WebAuthenticator
-        // or SecureStorage for production
-        if (_token != null)
+        Console.WriteLine($"[AUTH] SaveTokenSecurelyAsync called");
+        Console.WriteLine($"[AUTH] _token: {(_token == null ? "NULL" : $"'{_token}' (length: {_token.Length})")}");
+        Console.WriteLine($"[AUTH] _userId: {(_userId == null ? "NULL" : $"'{_userId}'")}");
+        Console.WriteLine($"[AUTH] _email: {(_email == null ? "NULL" : $"'{_email}'")}");
+        Console.WriteLine($"[AUTH] _userName: {(_userName == null ? "NULL" : $"'{_userName}'")}");
+        
+        if (string.IsNullOrEmpty(_token))
         {
-            await SecureStorage.Default.SetAsync("auth_token", _token);
-            await SecureStorage.Default.SetAsync("user_id", _userId ?? "");
-            await SecureStorage.Default.SetAsync("email", _email ?? "");
-            await SecureStorage.Default.SetAsync("username", _userName ?? "");
+            Console.WriteLine("[AUTH] ERROR: No token to save - _token is null or empty!");
+            return Task.CompletedTask;
         }
+
+        try
+        {
+            // For iOS simulator, just use Preferences directly since SecureStorage has issues
+            Preferences.Default.Set("auth_token", _token);
+            Preferences.Default.Set("user_id", _userId ?? "");
+            Preferences.Default.Set("email", _email ?? "");
+            Preferences.Default.Set("username", _userName ?? "");
+            Console.WriteLine("[AUTH] Token saved to Preferences successfully");
+            _logger?.LogInformation("Token saved to Preferences successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[AUTH] ERROR saving token: {ex.Message}");
+            _logger?.LogError(ex, "Error saving token");
+        }
+        
+        return Task.CompletedTask;
     }
 
     public async Task LoadTokenFromSecureStorageAsync()
     {
         try
         {
-            var token = await SecureStorage.Default.GetAsync("auth_token");
-            var userId = await SecureStorage.Default.GetAsync("user_id");
-            var email = await SecureStorage.Default.GetAsync("email");
-            var userName = await SecureStorage.Default.GetAsync("username");
+            Console.WriteLine("[AUTH] Loading authentication token from storage");
+            _logger?.LogInformation("Loading authentication token from storage");
+            
+            // Use Preferences directly for simplicity
+            var storedToken = Preferences.Default.Get("auth_token", "");
+            var storedUserId = Preferences.Default.Get("user_id", "");
+            var storedEmail = Preferences.Default.Get("email", "");
+            var storedUserName = Preferences.Default.Get("username", "");
+            
+            Console.WriteLine($"[AUTH] Loaded from Preferences:");
+            Console.WriteLine($"[AUTH]   auth_token: {(string.IsNullOrEmpty(storedToken) ? "NULL/EMPTY" : $"EXISTS ({storedToken.Length} chars)")}");
+            Console.WriteLine($"[AUTH]   user_id: {(string.IsNullOrEmpty(storedUserId) ? "NULL/EMPTY" : storedUserId)}");
+            Console.WriteLine($"[AUTH]   email: {(string.IsNullOrEmpty(storedEmail) ? "NULL/EMPTY" : storedEmail)}");
+            Console.WriteLine($"[AUTH]   username: {(string.IsNullOrEmpty(storedUserName) ? "NULL/EMPTY" : storedUserName)}");
+            
+            _logger?.LogInformation($"Loaded from Preferences:");
+            _logger?.LogInformation($"  auth_token: {(string.IsNullOrEmpty(storedToken) ? "NULL/EMPTY" : $"EXISTS ({storedToken.Length} chars)")}");
+            _logger?.LogInformation($"  user_id: {(string.IsNullOrEmpty(storedUserId) ? "NULL/EMPTY" : storedUserId)}");
+            _logger?.LogInformation($"  email: {(string.IsNullOrEmpty(storedEmail) ? "NULL/EMPTY" : storedEmail)}");
+            _logger?.LogInformation($"  username: {(string.IsNullOrEmpty(storedUserName) ? "NULL/EMPTY" : storedUserName)}");
 
-            if (!string.IsNullOrEmpty(token) && !string.IsNullOrEmpty(userId))
+            if (!string.IsNullOrEmpty(storedToken) && !string.IsNullOrEmpty(storedUserId))
             {
-                SetAuthenticationState(token, userId, email ?? "", userName ?? "");
+                Console.WriteLine($"[AUTH] Found valid stored credentials for user: {storedEmail}");
+                _logger?.LogInformation($"Found valid stored credentials for user: {storedEmail}");
+                SetAuthenticationState(storedToken, storedUserId, storedEmail ?? "", storedUserName ?? "");
+                Console.WriteLine("[AUTH] Authentication state restored from storage");
+                _logger?.LogInformation("Authentication state restored from storage");
+            }
+            else
+            {
+                Console.WriteLine("[AUTH] No valid stored authentication credentials found");
+                _logger?.LogInformation("No valid stored authentication credentials found");
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // Token might be corrupted, clear it
+            Console.WriteLine($"[AUTH] Error loading token from storage: {ex.Message}");
+            _logger?.LogError(ex, "Error loading token from storage");
             await ClearStoredTokenAsync();
+        }
+    }
+
+    private async Task<bool> IsTokenValidAsync(string token)
+    {
+        try
+        {
+            // Try a simple API call to validate the token
+            var originalAuth = _httpClient.DefaultRequestHeaders.Authorization;
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            
+            var response = await _httpClient.GetAsync("api/auth/validate");
+            
+            // Restore original auth header
+            _httpClient.DefaultRequestHeaders.Authorization = originalAuth;
+            
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
         }
     }
 
     public Task ClearStoredTokenAsync()
     {
-        SecureStorage.Default.Remove("auth_token");
-        SecureStorage.Default.Remove("user_id");
-        SecureStorage.Default.Remove("email");
-        SecureStorage.Default.Remove("username");
+        _logger?.LogInformation("Clearing stored authentication token");
+        Console.WriteLine("[AUTH] Clearing stored authentication token");
+        
+        // Clear from Preferences
+        Preferences.Default.Remove("auth_token");
+        Preferences.Default.Remove("user_id");
+        Preferences.Default.Remove("email");
+        Preferences.Default.Remove("username");
+        
         ClearAuthenticationState();
         return Task.CompletedTask;
+    }
+
+    public async Task LogoutAsync()
+    {
+        _logger?.LogInformation("User logging out");
+        await ClearStoredTokenAsync();
+        // Additional logout logic could go here (e.g., calling logout API)
     }
 }
