@@ -56,8 +56,8 @@
                         <!-- Key Statistics -->
                         <MudGrid Class="mb-4" Spacing="2">
                             <MudItem xs="6">
-                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%); color: white;">
-                                    <div class="text-center">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%); color: white; height: 120px;">
+                                    <div class="text-center d-flex flex-column justify-center" style="height: 100%;">
                                         <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Medium" Class="mb-1" />
                                         <MudText Typo="Typo.h4" Class="mb-1">@(dashboardStats?.TotalRounds ?? 0)</MudText>
                                         <MudText Typo="Typo.caption">Total Rounds</MudText>
@@ -66,8 +66,8 @@
                             </MudItem>
                             
                             <MudItem xs="6">
-                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%); color: white;">
-                                    <div class="text-center">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%); color: white; height: 120px;">
+                                    <div class="text-center d-flex flex-column justify-center" style="height: 100%;">
                                         <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Medium" Class="mb-1" />
                                         <MudText Typo="Typo.h4" Class="mb-1">@(dashboardStats?.BestScore ?? 0)</MudText>
                                         <MudText Typo="Typo.caption">Best Score</MudText>
@@ -76,8 +76,8 @@
                             </MudItem>
                             
                             <MudItem xs="6">
-                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%); color: white;">
-                                    <div class="text-center">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%); color: white; height: 120px;">
+                                    <div class="text-center d-flex flex-column justify-center" style="height: 100%;">
                                         <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Medium" Class="mb-1" />
                                         <MudText Typo="Typo.h4" Class="mb-1">@((dashboardStats?.AverageToPar ?? 0).ToString("F1"))</MudText>
                                         <MudText Typo="Typo.caption">Avg to Par</MudText>
@@ -86,15 +86,17 @@
                             </MudItem>
                             
                             <MudItem xs="6">
-                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 50%); color: white;">
-                                    <div class="text-center">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 50%); color: white; height: 120px;">
+                                    <div class="text-center d-flex flex-column justify-space-between" style="height: 100%;">
                                         <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Size="Size.Medium" Class="mb-1" />
-                                        <MudText Typo="Typo.h4" Class="mb-1">@(dashboardStats?.FavoriteCourseRounds ?? 0)</MudText>
-                                        <MudText Typo="Typo.caption">Most Played</MudText>
-                                        @if (!string.IsNullOrEmpty(dashboardStats?.FavoriteCourseName))
-                                        {
-                                            <MudText Typo="Typo.caption" Style="font-size: 0.6rem;">@dashboardStats.FavoriteCourseName</MudText>
-                                        }
+                                        <div>
+                                            <MudText Typo="Typo.h4" Class="mb-1">@(dashboardStats?.FavoriteCourseRounds ?? 0)</MudText>
+                                            <MudText Typo="Typo.caption">Most Played</MudText>
+                                            @if (!string.IsNullOrEmpty(dashboardStats?.FavoriteCourseName))
+                                            {
+                                                <MudText Typo="Typo.caption" Style="font-size: 0.55rem; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@dashboardStats.FavoriteCourseName</MudText>
+                                            }
+                                        </div>
                                     </div>
                                 </MudCard>
                             </MudItem>
@@ -102,21 +104,21 @@
 
                         <!-- Quick Actions -->
                         <MudCard Elevation="3" Class="mb-4">
-                            <MudCardHeader>
+                            <MudCardHeader Class="pb-2">
                                 <CardHeaderContent>
                                     <MudText Typo="Typo.h6">⚡ Quick Actions</MudText>
                                 </CardHeaderContent>
                             </MudCardHeader>
-                            <MudCardContent>
+                            <MudCardContent Class="pt-0">
                                 <MudGrid Spacing="2">
                                     <MudItem xs="12">
                                         <MudButton Variant="Variant.Filled" 
                                                   Color="Color.Primary" 
                                                   FullWidth="true"
-                                                  Size="Size.Large"
+                                                  Size="Size.Medium"
                                                   StartIcon="@Icons.Material.Filled.EditNote"
                                                   OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
-                                                  Style="height: 48px;">
+                                                  Style="height: 40px;">
                                             📝 Record a Round
                                         </MudButton>
                                     </MudItem>
@@ -124,8 +126,10 @@
                                         <MudButton Variant="Variant.Outlined" 
                                                   Color="Color.Secondary" 
                                                   FullWidth="true"
+                                                  Size="Size.Small"
                                                   StartIcon="@Icons.Material.Filled.GolfCourse"
-                                                  OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))">
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))"
+                                                  Style="height: 36px;">
                                             Find Clubs
                                         </MudButton>
                                     </MudItem>
@@ -133,8 +137,10 @@
                                         <MudButton Variant="Variant.Outlined" 
                                                   Color="Color.Info" 
                                                   FullWidth="true"
+                                                  Size="Size.Small"
                                                   StartIcon="@Icons.Material.Filled.BarChart"
-                                                  OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))">
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))"
+                                                  Style="height: 36px;">
                                             Full Stats
                                         </MudButton>
                                     </MudItem>
@@ -400,7 +406,7 @@
     <!-- Bottom Navigation -->
     <MudPaper Class="fixed-bottom-nav" 
               Elevation="8" 
-              Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);">
+              Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
         <MudGrid Justify="Justify.SpaceEvenly" AlignItems="Center.Center" Class="pa-2">
             <!-- Home -->
             <MudItem xs="2" Class="text-center">
