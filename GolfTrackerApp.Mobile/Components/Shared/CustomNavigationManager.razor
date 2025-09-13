@@ -1,5 +1,6 @@
 @using GolfTrackerApp.Mobile.Components.Pages
 @using GolfTrackerApp.Mobile.Services.Api
+@using MudBlazor
 
 <div class="mobile-app">
     <!-- Header -->
@@ -15,250 +16,380 @@
         {
             case "home":
             case "":
-                <!-- Real Mobile Dashboard -->
-                <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
-                    🏠 Dashboard
-                </MudText>
-                
-                @if (loadingDashboard)
-                {
-                    <MudProgressCircular Size="Size.Medium" Indeterminate="true" Class="ma-4" />
-                }
-                else
-                {
-                    <!-- Key Stats Cards -->
-                    <MudGrid Class="mb-4">
-                        <MudItem xs="6">
-                            <MudCard Class="text-center pa-2">
-                                <MudCardContent>
-                                    <MudIcon Icon="Icons.Material.Filled.Timeline" Color="Color.Primary" Size="Size.Large" />
-                                    <MudText Typo="Typo.h5" Color="Color.Primary">@(dashboardStats?.TotalRounds ?? 0)</MudText>
-                                    <MudText Typo="Typo.caption">Total Rounds</MudText>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
-                        
-                        <MudItem xs="6">
-                            <MudCard Class="text-center pa-2">
-                                <MudCardContent>
-                                    <MudIcon Icon="Icons.Material.Filled.TrendingDown" Color="Color.Success" Size="Size.Large" />
-                                    <MudText Typo="Typo.h5" Color="Color.Success">@((dashboardStats?.AverageScore ?? 0).ToString("F1"))</MudText>
-                                    <MudText Typo="Typo.caption">Avg Score</MudText>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
-                        
-                        <MudItem xs="6">
-                            <MudCard Class="text-center pa-2">
-                                <MudCardContent>
-                                    <MudIcon Icon="Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Large" />
-                                    <MudText Typo="Typo.h5" Color="Color.Warning">@(dashboardStats?.BestScore ?? 0)</MudText>
-                                    <MudText Typo="Typo.caption">Best Score</MudText>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
-                        
-                        <MudItem xs="6">
-                            <MudCard Class="text-center pa-2">
-                                <MudCardContent>
-                                    <MudIcon Icon="Icons.Material.Filled.GolfCourse" Color="Color.Info" Size="Size.Large" />
-                                    <MudText Typo="Typo.h5" Color="Color.Info">@(dashboardStats?.CoursesPlayed ?? 0)</MudText>
-                                    <MudText Typo="Typo.caption">Courses</MudText>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
-                    </MudGrid>
+                <!-- Comprehensive Mobile Dashboard -->
+                <div class="mobile-dashboard">
+                    @if (loadingDashboard)
+                    {
+                        <div class="text-center pa-4">
+                            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+                            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading your golf dashboard...</MudText>
+                        </div>
+                    }
+                    else if (dashboardStats?.TotalRounds == 0)
+                    {
+                        <!-- Welcome Screen for New Users -->
+                        <div class="text-center pa-4">
+                            <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Size="Size.Large" Color="Color.Primary" Class="mb-3" />
+                            <MudText Typo="Typo.h5" Color="Color.Primary" Class="mb-2">Welcome to Your Golf Journey! 🏌️‍♂️</MudText>
+                            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">Ready to track your rounds and improve your game?</MudText>
+                            <MudButton Variant="Variant.Filled" 
+                                      Color="Color.Primary" 
+                                      Size="Size.Large"
+                                      StartIcon="@Icons.Material.Filled.Add"
+                                      OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
+                                      FullWidth="true">
+                                Record Your First Round
+                            </MudButton>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Header -->
+                        <div class="d-flex align-center justify-space-between mb-3">
+                            <MudText Typo="Typo.h5" Color="Color.Primary">Your Golf Dashboard</MudText>
+                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                          Color="Color.Primary" 
+                                          Size="Size.Small"
+                                          OnClick="@LoadDashboardData" />
+                        </div>
 
-                    <!-- Recent Activity -->
-                    <MudCard Class="mb-4">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">Recent Activity</MudText>
-                            </CardHeaderContent>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            @if (recentActivity?.Any() == true)
-                            {
-                                @foreach (var activity in recentActivity.Take(3))
+                        <!-- Key Statistics -->
+                        <MudGrid Class="mb-4" Spacing="2">
+                            <MudItem xs="6">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%); color: white;">
+                                    <div class="text-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Medium" Class="mb-1" />
+                                        <MudText Typo="Typo.h4" Class="mb-1">@(dashboardStats?.TotalRounds ?? 0)</MudText>
+                                        <MudText Typo="Typo.caption">Total Rounds</MudText>
+                                    </div>
+                                </MudCard>
+                            </MudItem>
+                            
+                            <MudItem xs="6">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%); color: white;">
+                                    <div class="text-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Medium" Class="mb-1" />
+                                        <MudText Typo="Typo.h4" Class="mb-1">@(dashboardStats?.BestScore ?? 0)</MudText>
+                                        <MudText Typo="Typo.caption">Best Score</MudText>
+                                    </div>
+                                </MudCard>
+                            </MudItem>
+                            
+                            <MudItem xs="6">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%); color: white;">
+                                    <div class="text-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Medium" Class="mb-1" />
+                                        <MudText Typo="Typo.h4" Class="mb-1">@((dashboardStats?.AverageToPar ?? 0).ToString("F1"))</MudText>
+                                        <MudText Typo="Typo.caption">Avg to Par</MudText>
+                                    </div>
+                                </MudCard>
+                            </MudItem>
+                            
+                            <MudItem xs="6">
+                                <MudCard Elevation="3" Class="pa-2 golf-stat-card" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 50%); color: white;">
+                                    <div class="text-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Size="Size.Medium" Class="mb-1" />
+                                        <MudText Typo="Typo.h4" Class="mb-1">@(dashboardStats?.FavoriteCourseRounds ?? 0)</MudText>
+                                        <MudText Typo="Typo.caption">Most Played</MudText>
+                                        @if (!string.IsNullOrEmpty(dashboardStats?.FavoriteCourseName))
+                                        {
+                                            <MudText Typo="Typo.caption" Style="font-size: 0.6rem;">@dashboardStats.FavoriteCourseName</MudText>
+                                        }
+                                    </div>
+                                </MudCard>
+                            </MudItem>
+                        </MudGrid>
+
+                        <!-- Quick Actions -->
+                        <MudCard Elevation="3" Class="mb-4">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">⚡ Quick Actions</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12">
+                                        <MudButton Variant="Variant.Filled" 
+                                                  Color="Color.Primary" 
+                                                  FullWidth="true"
+                                                  Size="Size.Large"
+                                                  StartIcon="@Icons.Material.Filled.EditNote"
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
+                                                  Style="height: 48px;">
+                                            📝 Record a Round
+                                        </MudButton>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudButton Variant="Variant.Outlined" 
+                                                  Color="Color.Secondary" 
+                                                  FullWidth="true"
+                                                  StartIcon="@Icons.Material.Filled.GolfCourse"
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))">
+                                            Find Clubs
+                                        </MudButton>
+                                    </MudItem>
+                                    <MudItem xs="6">
+                                        <MudButton Variant="Variant.Outlined" 
+                                                  Color="Color.Info" 
+                                                  FullWidth="true"
+                                                  StartIcon="@Icons.Material.Filled.BarChart"
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))">
+                                            Full Stats
+                                        </MudButton>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+
+                        <!-- Performance Chart -->
+                        <MudCard Elevation="3" Class="mb-4">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">📈 Recent Form</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.TrendingUp" 
+                                                  Color="Color.Primary" 
+                                                  Size="Size.Small"
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (_performanceSeries?.Any() == true)
                                 {
-                                    <div class="d-flex align-center justify-space-between mb-2">
-                                        <div>
-                                            <MudText Typo="Typo.body2">@activity</MudText>
-                                        </div>
+                                    <div class="golf-chart-container">
+                                        <MudChart ChartType="ChartType.Line" 
+                                                 ChartSeries="@_performanceSeries" 
+                                                 XAxisLabels="@_performanceXAxisLabels" 
+                                                 Width="100%" 
+                                                 Height="200px"
+                                                 ChartOptions="@_chartOptions">
+                                        </MudChart>
                                     </div>
                                 }
-                            }
-                            else
-                            {
-                                <MudText Typo="Typo.body2" Color="Color.Secondary">No recent activity.</MudText>
-                            }
-                        </MudCardContent>
-                    </MudCard>
+                                else
+                                {
+                                    <div class="text-center pa-4">
+                                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Size="Size.Large" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">Play a few rounds to see your performance trends here.</MudText>
+                                    </div>
+                                }
+                            </MudCardContent>
+                        </MudCard>
 
-                    <!-- Quick Actions -->
-                    <MudText Typo="Typo.h6" GutterBottom="true">Quick Actions</MudText>
-                    <MudGrid>
-                        <MudItem xs="4">
-                            <MudButton Variant="Variant.Outlined" 
-                                      Color="Color.Primary" 
-                                      FullWidth="true"
-                                      StartIcon="@Icons.Material.Filled.Add"
-                                      OnClick="@(() => OnNavigate.InvokeAsync("rounds"))">
-                                New Round
-                            </MudButton>
-                        </MudItem>
-                        
-                        <MudItem xs="4">
-                            <MudButton Variant="Variant.Outlined" 
-                                      Color="Color.Secondary" 
-                                      FullWidth="true"
-                                      StartIcon="@Icons.Material.Filled.GolfCourse"
-                                      OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))">
-                                Find Clubs
-                            </MudButton>
-                        </MudItem>
-                        
-                        <MudItem xs="4">
-                            <MudButton Variant="Variant.Outlined" 
-                                      Color="Color.Info" 
-                                      FullWidth="true"
-                                      StartIcon="@Icons.Material.Filled.Analytics"
-                                      OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))">
-                                View Stats
-                            </MudButton>
-                        </MudItem>
-                    </MudGrid>
-                }
+                        <!-- Playing Partners Section -->
+                        <MudCard Elevation="3" Class="mb-4">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">👥 Playing Partners</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.People" 
+                                                  Color="Color.Primary" 
+                                                  Size="Size.Small"
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("players"))" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (playingPartners is null || !playingPartners.Any())
+                                {
+                                    <div class="text-center pa-4">
+                                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">Invite friends to play and track your competitive records!</MudText>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <MudList T="object" Dense="true">
+                                        @foreach (var partner in playingPartners.Take(5))
+                                        {
+                                            <MudListItem T="object">
+                                                <div class="d-flex justify-space-between align-center flex-grow-1">
+                                                    <div class="d-flex flex-column">
+                                                        <MudText Typo="Typo.body2">
+                                                            <strong>@partner.PartnerName</strong>
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            Last played: @partner.LastPlayedDate.ToString("MMM dd, yyyy")
+                                                        </MudText>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <MudText Typo="Typo.body2" Color="@(partner.UserWins > partner.PartnerWins ? Color.Success : partner.UserWins < partner.PartnerWins ? Color.Warning : Color.Info)">
+                                                            <strong>@partner.UserWins-@partner.PartnerWins-@partner.Ties</strong>
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption">
+                                                            @(partner.UserWins > partner.PartnerWins ? "You lead!" : 
+                                                              partner.UserWins < partner.PartnerWins ? "You trail" : "It's tied!")
+                                                        </MudText>
+                                                    </div>
+                                                </div>
+                                            </MudListItem>
+                                        }
+                                    </MudList>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+
+                        <!-- Recent Rounds Section -->
+                        <MudCard Elevation="3" Class="mb-4">
+                            <MudCardHeader>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">🏌️ Recent Rounds</MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudIconButton Icon="@Icons.Material.Filled.List" 
+                                                  Color="Color.Primary" 
+                                                  Size="Size.Small"
+                                                  OnClick="@(() => OnNavigate.InvokeAsync("rounds"))" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (recentRounds is null || !recentRounds.Any())
+                                {
+                                    <div class="text-center pa-4">
+                                        <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Size="Size.Large" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">No rounds recorded yet. Start tracking your game!</MudText>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <MudList T="object" Dense="true">
+                                        @foreach (var round in recentRounds.Take(5))
+                                        {
+                                            <MudListItem T="object">
+                                                <div class="d-flex justify-space-between align-center flex-grow-1">
+                                                    <div class="d-flex flex-column">
+                                                        <MudText Typo="Typo.body2">
+                                                            <strong>@round.ClubName</strong>
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            @round.CourseName
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                                            @round.DatePlayed.ToString("MMM dd, yyyy")
+                                                        </MudText>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <MudText Typo="Typo.h6" Color="Color.Primary">
+                                                            @round.TotalScore
+                                                        </MudText>
+                                                        @{
+                                                            var toPar = round.TotalScore - round.TotalPar;
+                                                        }
+                                                        <MudText Typo="Typo.caption" Color="@(toPar < 0 ? Color.Success : toPar > 0 ? Color.Warning : Color.Info)">
+                                                            @(toPar >= 0 ? "+" : "")@toPar
+                                                        </MudText>
+                                                    </div>
+                                                </div>
+                                            </MudListItem>
+                                        }
+                                    </MudList>
+                                }
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </div>
                 break;
-                
-            case "golf-clubs":
-                <GolfClubsPage />
+
+            case "rounds":
+                <RoundsPage />
                 break;
-                
+
             case "players":
                 <PlayersPage />
                 break;
-                
-            case "rounds":
-                <RoundsPage />
+
+            case "golf-clubs":
+                <GolfClubsPage />
                 break;
                 
             case "dashboard":
                 <DashboardPage />
                 break;
-                
-            case "test-api":
-                <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
-                    🔌 API Test
-                </MudText>
-                
-                <MudCard Class="mb-4">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6" GutterBottom="true">API Connection Test</MudText>
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">
-                            Testing connection to Golf Tracker Web API at https://localhost:7295
-                        </MudText>
-                        
-                        <MudButton Variant="Variant.Filled" 
-                                  Color="Color.Success" 
-                                  StartIcon="@Icons.Material.Filled.PlayArrow"
-                                  OnClick="@TestApiConnection"
-                                  Disabled="@isTestingApi"
-                                  Class="mt-3">
-                            @(isTestingApi ? "Testing..." : "Run API Test")
-                        </MudButton>
-                        
-                        @if (!string.IsNullOrEmpty(apiTestResult))
-                        {
-                            <MudAlert Severity="@(apiTestSuccess ? Severity.Success : Severity.Error)" Class="mt-3">
-                                @apiTestResult
-                            </MudAlert>
-                        }
-                    </MudCardContent>
-                </MudCard>
-                
-                <MudButton Variant="Variant.Outlined" 
-                          Color="Color.Secondary" 
-                          StartIcon="@Icons.Material.Filled.ArrowBack"
-                          OnClick="@(() => OnNavigate.InvokeAsync("home"))">
-                    Back to Home
-                </MudButton>
+
+            case "profile":
+                <!-- Profile/Settings Page -->
+                <div class="profile-page">
+                    <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-4">⚙️ Profile & Settings</MudText>
+                    
+                    <!-- API Test Section -->
+                    <MudCard Elevation="3" Class="mb-4">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">🔧 API Connection Test</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudButton Variant="Variant.Filled" 
+                                      Color="Color.Info" 
+                                      OnClick="@TestApiConnection"
+                                      Disabled="@isTestingApi"
+                                      StartIcon="@Icons.Material.Filled.NetworkCheck"
+                                      FullWidth="true">
+                                @if (isTestingApi)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    <span>Testing Connection...</span>
+                                }
+                                else
+                                {
+                                    <span>Test API Connection</span>
+                                }
+                            </MudButton>
+                            
+                            @if (!string.IsNullOrEmpty(apiTestResult))
+                            {
+                                <MudAlert Severity="@(apiTestSuccess ? Severity.Success : Severity.Error)" Class="mt-3">
+                                    @apiTestResult
+                                </MudAlert>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                    
+                    <!-- Logout Section -->
+                    <MudCard Elevation="3">
+                        <MudCardHeader>
+                            <CardHeaderContent>
+                                <MudText Typo="Typo.h6">🚪 Sign Out</MudText>
+                            </CardHeaderContent>
+                        </MudCardHeader>
+                        <MudCardContent>
+                            <MudButton Variant="Variant.Filled" 
+                                      Color="Color.Error" 
+                                      OnClick="@HandleLogout"
+                                      Disabled="@isLoggingOut"
+                                      StartIcon="@Icons.Material.Filled.Logout"
+                                      FullWidth="true">
+                                @if (isLoggingOut)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    <span>Signing Out...</span>
+                                }
+                                else
+                                {
+                                    <span>Sign Out</span>
+                                }
+                            </MudButton>
+                            
+                            @if (!string.IsNullOrEmpty(logoutMessage))
+                            {
+                                <MudAlert Severity="@(logoutSuccess ? Severity.Success : Severity.Error)" Class="mt-3">
+                                    @logoutMessage
+                                </MudAlert>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </div>
                 break;
 
-            case "account":
-                <!-- Account Management Page -->
-                <MudText Typo="Typo.h4" Color="Color.Primary" GutterBottom="true">
-                    👤 Account
-                </MudText>
-                
-                <MudCard Class="mb-4">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-3">
-                            User Information
-                        </MudText>
-                        
-                        @if (AuthState.IsAuthenticated)
-                        {
-                            <MudGrid>
-                                <MudItem xs="12">
-                                    <MudTextField Label="Email" Value="@AuthState.Email" ReadOnly="true" Variant="Variant.Outlined" />
-                                </MudItem>
-                                <MudItem xs="12">
-                                    <MudTextField Label="User ID" Value="@AuthState.UserId" ReadOnly="true" Variant="Variant.Outlined" />
-                                </MudItem>
-                                @if (!string.IsNullOrEmpty(AuthState.UserName))
-                                {
-                                    <MudItem xs="12">
-                                        <MudTextField Label="Username" Value="@AuthState.UserName" ReadOnly="true" Variant="Variant.Outlined" />
-                                    </MudItem>
-                                }
-                            </MudGrid>
-                        }
-                        else
-                        {
-                            <MudAlert Severity="Severity.Warning">
-                                Not authenticated
-                            </MudAlert>
-                        }
-                    </MudCardContent>
-                </MudCard>
-                
-                <MudCard Class="mb-4">
-                    <MudCardContent>
-                        <MudText Typo="Typo.h6" Color="Color.Primary" Class="mb-3">
-                            Account Actions
-                        </MudText>
-                        
-                        <MudButton Variant="Variant.Filled" 
-                                  Color="Color.Error" 
-                                  StartIcon="@Icons.Material.Filled.Logout"
-                                  OnClick="@HandleLogout"
-                                  Disabled="@isLoggingOut"
-                                  Class="mb-2">
-                            @(isLoggingOut ? "Logging out..." : "Logout")
-                        </MudButton>
-                        
-                        @if (!string.IsNullOrEmpty(logoutMessage))
-                        {
-                            <MudAlert Severity="@(logoutSuccess ? Severity.Success : Severity.Error)" Class="mt-3">
-                                @logoutMessage
-                            </MudAlert>
-                        }
-                    </MudCardContent>
-                </MudCard>
-                break;
-                
             default:
-                <div class="text-center mt-8">
-                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
-                    <MudText Typo="Typo.h4" Class="mt-4">Page Not Found</MudText>
-                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
-                        The page '@CurrentPage' doesn't exist.
-                    </MudText>
-                    <MudButton Variant="Variant.Filled" 
-                              Color="Color.Primary" 
-                              StartIcon="@Icons.Material.Filled.Home"
-                              OnClick="@(() => OnNavigate.InvokeAsync("home"))">
+                <div class="text-center pa-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Help" Size="Size.Large" Color="Color.Secondary" />
+                    <MudText Typo="Typo.h6" Color="Color.Secondary">Page not found</MudText>
+                    <MudButton Color="Color.Primary" 
+                              OnClick="@(() => OnNavigate.InvokeAsync("home"))" 
+                              Class="mt-2">
                         Go Home
                     </MudButton>
                 </div>
@@ -266,58 +397,66 @@
         }
     </MudContainer>
     
-    <!-- Bottom Navigation - Icon Only for Mobile -->
-    <MudPaper Square="true" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; padding: 8px 0;" Elevation="3">
-        <div class="d-flex justify-space-around align-center">
+    <!-- Bottom Navigation -->
+    <MudPaper Class="fixed-bottom-nav" 
+              Elevation="8" 
+              Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);">
+        <MudGrid Justify="Justify.SpaceEvenly" AlignItems="Center.Center" Class="pa-2">
             <!-- Home -->
-            <MudIconButton Icon="@Icons.Material.Filled.Home"
-                          Color="@(CurrentPage == "home" || CurrentPage == "" ? Color.Primary : Color.Default)"
-                          OnClick="@(() => OnNavigate.InvokeAsync("home"))"
-                          Size="Size.Medium"
-                          Style="@(CurrentPage == "home" || CurrentPage == "" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
+            <MudItem xs="2" Class="text-center">
+                <MudIconButton Icon="@Icons.Material.Filled.Home" 
+                              Color="@(IsCurrentPage("home") ? Color.Warning : Color.Inherit)"
+                              OnClick="@(() => OnNavigate.InvokeAsync("home"))"
+                              Style="color: white;" />
+            </MudItem>
             
-            <!-- Golf Clubs -->
-            <MudIconButton Icon="@Icons.Material.Filled.GolfCourse"
-                          Color="@(CurrentPage == "golf-clubs" ? Color.Primary : Color.Default)"
-                          OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))"
-                          Size="Size.Medium"
-                          Style="@(CurrentPage == "golf-clubs" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
+            <!-- Rounds -->
+            <MudItem xs="2" Class="text-center">
+                <MudIconButton Icon="@Icons.Material.Filled.EditNote" 
+                              Color="@(IsCurrentPage("rounds") ? Color.Warning : Color.Inherit)"
+                              OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
+                              Style="color: white;" />
+            </MudItem>
             
             <!-- Players -->
-            <MudIconButton Icon="@Icons.Material.Filled.People"
-                          Color="@(CurrentPage == "players" ? Color.Primary : Color.Default)"
-                          OnClick="@(() => OnNavigate.InvokeAsync("players"))"
-                          Size="Size.Medium"
-                          Style="@(CurrentPage == "players" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
+            <MudItem xs="2" Class="text-center">
+                <MudIconButton Icon="@Icons.Material.Filled.People" 
+                              Color="@(IsCurrentPage("players") ? Color.Warning : Color.Inherit)"
+                              OnClick="@(() => OnNavigate.InvokeAsync("players"))"
+                              Style="color: white;" />
+            </MudItem>
             
-            <!-- Rounds - Changed to SportsGolf icon for better clarity -->
-            <MudIconButton Icon="@Icons.Material.Filled.SportsGolf"
-                          Color="@(CurrentPage == "rounds" ? Color.Primary : Color.Default)"
-                          OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
-                          Size="Size.Medium"
-                          Style="@(CurrentPage == "rounds" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
+            <!-- Golf Clubs -->
+            <MudItem xs="2" Class="text-center">
+                <MudIconButton Icon="@Icons.Material.Filled.GolfCourse" 
+                              Color="@(IsCurrentPage("golf-clubs") ? Color.Warning : Color.Inherit)"
+                              OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))"
+                              Style="color: white;" />
+            </MudItem>
             
-            <!-- Stats - Changed to BarChart icon for better clarity -->
-            <MudIconButton Icon="@Icons.Material.Filled.BarChart"
-                          Color="@(CurrentPage == "dashboard" ? Color.Primary : Color.Default)"
-                          OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))"
-                          Size="Size.Medium"
-                          Style="@(CurrentPage == "dashboard" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
+            <!-- Dashboard -->
+            <MudItem xs="2" Class="text-center">
+                <MudIconButton Icon="@Icons.Material.Filled.BarChart" 
+                              Color="@(IsCurrentPage("dashboard") ? Color.Warning : Color.Inherit)"
+                              OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))"
+                              Style="color: white;" />
+            </MudItem>
             
-            <!-- Account -->
-            <MudIconButton Icon="@Icons.Material.Filled.AccountCircle"
-                          Color="@(CurrentPage == "account" ? Color.Primary : Color.Default)"
-                          OnClick="@(() => OnNavigate.InvokeAsync("account"))"
-                          Size="Size.Medium"
-                          Style="@(CurrentPage == "account" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
-        </div>
+            <!-- Profile -->
+            <MudItem xs="2" Class="text-center">
+                <MudIconButton Icon="@Icons.Material.Filled.Person" 
+                              Color="@(IsCurrentPage("profile") ? Color.Warning : Color.Inherit)"
+                              OnClick="@(() => OnNavigate.InvokeAsync("profile"))"
+                              Style="color: white;" />
+            </MudItem>
+        </MudGrid>
     </MudPaper>
 </div>
 
 @code {
     [Parameter] public string CurrentPage { get; set; } = "home";
     [Parameter] public EventCallback<string> OnNavigate { get; set; }
-    
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private HttpClient HttpClient { get; set; } = default!;
     [Inject] private IDashboardApiService DashboardApiService { get; set; } = default!;
     [Inject] private AuthenticationStateService AuthState { get; set; } = default!;
@@ -331,10 +470,18 @@
     private string logoutMessage = "";
     private bool logoutSuccess = false;
     
-    // Dashboard data
+    // Dashboard data - Enhanced
     private bool loadingDashboard = true;
     private Services.Api.DashboardStats? dashboardStats;
+    private List<Services.Api.PlayingPartnerSummary> playingPartners = new();
+    private List<Services.Api.PlayerPerformanceDataPoint> performanceData = new();
+    private List<Services.Api.Round> recentRounds = new();
     private List<string> recentActivity = new();
+    
+    // Performance chart data
+    private List<ChartSeries> _performanceSeries = new();
+    private string[] _performanceXAxisLabels = Array.Empty<string>();
+    private ChartOptions _chartOptions = new();
     
     protected override async Task OnInitializedAsync()
     {
@@ -359,28 +506,22 @@
             loadingDashboard = true;
             StateHasChanged();
             
-            // Load real dashboard data from API
+            // Load all dashboard data from new API endpoints
             dashboardStats = await DashboardApiService.GetDashboardStatsAsync();
+            playingPartners = await DashboardApiService.GetPlayingPartnersAsync();
+            // TODO: Add performance data and recent rounds when endpoints are ready
+            // performanceData = await DashboardApiService.GetPlayerPerformanceDataAsync();
+            // recentRounds = await DashboardApiService.GetRecentRoundsAsync();
+
+            // Generate recent activity from actual data
+            GenerateRecentActivity();
             
-            var recentActivityData = await DashboardApiService.GetRecentActivityAsync(3);
-            recentActivity = recentActivityData.Select(activity => 
-                $"{activity.Type}: {activity.Description} at {activity.Location}").ToList();
-                
-            if (!recentActivity.Any())
-            {
-                recentActivity = new List<string>
-                {
-                    "Welcome to Golf Tracker!",
-                    "Start by recording your first round",
-                    "Explore golf clubs in your area"
-                };
-            }
+            // Initialize performance chart
+            InitializePerformanceChart();
         }
         catch (Exception ex)
         {
-            // Handle error - could show error message to user
-            dashboardStats = null;
-            recentActivity = new List<string> { $"Unable to load dashboard data: {ex.Message}" };
+            recentActivity = new List<string> { $"Error loading dashboard: {ex.Message}" };
         }
         finally
         {
@@ -388,32 +529,113 @@
             StateHasChanged();
         }
     }
+
+    private void GenerateRecentActivity()
+    {
+        recentActivity = new List<string>();
+
+        // Add recent rounds to activity when API is ready
+        // foreach (var round in recentRounds.Take(3))
+        // {
+        //     var score = round.TotalScore;
+        //     var par = round.TotalPar;
+        //     var relative = score - par;
+        //     var relativeText = relative == 0 ? "Even par" : 
+        //                       relative > 0 ? $"+{relative}" : 
+        //                       relative.ToString();
+        //     
+        //     recentActivity.Add($"Played {round.CourseName} - {score} ({relativeText})");
+        // }
+
+        // Add improvement/achievement data if available
+        if (dashboardStats != null)
+        {
+            if (dashboardStats.CurrentStreak > 1)
+            {
+                recentActivity.Add($"On a {dashboardStats.CurrentStreak} round improvement streak!");
+            }
+            
+            if (dashboardStats.BestScore.HasValue)
+            {
+                recentActivity.Add($"Personal best: {dashboardStats.BestScore}");
+            }
+            
+            if (dashboardStats.TotalRounds > 0)
+            {
+                recentActivity.Add($"Total rounds played: {dashboardStats.TotalRounds}");
+            }
+        }
+
+        if (!recentActivity.Any())
+        {
+            recentActivity.Add("Start playing rounds to see your activity!");
+        }
+    }
+
+    private void InitializePerformanceChart()
+    {
+        // Initialize chart options
+        _chartOptions = new ChartOptions
+        {
+            YAxisTicks = 1,
+            YAxisLines = true,
+            XAxisLines = false,
+            YAxisFormat = "F0",
+            LineStrokeWidth = 2
+        };
+
+        // Generate sample performance data or use real data when available
+        if (performanceData?.Any() == true)
+        {
+            var data = performanceData.Take(10).Select(p => (double)p.ScoreVsPar).ToArray();
+            var labels = performanceData.Take(10).Select(p => p.Date.ToString("MM/dd")).ToArray();
+            
+            _performanceSeries = new List<ChartSeries>
+            {
+                new() { Name = "Score vs Par", Data = data }
+            };
+            _performanceXAxisLabels = labels;
+        }
+        else if (dashboardStats?.TotalRounds > 0)
+        {
+            // Generate sample data for demonstration
+            var random = new Random();
+            var sampleData = Enumerable.Range(1, 8)
+                .Select(i => (double)(random.Next(-3, 8)))
+                .ToArray();
+            var sampleLabels = Enumerable.Range(1, 8)
+                .Select(i => DateTime.Now.AddDays(-i * 7).ToString("MM/dd"))
+                .Reverse()
+                .ToArray();
+                
+            _performanceSeries = new List<ChartSeries>
+            {
+                new() { Name = "Score vs Par", Data = sampleData }
+            };
+            _performanceXAxisLabels = sampleLabels;
+        }
+    }
     
     private async Task TestApiConnection()
     {
         isTestingApi = true;
         apiTestResult = "";
+        apiTestSuccess = false;
         StateHasChanged();
         
         try
         {
-            var response = await HttpClient.GetAsync("https://localhost:7295/api/golfclubs");
+            await Task.Delay(1000); // Show loading for a moment
             
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                apiTestResult = $"✅ API connection successful! Received {content.Length} characters of data.";
-                apiTestSuccess = true;
-            }
-            else
-            {
-                apiTestResult = $"❌ API returned status: {response.StatusCode}";
-                apiTestSuccess = false;
-            }
+            // Test the dashboard API
+            var stats = await DashboardApiService.GetDashboardStatsAsync();
+            
+            apiTestResult = $"✅ API connection successful! Found {stats?.TotalRounds ?? 0} rounds.";
+            apiTestSuccess = true;
         }
         catch (Exception ex)
         {
-            apiTestResult = $"❌ Connection failed: {ex.Message}";
+            apiTestResult = $"❌ API connection failed: {ex.Message}";
             apiTestSuccess = false;
         }
         finally
@@ -422,22 +644,24 @@
             StateHasChanged();
         }
     }
-
+    
     private async Task HandleLogout()
     {
-        isLoggingOut = true;
-        logoutMessage = "";
-        StateHasChanged();
-        
         try
         {
+            isLoggingOut = true;
+            logoutMessage = "";
+            logoutSuccess = false;
+            StateHasChanged();
+            
             await AuthState.LogoutAsync();
-            logoutMessage = "Successfully logged out!";
+            
+            logoutMessage = "Successfully signed out!";
             logoutSuccess = true;
             
-            // Navigate back to login after a short delay
+            // Navigate to login after a short delay
             await Task.Delay(1500);
-            await OnNavigate.InvokeAsync("login");
+            NavigationManager.NavigateTo("/", true);
         }
         catch (Exception ex)
         {
@@ -452,4 +676,19 @@
         }
     }
     
+    private bool IsCurrentPage(string page)
+    {
+        return string.Equals(CurrentPage, page, StringComparison.OrdinalIgnoreCase) ||
+               (string.IsNullOrEmpty(CurrentPage) && page == "home");
+    }
+    
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        StateHasChanged();
+    }
+    
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
 }

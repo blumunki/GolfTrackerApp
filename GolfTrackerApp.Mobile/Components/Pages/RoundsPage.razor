@@ -6,6 +6,10 @@
 @inject IRoundApiService RoundApiService
 @inject IJSRuntime JSRuntime
 
+@* Use aliases to resolve namespace conflicts *@
+@using ApiRound = GolfTrackerApp.Mobile.Services.Api.Round
+@using LocalRound = GolfTrackerApp.Mobile.Models.Round
+
 <MudContainer Class="pa-2">
     <MudText Typo="Typo.h4" Class="mb-3">Round History</MudText>
     
@@ -159,11 +163,11 @@
 </MudDialog>
 
 @code {
-    private List<Round>? rounds;
+    private List<LocalRound>? rounds;
     private List<Score>? scores;
     private bool loading = true;
     private bool showDetailsDialog = false;
-    private Round? selectedRound;
+    private LocalRound? selectedRound;
     
     private DialogOptions dialogOptions = new() 
     { 
@@ -186,7 +190,7 @@
             var roundResponses = await RoundApiService.GetRoundsAsync(1, 20);
             
             // Convert API responses to Round model for UI
-            rounds = roundResponses.Select(r => new Round
+            rounds = roundResponses.Select(r => new LocalRound
             {
                 Id = r.RoundId,
                 CourseName = r.CourseName,
@@ -203,7 +207,7 @@
         catch (Exception ex)
         {
             await JSRuntime.InvokeVoidAsync("console.error", $"Error loading rounds: {ex.Message}");
-            rounds = new List<Round>();
+            rounds = new List<LocalRound>();
         }
         finally
         {
@@ -212,7 +216,7 @@
         }
     }
 
-    private async Task ShowRoundDetails(Round round)
+    private async Task ShowRoundDetails(LocalRound round)
     {
         selectedRound = round;
         await LoadRoundScores(round.Id);

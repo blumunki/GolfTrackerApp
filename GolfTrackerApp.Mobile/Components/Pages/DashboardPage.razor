@@ -6,6 +6,10 @@
 @inject IDashboardApiService DashboardApiService
 @inject IJSRuntime JSRuntime
 
+@* Use aliases to resolve namespace conflicts *@
+@using ApiRound = GolfTrackerApp.Mobile.Services.Api.Round
+@using LocalRound = GolfTrackerApp.Mobile.Models.Round
+
 <MudContainer Class="pa-4">
     <MudText Typo="Typo.h4" Class="mb-4">Golf Dashboard</MudText>
     
@@ -71,7 +75,7 @@
                     <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
                         @foreach (var round in recentRounds.Take(5))
                         {
-                            <MudTimelineItem Color="@GetScoreColor(round.TotalScore, round.Par)" Size="Size.Small">
+                            <MudTimelineItem Color="@GetScoreColor(round.TotalScore, round.TotalPar)" Size="Size.Small">
                                 <ItemContent>
                                     <div class="d-flex align-center justify-space-between">
                                         <div>
@@ -80,11 +84,11 @@
                                             <MudText Typo="Typo.caption">@round.DatePlayed.ToString("MMM dd, yyyy")</MudText>
                                         </div>
                                         <div class="text-right">
-                                            <MudText Typo="Typo.h6" Color="@GetScoreColor(round.TotalScore, round.Par)">
+                                            <MudText Typo="Typo.h6" Color="@GetScoreColor(round.TotalScore, round.TotalPar)">
                                                 @round.TotalScore
                                             </MudText>
                                             <MudText Typo="Typo.caption">
-                                                @FormatScoreToPar(round.TotalScore, round.Par)
+                                                @FormatScoreToPar(round.TotalScore, round.TotalPar)
                                             </MudText>
                                         </div>
                                     </div>
@@ -173,7 +177,7 @@
 @code {
     private bool loading = true;
     private Services.Api.DashboardStats? stats;
-    private List<Round>? recentRounds;
+    private List<ApiRound>? recentRounds;
     private List<Services.Api.ScoreDistribution>? scoreDistribution;
     private List<Services.Api.FavoriteCourse>? favoriteCourses;
 
@@ -196,7 +200,7 @@
             
             // For recent rounds, we would need to get this from the rounds API
             // For now, we'll just leave it empty or use a mock
-            recentRounds = new List<Round>();
+            recentRounds = new List<ApiRound>();
         }
         catch (Exception ex)
         {
@@ -204,7 +208,7 @@
             
             // Set defaults on error
             stats = null;
-            recentRounds = new List<Round>();
+            recentRounds = new List<ApiRound>();
             scoreDistribution = new List<Services.Api.ScoreDistribution>();
             favoriteCourses = new List<Services.Api.FavoriteCourse>();
         }
