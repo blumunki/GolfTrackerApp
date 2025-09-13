@@ -266,62 +266,50 @@
         }
     </MudContainer>
     
-    <!-- Bottom Navigation -->
-    <MudPaper Square="true" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000;" Elevation="3">
-        <div class="d-flex justify-center pa-1" style="overflow-x: auto;">
-            <MudButton Color="@(CurrentPage == "home" ? Color.Primary : Color.Default)"
-                      Variant="@(CurrentPage == "home" ? Variant.Filled : Variant.Text)"
-                      StartIcon="@Icons.Material.Filled.Home"
-                      OnClick="@(() => OnNavigate.InvokeAsync("home"))"
-                      Size="Size.Small"
-                      Class="mx-1">
-                Home
-            </MudButton>
+    <!-- Bottom Navigation - Icon Only for Mobile -->
+    <MudPaper Square="true" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; padding: 8px 0;" Elevation="3">
+        <div class="d-flex justify-space-around align-center">
+            <!-- Home -->
+            <MudIconButton Icon="@Icons.Material.Filled.Home"
+                          Color="@(CurrentPage == "home" || CurrentPage == "" ? Color.Primary : Color.Default)"
+                          OnClick="@(() => OnNavigate.InvokeAsync("home"))"
+                          Size="Size.Medium"
+                          Style="@(CurrentPage == "home" || CurrentPage == "" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
             
-            <MudButton Color="@(CurrentPage == "golf-clubs" ? Color.Primary : Color.Default)"
-                      Variant="@(CurrentPage == "golf-clubs" ? Variant.Filled : Variant.Text)"
-                      StartIcon="@Icons.Material.Filled.GolfCourse"
-                      OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))"
-                      Size="Size.Small"
-                      Class="mx-1">
-                Clubs
-            </MudButton>
+            <!-- Golf Clubs -->
+            <MudIconButton Icon="@Icons.Material.Filled.GolfCourse"
+                          Color="@(CurrentPage == "golf-clubs" ? Color.Primary : Color.Default)"
+                          OnClick="@(() => OnNavigate.InvokeAsync("golf-clubs"))"
+                          Size="Size.Medium"
+                          Style="@(CurrentPage == "golf-clubs" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
             
-            <MudButton Color="@(CurrentPage == "players" ? Color.Primary : Color.Default)"
-                      Variant="@(CurrentPage == "players" ? Variant.Filled : Variant.Text)"
-                      StartIcon="@Icons.Material.Filled.People"
-                      OnClick="@(() => OnNavigate.InvokeAsync("players"))"
-                      Size="Size.Small"
-                      Class="mx-1">
-                Players
-            </MudButton>
+            <!-- Players -->
+            <MudIconButton Icon="@Icons.Material.Filled.People"
+                          Color="@(CurrentPage == "players" ? Color.Primary : Color.Default)"
+                          OnClick="@(() => OnNavigate.InvokeAsync("players"))"
+                          Size="Size.Medium"
+                          Style="@(CurrentPage == "players" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
             
-            <MudButton Color="@(CurrentPage == "rounds" ? Color.Primary : Color.Default)"
-                      Variant="@(CurrentPage == "rounds" ? Variant.Filled : Variant.Text)"
-                      StartIcon="@Icons.Material.Filled.Timeline"
-                      OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
-                      Size="Size.Small"
-                      Class="mx-1">
-                Rounds
-            </MudButton>
+            <!-- Rounds - Changed to SportsGolf icon for better clarity -->
+            <MudIconButton Icon="@Icons.Material.Filled.SportsGolf"
+                          Color="@(CurrentPage == "rounds" ? Color.Primary : Color.Default)"
+                          OnClick="@(() => OnNavigate.InvokeAsync("rounds"))"
+                          Size="Size.Medium"
+                          Style="@(CurrentPage == "rounds" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
             
-            <MudButton Color="@(CurrentPage == "dashboard" ? Color.Primary : Color.Default)"
-                      Variant="@(CurrentPage == "dashboard" ? Variant.Filled : Variant.Text)"
-                      StartIcon="@Icons.Material.Filled.Analytics"
-                      OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))"
-                      Size="Size.Small"
-                      Class="mx-1">
-                Stats
-            </MudButton>
+            <!-- Stats - Changed to BarChart icon for better clarity -->
+            <MudIconButton Icon="@Icons.Material.Filled.BarChart"
+                          Color="@(CurrentPage == "dashboard" ? Color.Primary : Color.Default)"
+                          OnClick="@(() => OnNavigate.InvokeAsync("dashboard"))"
+                          Size="Size.Medium"
+                          Style="@(CurrentPage == "dashboard" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
             
-            <MudButton Color="@(CurrentPage == "account" ? Color.Primary : Color.Default)"
-                      Variant="@(CurrentPage == "account" ? Variant.Filled : Variant.Text)"
-                      StartIcon="@Icons.Material.Filled.AccountCircle"
-                      OnClick="@(() => OnNavigate.InvokeAsync("account"))"
-                      Size="Size.Small"
-                      Class="mx-1">
-                Account
-            </MudButton>
+            <!-- Account -->
+            <MudIconButton Icon="@Icons.Material.Filled.AccountCircle"
+                          Color="@(CurrentPage == "account" ? Color.Primary : Color.Default)"
+                          OnClick="@(() => OnNavigate.InvokeAsync("account"))"
+                          Size="Size.Medium"
+                          Style="@(CurrentPage == "account" ? "background-color: rgba(var(--mud-palette-primary-rgb), 0.1); border-radius: 12px;" : "")" />
         </div>
     </MudPaper>
 </div>
