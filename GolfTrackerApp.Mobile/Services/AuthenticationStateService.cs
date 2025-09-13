@@ -23,6 +23,7 @@ public class AuthenticationStateService
     public string? UserId => _userId;
     public string? Email => _email;
     public string? UserName => _userName;
+    public string? Token => _token;
 
     public event Action? AuthenticationStateChanged;
 
