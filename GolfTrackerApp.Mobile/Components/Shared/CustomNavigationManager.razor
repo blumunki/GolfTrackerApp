@@ -509,9 +509,10 @@
             // Load all dashboard data from new API endpoints
             dashboardStats = await DashboardApiService.GetDashboardStatsAsync();
             playingPartners = await DashboardApiService.GetPlayingPartnersAsync();
-            // TODO: Add performance data and recent rounds when endpoints are ready
+            recentRounds = await DashboardApiService.GetRecentRoundsAsync();
+            
+            // TODO: Add performance data when endpoint is ready
             // performanceData = await DashboardApiService.GetPlayerPerformanceDataAsync();
-            // recentRounds = await DashboardApiService.GetRecentRoundsAsync();
 
             // Generate recent activity from actual data
             GenerateRecentActivity();
