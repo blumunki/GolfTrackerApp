@@ -20,11 +20,40 @@ public class RoundResponse
     public List<string> PlayingPartners { get; set; } = new();
 }
 
+public class ScoreResponse
+{
+    public int ScoreId { get; set; }
+    public int RoundId { get; set; }
+    public int PlayerId { get; set; }
+    public int HoleId { get; set; }
+    public int Strokes { get; set; }
+    public int? Putts { get; set; }
+    public bool? FairwayHit { get; set; }
+    public PlayerResponse? Player { get; set; }
+    public HoleResponse? Hole { get; set; }
+}
+
+public class PlayerResponse
+{
+    public int PlayerId { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
+    public string FullName => $"{FirstName} {LastName}";
+}
+
+public class HoleResponse
+{
+    public int HoleId { get; set; }
+    public int HoleNumber { get; set; }
+    public int Par { get; set; }
+}
+
 public interface IRoundApiService
 {
     Task<List<RoundResponse>> GetAllRoundsAsync();
     Task<List<RoundResponse>> GetRoundsAsync(int page = 1, int pageSize = 10);
     Task<RoundResponse?> GetRoundByIdAsync(int id);
+    Task<List<ScoreResponse>> GetRoundScoresAsync(int roundId);
 }
 
 public class RoundApiService : IRoundApiService
@@ -102,6 +131,25 @@ public class RoundApiService : IRoundApiService
         {
             _logger.LogError(ex, "Error fetching round {RoundId} from API", id);
             return null;
+        }
+    }
+
+    public async Task<List<ScoreResponse>> GetRoundScoresAsync(int roundId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/rounds/{roundId}/scores");
+            response.EnsureSuccessStatusCode();
+            
+            var json = await response.Content.ReadAsStringAsync();
+            var scores = JsonSerializer.Deserialize<List<ScoreResponse>>(json, _jsonOptions);
+            
+            return scores ?? new List<ScoreResponse>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching scores for round {RoundId} from API", roundId);
+            return new List<ScoreResponse>();
         }
     }
 }

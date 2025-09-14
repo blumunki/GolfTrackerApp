@@ -84,14 +84,35 @@ public class RoundsController : ControllerBase
     }
 
     [HttpGet("{id}/scores")]
-    public async Task<ActionResult<List<Score>>> GetRoundScores(int id)
+    public async Task<ActionResult<List<object>>> GetRoundScores(int id)
     {
         try
         {
             var scores = await _context.Scores
-                .Include(s => s.Hole)
                 .Where(s => s.RoundId == id)
                 .OrderBy(s => s.Hole != null ? s.Hole.HoleNumber : 1)
+                .Select(s => new
+                {
+                    ScoreId = s.ScoreId,
+                    RoundId = s.RoundId,
+                    PlayerId = s.PlayerId,
+                    HoleId = s.HoleId,
+                    Strokes = s.Strokes,
+                    Putts = s.Putts,
+                    FairwayHit = s.FairwayHit,
+                    Player = s.Player != null ? new
+                    {
+                        PlayerId = s.Player.PlayerId,
+                        FirstName = s.Player.FirstName,
+                        LastName = s.Player.LastName
+                    } : null,
+                    Hole = s.Hole != null ? new
+                    {
+                        HoleId = s.Hole.HoleId,
+                        HoleNumber = s.Hole.HoleNumber,
+                        Par = s.Hole.Par
+                    } : null
+                })
                 .ToListAsync();
             
             return Ok(scores);
