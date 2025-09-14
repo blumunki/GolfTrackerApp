@@ -22,7 +22,13 @@ builder.Services.AddRazorComponents()
     });
 
 // Add API controllers support (for mobile app)
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Configure JSON options for API responses
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+    });
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options => 
 {

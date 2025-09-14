@@ -173,16 +173,44 @@ public class ReportService : IReportService
     public async Task<PlayerReportViewModel> GetPlayerReportViewModelAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
     {
         var playerTask = _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.PlayerId == playerId);
-        var coursesTask = _context.GolfCourses.AsNoTracking().Include(c => c.GolfClub).ToListAsync();
+        
+        // Load courses with GolfClub for web app compatibility, but break circular references
+        var coursesQuery = _context.GolfCourses
+            .AsNoTracking()
+            .Include(c => c.GolfClub)
+            .Select(c => new 
+            {
+                Course = c,
+                ClubName = c.GolfClub != null ? c.GolfClub.Name : "Unknown Club"
+            });
 
-        await Task.WhenAll(playerTask, coursesTask);
+        var coursesData = await coursesQuery.ToListAsync();
+        
+        // Convert to GolfCourse objects without circular references
+        var courses = coursesData.Select(item => new GolfCourse
+        {
+            GolfCourseId = item.Course.GolfCourseId,
+            GolfClubId = item.Course.GolfClubId,
+            Name = item.Course.Name,
+            DefaultPar = item.Course.DefaultPar,
+            NumberOfHoles = item.Course.NumberOfHoles,
+            // Create a simple GolfClub without navigation properties
+            GolfClub = new GolfClub
+            {
+                GolfClubId = item.Course.GolfClubId,
+                Name = item.ClubName
+                // Deliberately omit GolfCourses collection to break circular reference
+            }
+        }).ToList();
+
+        await playerTask;
 
         var performanceData = await GetPlayerPerformanceAsync(playerId, courseId, holesPlayed, roundType, startDate, endDate);
 
         return new PlayerReportViewModel
         {
             Player = await playerTask,
-            FilterCourses = await coursesTask,
+            FilterCourses = courses,
             PerformanceData = performanceData
         };
     }

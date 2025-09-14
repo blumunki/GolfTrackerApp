@@ -313,6 +313,10 @@
             case "dashboard":
                 <DashboardPage />
                 break;
+                
+            case "player-report":
+                <PlayerReportPage PlayerId="@ExtractPlayerIdFromNavigationManager()" />
+                break;
 
             case "profile":
                 <!-- Profile/Settings Page -->
@@ -407,7 +411,7 @@
     <MudPaper Class="fixed-bottom-nav" 
               Elevation="8" 
               Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1000; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-        <MudGrid Justify="Justify.SpaceEvenly" AlignItems="Center.Center" Class="pa-2">
+        <MudGrid Justify="Justify.SpaceEvenly" alignitems="center" Class="pa-2">
             <!-- Home -->
             <MudItem xs="2" Class="text-center">
                 <MudIconButton Icon="@Icons.Material.Filled.Home" 
@@ -675,6 +679,83 @@
     {
         return string.Equals(CurrentPage, page, StringComparison.OrdinalIgnoreCase) ||
                (string.IsNullOrEmpty(CurrentPage) && page == "home");
+    }
+    
+    private string ExtractPlayerIdFromNavigationManager()
+    {
+        // Get the current URL from NavigationManager
+        var uri = NavigationManager.Uri;
+        var path = new Uri(uri).AbsolutePath;
+        
+        // Debug: Let's see what we're working with
+        Console.WriteLine($"[DEBUG] Full URI: {uri}");
+        Console.WriteLine($"[DEBUG] AbsolutePath: {path}");
+        
+        // Look for pattern like /players/123/report
+        if (path.Contains("/players/") && path.Contains("/report"))
+        {
+            var segments = path.Split('/');
+            Console.WriteLine($"[DEBUG] Path segments: [{string.Join(", ", segments.Select((s, i) => $"{i}:'{s}'"))}]");
+            Console.WriteLine($"[DEBUG] Total segments: {segments.Length}");
+            
+            // We need to check up to segments.Length - 2 since we access i+2
+            for (int i = 0; i < segments.Length - 2; i++)
+            {
+                Console.WriteLine($"[DEBUG] Checking segment {i}: '{segments[i]}' (looking for 'players')");
+                if (segments[i] == "players" && i + 1 < segments.Length && i + 2 < segments.Length && segments[i + 2] == "report")
+                {
+                    var playerId = segments[i + 1];
+                    Console.WriteLine($"[DEBUG] Found player ID at index {i + 1}: '{playerId}'");
+                    return playerId;
+                }
+            }
+        }
+        
+        Console.WriteLine("[DEBUG] No player ID found");
+        return string.Empty;
+    }
+    
+    private string ExtractPlayerIdFromCurrentPage()
+    {
+        // Try to get from navigation manager URL
+        var uri = NavigationManager.Uri;
+        var path = new Uri(uri).AbsolutePath;
+        
+        // Look for patterns like /player-report/123 or /players/123/report
+        if (path.Contains("/players/") && path.Contains("/report"))
+        {
+            var segments = path.Split('/');
+            for (int i = 0; i < segments.Length - 1; i++)
+            {
+                if (segments[i] == "players" && i + 1 < segments.Length)
+                {
+                    return segments[i + 1];
+                }
+            }
+        }
+        else if (path.Contains("/player-report/"))
+        {
+            var segments = path.Split('/');
+            for (int i = 0; i < segments.Length - 1; i++)
+            {
+                if (segments[i] == "player-report" && i + 1 < segments.Length)
+                {
+                    return segments[i + 1];
+                }
+            }
+        }
+        
+        return string.Empty;
+    }
+    
+    private string ExtractPlayerIdFromUrl(string page)
+    {
+        // Extract from patterns like "player-report/123"
+        if (page.StartsWith("player-report/"))
+        {
+            return page.Substring("player-report/".Length);
+        }
+        return string.Empty;
     }
     
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)

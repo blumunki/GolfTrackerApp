@@ -105,6 +105,7 @@ public static class MauiProgram
 		// Authentication services
 		builder.Services.AddSingleton<ConfigurationService>();
 		builder.Services.AddSingleton<AuthenticationStateService>();
+		builder.Services.AddSingleton<INavigationService, NavigationService>();
 		
 		// Configure GoogleAuthenticationService with proper HttpClient setup
 		builder.Services.AddSingleton<GoogleAuthenticationService>(serviceProvider =>

@@ -4,6 +4,7 @@
 @using GolfTrackerApp.Mobile.Components.Shared
 @inject AuthenticationStateService AuthState
 @inject NavigationManager Navigation
+@inject INavigationService NavigationService
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -54,6 +55,7 @@
         // Listen for navigation changes
         NavigationManager.LocationChanged += OnLocationChanged;
         AuthState.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        NavigationService.NavigationRequested += OnNavigationRequested;
         
         isCheckingAuth = false;
         
@@ -85,11 +87,22 @@
         var path = new Uri(e.Location).AbsolutePath.Trim('/');
         var newPage = string.IsNullOrEmpty(path) ? "home" : path;
         
+        // Handle specific route patterns
+        if (path.StartsWith("players/") && path.EndsWith("/report"))
+        {
+            newPage = "player-report"; // Map to the CustomNavigationManager case
+        }
+        
         if (newPage != currentPage)
         {
             currentPage = newPage;
             StateHasChanged();
         }
+    }
+    
+    private void OnNavigationRequested(string page)
+    {
+        HandleNavigation(page);
     }
     
     private void HandleNavigation(string page)
@@ -104,5 +117,6 @@
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
         AuthState.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        NavigationService.NavigationRequested -= OnNavigationRequested;
     }
 }

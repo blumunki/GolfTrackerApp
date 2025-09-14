@@ -1,15 +1,17 @@
 @page "/players"
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
+@using GolfTrackerApp.Mobile.Services
 @using System.Text.Json
 @inject HttpClient Http
 @inject IPlayerApiService PlayerApiService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
+@inject INavigationService NavigationService
 
 <MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
     <!-- Header and Add Actions -->
-    <div class="d-flex align-center justify-space-between mb-3">
+    <div class="d-flex align-center justify-space-between mb-4">
         <MudText Typo="Typo.h4" Color="Color.Primary">👥 Players</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Add" 
                       Color="Color.Primary" 
@@ -102,7 +104,7 @@
                                     <MudIconButton Icon="@Icons.Material.Filled.Assessment" 
                                                   Color="Color.Primary" 
                                                   Size="Size.Small"
-                                                  Title="View Report"
+                                                  title="View Report"
                                                   OnClick="@(() => ViewPlayerReport(player))" />
                                     <MudMenu>
                                         <ActivatorContent>
@@ -457,9 +459,12 @@
 
     private async Task ViewPlayerReport(Player player)
     {
-        // Navigate to the player report page
+        // Navigate using standard Blazor routing
         CloseDetailsDialog();
+        
+        // Use NavigationManager.NavigateTo with the proper route
         NavigationManager.NavigateTo($"/players/{player.Id}/report");
+        
         await Task.CompletedTask;
     }
 

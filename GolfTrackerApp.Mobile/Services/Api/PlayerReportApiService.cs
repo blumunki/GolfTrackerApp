@@ -1,14 +1,20 @@
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Net.Http.Headers;
+using GolfTrackerApp.Mobile.Models;
 
 namespace GolfTrackerApp.Mobile.Services.Api;
 
 // Response models for player report data
 public class PlayerReportViewModel
 {
-    public PlayerResponse? Player { get; set; }
-    public List<GolfCourseResponse> FilterCourses { get; set; } = new();
+    public Player? Player { get; set; }
+    
+    [JsonPropertyName("filterCourses")]
+    public List<GolfCourse> FilterCourses { get; set; } = new();
+    
+    [JsonPropertyName("performanceData")]
     public List<PlayerReportPerformanceDataPoint> PerformanceData { get; set; } = new();
 }
 
@@ -20,19 +26,6 @@ public class PlayerReportPerformanceDataPoint
     public int ScoreVsPar => TotalScore - TotalPar;
     public string CourseName { get; set; } = string.Empty;
     public int HolesPlayed { get; set; }
-}
-
-public class GolfCourseResponse
-{
-    public int GolfCourseId { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public GolfClubResponse? GolfClub { get; set; }
-}
-
-public class GolfClubResponse
-{
-    public int GolfClubId { get; set; }
-    public string Name { get; set; } = string.Empty;
 }
 
 public class ScoringDistribution
@@ -83,6 +76,7 @@ public interface IPlayerReportApiService
     Task<PlayerReportViewModel?> GetPlayerReportAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null);
     Task<ScoringDistribution?> GetScoringDistributionAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null);
     Task<PerformanceByPar?> GetPerformanceByParAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null);
+    string LastApiError { get; }
 }
 
 public class PlayerReportApiService : IPlayerReportApiService
@@ -134,6 +128,7 @@ public class PlayerReportApiService : IPlayerReportApiService
 
     public async Task<PlayerReportViewModel?> GetPlayerReportAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null)
     {
+        HttpResponseMessage? response = null;
         try
         {
             EnsureAuthorizationHeader();
@@ -142,26 +137,64 @@ public class PlayerReportApiService : IPlayerReportApiService
             var url = $"api/players/{playerId}/report{queryString}";
             
             _logger.LogInformation("Fetching player report from API: {Url}", url);
-            var response = await _httpClient.GetAsync(url);
+            response = await _httpClient.GetAsync(url);
+            
+            _logger.LogInformation("Player report API response status: {StatusCode}", response.StatusCode);
+            
+            // Store response details for debugging (this is a hack but we need visibility)
+            LastApiError = $"HTTP {(int)response.StatusCode} {response.StatusCode}";
             
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
+                _logger.LogWarning("Player {PlayerId} not found (404)", playerId);
+                LastApiError += " - Player not found";
                 return null;
             }
             
-            response.EnsureSuccessStatusCode();
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                _logger.LogWarning("Unauthorized access (401) for player report {PlayerId}", playerId);
+                LastApiError += " - Unauthorized";
+                return null;
+            }
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("API error {StatusCode}: {ErrorContent}", response.StatusCode, errorContent);
+                LastApiError += $" - {errorContent}";
+                return null;
+            }
             
             var json = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("Player report API response length: {Length}", json.Length);
+            
+            if (string.IsNullOrEmpty(json))
+            {
+                _logger.LogWarning("Empty response from player report API");
+                LastApiError += " - Empty response";
+                return null;
+            }
+            
             var report = JsonSerializer.Deserialize<PlayerReportViewModel>(json, _jsonOptions);
+            LastApiError = $"Success - got {report?.PerformanceData?.Count ?? 0} data points";
             
             return report;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching player report for player {PlayerId} from API", playerId);
+            LastApiError = $"Exception: {ex.GetType().Name} - {ex.Message}";
+            if (response != null)
+            {
+                LastApiError += $" (HTTP {(int)response.StatusCode})";
+            }
             return null;
         }
     }
+    
+    // Temporary property to expose API error details
+    public string LastApiError { get; private set; } = "";
 
     public async Task<ScoringDistribution?> GetScoringDistributionAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null)
     {

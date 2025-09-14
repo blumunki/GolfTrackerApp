@@ -182,6 +182,17 @@ public class PlayersController : BaseApiController
     {
         try
         {
+            var userId = GetCurrentUserId();
+            
+            // First verify the player belongs to the current user
+            var player = await _context.Players
+                .FirstOrDefaultAsync(p => p.PlayerId == id && p.CreatedByApplicationUserId == userId);
+                
+            if (player == null)
+            {
+                return NotFound($"Player with ID {id} not found or not accessible");
+            }
+            
             var report = await _reportService.GetPlayerReportViewModelAsync(id, courseId, holesPlayed, roundType, startDate, endDate);
             return Ok(report);
         }
