@@ -33,13 +33,15 @@ public class RoundsController : ControllerBase
                 .OrderByDescending(r => r.DatePlayed)
                 .Select(r => new
                 {
-                    Id = r.RoundId,
+                    RoundId = r.RoundId,
                     CourseName = r.GolfCourse != null ? r.GolfCourse.Name : "Unknown",
                     ClubName = r.GolfCourse != null && r.GolfCourse.GolfClub != null ? r.GolfCourse.GolfClub.Name : "Unknown",
                     DatePlayed = r.DatePlayed,
                     TotalScore = r.Scores.Sum(s => s.Strokes),
-                    Par = r.GolfCourse != null ? r.GolfCourse.DefaultPar : 72,
-                    Holes = r.GolfCourse != null ? r.GolfCourse.NumberOfHoles : 18,
+                    TotalPar = r.GolfCourse != null ? r.GolfCourse.DefaultPar : 72,
+                    HolesPlayed = r.GolfCourse != null ? r.GolfCourse.NumberOfHoles : 18,
+                    PlayerCount = r.RoundPlayers.Count,
+                    RoundType = r.RoundType.ToString(),
                     PlayingPartners = r.RoundPlayers.Select(rp => rp.Player != null ? $"{rp.Player.FirstName} {rp.Player.LastName}" : "Unknown").ToList(),
                     Weather = "",
                     Notes = r.Notes ?? ""

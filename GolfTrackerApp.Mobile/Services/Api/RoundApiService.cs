@@ -15,6 +15,9 @@ public class RoundResponse
     public int TotalPar { get; set; }
     public int HolesPlayed { get; set; }
     public string? Notes { get; set; }
+    public int PlayerCount { get; set; }
+    public string RoundType { get; set; } = string.Empty;
+    public List<string> PlayingPartners { get; set; } = new();
 }
 
 public interface IRoundApiService

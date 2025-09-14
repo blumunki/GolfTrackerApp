@@ -10,7 +10,7 @@
 @using ApiRound = GolfTrackerApp.Mobile.Services.Api.Round
 @using LocalRound = GolfTrackerApp.Mobile.Models.Round
 
-<MudContainer Class="pa-2">
+<MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
     <!-- Header with Actions -->
     <div class="d-flex align-center justify-space-between mb-3">
         <MudText Typo="Typo.h4" Color="Color.Primary">🏌️ Rounds</MudText>
@@ -108,10 +108,29 @@
                                                   Color="Color.Primary" 
                                                   Size="Size.Small"
                                                   OnClick="@(() => ShowRoundDetails(round))" />
-                                    <MudIconButton Icon="@Icons.Material.Filled.MoreVert" 
-                                                  Color="Color.Secondary" 
-                                                  Size="Size.Small"
-                                                  OnClick="@(() => ShowRoundActions(round))" />
+                                    <MudMenu>
+                                        <ActivatorContent>
+                                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" 
+                                                          Color="Color.Secondary" 
+                                                          Size="Size.Small" />
+                                        </ActivatorContent>
+                                        <ChildContent>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" 
+                                                         OnClick="@(() => ShowRoundDetails(round))">
+                                                View Details
+                                            </MudMenuItem>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" 
+                                                         OnClick="@(() => EditRoundFromMenu(round))">
+                                                Edit Round
+                                            </MudMenuItem>
+                                            <MudDivider />
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" 
+                                                         OnClick="@(() => DeleteRoundFromMenu(round))"
+                                                         Style="color: var(--mud-palette-error);">
+                                                Delete Round
+                                            </MudMenuItem>
+                                        </ChildContent>
+                                    </MudMenu>
                                 </div>
                             </div>
                         </MudCardContent>
@@ -295,29 +314,6 @@
         </MudButton>
     </DialogActions>
 </MudDialog>
-
-<!-- Round Actions Menu -->
-<MudMenu @bind-Open="showActionsMenu" ActivationEvent="MouseEvent.LeftClick">
-    <ActivatorContent>
-        <!-- This is controlled by the more actions button -->
-    </ActivatorContent>
-    <ChildContent>
-        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" 
-                     OnClick="@(async () => { showActionsMenu = false; await ShowRoundDetails(selectedActionRound!); })">
-            View Details
-        </MudMenuItem>
-        <MudMenuItem Icon="@Icons.Material.Filled.Edit" 
-                     OnClick="@(async () => { showActionsMenu = false; await EditRound(); })">
-            Edit Round
-        </MudMenuItem>
-        <MudDivider />
-        <MudMenuItem Icon="@Icons.Material.Filled.Delete" 
-                     OnClick="@(async () => { showActionsMenu = false; await DeleteRound(); })"
-                     Style="color: var(--mud-palette-error);">
-            Delete Round
-        </MudMenuItem>
-    </ChildContent>
-</MudMenu>
 @code {
     private List<LocalRound>? rounds;
     private List<LocalRound>? filteredRounds;
@@ -364,8 +360,10 @@
                 Par = r.TotalPar,
                 Holes = r.HolesPlayed,
                 Notes = r.Notes ?? string.Empty,
-                PlayingPartners = new List<string>(), // Would need separate API call for playing partners
-                Weather = "N/A" // Would need to add weather field to API
+                PlayingPartners = r.PlayingPartners ?? new List<string>(),
+                Weather = "N/A", // Would need to add weather field to API
+                PlayerCount = r.PlayerCount,
+                RoundType = r.RoundType
             }).OrderByDescending(r => r.DatePlayed).ToList();
             
             totalRounds = rounds?.Count ?? 0;
@@ -423,10 +421,14 @@
         showDetailsDialog = true;
     }
 
-    private void ShowRoundActions(LocalRound round)
+    private async Task EditRoundFromMenu(LocalRound round)
     {
-        selectedActionRound = round;
-        showActionsMenu = true;
+        await JSRuntime.InvokeVoidAsync("alert", $"Edit functionality coming soon for round at {round.CourseName}!");
+    }
+
+    private async Task DeleteRoundFromMenu(LocalRound round)
+    {
+        await JSRuntime.InvokeVoidAsync("alert", $"Delete functionality coming soon for round at {round.CourseName}!");
     }
 
     private async Task LoadRoundScores(int roundId)
@@ -485,14 +487,12 @@
 
     private string GetRoundTypeDisplay(LocalRound round)
     {
-        // Mock round type - in real implementation would come from API
-        return round.Holes == 18 ? "Stroke Play" : "Practice Round";
+        return string.IsNullOrEmpty(round.RoundType) ? "Friendly" : round.RoundType;
     }
 
     private string GetPlayerCountDisplay(LocalRound round)
     {
-        // Mock player count - in real implementation would come from API
-        return new Random(round.Id).Next(1, 5).ToString();
+        return round.PlayerCount > 0 ? round.PlayerCount.ToString() : "1";
     }
 
     private string FormatScoreToPar(int score, int par)

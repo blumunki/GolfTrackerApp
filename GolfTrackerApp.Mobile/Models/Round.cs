@@ -12,6 +12,8 @@ namespace GolfTrackerApp.Mobile.Models
         public List<string> PlayingPartners { get; set; } = new();
         public string Weather { get; set; } = string.Empty;
         public string Notes { get; set; } = string.Empty;
+        public int PlayerCount { get; set; }
+        public string RoundType { get; set; } = string.Empty;
     }
 
     public class Score
