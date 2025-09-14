@@ -11,7 +11,7 @@
 @using LocalRound = GolfTrackerApp.Mobile.Models.Round
 
 <MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
-    <!-- Header with Actions -->
+    <!-- Search and Add Actions -->
     <div class="d-flex align-center justify-space-between mb-3">
         <MudText Typo="Typo.h4" Color="Color.Primary">🏌️ Rounds</MudText>
         <MudIconButton Icon="@Icons.Material.Filled.Add" 
@@ -309,7 +309,7 @@
         <MudButton Color="Color.Info" 
                   Variant="Variant.Outlined" 
                   StartIcon="@Icons.Material.Filled.Edit"
-                  OnClick="EditRound">
+                  OnClick="@(() => EditRoundFromMenu(selectedRound!))">
             Edit
         </MudButton>
     </DialogActions>
@@ -323,10 +323,6 @@
     private LocalRound? selectedRound;
     private string searchString = "";
     private int totalRounds = 0;
-    
-    // Actions menu
-    private bool showActionsMenu = false;
-    private LocalRound? selectedActionRound;
     
     private DialogOptions detailsDialogOptions = new() 
     { 
@@ -465,24 +461,6 @@
         showDetailsDialog = false;
         selectedRound = null;
         scores = null;
-    }
-
-    private async Task EditRound()
-    {
-        var round = selectedRound ?? selectedActionRound;
-        if (round != null)
-        {
-            await JSRuntime.InvokeVoidAsync("alert", $"Edit functionality coming soon for round at {round.CourseName}!");
-        }
-    }
-
-    private async Task DeleteRound()
-    {
-        var round = selectedActionRound;
-        if (round != null)
-        {
-            await JSRuntime.InvokeVoidAsync("alert", $"Delete functionality coming soon for round at {round.CourseName}!");
-        }
     }
 
     private string GetRoundTypeDisplay(LocalRound round)
