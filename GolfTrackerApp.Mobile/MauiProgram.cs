@@ -96,6 +96,12 @@ public static class MauiProgram
 #endif
 			;
 
+		builder.Services.AddHttpClient<IPlayerReportApiService, PlayerReportApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
 		// Authentication services
 		builder.Services.AddSingleton<ConfigurationService>();
 		builder.Services.AddSingleton<AuthenticationStateService>();

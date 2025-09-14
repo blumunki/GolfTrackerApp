@@ -1,0 +1,430 @@
+@page "/players/{PlayerId:int}/report"
+@using System.Globalization
+@using MudBlazor
+@using ApiModels = GolfTrackerApp.Mobile.Services.Api
+@inject ApiModels.IPlayerReportApiService PlayerReportApiService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
+    @if (isLoading)
+    {
+        <div class="text-center pa-4">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading player report...</MudText>
+        </div>
+    }
+    else
+    {
+        <!-- Header -->
+        <div class="d-flex align-center justify-space-between mb-3">
+            <div>
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" 
+                              Color="Color.Primary" 
+                              OnClick="@(() => NavigationManager.NavigateTo("/players"))" />
+            </div>
+            <MudText Typo="Typo.h5" Color="Color.Primary" Class="text-center flex-grow-1">
+                📊 @(_viewModel?.Player?.FirstName) @(_viewModel?.Player?.LastName)
+            </MudText>
+            <div style="width: 40px;"></div> <!-- Spacer for alignment -->
+        </div>
+
+        <!-- Filters -->
+        <MudExpansionPanels Elevation="2" Class="mb-4">
+            <MudExpansionPanel IsInitiallyExpanded="false">
+                <TitleContent>
+                    <div style="display: flex; align-items: center">
+                        <MudIcon Icon="@Icons.Material.Filled.FilterList" class="mr-3" />
+                        <MudText>Filters & Options</MudText>
+                    </div>
+                </TitleContent>
+                <ChildContent>
+                    <MudGrid Spacing="2" Class="pa-2">
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int?" Label="Filter by Course" @bind-Value="SelectedCourseId" Clearable="true">
+                                @if (_viewModel?.FilterCourses?.Any() == true)
+                                {
+                                    @foreach (var course in _viewModel.FilterCourses.OrderBy(c => c.GolfClub?.Name).ThenBy(c => c.Name))
+                                    {
+                                        <MudSelectItem T="int?" Value="@course.GolfCourseId">
+                                            @($"{course.GolfClub?.Name} - {course.Name}")
+                                        </MudSelectItem>
+                                    }
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="int?" Label="Holes Played" @bind-Value="SelectedHolesPlayed" Clearable="true">
+                                <MudSelectItem T="int?" Value="9">9 Holes</MudSelectItem>
+                                <MudSelectItem T="int?" Value="18">18 Holes</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSelect T="ApiModels.RoundTypeOption?" Label="Round Type" @bind-Value="SelectedRoundType" Clearable="true">
+                                <MudSelectItem T="ApiModels.RoundTypeOption?" Value="@ApiModels.RoundTypeOption.Friendly">Friendly</MudSelectItem>
+                                <MudSelectItem T="ApiModels.RoundTypeOption?" Value="@ApiModels.RoundTypeOption.Competitive">Competitive</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudSwitch @bind-Value="ShowScoreVsPar" Label="Show Score vs Par" Color="Color.Primary"/>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker Label="Start Date" @bind-Date="StartDate" Clearable="true" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudDatePicker Label="End Date" @bind-Date="EndDate" Clearable="true" DateFormat="dd/MM/yyyy" />
+                        </MudItem>
+                    </MudGrid>
+                </ChildContent>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        @if (_viewModel?.PerformanceData?.Any() == true)
+        {
+            <!-- Performance Over Time Card -->
+            <MudCard Class="mb-4" Elevation="2">
+                <MudCardContent Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">📈 Performance Over Time</MudText>
+                    
+                    <!-- Simple line chart representation using cards -->
+                    <div class="performance-timeline">
+                        @{
+                            // For now, use mock data until API is properly set up
+                            var recentPerformance = new List<ApiModels.PlayerReportPerformanceDataPoint>();
+                            if (_viewModel?.PerformanceData?.Any() == true)
+                            {
+                                recentPerformance = _viewModel.PerformanceData.OrderByDescending(p => p.Date).Take(10).Reverse().ToList();
+                            }
+                        }
+                        
+                        <div class="d-flex align-center mb-3">
+                            <MudText Typo="Typo.body2" Class="mr-2">Recent Performance:</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @(ShowScoreVsPar ? "Score vs Par" : "Total Score")
+                            </MudText>
+                        </div>
+                        
+                        <div style="overflow-x: auto;">
+                            <div class="d-flex gap-2" style="min-width: 600px;">
+                                @if (recentPerformance?.Any() == true)
+                                {
+                                    @foreach (var point in recentPerformance)
+                                    {
+                                        var value = ShowScoreVsPar ? point.ScoreVsPar : point.TotalScore;
+                                        var color = ShowScoreVsPar ? GetScoreColor(point.ScoreVsPar) : Color.Primary;
+                                        
+                                        <MudCard Elevation="1" Class="pa-2 text-center" Style="min-width: 80px;">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @point.Date.ToString("dd/MM")
+                                            </MudText>
+                                            <MudText Typo="Typo.body1" Color="@color" Style="font-weight: 600;">
+                                                @(ShowScoreVsPar ? FormatScoreToPar(value) : value.ToString())
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @(point.CourseName?.Split(' ').FirstOrDefault() ?? "Course")
+                                            </MudText>
+                                        </MudCard>
+                                    }
+                                }
+                                else
+                                {
+                                    <MudAlert Severity="Severity.Info">No performance data available</MudAlert>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+
+            <!-- Statistics Grid -->
+            <MudGrid Spacing="2" Class="mb-4">
+                <!-- Scoring Distribution -->
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2" Style="height: 100%;">
+                        <MudCardContent Class="pa-4">
+                            <MudText Typo="Typo.h6" Class="mb-3">🎯 Scoring Distribution</MudText>
+                            @if (_scoringDistribution?.TotalHoles > 0)
+                            {
+                                <div class="scoring-distribution">
+                                    @if (_scoringDistribution.EagleCount > 0)
+                                    {
+                                        <div class="d-flex justify-space-between align-center mb-2">
+                                            <MudText Typo="Typo.body2">🦅 Eagle</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Success">
+                                                @_scoringDistribution.EagleCount (@_scoringDistribution.EaglePercentage.ToString("F1")%)
+                                            </MudChip>
+                                        </div>
+                                    }
+                                    @if (_scoringDistribution.BirdieCount > 0)
+                                    {
+                                        <div class="d-flex justify-space-between align-center mb-2">
+                                            <MudText Typo="Typo.body2">🐦 Birdie</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                                                @_scoringDistribution.BirdieCount (@_scoringDistribution.BirdiePercentage.ToString("F1")%)
+                                            </MudChip>
+                                        </div>
+                                    }
+                                    <div class="d-flex justify-space-between align-center mb-2">
+                                        <MudText Typo="Typo.body2">🏌️ Par</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">
+                                            @_scoringDistribution.ParCount (@_scoringDistribution.ParPercentage.ToString("F1")%)
+                                        </MudChip>
+                                    </div>
+                                    <div class="d-flex justify-space-between align-center mb-2">
+                                        <MudText Typo="Typo.body2">📈 Bogey</MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">
+                                            @_scoringDistribution.BogeyCount (@_scoringDistribution.BogeyPercentage.ToString("F1")%)
+                                        </MudChip>
+                                    </div>
+                                    @if (_scoringDistribution.DoubleBogeyCount > 0)
+                                    {
+                                        <div class="d-flex justify-space-between align-center mb-2">
+                                            <MudText Typo="Typo.body2">📊 Double+</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Error">
+                                                @(_scoringDistribution.DoubleBogeyCount + _scoringDistribution.TripleBogeyOrWorseCount) 
+                                                (@((_scoringDistribution.DoubleBogeyPercentage + _scoringDistribution.TripleBogeyOrWorsePercentage).ToString("F1"))%)
+                                            </MudChip>
+                                        </div>
+                                    }
+                                    <MudDivider Class="my-2" />
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="text-center">
+                                        Based on @_scoringDistribution.TotalHoles holes
+                                    </MudText>
+                                </div>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info">No scoring data available.</MudAlert>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+
+                <!-- Performance by Par -->
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2" Style="height: 100%;">
+                        <MudCardContent Class="pa-4">
+                            <MudText Typo="Typo.h6" Class="mb-3">⛳ Performance by Par</MudText>
+                            @if (_performanceByPar?.HasValidData == true)
+                            {
+                                <div class="performance-by-par">
+                                    @if (_performanceByPar.Par3Count > 0)
+                                    {
+                                        <MudCard Elevation="1" Class="pa-3 mb-2">
+                                            <div class="text-center">
+                                                <MudText Typo="Typo.subtitle1" Color="Color.Primary">Par 3</MudText>
+                                                <MudText Typo="Typo.h6" Class="mt-1">
+                                                    @(ShowScoreVsPar ? _performanceByPar.Par3RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par3Average.ToString("F2"))
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @(ShowScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par3Count holes
+                                                </MudText>
+                                            </div>
+                                        </MudCard>
+                                    }
+                                    @if (_performanceByPar.Par4Count > 0)
+                                    {
+                                        <MudCard Elevation="1" Class="pa-3 mb-2">
+                                            <div class="text-center">
+                                                <MudText Typo="Typo.subtitle1" Color="Color.Primary">Par 4</MudText>
+                                                <MudText Typo="Typo.h6" Class="mt-1">
+                                                    @(ShowScoreVsPar ? _performanceByPar.Par4RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par4Average.ToString("F2"))
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @(ShowScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par4Count holes
+                                                </MudText>
+                                            </div>
+                                        </MudCard>
+                                    }
+                                    @if (_performanceByPar.Par5Count > 0)
+                                    {
+                                        <MudCard Elevation="1" Class="pa-3 mb-2">
+                                            <div class="text-center">
+                                                <MudText Typo="Typo.subtitle1" Color="Color.Primary">Par 5</MudText>
+                                                <MudText Typo="Typo.h6" Class="mt-1">
+                                                    @(ShowScoreVsPar ? _performanceByPar.Par5RelativeToPar.ToString("+0.00;-0.00;0.00") : _performanceByPar.Par5Average.ToString("F2"))
+                                                </MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @(ShowScoreVsPar ? "vs Par" : "Average") • @_performanceByPar.Par5Count holes
+                                                </MudText>
+                                            </div>
+                                        </MudCard>
+                                    }
+                                </div>
+                                
+                                <MudText Typo="Typo.caption" Class="mt-2 text-center" Color="Color.Secondary">
+                                    @if (ShowScoreVsPar)
+                                    {
+                                        <text>Performance relative to par (+ over, - under)</text>
+                                    }
+                                    else
+                                    {
+                                        <text>Average strokes per hole type</text>
+                                    }
+                                </MudText>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="Severity.Info">No par performance data available.</MudAlert>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Class="mt-4">
+                No completed rounds found for this player with the selected filters.
+            </MudAlert>
+        }
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public int PlayerId { get; set; }
+
+    private ApiModels.PlayerReportViewModel? _viewModel;
+    private ApiModels.ScoringDistribution? _scoringDistribution;
+    private ApiModels.PerformanceByPar? _performanceByPar;
+    private bool isLoading = true;
+
+    // Filter properties
+    private int? _selectedCourseId;
+    public int? SelectedCourseId 
+    { 
+        get => _selectedCourseId; 
+        set 
+        { 
+            if (_selectedCourseId != value) 
+            { 
+                _selectedCourseId = value; 
+                _ = OnFilterChanged(); 
+            } 
+        } 
+    }
+
+    private int? _selectedHolesPlayed;
+    public int? SelectedHolesPlayed 
+    { 
+        get => _selectedHolesPlayed; 
+        set 
+        { 
+            if (_selectedHolesPlayed != value) 
+            { 
+                _selectedHolesPlayed = value; 
+                _ = OnFilterChanged(); 
+            } 
+        } 
+    }
+
+    private ApiModels.RoundTypeOption? _selectedRoundType;
+    public ApiModels.RoundTypeOption? SelectedRoundType 
+    { 
+        get => _selectedRoundType; 
+        set 
+        { 
+            if (_selectedRoundType != value) 
+            { 
+                _selectedRoundType = value; 
+                _ = OnFilterChanged(); 
+            } 
+        } 
+    }
+
+    private DateTime? _startDate;
+    public DateTime? StartDate 
+    { 
+        get => _startDate; 
+        set 
+        { 
+            if (_startDate != value) 
+            { 
+                _startDate = value; 
+                _ = OnFilterChanged(); 
+            } 
+        } 
+    }
+
+    private DateTime? _endDate;
+    public DateTime? EndDate 
+    { 
+        get => _endDate; 
+        set 
+        { 
+            if (_endDate != value) 
+            { 
+                _endDate = value; 
+                _ = OnFilterChanged(); 
+            } 
+        } 
+    }
+
+    private bool _showScoreVsPar = true;
+    public bool ShowScoreVsPar 
+    { 
+        get => _showScoreVsPar; 
+        set 
+        { 
+            if (_showScoreVsPar != value) 
+            { 
+                _showScoreVsPar = value; 
+                StateHasChanged(); 
+            } 
+        } 
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReportData();
+    }
+
+    private async Task OnFilterChanged() => await LoadReportData();
+
+    private async Task LoadReportData()
+    {
+        isLoading = true;
+        try
+        {
+            // Load all data in parallel for efficiency
+            var reportTask = PlayerReportApiService.GetPlayerReportAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
+            var scoringDistributionTask = PlayerReportApiService.GetScoringDistributionAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
+            var performanceByParTask = PlayerReportApiService.GetPerformanceByParAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
+
+            await Task.WhenAll(reportTask, scoringDistributionTask, performanceByParTask);
+
+            _viewModel = await reportTask;
+            _scoringDistribution = await scoringDistributionTask;
+            _performanceByPar = await performanceByParTask;
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading report data: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", "Error loading report data. Please try again.");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string FormatScoreToPar(int score)
+    {
+        if (score == 0) return "E";
+        return score > 0 ? $"+{score}" : score.ToString();
+    }
+
+    private Color GetScoreColor(int scoreToPar)
+    {
+        return scoreToPar switch
+        {
+            <= -2 => Color.Success,
+            -1 => Color.Info,
+            0 => Color.Primary,
+            1 => Color.Warning,
+            _ => Color.Error
+        };
+    }
+}

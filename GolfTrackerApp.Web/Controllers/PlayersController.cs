@@ -12,11 +12,13 @@ public class PlayersController : BaseApiController
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<PlayersController> _logger;
+    private readonly IReportService _reportService;
 
-    public PlayersController(ApplicationDbContext context, ILogger<PlayersController> logger)
+    public PlayersController(ApplicationDbContext context, ILogger<PlayersController> logger, IReportService reportService)
     {
         _context = context;
         _logger = logger;
+        _reportService = reportService;
     }
 
     [HttpGet]
@@ -166,6 +168,69 @@ public class PlayersController : BaseApiController
         {
             _logger.LogError(ex, "Error deleting player {PlayerId}", id);
             return StatusCode(500, "An error occurred while deleting the player");
+        }
+    }
+
+    [HttpGet("{id}/report")]
+    public async Task<ActionResult<PlayerReportViewModel>> GetPlayerReport(
+        int id,
+        [FromQuery] int? courseId = null,
+        [FromQuery] int? holesPlayed = null,
+        [FromQuery] RoundTypeOption? roundType = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var report = await _reportService.GetPlayerReportViewModelAsync(id, courseId, holesPlayed, roundType, startDate, endDate);
+            return Ok(report);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving player report for player {PlayerId}", id);
+            return StatusCode(500, "An error occurred while retrieving the player report");
+        }
+    }
+
+    [HttpGet("{id}/scoring-distribution")]
+    public async Task<ActionResult<ScoringDistribution>> GetScoringDistribution(
+        int id,
+        [FromQuery] int? courseId = null,
+        [FromQuery] int? holesPlayed = null,
+        [FromQuery] RoundTypeOption? roundType = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var distribution = await _reportService.GetScoringDistributionAsync(id, courseId, holesPlayed, roundType, startDate, endDate);
+            return Ok(distribution);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving scoring distribution for player {PlayerId}", id);
+            return StatusCode(500, "An error occurred while retrieving the scoring distribution");
+        }
+    }
+
+    [HttpGet("{id}/performance-by-par")]
+    public async Task<ActionResult<PerformanceByPar>> GetPerformanceByPar(
+        int id,
+        [FromQuery] int? courseId = null,
+        [FromQuery] int? holesPlayed = null,
+        [FromQuery] RoundTypeOption? roundType = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var performance = await _reportService.GetPerformanceByParAsync(id, courseId, holesPlayed, roundType, startDate, endDate);
+            return Ok(performance);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving performance by par for player {PlayerId}", id);
+            return StatusCode(500, "An error occurred while retrieving the performance by par");
         }
     }
 }

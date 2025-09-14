@@ -5,90 +5,250 @@
 @inject HttpClient Http
 @inject IPlayerApiService PlayerApiService
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
 
-<MudContainer Class="pa-2">
-    <MudText Typo="Typo.h4" Class="mb-3">Playing Partners</MudText>
+<MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
+    <!-- Header and Add Actions -->
+    <div class="d-flex align-center justify-space-between mb-3">
+        <MudText Typo="Typo.h4" Color="Color.Primary">👥 Players</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                      Color="Color.Primary" 
+                      Size="Size.Large"
+                      OnClick="@(() => ShowAddPlayerDialog())" />
+    </div>
+    
+    <!-- Search Bar -->
+    <MudPaper Class="pa-3 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Search players by name..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      DebounceInterval="300" 
+                      OnDebounceIntervalElapsed="OnSearchTextChanged"
+                      Margin="Margin.Dense"
+                      FullWidth="true" />
+    </MudPaper>
     
     @if (loading)
     {
-        <MudProgressCircular Size="Size.Large" Indeterminate="true" Class="ma-4" />
+        <div class="text-center pa-4">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading players...</MudText>
+        </div>
     }
-    else if (players?.Any() == true)
+    else if (filteredPlayers?.Any() == true)
     {
-        <MudGrid>
-            @foreach (var player in players)
+        <MudList T="object" Class="players-list">
+            @foreach (var player in filteredPlayers)
             {
-                <MudItem xs="12" sm="6" md="4">
-                    <MudCard Class="mb-4" Style="height: 100%;">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudAvatar Color="Color.Primary" Class="mb-2">
-                                    @player.FirstName?.Substring(0, 1)@player.LastName?.Substring(0, 1)
-                                </MudAvatar>
-                                <MudText Typo="Typo.h6">@player.FirstName @player.LastName</MudText>
-                            </CardHeaderContent>
-                            <CardHeaderActions>
-                                <MudIconButton Icon="Icons.Material.Filled.Info" Color="Color.Primary" 
-                                             OnClick="@(() => ShowPlayerDetails(player))" />
-                            </CardHeaderActions>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            <MudText Typo="Typo.body2" Class="mb-1">Email: @player.Email</MudText>
-                            <MudText Typo="Typo.body2" Class="mb-1">Phone: @player.Phone</MudText>
-                            <MudDivider Class="my-2" />
-                            <MudText Typo="Typo.body2" Color="Color.Primary">
-                                Handicap: @(player.Handicap?.ToString("F1") ?? "N/A")
-                            </MudText>
+                <MudListItem T="object" Class="player-list-item">
+                    <MudCard Elevation="2" 
+                             Class="mb-3 player-card" 
+                             Style="border-left: 4px solid #667eea; cursor: pointer; transition: all 0.2s ease;"
+                             @onclick="@(() => ShowPlayerDetails(player))">
+                        <MudCardContent Class="pa-3">
+                            <div class="d-flex justify-space-between align-start">
+                                <!-- Main Player Info -->
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-center mb-2">
+                                        <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="mr-3">
+                                            @(GetPlayerInitials(player))
+                                        </MudAvatar>
+                                        <div>
+                                            <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                                                @player.FirstName @player.LastName
+                                            </MudText>
+                                            @if (player.Handicap.HasValue)
+                                            {
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    Handicap: @player.Handicap.Value.ToString("F1")
+                                                </MudText>
+                                            }
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex align-center gap-4">
+                                        @if (!string.IsNullOrEmpty(player.Email))
+                                        {
+                                            <div class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Email" 
+                                                        Size="Size.Small" 
+                                                        Class="mr-1" 
+                                                        Color="Color.Info" />
+                                                <MudText Typo="Typo.caption">
+                                                    @player.Email
+                                                </MudText>
+                                            </div>
+                                        }
+                                        
+                                        @if (!string.IsNullOrEmpty(player.Phone))
+                                        {
+                                            <div class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Phone" 
+                                                        Size="Size.Small" 
+                                                        Class="mr-1" 
+                                                        Color="Color.Success" />
+                                                <MudText Typo="Typo.caption">
+                                                    @player.Phone
+                                                </MudText>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                
+                                <!-- Quick Actions -->
+                                <div class="d-flex flex-column align-center ml-2">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Assessment" 
+                                                  Color="Color.Primary" 
+                                                  Size="Size.Small"
+                                                  Title="View Report"
+                                                  OnClick="@(() => ViewPlayerReport(player))" />
+                                    <MudMenu>
+                                        <ActivatorContent>
+                                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" 
+                                                          Color="Color.Secondary" 
+                                                          Size="Size.Small" />
+                                        </ActivatorContent>
+                                        <ChildContent>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" 
+                                                         OnClick="@(() => ShowPlayerDetails(player))">
+                                                View Details
+                                            </MudMenuItem>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Assessment" 
+                                                         OnClick="@(() => ViewPlayerReport(player))">
+                                                View Report
+                                            </MudMenuItem>
+                                            @if (IsPlayerManaged(player))
+                                            {
+                                                <MudMenuItem Icon="@Icons.Material.Filled.Edit" 
+                                                             OnClick="@(() => EditPlayer(player))">
+                                                    Edit Player
+                                                </MudMenuItem>
+                                                <MudDivider />
+                                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" 
+                                                             OnClick="@(() => DeletePlayer(player))"
+                                                             Style="color: var(--mud-palette-error);">
+                                                    Delete Player
+                                                </MudMenuItem>
+                                            }
+                                        </ChildContent>
+                                    </MudMenu>
+                                </div>
+                            </div>
                         </MudCardContent>
                     </MudCard>
-                </MudItem>
+                </MudListItem>
             }
-        </MudGrid>
+        </MudList>
+        
+        @if (totalPlayers > filteredPlayers.Count)
+        {
+            <div class="text-center mt-4">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Showing @filteredPlayers.Count of @totalPlayers players
+                </MudText>
+            </div>
+        }
+    }
+    else if (!loading && players?.Any() == true)
+    {
+        <!-- No search results -->
+        <div class="text-center pa-4">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No players found</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Try adjusting your search terms</MudText>
+        </div>
     }
     else
     {
-        <MudAlert Severity="Severity.Info" Class="mt-4">
-            No playing partners found yet. Play some rounds to build your network!
-        </MudAlert>
+        <!-- No players at all -->
+        <div class="text-center pa-4">
+            <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No players added yet</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Add players to start tracking rounds and performance!
+            </MudText>
+            <MudButton Variant="Variant.Filled" 
+                      Color="Color.Primary" 
+                      StartIcon="@Icons.Material.Filled.Add"
+                      OnClick="@(() => ShowAddPlayerDialog())">
+                Add Your First Player
+            </MudButton>
+        </div>
     }
 </MudContainer>
 
 <!-- Player Details Dialog -->
-<MudDialog @bind-Visible="showDetailsDialog" Options="dialogOptions">
+<MudDialog @bind-Visible="showDetailsDialog" Options="detailsDialogOptions">
     <DialogContent>
         @if (selectedPlayer != null)
         {
-            <div class="d-flex align-center mb-4">
-                <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-4">
-                    @selectedPlayer.FirstName?.Substring(0, 1)@selectedPlayer.LastName?.Substring(0, 1)
-                </MudAvatar>
-                <div>
-                    <MudText Typo="Typo.h5">@selectedPlayer.FirstName @selectedPlayer.LastName</MudText>
-                    <MudText Typo="Typo.body1" Color="Color.Secondary">Handicap: @(selectedPlayer.Handicap?.ToString("F1") ?? "N/A")</MudText>
+            <!-- Player Header -->
+            <div class="mb-4">
+                <div class="d-flex align-center mb-3">
+                    <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-4">
+                        @(GetPlayerInitials(selectedPlayer))
+                    </MudAvatar>
+                    <div>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">
+                            @selectedPlayer.FirstName @selectedPlayer.LastName
+                        </MudText>
+                        @if (selectedPlayer.Handicap.HasValue)
+                        {
+                            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
+                                Handicap: @selectedPlayer.Handicap.Value.ToString("F1")
+                            </MudText>
+                        }
+                    </div>
                 </div>
             </div>
             
-            <MudGrid>
+            <!-- Player Details Cards -->
+            <MudGrid Spacing="2">
                 <MudItem xs="12" md="6">
-                    <MudCard Elevation="2">
-                        <MudCardContent>
-                            <MudText Typo="Typo.h6" Class="mb-2">Contact Information</MudText>
-                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Email:</strong> @selectedPlayer.Email</MudText>
-                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Phone:</strong> @selectedPlayer.Phone</MudText>
-                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Date of Birth:</strong> @selectedPlayer.DateOfBirth?.ToString("MMM dd, yyyy")</MudText>
-                        </MudCardContent>
+                    <MudCard Elevation="1" Class="pa-3">
+                        <MudText Typo="Typo.h6" Class="mb-3">📧 Contact Information</MudText>
+                        @if (!string.IsNullOrEmpty(selectedPlayer.Email))
+                        {
+                            <div class="d-flex justify-space-between mb-2">
+                                <MudText Typo="Typo.body2">Email:</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.Email</MudText>
+                            </div>
+                        }
+                        @if (!string.IsNullOrEmpty(selectedPlayer.Phone))
+                        {
+                            <div class="d-flex justify-space-between mb-2">
+                                <MudText Typo="Typo.body2">Phone:</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.Phone</MudText>
+                            </div>
+                        }
+                        @if (selectedPlayer.DateOfBirth.HasValue)
+                        {
+                            <div class="d-flex justify-space-between mb-2">
+                                <MudText Typo="Typo.body2">Date of Birth:</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.DateOfBirth.Value.ToString("MMM dd, yyyy")</MudText>
+                            </div>
+                        }
                     </MudCard>
                 </MudItem>
                 
                 <MudItem xs="12" md="6">
-                    <MudCard Elevation="2">
-                        <MudCardContent>
-                            <MudText Typo="Typo.h6" Class="mb-2">Playing Statistics</MudText>
-                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Rounds Played:</strong> @roundsPlayedTogether</MudText>
-                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Average Score:</strong> @(averageScore?.ToString("F1") ?? "N/A")</MudText>
-                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Best Score:</strong> @(bestScore?.ToString() ?? "N/A")</MudText>
-                            <MudText Typo="Typo.body1" Class="mb-1"><strong>Last Played:</strong> @(lastPlayedDate?.ToString("MMM dd, yyyy") ?? "N/A")</MudText>
-                        </MudCardContent>
+                    <MudCard Elevation="1" Class="pa-3">
+                        <MudText Typo="Typo.h6" Class="mb-3">🏌️ Golf Information</MudText>
+                        @if (selectedPlayer.Handicap.HasValue)
+                        {
+                            <div class="d-flex justify-space-between mb-2">
+                                <MudText Typo="Typo.body2">Handicap:</MudText>
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.Handicap.Value.ToString("F1")</MudText>
+                            </div>
+                        }
+                        
+                        <!-- Placeholder for future stats -->
+                        <div class="d-flex justify-space-between mb-2">
+                            <MudText Typo="Typo.body2">Status:</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@(IsPlayerManaged(selectedPlayer) ? "Managed" : "Playing Partner")</MudText>
+                        </div>
                     </MudCard>
                 </MudItem>
             </MudGrid>
@@ -96,26 +256,114 @@
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Secondary" OnClick="CloseDetailsDialog">Close</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="InviteToRound">Invite to Round</MudButton>
+        <MudButton Color="Color.Info" 
+                  Variant="Variant.Outlined" 
+                  StartIcon="@Icons.Material.Filled.Assessment"
+                  OnClick="@(() => ViewPlayerReport(selectedPlayer!))">
+            View Report
+        </MudButton>
+        @if (IsPlayerManaged(selectedPlayer))
+        {
+            <MudButton Color="Color.Primary" 
+                      Variant="Variant.Filled" 
+                      StartIcon="@Icons.Material.Filled.Edit"
+                      OnClick="@(() => EditPlayer(selectedPlayer!))">
+                Edit
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+<!-- Add/Edit Player Dialog -->
+<MudDialog @bind-Visible="showEditDialog" Options="editDialogOptions">
+    <DialogContent>
+        @if (editingPlayer != null)
+        {
+            <MudText Typo="Typo.h6" Class="mb-4">
+                @(isEditMode ? "Edit Player" : "Add New Player")
+            </MudText>
+            
+            <MudGrid Spacing="3">
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="editingPlayer.FirstName" 
+                                  Label="First Name" 
+                                  Variant="Variant.Outlined" 
+                                  Required="true"
+                                  For="@(() => editingPlayer.FirstName)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="editingPlayer.LastName" 
+                                  Label="Last Name" 
+                                  Variant="Variant.Outlined" 
+                                  Required="true"
+                                  For="@(() => editingPlayer.LastName)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudTextField @bind-Value="editingPlayer.Email" 
+                                  Label="Email" 
+                                  Variant="Variant.Outlined" 
+                                  InputType="InputType.Email"
+                                  For="@(() => editingPlayer.Email)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField @bind-Value="editingPlayer.Phone" 
+                                  Label="Phone" 
+                                  Variant="Variant.Outlined" 
+                                  For="@(() => editingPlayer.Phone)" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField @bind-Value="editingPlayer.Handicap" 
+                                     Label="Handicap" 
+                                     Variant="Variant.Outlined" 
+                                     Format="F1"
+                                     Min="0"
+                                     Max="54"
+                                     For="@(() => editingPlayer.Handicap)" />
+                </MudItem>
+                <MudItem xs="12">
+                    <MudDatePicker @bind-Date="editingPlayer.DateOfBirth" 
+                                   Label="Date of Birth" 
+                                   Variant="Variant.Outlined" 
+                                   DateFormat="dd/MM/yyyy"
+                                   For="@(() => editingPlayer.DateOfBirth)" />
+                </MudItem>
+            </MudGrid>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="CancelEdit">Cancel</MudButton>
+        <MudButton Color="Color.Primary" 
+                  Variant="Variant.Filled" 
+                  OnClick="SavePlayer"
+                  Disabled="@(string.IsNullOrWhiteSpace(editingPlayer?.FirstName) || string.IsNullOrWhiteSpace(editingPlayer?.LastName))">
+            @(isEditMode ? "Update" : "Add") Player
+        </MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     private List<Player>? players;
+    private List<Player>? filteredPlayers;
     private bool loading = true;
     private bool showDetailsDialog = false;
+    private bool showEditDialog = false;
     private Player? selectedPlayer;
+    private Player? editingPlayer;
+    private bool isEditMode = false;
+    private string searchString = "";
+    private int totalPlayers = 0;
     
-    // Player statistics
-    private int roundsPlayedTogether = 0;
-    private decimal? averageScore;
-    private int? bestScore;
-    private DateTime? lastPlayedDate;
-    
-    private DialogOptions dialogOptions = new() 
+    private DialogOptions detailsDialogOptions = new() 
     { 
         MaxWidth = MaxWidth.Medium, 
-        FullWidth = true 
+        FullWidth = true,
+        CloseButton = true
+    };
+    
+    private DialogOptions editDialogOptions = new() 
+    { 
+        MaxWidth = MaxWidth.Small, 
+        FullWidth = true
     };
 
     protected override async Task OnInitializedAsync()
@@ -129,11 +377,15 @@
         {
             loading = true;
             players = await PlayerApiService.GetAllPlayersAsync();
+            totalPlayers = players?.Count ?? 0;
+            ApplySearchFilter();
         }
         catch (Exception ex)
         {
             await JSRuntime.InvokeVoidAsync("console.error", $"Error loading players: {ex.Message}");
             players = new List<Player>();
+            filteredPlayers = new List<Player>();
+            totalPlayers = 0;
         }
         finally
         {
@@ -142,45 +394,184 @@
         }
     }
 
+    private async Task OnSearchTextChanged(string text)
+    {
+        searchString = text;
+        ApplySearchFilter();
+        await Task.CompletedTask;
+    }
+
+    private void ApplySearchFilter()
+    {
+        if (players == null)
+        {
+            filteredPlayers = new List<Player>();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(searchString))
+        {
+            filteredPlayers = players;
+        }
+        else
+        {
+            var searchTerm = searchString.Trim().ToLowerInvariant();
+            filteredPlayers = players.Where(p =>
+                (p.FirstName?.ToLowerInvariant().Contains(searchTerm) == true) ||
+                (p.LastName?.ToLowerInvariant().Contains(searchTerm) == true) ||
+                (p.Email?.ToLowerInvariant().Contains(searchTerm) == true)
+            ).ToList();
+        }
+        
+        StateHasChanged();
+    }
+
+    private string GetPlayerInitials(Player player)
+    {
+        var firstInitial = !string.IsNullOrEmpty(player.FirstName) ? player.FirstName.Substring(0, 1) : "?";
+        var lastInitial = !string.IsNullOrEmpty(player.LastName) ? player.LastName.Substring(0, 1) : "?";
+        return $"{firstInitial}{lastInitial}";
+    }
+
+    private bool IsPlayerManaged(Player? player)
+    {
+        if (player == null) return false;
+        // Players created by the current user (managed players) can be edited/deleted
+        // For now, assume all players are managed - in real implementation, 
+        // you'd check if player.CreatedByApplicationUserId matches current user
+        return true;
+    }
+
     private async Task ShowPlayerDetails(Player player)
     {
         selectedPlayer = player;
-        await LoadPlayerStatistics(player.Id);
         showDetailsDialog = true;
-    }
-
-    private async Task LoadPlayerStatistics(int playerId)
-    {
-        try
-        {
-            // These would be real API calls to get player statistics
-            // For now, using mock data
-            roundsPlayedTogether = new Random().Next(1, 25);
-            averageScore = (decimal)(new Random().NextDouble() * 20 + 75);
-            bestScore = new Random().Next(68, 95);
-            lastPlayedDate = DateTime.Now.AddDays(-new Random().Next(1, 90));
-        }
-        catch (Exception ex)
-        {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading player statistics: {ex.Message}");
-        }
+        await Task.CompletedTask;
     }
 
     private void CloseDetailsDialog()
     {
         showDetailsDialog = false;
         selectedPlayer = null;
-        roundsPlayedTogether = 0;
-        averageScore = null;
-        bestScore = null;
-        lastPlayedDate = null;
     }
 
-    private async Task InviteToRound()
+    private async Task ViewPlayerReport(Player player)
     {
-        if (selectedPlayer != null)
+        // Navigate to the player report page
+        CloseDetailsDialog();
+        NavigationManager.NavigateTo($"/players/{player.Id}/report");
+        await Task.CompletedTask;
+    }
+
+    private void ShowAddPlayerDialog()
+    {
+        editingPlayer = new Player();
+        isEditMode = false;
+        showEditDialog = true;
+    }
+
+    private void EditPlayer(Player player)
+    {
+        editingPlayer = new Player
         {
-            await JSRuntime.InvokeVoidAsync("alert", $"Invite feature coming soon! Will invite {selectedPlayer.FirstName} {selectedPlayer.LastName} to play.");
+            Id = player.Id,
+            FirstName = player.FirstName,
+            LastName = player.LastName,
+            Email = player.Email,
+            Phone = player.Phone,
+            Handicap = player.Handicap,
+            DateOfBirth = player.DateOfBirth
+        };
+        isEditMode = true;
+        showEditDialog = true;
+        CloseDetailsDialog();
+    }
+
+    private void CancelEdit()
+    {
+        showEditDialog = false;
+        editingPlayer = null;
+        isEditMode = false;
+    }
+
+    private async Task SavePlayer()
+    {
+        if (editingPlayer == null) return;
+
+        try
+        {
+            loading = true;
+            
+            if (isEditMode)
+            {
+                var success = await PlayerApiService.UpdatePlayerAsync(editingPlayer.Id, editingPlayer);
+                if (success)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "Player updated successfully!");
+                    await LoadPlayers();
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "Failed to update player. Please try again.");
+                }
+            }
+            else
+            {
+                var createdPlayer = await PlayerApiService.CreatePlayerAsync(editingPlayer);
+                if (createdPlayer != null)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "Player added successfully!");
+                    await LoadPlayers();
+                }
+                else
+                {
+                    await JSRuntime.InvokeVoidAsync("alert", "Failed to add player. Please try again.");
+                }
+            }
+            
+            CancelEdit();
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error saving player: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", "An error occurred while saving the player.");
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeletePlayer(Player player)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete {player.FirstName} {player.LastName}?");
+        if (!confirmed) return;
+
+        try
+        {
+            loading = true;
+            var success = await PlayerApiService.DeletePlayerAsync(player.Id);
+            
+            if (success)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Player deleted successfully!");
+                await LoadPlayers();
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Failed to delete player. Please try again.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("console.error", $"Error deleting player: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("alert", "An error occurred while deleting the player.");
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
         }
     }
 }
