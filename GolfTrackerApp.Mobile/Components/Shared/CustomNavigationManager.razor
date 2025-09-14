@@ -517,8 +517,8 @@
             playingPartners = await DashboardApiService.GetPlayingPartnersAsync();
             recentRounds = await DashboardApiService.GetRecentRoundsAsync();
             
-            // TODO: Add performance data when endpoint is ready
-            // performanceData = await DashboardApiService.GetPlayerPerformanceDataAsync();
+            // Load real performance data for the chart
+            performanceData = await DashboardApiService.GetPerformanceSummaryAsync(7);
 
             // Generate recent activity from actual data
             GenerateRecentActivity();
@@ -591,7 +591,7 @@
             LineStrokeWidth = 2
         };
 
-        // Generate sample performance data or use real data when available
+        // Use real performance data when available
         if (performanceData?.Any() == true)
         {
             var data = performanceData.Take(10).Select(p => (double)p.ScoreVsPar).ToArray();
@@ -603,23 +603,11 @@
             };
             _performanceXAxisLabels = labels;
         }
-        else if (dashboardStats?.TotalRounds > 0)
+        else
         {
-            // Generate sample data for demonstration
-            var random = new Random();
-            var sampleData = Enumerable.Range(1, 8)
-                .Select(i => (double)(random.Next(-3, 8)))
-                .ToArray();
-            var sampleLabels = Enumerable.Range(1, 8)
-                .Select(i => DateTime.Now.AddDays(-i * 7).ToString("MM/dd"))
-                .Reverse()
-                .ToArray();
-                
-            _performanceSeries = new List<ChartSeries>
-            {
-                new() { Name = "Score vs Par", Data = sampleData }
-            };
-            _performanceXAxisLabels = sampleLabels;
+            // No data available - chart will show empty state
+            _performanceSeries.Clear();
+            _performanceXAxisLabels = Array.Empty<string>();
         }
     }
     
