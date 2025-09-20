@@ -6,23 +6,20 @@
     <title>Golf Tracker</title>
     <base href="/" />
     
-    <!-- MudBlazor CSS -->
+    <!-- Load MudBlazor CSS -->
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
-    
-    <!-- Mobile-specific CSS -->
-    <link rel="stylesheet" href="css/mobile.css" />
-    <link rel="icon" href="data:,">
+
+    <!-- Mobile-specific overrides can go here if needed -->
+    <link href="css/app.css" rel="stylesheet" />
+    <link href="GolfTrackerApp.Mobile.styles.css" rel="stylesheet" />
 </head>
 
 <body>
 
-    <div class="status-bar-safe-area"></div>
-
     <div id="app">
-        <div class="loading-container">
-            <div class="loading-spinner"></div>
-            <h3>Golf Tracker</h3>
-            <p>Loading your golf app...</p>
+        <div style="position:absolute; top:30vh; width:100%; text-align:center">
+            <p>Loading Golf Tracker...</p>
+            <div style="display:flex; justify-content:center;"><div class="mud-progress-circular mud-primary-text mud-progress-indeterminate" role="progressbar" aria-valuenow="0" style="width:60px;height:60px;"><svg class="mud-progress-circular-svg" viewBox="22 22 44 44"><circle class="mud-progress-circular-circle mud-progress-circular-circle-indeterminate mud-primary-text" cx="44" cy="44" r="20" fill="none" stroke-width="3"></circle></svg></div></div>
         </div>
     </div>
 
@@ -32,26 +29,10 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <!-- This is the only Blazor script needed for MAUI Blazor Hybrid -->
     <script src="_framework/blazor.webview.js" autostart="false"></script>
-    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     
-    <script>
-        window.addEventListener('DOMContentLoaded', function () {
-            console.log('DOM Content Loaded');
-            
-            window.addEventListener('blazor:error', function (event) {
-                console.error('Blazor error:', event.detail);
-            });
-            
-            // Start Blazor manually with error handling
-            try {
-                Blazor.start();
-                console.log('Blazor started successfully');
-            } catch (error) {
-                console.error('Failed to start Blazor:', error);
-            }
-        });
-    </script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 
 </body>
 

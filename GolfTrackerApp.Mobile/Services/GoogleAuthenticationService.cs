@@ -1,304 +1,357 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Maui.Authentication;
 using System.Text;
 using System.Text.Json;
 
-namespace GolfTrackerApp.Mobile.Services;
-
-public class GoogleAuthenticationService
+namespace GolfTrackerApp.Mobile.Services
 {
-    private readonly HttpClient _httpClient;
-    private readonly IConfiguration _configuration;
-    private readonly ConfigurationService _configService;
-    private readonly ILogger<GoogleAuthenticationService> _logger;
-    private readonly AuthenticationStateService _authenticationStateService;
-
-    public GoogleAuthenticationService(
-        HttpClient httpClient, 
-        IConfiguration configuration,
-        ConfigurationService configService,
-        ILogger<GoogleAuthenticationService> logger,
-        AuthenticationStateService authenticationStateService)
+    public class AuthenticationResult
     {
-        _httpClient = httpClient;
-        _configuration = configuration;
-        _configService = configService;
-        _logger = logger;
-        _authenticationStateService = authenticationStateService;
-        
-        _logger.LogInformation("GoogleAuthenticationService initialized");
+        public bool IsSuccess { get; set; }
+        public string? ErrorMessage { get; set; }
+        public string? AccessToken { get; set; }
+        public string? IdToken { get; set; }
+        public string? RefreshToken { get; set; }
+        public string? JwtToken { get; set; }
+        public string? UserId { get; set; }
+        public string? Email { get; set; }
+        public string? Name { get; set; }
     }
 
-    public async Task<bool> GoogleSignInAsync()
+    public class GoogleAuthenticationService
     {
-        try
+        private readonly HttpClient _httpClient;
+        private readonly IConfiguration _configuration;
+        private readonly ConfigurationService _configurationService;
+        private readonly ILogger<GoogleAuthenticationService> _logger;
+        private readonly AuthenticationStateService _authStateService;
+
+        private string? _googleClientId;
+        private string? _googleClientSecret;
+
+        public GoogleAuthenticationService(
+            HttpClient httpClient,
+            IConfiguration configuration,
+            ConfigurationService configurationService,
+            ILogger<GoogleAuthenticationService> logger,
+            AuthenticationStateService authStateService)
         {
-            _logger.LogInformation("Starting Google Sign-In process");
-            
-            // Get Google OAuth configuration
-            var clientId = _configuration["Authentication:Google:ClientId"] ?? _configService.GoogleClientId;
-            var clientSecret = _configuration["Authentication:Google:ClientSecret"] ?? _configService.GoogleClientSecret;
+            _httpClient = httpClient;
+            _configuration = configuration;
+            _configurationService = configurationService;
+            _logger = logger;
+            _authStateService = authStateService;
 
-            _logger.LogInformation($"Client ID configured: {!string.IsNullOrEmpty(clientId)}");
-            _logger.LogInformation($"Client Secret configured: {!string.IsNullOrEmpty(clientSecret)}");
+            LoadConfiguration();
+        }
 
-            if (string.IsNullOrEmpty(clientId))
-            {
-                _logger.LogError("Google Client ID not configured");
-                throw new InvalidOperationException("Google Client ID not configured");
-            }
-
-            if (string.IsNullOrEmpty(clientSecret))
-            {
-                _logger.LogError("Google Client Secret not configured");
-                throw new InvalidOperationException("Google Client Secret not configured");
-            }
-
-            _logger.LogInformation($"Using Google Client ID: {clientId?.Substring(0, 20)}...");
-
-            // Create the authorization URL
-            var state = Guid.NewGuid().ToString("N");
-            var codeVerifier = GenerateCodeVerifier();
-            var codeChallenge = GenerateCodeChallenge(codeVerifier);
-            
-            // Use localhost redirect URI for mobile apps (required by Google)
-            var redirectUri = "http://localhost:7777/oauth/callback";
-            
-            _logger.LogInformation($"Client ID: {clientId}");
-            _logger.LogInformation($"Using mobile redirect: {redirectUri}");
-            
-            var authUrl = "https://accounts.google.com/o/oauth2/v2/auth" +
-                $"?client_id={clientId}" +
-                $"&redirect_uri={Uri.EscapeDataString(redirectUri)}" +
-                "&response_type=code" +
-                "&scope=openid%20email%20profile" +
-                $"&state={state}" +
-                $"&code_challenge={codeChallenge}" +
-                "&code_challenge_method=S256";
-
-            // For testing purposes, let's try opening the URL manually and handle the callback differently
-            _logger.LogInformation($"OAuth URL: {authUrl}");
-            _logger.LogInformation("For iOS Simulator testing, opening Safari manually");
-
-            string? authCode = null;
+        private void LoadConfiguration()
+        {
             try
             {
-                _logger.LogInformation("Starting OAuth callback server");
+#if DEBUG
+                _googleClientId = GolfTrackerApp.Mobile.Generated.DevConfiguration.GoogleClientId;
+                _googleClientSecret = GolfTrackerApp.Mobile.Generated.DevConfiguration.GoogleClientSecret;
                 
-                // Start the callback server to handle the OAuth redirect
-                using var callbackServer = new OAuthCallbackServer(7777, "/oauth/callback");
-                
-                // Start server and get auth code (with timeout)
-                var serverTask = callbackServer.StartAndWaitForCallbackAsync(TimeSpan.FromMinutes(5));
-                
-                _logger.LogInformation("About to call WebAuthenticator.AuthenticateAsync");
-                
-                // Use WebAuthenticator to open the browser - must be called on main UI thread
-                var authTask = MainThread.InvokeOnMainThreadAsync(async () =>
-                {
-                    try
-                    {
-                        return await Microsoft.Maui.Authentication.WebAuthenticator.AuthenticateAsync(
-                            new Microsoft.Maui.Authentication.WebAuthenticatorOptions
-                            {
-                                Url = new Uri(authUrl),
-                                CallbackUrl = new Uri(redirectUri),
-                                PrefersEphemeralWebBrowserSession = false
-                            });
-                    }
-                    catch (Exception)
-                    {
-                        return null; // This is expected since user will cancel Safari
-                    }
-                });
+                _logger.LogInformation("Loading Google OAuth configuration from DevConfiguration");
+                _logger.LogInformation($"Google Client ID loaded: {!string.IsNullOrEmpty(_googleClientId)}");
+#else
+                _googleClientId = _configuration["Authentication:Google:ClientId"];
+                _googleClientSecret = _configuration["Authentication:Google:ClientSecret"];
+#endif
 
-                // Wait for the callback server to get the authorization code
-                // The WebAuthenticator will likely fail when user presses Cancel, but that's OK
-                authCode = await serverTask;
-                
-                if (!string.IsNullOrEmpty(authCode))
+                if (string.IsNullOrEmpty(_googleClientId))
                 {
-                    _logger.LogInformation("Authorization code received from callback server");
-                }
-                else
-                {
-                    _logger.LogError("No authorization code received from callback server");
-                    
-                    // Try to get result from WebAuthenticator as fallback
-                    try
-                    {
-                        var authResult = await authTask;
-                        if (authResult?.Properties.TryGetValue("code", out authCode) == true)
-                        {
-                            _logger.LogInformation("Got authorization code from WebAuthenticator fallback");
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        // WebAuthenticator failed as backup too
-                    }
-                }
-
-                if (string.IsNullOrEmpty(authCode))
-                {
-                    _logger.LogError("No authorization code received");
-                    return false;
+                    _logger.LogError("Google Client ID not configured");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError($"WebAuthenticator failed: {ex.Message}");
-                _logger.LogError($"WebAuthenticator exception type: {ex.GetType().Name}");
-                _logger.LogError($"WebAuthenticator stack trace: {ex.StackTrace}");
-                
-                // Check if it was user cancellation
-                if (ex is TaskCanceledException || ex.Message.Contains("canceled") || ex.Message.Contains("cancelled"))
+                _logger.LogError(ex, "Failed to load Google OAuth configuration");
+            }
+        }
+
+        public async Task<AuthenticationResult> GoogleSignInAsync()
+        {
+            try
+            {
+                _logger.LogInformation("Starting Google authentication flow");
+
+                if (string.IsNullOrEmpty(_googleClientId))
                 {
-                    _logger.LogInformation("User canceled the authentication process");
-                    return false;
+                    return new AuthenticationResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "Configuration error: Google Client ID not configured"
+                    };
                 }
-                
-                // For other errors, provide debugging information
-                _logger.LogInformation("WebAuthenticator failed. Make sure:");
-                _logger.LogInformation("1. Google OAuth client has http://localhost:7777/oauth/callback in redirect URIs");
-                _logger.LogInformation("2. Complete the OAuth flow without dismissing Safari manually");
-                _logger.LogInformation($"3. OAuth URL for manual testing: {authUrl}");
-                
-                return false;
-            }
 
-            // Exchange authorization code for access token
-            var tokenData = new List<KeyValuePair<string, string>>
-            {
-                new("client_id", clientId!),
-                new("client_secret", clientSecret!),
-                new("code", authCode!),
-                new("grant_type", "authorization_code"),
-                new("redirect_uri", redirectUri),
-                new("code_verifier", codeVerifier)
-            };
+                // Use different callback URLs for different platforms
+                string callbackUrl;
+                string authUrl;
 
-            var tokenContent = new FormUrlEncodedContent(tokenData);
-            
-            _logger.LogInformation("Exchanging authorization code for access token");
-            
-            var tokenResponse = await _httpClient.PostAsync("https://oauth2.googleapis.com/token", tokenContent);
-
-            if (!tokenResponse.IsSuccessStatusCode)
-            {
-                var errorContent = await tokenResponse.Content.ReadAsStringAsync();
-                _logger.LogError($"Token exchange failed with status {tokenResponse.StatusCode}: {errorContent}");
-                return false;
-            }
-
-            var tokenJson = await tokenResponse.Content.ReadAsStringAsync();
-            var tokenResult = JsonSerializer.Deserialize<JsonElement>(tokenJson);
-            
-            if (!tokenResult.TryGetProperty("access_token", out var accessTokenElement))
-            {
-                _logger.LogError("No access token in response");
-                return false;
-            }
-
-            var accessToken = accessTokenElement.GetString();
-            _logger.LogInformation("Access token received, getting user profile");
-
-            // Get user profile from Google
-            using var profileRequest = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
-            profileRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-
-            var profileResponse = await _httpClient.SendAsync(profileRequest);
-            if (!profileResponse.IsSuccessStatusCode)
-            {
-                _logger.LogError("Failed to get user profile");
-                return false;
-            }
-
-            var profileJson = await profileResponse.Content.ReadAsStringAsync();
-            var profile = JsonSerializer.Deserialize<JsonElement>(profileJson);
-
-            var email = profile.TryGetProperty("email", out var emailProp) ? emailProp.GetString() : "";
-            var name = profile.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : "";
-            var googleId = profile.TryGetProperty("id", out var idProp) ? idProp.GetString() : "";
-
-            _logger.LogInformation($"User profile received: {email}");
-
-            // Send the Google auth data to our API
-            var googleSignInData = new
-            {
-                Email = email,
-                Name = name,
-                GoogleId = googleId,
-                AccessToken = accessToken
-            };
-
-            var json = JsonSerializer.Serialize(googleSignInData);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            _logger.LogInformation("Sending Google auth data to API");
-            var apiResponse = await _httpClient.PostAsync("api/auth/google-signin", content);
-
-            if (apiResponse.IsSuccessStatusCode)
-            {
-                var responseJson = await apiResponse.Content.ReadAsStringAsync();
-                var authResponse = JsonSerializer.Deserialize<JsonElement>(responseJson);
-
-                if (authResponse.TryGetProperty("token", out var tokenProp) &&
-                    authResponse.TryGetProperty("userId", out var userIdProp))
+#if IOS
+                // iOS uses reverse client ID for native app authentication
+                var clientIdParts = _googleClientId.Split('-');
+                if (clientIdParts.Length < 2)
                 {
-                    var jwtToken = tokenProp.GetString();
-                    var userId = userIdProp.GetString();
+                    return new AuthenticationResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "Invalid Google Client ID format for iOS"
+                    };
+                }
+                var reverseClientId = $"com.googleusercontent.apps.{clientIdParts[0]}";
+                callbackUrl = $"{reverseClientId}://oauth";
+#else
+                // Android and other platforms use localhost callback
+                callbackUrl = "http://localhost:7777/oauth/callback";
+#endif
 
-                    _logger.LogInformation("Authentication successful, setting auth state");
+                authUrl = $"https://accounts.google.com/o/oauth2/v2/auth" +
+                    $"?client_id={Uri.EscapeDataString(_googleClientId)}" +
+                    $"&response_type=code" +
+                    $"&scope={Uri.EscapeDataString("openid profile email")}" +
+                    $"&redirect_uri={Uri.EscapeDataString(callbackUrl)}" +
+                    $"&state={Guid.NewGuid()}";
 
-                    // Set authentication state
-                    _authenticationStateService.SetAuthenticationState(
-                        jwtToken!, 
-                        userId!, 
-                        email!, 
-                        name!);
+                _logger.LogInformation("Starting WebAuthenticator with callback: {CallbackUrl}", callbackUrl);
 
-                    // Save to secure storage
-                    await _authenticationStateService.SaveTokenSecurelyAsync();
+                var authResult = await WebAuthenticator.AuthenticateAsync(
+                    new WebAuthenticatorOptions
+                    {
+                        Url = new Uri(authUrl),
+                        CallbackUrl = new Uri(callbackUrl)
+                    });
 
-                    return true;
+                if (authResult?.Properties?.ContainsKey("code") == true)
+                {
+                    var authCode = authResult.Properties["code"];
+                    var tokenResult = await ExchangeCodeForTokens(authCode, callbackUrl);
+                    
+                    if (tokenResult.IsSuccess && !string.IsNullOrEmpty(tokenResult.AccessToken))
+                    {
+                        // Get user profile from Google
+                        var profileResult = await GetUserProfile(tokenResult.AccessToken);
+                        if (profileResult.IsSuccess)
+                        {
+                            tokenResult.Email = profileResult.Email;
+                            tokenResult.Name = profileResult.Name;
+
+                            // Send to our API to get JWT token
+                            var apiResult = await SendToApi(profileResult.Email!, profileResult.Name!, profileResult.IdToken!, tokenResult.AccessToken);
+                            if (apiResult.IsSuccess)
+                            {
+                                tokenResult.JwtToken = apiResult.JwtToken;
+                                tokenResult.UserId = apiResult.UserId;
+
+                                // Set full authentication state
+                                _authStateService.SetAuthenticationState(
+                                    apiResult.JwtToken!, 
+                                    apiResult.UserId!, 
+                                    profileResult.Email!, 
+                                    profileResult.Name!);
+
+                                // Save to secure storage
+                                await _authStateService.SaveTokenSecurelyAsync();
+                            }
+                        }
+                    }
+
+                    return tokenResult;
+                }
+                else
+                {
+                    return new AuthenticationResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "No authorization code received"
+                    };
                 }
             }
-            else
+            catch (TaskCanceledException)
             {
-                var errorContent = await apiResponse.Content.ReadAsStringAsync();
-                _logger.LogError($"API authentication failed: {errorContent}");
+                return new AuthenticationResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "Authentication was cancelled"
+                };
             }
-
-            return false;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Google authentication failed");
+                return new AuthenticationResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = $"Authentication failed: {ex.Message}"
+                };
+            }
         }
-        catch (TaskCanceledException)
+
+        private async Task<AuthenticationResult> ExchangeCodeForTokens(string authorizationCode, string redirectUri)
         {
-            _logger.LogInformation("User canceled the authentication");
-            return false;
+            try
+            {
+                var tokenRequest = new Dictionary<string, string>
+                {
+                    ["grant_type"] = "authorization_code",
+                    ["client_id"] = _googleClientId!,
+                    ["client_secret"] = _googleClientSecret!,
+                    ["redirect_uri"] = redirectUri,
+                    ["code"] = authorizationCode
+                };
+
+                var requestContent = new FormUrlEncodedContent(tokenRequest);
+                var response = await _httpClient.PostAsync("https://oauth2.googleapis.com/token", requestContent);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    var tokenResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
+
+                    var accessToken = tokenResponse.GetProperty("access_token").GetString();
+
+                    return new AuthenticationResult
+                    {
+                        IsSuccess = true,
+                        AccessToken = accessToken
+                    };
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"Token exchange failed: {response.StatusCode} - {errorContent}");
+                    
+                    return new AuthenticationResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = $"Token exchange failed: {response.StatusCode}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during token exchange");
+                return new AuthenticationResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = $"Token exchange error: {ex.Message}"
+                };
+            }
         }
-        catch (Exception ex)
+
+        private async Task<AuthenticationResult> GetUserProfile(string accessToken)
         {
-            _logger.LogError(ex, "An error occurred during Google sign-in");
-            throw;
+            try
+            {
+                using var profileRequest = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v2/userinfo");
+                profileRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                
+                var profileResponse = await _httpClient.SendAsync(profileRequest);
+                if (!profileResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogError("Failed to get user profile");
+                    return new AuthenticationResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = "Failed to get user profile"
+                    };
+                }
+
+                var profileJson = await profileResponse.Content.ReadAsStringAsync();
+                var profile = JsonSerializer.Deserialize<JsonElement>(profileJson);
+                
+                var email = profile.TryGetProperty("email", out var emailProp) ? emailProp.GetString() : "";
+                var name = profile.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : "";
+                var googleId = profile.TryGetProperty("id", out var idProp) ? idProp.GetString() : "";
+                
+                _logger.LogInformation($"User profile received: {email}");
+
+                return new AuthenticationResult
+                {
+                    IsSuccess = true,
+                    Email = email,
+                    Name = name,
+                    IdToken = googleId // Store Google ID in IdToken field for API call
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting user profile");
+                return new AuthenticationResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = $"Profile error: {ex.Message}"
+                };
+            }
         }
-    }
 
-    private static string GenerateCodeVerifier()
-    {
-        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
-        var random = new Random();
-        return new string(Enumerable.Repeat(chars, 128)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
-    }
+        private async Task<AuthenticationResult> SendToApi(string email, string name, string googleId, string accessToken)
+        {
+            try
+            {
+                var googleSignInData = new
+                {
+                    Email = email,
+                    Name = name,
+                    GoogleId = googleId,
+                    AccessToken = accessToken
+                };
 
-    private static string GenerateCodeChallenge(string codeVerifier)
-    {
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var challengeBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(codeVerifier));
-        return Convert.ToBase64String(challengeBytes)
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+                var json = JsonSerializer.Serialize(googleSignInData);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+                
+                _logger.LogInformation("Sending Google auth data to API");
+                var apiResponse = await _httpClient.PostAsync("api/auth/google-signin", content);
+                
+                if (apiResponse.IsSuccessStatusCode)
+                {
+                    var responseJson = await apiResponse.Content.ReadAsStringAsync();
+                    var authResponse = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                    
+                    if (authResponse.TryGetProperty("token", out var tokenProp) &&
+                        authResponse.TryGetProperty("userId", out var userIdProp))
+                    {
+                        var jwtToken = tokenProp.GetString();
+                        var userId = userIdProp.GetString();
+
+                        _logger.LogInformation("API authentication successful");
+                        
+                        return new AuthenticationResult
+                        {
+                            IsSuccess = true,
+                            JwtToken = jwtToken,
+                            UserId = userId
+                        };
+                    }
+                }
+                else
+                {
+                    var errorContent = await apiResponse.Content.ReadAsStringAsync();
+                    _logger.LogError($"API authentication failed: {errorContent}");
+                }
+
+                return new AuthenticationResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = "API authentication failed"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending to API");
+                return new AuthenticationResult
+                {
+                    IsSuccess = false,
+                    ErrorMessage = $"API error: {ex.Message}"
+                };
+            }
+        }
+
+        public void SignOut()
+        {
+            _authStateService.ClearAuthenticationState();
+        }
     }
 }

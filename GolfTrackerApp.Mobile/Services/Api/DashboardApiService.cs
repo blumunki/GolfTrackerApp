@@ -119,10 +119,22 @@ public class DashboardApiService : IDashboardApiService
     {
         try
         {
+            // Debug: Check if we even enter the service method
+            Console.WriteLine("[DASHBOARD_API] GetDashboardStatsAsync() method entered");
+            System.Diagnostics.Debug.WriteLine("[DASHBOARD_API] GetDashboardStatsAsync() method entered");
+            
             EnsureAuthorizationHeader();
+            
+            Console.WriteLine($"[DASHBOARD_API] HttpClient.BaseAddress: {_httpClient.BaseAddress}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD_API] HttpClient.BaseAddress: {_httpClient.BaseAddress}");
+            Console.WriteLine($"[DASHBOARD_API] Authorization header: {_httpClient.DefaultRequestHeaders.Authorization?.ToString() ?? "NULL"}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD_API] Authorization header: {_httpClient.DefaultRequestHeaders.Authorization?.ToString() ?? "NULL"}");
             
             _logger.LogInformation("Fetching dashboard stats from Reports API");
             var response = await _httpClient.GetAsync("api/reports/dashboard-stats");
+            
+            Console.WriteLine($"[DASHBOARD_API] Response Status: {response.StatusCode}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD_API] Response Status: {response.StatusCode}");
             
             _logger.LogInformation($"Dashboard stats API response: {response.StatusCode}");
             
@@ -137,13 +149,23 @@ public class DashboardApiService : IDashboardApiService
             var json = await response.Content.ReadAsStringAsync();
             _logger.LogInformation($"Dashboard stats API response content length: {json.Length}");
             
+            Console.WriteLine($"[DASHBOARD_API] Response JSON: {json}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD_API] Response JSON: {json}");
+            
             var stats = JsonSerializer.Deserialize<DashboardStats>(json, _jsonOptions);
             
             _logger.LogInformation($"Deserialized dashboard stats: TotalRounds={stats?.TotalRounds ?? 0}");
+            Console.WriteLine($"[DASHBOARD_API] Deserialized stats: TotalRounds={stats?.TotalRounds ?? 0}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD_API] Deserialized stats: TotalRounds={stats?.TotalRounds ?? 0}");
+            
             return stats;
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DASHBOARD_API] Exception: {ex.Message}");
+            Console.WriteLine($"[DASHBOARD_API] Exception details: {ex}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD_API] Exception: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD_API] Exception details: {ex}");
             _logger.LogError(ex, "Error fetching dashboard stats from API");
             return null;
         }

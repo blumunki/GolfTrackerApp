@@ -38,6 +38,7 @@
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>golftracker</string>
+                <string>com.googleusercontent.apps.956988809981</string>
             </array>
         </dict>
     </array>

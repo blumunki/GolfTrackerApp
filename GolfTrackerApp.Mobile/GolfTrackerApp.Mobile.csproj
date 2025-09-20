@@ -43,6 +43,14 @@
       <UserSecretsId>225a16cb-90ae-40d8-b215-93fc8db227ba</UserSecretsId>
   </PropertyGroup>
 
+  <!-- Android specific properties -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <PublishTrimmed>false</PublishTrimmed>
+    <RunAOTCompilation>false</RunAOTCompilation>
+  </PropertyGroup>
+
     <ItemGroup>
         <!-- App Icon -->
         <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#2c5530" />
@@ -61,13 +69,13 @@
         <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.5" />
-        <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.2" />
-        <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="9.0.0" />
-        <PackageReference Include="MudBlazor" Version="8.10.0" />
+        <ItemGroup>
+        <PackageReference Include="Microsoft.Maui.Controls" Version="9.0.21" />
+        <PackageReference Include="Microsoft.Maui.Controls.Compatibility" Version="9.0.21" />
+        <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="9.0.21" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
+        <PackageReference Include="MudBlazor" Version="7.8.0" />
     </ItemGroup>
 
 </Project>

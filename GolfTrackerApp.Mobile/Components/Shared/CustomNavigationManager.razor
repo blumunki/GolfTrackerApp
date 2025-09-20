@@ -516,22 +516,51 @@
             loadingDashboard = true;
             StateHasChanged();
             
+            // Add debug logging
+            Console.WriteLine("[CUSTOM_NAV] Starting LoadDashboardData()");
+            System.Diagnostics.Debug.WriteLine("[CUSTOM_NAV] Starting LoadDashboardData()");
+            
             // Load all dashboard data from new API endpoints
+            Console.WriteLine("[CUSTOM_NAV] Calling GetDashboardStatsAsync()");
+            System.Diagnostics.Debug.WriteLine("[CUSTOM_NAV] Calling GetDashboardStatsAsync()");
             dashboardStats = await DashboardApiService.GetDashboardStatsAsync();
+            Console.WriteLine($"[CUSTOM_NAV] GetDashboardStatsAsync() returned: {(dashboardStats != null ? $"TotalRounds={dashboardStats.TotalRounds}, BestScore={dashboardStats.BestScore}" : "NULL")}");
+            System.Diagnostics.Debug.WriteLine($"[CUSTOM_NAV] GetDashboardStatsAsync() returned: {(dashboardStats != null ? $"TotalRounds={dashboardStats.TotalRounds}, BestScore={dashboardStats.BestScore}" : "NULL")}");
+            
+            Console.WriteLine("[CUSTOM_NAV] Calling GetPlayingPartnersAsync()");
+            System.Diagnostics.Debug.WriteLine("[CUSTOM_NAV] Calling GetPlayingPartnersAsync()");
             playingPartners = await DashboardApiService.GetPlayingPartnersAsync();
+            Console.WriteLine($"[CUSTOM_NAV] GetPlayingPartnersAsync() returned: {(playingPartners?.Count ?? 0)} partners");
+            System.Diagnostics.Debug.WriteLine($"[CUSTOM_NAV] GetPlayingPartnersAsync() returned: {(playingPartners?.Count ?? 0)} partners");
+            
+            Console.WriteLine("[CUSTOM_NAV] Calling GetRecentRoundsAsync()");
+            System.Diagnostics.Debug.WriteLine("[CUSTOM_NAV] Calling GetRecentRoundsAsync()");
             recentRounds = await DashboardApiService.GetRecentRoundsAsync();
+            Console.WriteLine($"[CUSTOM_NAV] GetRecentRoundsAsync() returned: {(recentRounds?.Count ?? 0)} rounds");
+            System.Diagnostics.Debug.WriteLine($"[CUSTOM_NAV] GetRecentRoundsAsync() returned: {(recentRounds?.Count ?? 0)} rounds");
             
             // Load real performance data for the chart
+            Console.WriteLine("[CUSTOM_NAV] Calling GetPerformanceSummaryAsync()");
+            System.Diagnostics.Debug.WriteLine("[CUSTOM_NAV] Calling GetPerformanceSummaryAsync()");
             performanceData = await DashboardApiService.GetPerformanceSummaryAsync(7);
+            Console.WriteLine($"[CUSTOM_NAV] GetPerformanceSummaryAsync() returned: {(performanceData?.Count ?? 0)} data points");
+            System.Diagnostics.Debug.WriteLine($"[CUSTOM_NAV] GetPerformanceSummaryAsync() returned: {(performanceData?.Count ?? 0)} data points");
 
             // Generate recent activity from actual data
             GenerateRecentActivity();
             
             // Initialize performance chart
             InitializePerformanceChart();
+            
+            Console.WriteLine("[CUSTOM_NAV] LoadDashboardData() completed successfully");
+            System.Diagnostics.Debug.WriteLine("[CUSTOM_NAV] LoadDashboardData() completed successfully");
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[CUSTOM_NAV] Error loading dashboard: {ex.Message}");
+            Console.WriteLine($"[CUSTOM_NAV] Exception details: {ex}");
+            System.Diagnostics.Debug.WriteLine($"[CUSTOM_NAV] Error loading dashboard: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[CUSTOM_NAV] Exception details: {ex}");
             recentActivity = new List<string> { $"Error loading dashboard: {ex.Message}" };
         }
         finally

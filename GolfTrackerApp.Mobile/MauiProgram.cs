@@ -3,6 +3,7 @@ using MudBlazor.Services;
 using GolfTrackerApp.Mobile.Services.Api;
 using GolfTrackerApp.Mobile.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Http;
 
 namespace GolfTrackerApp.Mobile;
 
@@ -21,8 +22,8 @@ public static class MauiProgram
 			var configBuilder = new ConfigurationBuilder();
 			configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
 			{
-				{ "Authentication:Google:ClientId", Generated.DevConfiguration.GoogleClientId },
-				{ "Authentication:Google:ClientSecret", Generated.DevConfiguration.GoogleClientSecret }
+				{ "Authentication:Google:ClientId", GolfTrackerApp.Mobile.Generated.DevConfiguration.GoogleClientId },
+				{ "Authentication:Google:ClientSecret", GolfTrackerApp.Mobile.Generated.DevConfiguration.GoogleClientSecret }
 			});
 			
 			var devConfig = configBuilder.Build();
@@ -57,7 +58,13 @@ public static class MauiProgram
 		// Configure base HTTP client settings
 		var httpClientBuilder = new Action<HttpClient>(client =>
 		{
+#if ANDROID
+			// Use Android emulator bridge IP to connect to host development server
+			// Use HTTPS since API only responds on HTTPS
+			client.BaseAddress = new Uri("https://10.0.2.2:7295/");
+#else
 			client.BaseAddress = new Uri("https://localhost:7295/");
+#endif
 			client.DefaultRequestHeaders.Add("Accept", "application/json");
 		});
 
@@ -110,23 +117,27 @@ public static class MauiProgram
 		// Configure GoogleAuthenticationService with proper HttpClient setup
 		builder.Services.AddSingleton<GoogleAuthenticationService>(serviceProvider =>
 		{
-			var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-			var httpClient = httpClientFactory.CreateClient();
 			var configuration = serviceProvider.GetRequiredService<IConfiguration>();
 			var configService = serviceProvider.GetRequiredService<ConfigurationService>();
 			var logger = serviceProvider.GetRequiredService<ILogger<GoogleAuthenticationService>>();
 			var authStateService = serviceProvider.GetRequiredService<AuthenticationStateService>();
 			
-			httpClient.BaseAddress = new Uri("https://localhost:7295/");
-			httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
-			
+			// Create HttpClient with proper configuration for Android/iOS
+			HttpClient httpClient;
 #if DEBUG
 			var handler = new HttpClientHandler();
 			handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
 			httpClient = new HttpClient(handler);
-			httpClient.BaseAddress = new Uri("https://localhost:7295/");
-			httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+#else
+			httpClient = new HttpClient();
 #endif
+
+#if ANDROID
+			httpClient.BaseAddress = new Uri("https://10.0.2.2:7295/");
+#else
+			httpClient.BaseAddress = new Uri("https://localhost:7295/");
+#endif
+			httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
 			return new GoogleAuthenticationService(httpClient, configuration, configService, logger, authStateService);
 		});

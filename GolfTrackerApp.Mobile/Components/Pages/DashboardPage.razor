@@ -193,18 +193,42 @@
             loading = true;
             StateHasChanged();
             
+            // Add debug logging
+            await JSRuntime.InvokeVoidAsync("console.log", "[DASHBOARD] Starting LoadDashboardData()");
+            System.Diagnostics.Debug.WriteLine("[DASHBOARD] Starting LoadDashboardData()");
+            
             // Load real dashboard data from API
+            await JSRuntime.InvokeVoidAsync("console.log", "[DASHBOARD] Calling GetDashboardStatsAsync()");
+            System.Diagnostics.Debug.WriteLine("[DASHBOARD] Calling GetDashboardStatsAsync()");
             stats = await DashboardApiService.GetDashboardStatsAsync();
+            await JSRuntime.InvokeVoidAsync("console.log", $"[DASHBOARD] GetDashboardStatsAsync() returned: {(stats != null ? "Success" : "Null")}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD] GetDashboardStatsAsync() returned: {(stats != null ? $"TotalRounds={stats.TotalRounds}" : "Null")}");
+            
+            await JSRuntime.InvokeVoidAsync("console.log", "[DASHBOARD] Calling GetScoreDistributionAsync()");
+            System.Diagnostics.Debug.WriteLine("[DASHBOARD] Calling GetScoreDistributionAsync()");
             scoreDistribution = await DashboardApiService.GetScoreDistributionAsync();
+            await JSRuntime.InvokeVoidAsync("console.log", $"[DASHBOARD] GetScoreDistributionAsync() returned: {(scoreDistribution?.Count ?? 0)} items");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD] GetScoreDistributionAsync() returned: {(scoreDistribution?.Count ?? 0)} items");
+            
+            await JSRuntime.InvokeVoidAsync("console.log", "[DASHBOARD] Calling GetFavoriteCoursesAsync()");
+            System.Diagnostics.Debug.WriteLine("[DASHBOARD] Calling GetFavoriteCoursesAsync()");
             favoriteCourses = await DashboardApiService.GetFavoriteCoursesAsync(4);
+            await JSRuntime.InvokeVoidAsync("console.log", $"[DASHBOARD] GetFavoriteCoursesAsync() returned: {(favoriteCourses?.Count ?? 0)} items");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD] GetFavoriteCoursesAsync() returned: {(favoriteCourses?.Count ?? 0)} items");
             
             // For recent rounds, we would need to get this from the rounds API
             // For now, we'll just leave it empty or use a mock
             recentRounds = new List<ApiRound>();
+            
+            await JSRuntime.InvokeVoidAsync("console.log", "[DASHBOARD] LoadDashboardData() completed successfully");
+            System.Diagnostics.Debug.WriteLine("[DASHBOARD] LoadDashboardData() completed successfully");
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading dashboard data: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("console.error", $"[DASHBOARD] Error loading dashboard data: {ex.Message}");
+            await JSRuntime.InvokeVoidAsync("console.error", $"[DASHBOARD] Exception details: {ex}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD] Error loading dashboard data: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[DASHBOARD] Exception details: {ex}");
             
             // Set defaults on error
             stats = null;
