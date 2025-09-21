@@ -3,15 +3,10 @@
 @using MudBlazor
 
 <div class="mobile-app">
-    <!-- Header -->
-    <MudAppBar Color="Color.Primary" Fixed="true" Style="background: linear-gradient(135deg, #2c5530 0%, #3d7c3f 100%);">
-        <MudText Typo="Typo.h5" Style="font-weight: 600;">
-            🏌️ Golf Tracker Mobile
-        </MudText>
-    </MudAppBar>
+    
     
     <!-- Content Area -->
-    <MudContainer MaxWidth="MaxWidth.False" Style="margin-top: 64px; margin-bottom: 80px; padding: 8px 16px; height: calc(100vh - 144px); overflow-y: auto;">
+    <MudContainer MaxWidth="MaxWidth.False" Style="margin-top: 0; margin-bottom: 80px; padding: 8px 16px; height: calc(100vh - 80px); overflow-y: auto;">
         @switch (CurrentPage.ToLower())
         {
             case "home":
