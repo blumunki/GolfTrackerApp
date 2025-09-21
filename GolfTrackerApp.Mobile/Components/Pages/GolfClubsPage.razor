@@ -4,126 +4,211 @@
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IGolfClubApiService GolfClubApi
 @inject ILogger<GolfClubsPage> Logger
+@inject IJSRuntime JSRuntime
 
-<MudContainer Class="pa-2">
-    <MudText Typo="Typo.h4" Class="mb-3">Golf Clubs</MudText>
+<MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
+    <!-- Header and Add Actions -->
+    <div class="d-flex align-center justify-space-between mb-4">
+        <MudText Typo="Typo.h4" Color="Color.Primary">⛳️ Golf Clubs</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                      Color="Color.Primary" 
+                      Size="Size.Large"
+                      OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Add new club coming soon!"))" />
+    </div>
+    
+    <!-- Search Bar -->
+    <MudPaper Class="pa-3 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);">
+        <MudTextField @bind-Value="searchString" 
+                      Label="Search clubs by name or location..." 
+                      Variant="Variant.Outlined" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      DebounceInterval="300" 
+                      OnDebounceIntervalElapsed="OnSearchTextChanged"
+                      Margin="Margin.Dense"
+                      FullWidth="true" />
+    </MudPaper>
     
     @if (loading)
     {
-        <MudProgressCircular Size="Size.Large" Indeterminate="true" Class="ma-4" />
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Loading golf clubs...</MudText>
+        <div class="text-center pa-4">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading golf clubs...</MudText>
+        </div>
     }
-    else if (golfClubs?.Any() == true)
+    else if (filteredClubs?.Any() == true)
     {
-        <MudGrid>
-            @foreach (var club in golfClubs)
+        <MudList T="object" Class="clubs-list">
+            @foreach (var club in filteredClubs)
             {
-                <MudItem xs="12" sm="6" md="4">
-                    <MudCard Class="mb-4" Style="height: 100%; cursor: pointer;" @onclick="@(() => ShowClubDetails(club))">
-                        <MudCardHeader>
-                            <CardHeaderContent>
-                                <MudText Typo="Typo.h6">@club.Name</MudText>
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">@GetClubLocation(club)</MudText>
-                            </CardHeaderContent>
-                            <CardHeaderActions>
-                                <MudIconButton Icon="Icons.Material.Filled.Info" Color="Color.Primary" Size="Size.Small" />
-                            </CardHeaderActions>
-                        </MudCardHeader>
-                        <MudCardContent>
-                            <MudText Typo="Typo.body2" Class="mb-1">@club.AddressLine1</MudText>
-                            @if (!string.IsNullOrEmpty(club.AddressLine2))
-                            {
-                                <MudText Typo="Typo.body2" Class="mb-1">@club.AddressLine2</MudText>
-                            }
-                            <MudText Typo="Typo.body2" Class="mb-2">@club.City, @club.Postcode</MudText>
-                            
-                            @if (!string.IsNullOrEmpty(club.Website))
-                            {
-                                <MudText Typo="Typo.caption" Color="Color.Primary">@club.Website</MudText>
-                            }
-                            
-                            <MudDivider Class="my-2" />
-                            <MudText Typo="Typo.body2" Color="Color.Info">
-                                Golf Club
-                            </MudText>
+                <MudListItem T="object" Class="club-list-item">
+                    <MudCard Elevation="2" 
+                             Class="mb-3 club-card" 
+                             Style="border-left: 4px solid #3c8dbc; cursor: pointer; transition: all 0.2s ease;"
+                             @onclick="@(() => ShowClubDetails(club.GolfClubId))">
+                        <MudCardContent Class="pa-3">
+                            <div class="d-flex justify-space-between align-start">
+                                <!-- Main Club Info -->
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-center mb-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Color="Color.Primary" Class="mr-3" />
+                                        <div>
+                                            <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                                                @club.Name
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @GetClubLocation(club)
+                                            </MudText>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex align-center gap-4 mt-2">
+                                        <div class="d-flex align-center">
+                                            <MudIcon Icon="@Icons.Material.Filled.Flag" 
+                                                    Size="Size.Small" 
+                                                    Class="mr-1" 
+                                                    Color="Color.Info" />
+                                            <MudText Typo="Typo.caption">
+                                                @club.CourseCount Courses
+                                            </MudText>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(club.Website))
+                                        {
+                                            <div class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Language"
+                                                        Size="Size.Small"
+                                                        Class="mr-1"
+                                                        Color="Color.Success" />
+                                                <MudText Typo="Typo.caption">
+                                                    Has Website
+                                                </MudText>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                                
+                                <!-- Quick Actions -->
+                                <div class="d-flex flex-column align-center ml-2">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                                  Color="Color.Primary" 
+                                                  Size="Size.Small"
+                                                  title="View Courses"
+                                                  OnClick="@(() => ShowClubDetails(club.GolfClubId))" />
+                                    <MudMenu>
+                                        <ActivatorContent>
+                                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" 
+                                                          Color="Color.Secondary" 
+                                                          Size="Size.Small" />
+                                        </ActivatorContent>
+                                        <ChildContent>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" 
+                                                         OnClick="@(() => ShowClubDetails(club.GolfClubId))">
+                                                View Details
+                                            </MudMenuItem>
+                                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" 
+                                                         OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Edit club coming soon!"))">
+                                                Edit Club
+                                            </MudMenuItem>
+                                        </ChildContent>
+                                    </MudMenu>
+                                </div>
+                            </div>
                         </MudCardContent>
                     </MudCard>
-                </MudItem>
+                </MudListItem>
             }
-        </MudGrid>
+        </MudList>
     }
-    else if (!loading && golfClubs != null)
+    else if (!loading && golfClubs?.Any() == true)
     {
-        <MudAlert Severity="Severity.Info" Class="mt-4">
-            No golf clubs found.
-        </MudAlert>
+        <!-- No search results -->
+        <div class="text-center pa-4">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No clubs found</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Try adjusting your search terms</MudText>
+        </div>
     }
     else
     {
-        <MudAlert Severity="Severity.Error" Class="mt-4">
-            <MudText Typo="Typo.body1">Failed to load golf clubs.</MudText>
-            <MudButton Color="Color.Primary" Variant="Variant.Text" OnClick="LoadGolfClubs" Class="mt-2">
-                Try Again
+        <!-- No clubs at all -->
+        <div class="text-center pa-4">
+            <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No golf clubs found</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Add a club to get started.
+            </MudText>
+            <MudButton Variant="Variant.Filled" 
+                      Color="Color.Primary" 
+                      StartIcon="@Icons.Material.Filled.Add"
+                      OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Add new club coming soon!"))">
+                Add a Club
             </MudButton>
-        </MudAlert>
+        </div>
     }
 </MudContainer>
 
 <!-- Club Details Dialog -->
-<MudDialog @bind-Visible="showDetailsDialog" Options="@(new DialogOptions() { FullWidth = true, MaxWidth = MaxWidth.Medium })">
-    <TitleContent>
-        <MudText Typo="Typo.h6">
-            <MudIcon Icon="Icons.Material.Filled.GolfCourse" Style="margin-right: 8px;" />
-            @(selectedClub?.Name ?? "Club Details")
-        </MudText>
-    </TitleContent>
+<MudDialog @bind-Visible="showDetailsDialog" Options="detailsDialogOptions">
     <DialogContent>
-        @if (selectedClub != null)
+        @if (dialogLoading)
         {
-            <MudGrid>
-                <MudItem xs="12">
-                    <MudCard>
-                        <MudCardContent>
-                            <MudText Typo="Typo.h6" Class="mb-3">@selectedClub.Name</MudText>
-                            
-                            <MudText Typo="Typo.body1" Class="mb-2">
-                                <MudIcon Icon="Icons.Material.Filled.LocationOn" Size="Size.Small" Style="margin-right: 8px;" />
-                                Address
-                            </MudText>
-                            <MudText Typo="Typo.body2" Class="ml-4 mb-1">@selectedClub.AddressLine1</MudText>
-                            @if (!string.IsNullOrEmpty(selectedClub.AddressLine2))
-                            {
-                                <MudText Typo="Typo.body2" Class="ml-4 mb-1">@selectedClub.AddressLine2</MudText>
-                            }
-                            <MudText Typo="Typo.body2" Class="ml-4 mb-3">@selectedClub.City, @selectedClub.CountyOrRegion @selectedClub.Postcode</MudText>
-                            <MudText Typo="Typo.body2" Class="ml-4 mb-3">@selectedClub.Country</MudText>
-                            
-                            @if (!string.IsNullOrEmpty(selectedClub.Website))
-                            {
-                                <MudText Typo="Typo.body1" Class="mb-2">
-                                    <MudIcon Icon="Icons.Material.Filled.Web" Size="Size.Small" Style="margin-right: 8px;" />
-                                    Website
-                                </MudText>
-                                <MudLink Href="@selectedClub.Website" Target="_blank" Class="ml-4">
-                                    @selectedClub.Website
-                                </MudLink>
-                            }
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
-            </MudGrid>
+            <div class="text-center pa-8">
+                <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading club details...</MudText>
+            </div>
+        }
+        else if (selectedClub != null)
+        {
+            <div class="mb-2">
+                <MudText Typo="Typo.h5" Color="Color.Primary">@selectedClub.Name</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@GetClubLocation(selectedClub)</MudText>
+            </div>
+
+            <MudText Typo="Typo.h6" Class="mt-4 mb-2">Courses</MudText>
+            @if (selectedClub.Courses?.Any() == true)
+            {
+                <MudList T="object" Dense="true">
+                    @foreach (var course in selectedClub.Courses)
+                    {
+                        <MudListItem T="object">
+                            <div class="d-flex justify-space-between align-center flex-grow-1">
+                                <div>
+                                    <MudText>@course.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @course.NumberOfHoles holes | Par @course.DefaultPar
+                                    </MudText>
+                                </div>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info">No courses have been added for this club yet.</MudAlert>
+            }
         }
     </DialogContent>
     <DialogActions>
-        <MudButton Color="Color.Primary" OnClick="CloseDetailsDialog">Close</MudButton>
+        <MudButton Color="Color.Secondary" OnClick="CloseDetailsDialog">Close</MudButton>
     </DialogActions>
 </MudDialog>
 
 @code {
     private List<GolfClub>? golfClubs;
+    private List<GolfClub>? filteredClubs;
     private bool loading = true;
+    private bool dialogLoading = false;
     private bool showDetailsDialog = false;
     private GolfClub? selectedClub;
+    private string searchString = "";
+
+    private DialogOptions detailsDialogOptions = new() 
+    { 
+        MaxWidth = MaxWidth.Medium, 
+        FullWidth = true,
+        CloseButton = true
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -135,22 +220,51 @@
         try
         {
             loading = true;
-            StateHasChanged();
-            
-            Logger.LogInformation("Loading golf clubs from API...");
             golfClubs = await GolfClubApi.GetAllGolfClubsAsync();
-            Logger.LogInformation("Successfully loaded {Count} golf clubs", golfClubs?.Count ?? 0);
+            ApplySearchFilter();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading golf clubs");
-            golfClubs = null; // Set to null to show error state
+            golfClubs = new List<GolfClub>();
         }
         finally
         {
             loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task OnSearchTextChanged(string text)
+    {
+        searchString = text;
+        ApplySearchFilter();
+        await Task.CompletedTask;
+    }
+
+    private void ApplySearchFilter()
+    {
+        if (golfClubs == null)
+        {
+            filteredClubs = new List<GolfClub>();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(searchString))
+        {
+            filteredClubs = golfClubs;
+        }
+        else
+        {
+            var searchTerm = searchString.Trim().ToLowerInvariant();
+            filteredClubs = golfClubs.Where(c =>
+                (c.Name?.ToLowerInvariant().Contains(searchTerm) == true) ||
+                (c.City?.ToLowerInvariant().Contains(searchTerm) == true) ||
+                (c.CountyOrRegion?.ToLowerInvariant().Contains(searchTerm) == true)
+            ).ToList();
+        }
+        
+        StateHasChanged();
     }
 
     private string GetClubLocation(GolfClub club)
@@ -161,10 +275,26 @@
         return string.Join(", ", parts);
     }
 
-    private void ShowClubDetails(GolfClub club)
+    private async Task ShowClubDetails(int clubId)
     {
-        selectedClub = club;
         showDetailsDialog = true;
+        dialogLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            selectedClub = await GolfClubApi.GetGolfClubByIdAsync(clubId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error fetching details for club {ClubId}", clubId);
+            // Optionally, show an error in the dialog
+        }
+        finally
+        {
+            dialogLoading = false;
+            StateHasChanged();
+        }
     }
 
     private void CloseDetailsDialog()
