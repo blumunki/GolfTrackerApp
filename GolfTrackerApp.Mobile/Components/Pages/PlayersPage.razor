@@ -1,4 +1,5 @@
 @page "/players"
+@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Services
@@ -459,13 +460,22 @@
 
     private async Task ViewPlayerReport(Player player)
     {
-        // Navigate using standard Blazor routing
+        Console.WriteLine($"[PLAYERS] ========== PLAYER REPORT NAVIGATION ==========");
+        Console.WriteLine($"[PLAYERS] Player ID: {player.Id}");
+        Console.WriteLine($"[PLAYERS] Player Name: {player.FirstName} {player.LastName}");
+        Console.WriteLine($"[PLAYERS] Target URL: /players/{player.Id}/report");
+        
+        // Close dialogs first
         CloseDetailsDialog();
         
-        // Use NavigationManager.NavigateTo with the proper route
-        NavigationManager.NavigateTo($"/players/{player.Id}/report");
+        // Small delay to ensure dialog closes before navigation
+        await Task.Delay(100);
         
-        await Task.CompletedTask;
+        // Navigate using the route that PlayerReportPage expects
+        var targetUrl = $"/players/{player.Id}/report";
+        Console.WriteLine($"[PLAYERS] Calling NavigationManager.NavigateTo('{targetUrl}')");
+        NavigationManager.NavigateTo(targetUrl, forceLoad: false);
+        Console.WriteLine($"[PLAYERS] Navigation call completed");
     }
 
     private void ShowAddPlayerDialog()

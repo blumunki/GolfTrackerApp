@@ -7,6 +7,9 @@ namespace GolfTrackerApp.Mobile.Models
     {
         [JsonPropertyName("playerId")]
         public int Id { get; set; }
+        
+        [JsonPropertyName("applicationUserId")]
+        public string? ApplicationUserId { get; set; }
 
         [Required]
         [JsonPropertyName("firstName")]

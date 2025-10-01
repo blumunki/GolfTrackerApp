@@ -1,0 +1,63 @@
+
+
+@try {
+<MudGrid Class="mb-4" Spacing="2">
+    <MudItem xs="6">
+        <MudCard Elevation="3" Class="pa-3" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%); color: white; min-height: 100px;">
+            <div class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Medium" Class="mb-2" />
+                <MudText Typo="Typo.h4" Class="mb-1">@GetSafeValue(Stats?.TotalRounds)</MudText>
+                <MudText Typo="Typo.caption">Total Rounds</MudText>
+            </div>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="6">
+        <MudCard Elevation="3" Class="pa-3" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%); color: white; min-height: 100px;">
+            <div class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.Star" Size="Size.Medium" Class="mb-2" />
+                <MudText Typo="Typo.h4" Class="mb-1">@GetSafeValue(Stats?.BestScore)</MudText>
+                <MudText Typo="Typo.caption">Best Score</MudText>
+            </div>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="6">
+        <MudCard Elevation="3" Class="pa-3" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%); color: white; min-height: 100px;">
+            <div class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingDown" Size="Size.Medium" Class="mb-2" />
+                <MudText Typo="Typo.h4" Class="mb-1">@GetSafeDecimal(Stats?.AverageToPar)</MudText>
+                <MudText Typo="Typo.caption">Avg to Par</MudText>
+            </div>
+        </MudCard>
+    </MudItem>
+    
+    <MudItem xs="6">
+        <MudCard Elevation="3" Class="pa-3" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 50%); color: white; min-height: 100px;">
+            <div class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Size="Size.Medium" Class="mb-2" />
+                <MudText Typo="Typo.h4" Class="mb-1">@GetSafeValue(Stats?.CurrentStreak)</MudText>
+                <MudText Typo="Typo.caption">Current Streak</MudText>
+            </div>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+}
+catch (Exception ex)
+{
+    <MudAlert Severity="Severity.Error">Error rendering stats: @ex.Message</MudAlert>
+}
+
+@code {
+    [Parameter] public Services.Api.DashboardStats? Stats { get; set; }
+    
+    private string GetSafeValue(int? value)
+    {
+        return (value ?? 0).ToString();
+    }
+    
+    private string GetSafeDecimal(double? value)
+    {
+        return (value ?? 0.0).ToString("F1");
+    }
+}

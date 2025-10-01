@@ -1,0 +1,30 @@
+@if (Partners?.Any() == true)
+{
+    <MudCard Elevation="3" Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6" Color="Color.Primary">Playing Partners</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudList T="string">
+                @foreach (var partner in Partners.Take(3))
+                {
+                    <MudListItem T="string">
+                        <div class="d-flex align-center justify-space-between">
+                            <div>
+                                <MudText Typo="Typo.body1">@partner.PartnerName</MudText>
+                                <MudText Typo="Typo.caption">@partner.RoundsPlayed rounds played</MudText>
+                            </div>
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
+                        </div>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    [Parameter] public List<PlayingPartnerSummary>? Partners { get; set; }
+}

@@ -48,15 +48,23 @@ public class PlayerApiService : IPlayerApiService
     {
         try
         {
+            Console.WriteLine($"[PLAYER_API] GetAllPlayersAsync called");
+            Console.WriteLine($"[PLAYER_API] HttpClient.BaseAddress: {_httpClient.BaseAddress}");
+            Console.WriteLine($"[PLAYER_API] Auth Status: IsAuthenticated={_authService.IsAuthenticated}, HasToken={!string.IsNullOrEmpty(_authService.Token)}");
+            
             EnsureAuthorizationHeader();
+            
+            Console.WriteLine($"[PLAYER_API] Authorization header: {_httpClient.DefaultRequestHeaders.Authorization?.ToString() ?? "NULL"}");
             
             _logger.LogInformation("Fetching all players from API");
             var response = await _httpClient.GetAsync("api/players");
             
+            Console.WriteLine($"[PLAYER_API] Response status: {response.StatusCode}");
             _logger.LogInformation($"Players API response: {response.StatusCode}");
             
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
+                Console.WriteLine($"[PLAYER_API] ERROR: Unauthorized (401)");
                 _logger.LogWarning("Players API returned 401 Unauthorized");
                 return new List<Player>();
             }
@@ -64,15 +72,25 @@ public class PlayerApiService : IPlayerApiService
             response.EnsureSuccessStatusCode();
             
             var json = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[PLAYER_API] Response JSON: {json}");
             _logger.LogInformation($"Players API response content length: {json.Length}");
             
             var players = JsonSerializer.Deserialize<List<Player>>(json, _jsonOptions);
             
+            Console.WriteLine($"[PLAYER_API] Deserialized {players?.Count ?? 0} players");
             _logger.LogInformation($"Deserialized {players?.Count ?? 0} players");
+            
+            if (players?.Any() == true)
+            {
+                Console.WriteLine($"[PLAYER_API] First player: ID={players[0].Id}, Name={players[0].FirstName} {players[0].LastName}");
+            }
+            
             return players ?? new List<Player>();
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[PLAYER_API] Exception: {ex.Message}");
+            Console.WriteLine($"[PLAYER_API] Exception details: {ex}");
             _logger.LogError(ex, "Error fetching players from API");
             return new List<Player>();
         }

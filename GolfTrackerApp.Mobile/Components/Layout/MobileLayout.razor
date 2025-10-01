@@ -1,60 +1,86 @@
+@using GolfTrackerApp.Mobile.Services
 @inherits LayoutComponentBase
-@using MudBlazor
+@inject AuthenticationStateService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 
 <MudThemeProvider />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
-<MudLayout>
-    <!-- Top App Bar -->
-    <MudAppBar Elevation="1" Class="mobile-header">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
-                      Color="Color.Inherit" 
-                      OnClick="@ToggleDrawer" />
-        <MudText Typo="Typo.h6" Class="mobile-title">Golf Tracker</MudText>
-        <MudSpacer />
-        <MudButton Variant="Variant.Text" 
-                  Color="Color.Inherit" 
-                  OnClick="@(() => Navigation.NavigateTo("/login"))">
-            Login
-        </MudButton>
-    </MudAppBar>
-
-    <!-- Side Navigation Drawer -->
-    <MudDrawer @bind-Open="@_drawerOpen" 
-               Elevation="2" 
-               ClipMode="DrawerClipMode.Always"
-               Overlay="true">
-        <MudDrawerHeader>
-            <MudText Typo="Typo.h6">Golf Tracker</MudText>
-        </MudDrawerHeader>
-        <MudNavMenu>
-            <MudNavLink Href="/" Icon="@Icons.Material.Filled.Home">Home</MudNavLink>
-            <MudNavLink Href="/login" Icon="@Icons.Material.Filled.Login">Login</MudNavLink>
-            
-            <!-- Debug/Development Tools -->
-            <MudDivider Class="my-2"/>
-            <MudText Typo="Typo.caption" Class="px-4">Debug Tools</MudText>
-            <MudNavLink Href="/test-api" Icon="@Icons.Material.Filled.Api">Test API</MudNavLink>
-            <MudNavLink Href="/test" Icon="@Icons.Material.Filled.Settings">Config Test</MudNavLink>
-        </MudNavMenu>
-    </MudDrawer>
-
-    <!-- Main Content -->
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+@if (isCheckingAuth)
+{
+    <!-- Loading state while checking authentication -->
+    <MudContainer MaxWidth="MaxWidth.False" Style="height: 100vh; display: flex; align-items: center; justify-content: center;">
+        <div class="text-center">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Checking authentication...</MudText>
+        </div>
+    </MudContainer>
+}
+else if (isAuthenticated || isOnLoginPage)
+{
+    <MudLayout Style="min-height: 100vh;">
+        <!-- Main content area with padding for bottom nav -->
+        <MudMainContent Style="padding-bottom: 80px;">
             @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+        </MudMainContent>
+        
+        <!-- Fixed bottom navigation (only show when authenticated and not on login page) -->
+        @if (isAuthenticated && !isOnLoginPage)
+        {
+            <BottomNavigation />
+        }
+    </MudLayout>
+}
 
 @code {
-    private bool _drawerOpen = false;
+    private bool isCheckingAuth = true;
+    private bool isAuthenticated = false;
+    private bool isOnLoginPage = false;
 
-    private void ToggleDrawer()
+    protected override async Task OnInitializedAsync()
     {
-        _drawerOpen = !_drawerOpen;
+        Console.WriteLine("[LAYOUT] *** MOBILE LAYOUT V2.1 *** Initializing");
+        
+        // First load stored authentication
+        await AuthService.LoadTokenFromSecureStorageAsync();
+        
+        // Check current route
+        var currentUri = Navigation.ToBaseRelativePath(Navigation.Uri).ToLower();
+        isOnLoginPage = currentUri.StartsWith("login");
+        
+        Console.WriteLine($"[LAYOUT] Current URI: {currentUri}, isOnLoginPage: {isOnLoginPage}");
+        
+        // Check authentication state
+        isAuthenticated = AuthService.IsAuthenticated;
+        Console.WriteLine($"[LAYOUT] Is authenticated: {isAuthenticated}");
+        
+        isCheckingAuth = false;
+        
+        // Redirect logic
+        if (!isAuthenticated && !isOnLoginPage)
+        {
+            Console.WriteLine("[LAYOUT] Not authenticated and not on login page - redirecting to login");
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        else if (isAuthenticated && isOnLoginPage)
+        {
+            Console.WriteLine("[LAYOUT] Authenticated but on login page - redirecting to home");
+            Navigation.NavigateTo("/");
+            return;
+        }
+        
+        Console.WriteLine("[LAYOUT] Authentication check complete");
+        StateHasChanged();
+    }
+    
+    protected override void OnParametersSet()
+    {
+        // Update current page check
+        var currentUri = Navigation.ToBaseRelativePath(Navigation.Uri).ToLower();
+        isOnLoginPage = currentUri.StartsWith("login");
     }
 }

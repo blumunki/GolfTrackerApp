@@ -2,9 +2,9 @@
 @using GolfTrackerApp.Mobile.Services
 @using GolfTrackerApp.Mobile.Components.Pages
 @using GolfTrackerApp.Mobile.Components.Shared
+@using GolfTrackerApp.Mobile.Components.Navigation
 @inject AuthenticationStateService AuthState
 @inject NavigationManager Navigation
-@inject INavigationService NavigationService
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -21,102 +21,188 @@
             </div>
         </div>
     }
-    else if (currentPage == "login" || !AuthState.IsAuthenticated)
+    else if (!AuthState.IsAuthenticated)
     {
-        <!-- Show login page -->
+        <!-- Show login page directly (no layout) -->
         <LoginPage />
     }
     else
     {
-        <!-- Main application with navigation -->
-        <CustomNavigationManager CurrentPage="@currentPage" OnNavigate="@HandleNavigation" />
+        <!-- Show authenticated app with simple page switcher -->
+        <MudLayout Style="min-height: 100vh;">
+            <MudMainContent Style="padding-bottom: 80px;">
+                @switch (currentPage)
+                {
+                    case "home":
+                        <Home />
+                        break;
+                    case "rounds":
+                        <RoundsPage />
+                        break;
+                    case "players":
+                        <PlayersPage />
+                        break;
+                    case "golfclubs":
+                        <GolfClubsPage />
+                        break;
+                    case var page when page.StartsWith("players/") && page.Contains("/report"):
+                        {
+                            // Extract player ID from route like "players/123/report"
+                            var parts = currentPage.Split('/');
+                            var playerIdStr = parts.Length > 1 ? parts[1] : "";
+                            <PlayerReportPage PlayerId="@playerIdStr" />
+                        }
+                        break;
+                    case "profile":
+                        <div class="pa-4">
+                            <MudText Typo="Typo.h5" Class="mb-4">Profile & Settings</MudText>
+                            
+                            <MudCard Elevation="2" Class="mb-4">
+                                <MudCardContent>
+                                    <MudStack Spacing="3">
+                                        <div>
+                                            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                                                Account Management
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                                Use the stats icon in the navigation bar to view your performance report.
+                                            </MudText>
+                                        </div>
+                                        
+                                        <MudButton Variant="Variant.Filled" 
+                                                  Color="Color.Error"
+                                                  StartIcon="@Icons.Material.Filled.Logout"
+                                                  OnClick="@HandleLogout"
+                                                  FullWidth="true">
+                                            Sign Out
+                                        </MudButton>
+                                    </MudStack>
+                                </MudCardContent>
+                            </MudCard>
+                        </div>
+                        break;
+                    case "player-report":
+                        <PlayerReportPage PlayerId="me" />
+                        break;
+                    default:
+                        <Home />
+                        break;
+                }
+            </MudMainContent>
+            
+            <!-- Bottom Navigation - DIRECTLY in App.razor -->
+            <div class="bottom-navigation">
+                <MudPaper Elevation="8" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1300; border-radius: 20px 20px 0 0; background: rgba(255, 255, 255, 0.95);">
+                    <div class="d-flex justify-space-evenly align-center pa-2" Style="width: 100%; height: 60px;">
+                        <MudIconButton Icon="@Icons.Material.Filled.Home" 
+                                      Color="@(currentPage == "home" ? Color.Primary : Color.Secondary)"
+                                      Size="Size.Medium"
+                                      OnClick="@(() => NavigateToPage("home"))" />
+                        
+                        <MudIconButton Icon="@Icons.Material.Filled.SportsGolf" 
+                                      Color="@(currentPage == "rounds" ? Color.Primary : Color.Secondary)"
+                                      Size="Size.Medium"
+                                      OnClick="@(() => NavigateToPage("rounds"))" />
+                        
+                        <MudIconButton Icon="@Icons.Material.Filled.Assessment" 
+                                      Color="@(currentPage == "player-report" ? Color.Primary : Color.Secondary)"
+                                      Size="Size.Medium"
+                                      title="Your Stats"
+                                      OnClick="@(() => NavigateToPage("player-report"))" />
+                        
+                        <MudIconButton Icon="@Icons.Material.Filled.People" 
+                                      Color="@(currentPage == "players" ? Color.Primary : Color.Secondary)"
+                                      Size="Size.Medium"
+                                      OnClick="@(() => NavigateToPage("players"))" />
+                        
+                        <MudIconButton Icon="@Icons.Material.Filled.GolfCourse" 
+                                      Color="@(currentPage == "golfclubs" ? Color.Primary : Color.Secondary)"
+                                      Size="Size.Medium"
+                                      OnClick="@(() => NavigateToPage("golfclubs"))" />
+                        
+                        <MudIconButton Icon="@Icons.Material.Filled.Person" 
+                                      Color="@(currentPage == "profile" ? Color.Primary : Color.Secondary)"
+                                      Size="Size.Medium"
+                                      OnClick="@(() => NavigateToPage("profile"))" />
+                    </div>
+                </MudPaper>
+            </div>
+        </MudLayout>
     }
 </div>
 
 @code {
-    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
-    
-    private string currentPage = "home";
     private bool isCheckingAuth = true;
+    private string currentPage = "home";
+    private string? currentUserId = null;
     
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("[APP] *** SIMPLE PAGE SWITCHER - NO ROUTER ***");
+        
         // Check authentication state
         await AuthState.LoadTokenFromSecureStorageAsync();
         
-        // Parse the current URL to determine the page
-        var uri = NavigationManager.Uri;
-        var path = new Uri(uri).AbsolutePath.Trim('/');
-        currentPage = string.IsNullOrEmpty(path) ? "home" : path;
+        Console.WriteLine($"[APP] Is authenticated: {AuthState.IsAuthenticated}");
         
-        Console.WriteLine($"Custom navigation initialized. Current page: {currentPage}");
-        Console.WriteLine($"Is authenticated: {AuthState.IsAuthenticated}");
-        
-        // Listen for navigation changes
-        NavigationManager.LocationChanged += OnLocationChanged;
+        // Listen for authentication changes
         AuthState.AuthenticationStateChanged += OnAuthenticationStateChanged;
-        NavigationService.NavigationRequested += OnNavigationRequested;
+        
+        // Listen for URL changes
+        Navigation.LocationChanged += OnLocationChanged;
+        
+        // Get initial page from URL
+        UpdateCurrentPageFromUrl();
         
         isCheckingAuth = false;
+        StateHasChanged();
+    }
+    
+    private void UpdateCurrentPageFromUrl()
+    {
+        var uri = Navigation.ToBaseRelativePath(Navigation.Uri).ToLower().Trim('/');
         
-        // If not authenticated and not on login page, redirect to login
-        if (!AuthState.IsAuthenticated && currentPage != "login")
+        // Handle query strings by removing them
+        if (uri.Contains('?'))
         {
-            NavigationManager.NavigateTo("/login", replace: true);
+            uri = uri.Substring(0, uri.IndexOf('?'));
         }
         
+        currentPage = string.IsNullOrEmpty(uri) ? "home" : uri;
+        Console.WriteLine($"[APP] Current page from URL: {currentPage}");
+    }
+    
+    private void NavigateToPage(string page)
+    {
+        Console.WriteLine($"[APP] *** Button clicked - Navigating to: {page} ***");
+        currentPage = page;
+        Navigation.NavigateTo($"/{page}", false);
         StateHasChanged();
+    }
+    
+    private async Task HandleLogout()
+    {
+        Console.WriteLine("[APP] Logout clicked");
+        await AuthState.LogoutAsync();
+        Navigation.NavigateTo("/", forceLoad: true);
     }
     
     private void OnAuthenticationStateChanged()
     {
-        // When authentication state changes, re-evaluate routing
-        if (!AuthState.IsAuthenticated && currentPage != "login")
-        {
-            NavigationManager.NavigateTo("/login", replace: true);
-        }
-        else if (AuthState.IsAuthenticated && currentPage == "login")
-        {
-            NavigationManager.NavigateTo("/", replace: true);
-        }
+        Console.WriteLine("[APP] Authentication state changed");
         StateHasChanged();
     }
     
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
-        var path = new Uri(e.Location).AbsolutePath.Trim('/');
-        var newPage = string.IsNullOrEmpty(path) ? "home" : path;
-        
-        // Handle specific route patterns
-        if (path.StartsWith("players/") && path.EndsWith("/report"))
-        {
-            newPage = "player-report"; // Map to the CustomNavigationManager case
-        }
-        
-        if (newPage != currentPage)
-        {
-            currentPage = newPage;
-            StateHasChanged();
-        }
-    }
-    
-    private void OnNavigationRequested(string page)
-    {
-        HandleNavigation(page);
-    }
-    
-    private void HandleNavigation(string page)
-    {
-        currentPage = page;
-        var url = page == "home" ? "/" : $"/{page}";
-        NavigationManager.NavigateTo(url, false);
+        Console.WriteLine($"[APP] Location changed: {e.Location}");
+        UpdateCurrentPageFromUrl();
         StateHasChanged();
     }
     
     public void Dispose()
     {
-        NavigationManager.LocationChanged -= OnLocationChanged;
         AuthState.AuthenticationStateChanged -= OnAuthenticationStateChanged;
-        NavigationService.NavigationRequested -= OnNavigationRequested;
+        Navigation.LocationChanged -= OnLocationChanged;
     }
 }

@@ -1,0 +1,35 @@
+<MudCard Elevation="3" Class="mb-4">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6" Color="Color.Primary">Quick Actions</MudText>
+        </CardHeaderContent>
+    </MudCardHeader>
+    <MudCardContent>
+        <MudGrid Spacing="2">
+            <MudItem xs="6">
+                <MudButton Variant="Variant.Filled" 
+                          Color="Color.Primary"
+                          StartIcon="@Icons.Material.Filled.Add"
+                          FullWidth="true"
+                          Size="Size.Large"
+                          Href="/rounds">
+                    New Round
+                </MudButton>
+            </MudItem>
+            <MudItem xs="6">
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Secondary"
+                          StartIcon="@Icons.Material.Filled.Analytics"
+                          FullWidth="true"
+                          Size="Size.Large"
+                          Href="/player-report">
+                    View Stats
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudCardContent>
+</MudCard>
+
+@code {
+    // No parameters needed for this simple component
+}

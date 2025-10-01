@@ -1,0 +1,18 @@
+@if (Performance?.Any() == true)
+{
+    <MudCard Elevation="3" Class="mb-4">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6" Color="Color.Primary">Recent Performance</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Last 7 rounds trend</MudText>
+            <!-- Performance chart would go here -->
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    [Parameter] public List<PlayerPerformanceDataPoint>? Performance { get; set; }
+}

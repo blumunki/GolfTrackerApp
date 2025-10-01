@@ -1,7 +1,6 @@
 @page "/home"
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Models
-@using GolfTrackerApp.Mobile.Services
 @inject IDashboardApiService DashboardService
 @inject IRoundApiService RoundApiService
 @inject IPlayerReportApiService PlayerReportApiService
@@ -40,6 +39,15 @@
     }
     else if (dashboardStats != null)
     {
+        <MudStack Spacing="3" Class="mb-4">
+            <MudText Typo="Typo.h4" Style="font-weight: 700; color: #2e7d32;">
+                Your Golf Dashboard
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Default">
+                Track your performance and see how you're improving
+            </MudText>
+        </MudStack>
+
         <MudGrid Spacing="3" Class="mb-4">
             <MudItem xs="6">
                 <MudCard Elevation="2" Style="border-left: 4px solid #2e7d32;">
@@ -73,6 +81,7 @@
                     </MudCardContent>
                 </MudCard>
             </MudItem>
+
             <MudItem xs="6">
                 <MudCard Elevation="2" Style="border-left: 4px solid #9c27b0;">
                     <MudCardContent Class="pa-3">
@@ -103,7 +112,7 @@
             </MudCardContent>
         </MudCard>
 
-         <MudCard Elevation="2" Class="mb-4">
+        <MudCard Elevation="2" Class="mb-4">
             <MudCardContent Class="pa-3">
                 <MudStack Spacing="2">
                     <MudText Typo="Typo.h6" Style="font-weight: 700; color: #2e7d32;">
@@ -170,8 +179,8 @@
                 </CardHeaderContent>
                 <CardHeaderActions>
                     <MudIconButton Icon="@Icons.Material.Filled.List" 
-                                  Color="Color.Primary"
-                                  OnClick="@NavigateToRounds" />
+                                  Color="Color.Primary" 
+                                  OnClick="@(() => Navigation.NavigateTo(\"/rounds\"))" />
                 </CardHeaderActions>
             </MudCardHeader>
             <MudCardContent>
@@ -180,7 +189,7 @@
                     <MudList T="object">
                         @foreach (var round in recentRounds)
                         {
-                            <MudListItem T="object" OnClick="@(() => NavigateToRoundDetail(round.Id))" >
+                            <MudListItem T="object" OnClick="@(() => Navigation.NavigateTo($\"/rounds/{round.Id}\"))">
                                 <div class="d-flex justify-space-between align-center flex-grow-1">
                                     <div class="d-flex flex-column">
                                         <MudText Typo="Typo.body1">
@@ -223,8 +232,8 @@
                 </CardHeaderContent>
                 <CardHeaderActions>
                     <MudIconButton Icon="@Icons.Material.Filled.People" 
-                                  Color="Color.Primary"
-                                  OnClick="@NavigateToPlayers" />
+                                  Color="Color.Primary" 
+                                  OnClick="@(() => Navigation.NavigateTo(\"/players\"))" />
                 </CardHeaderActions>
             </MudCardHeader>
             <MudCardContent>
@@ -233,7 +242,7 @@
                     <MudList T="object">
                         @foreach (var partner in partnerSummary)
                         {
-                            <MudListItem T="object" OnClick="@(() => NavigateToPlayerReport(partner.PartnerId))" >
+                            <MudListItem T="object" OnClick="@(() => Navigation.NavigateTo($\"/players/{partner.PartnerId}/report\"))">
                                 <div class="d-flex justify-space-between align-center flex-grow-1">
                                     <div class="d-flex flex-column">
                                         <MudText Typo="Typo.body1">
@@ -268,8 +277,6 @@
                 }
             </MudCardContent>
         </MudCard>
-        
-
     }
 </MudContainer>
 
@@ -277,44 +284,11 @@
     private bool loadingDashboard = true;
     private string? errorMessage = null;
     private DashboardStats? dashboardStats = null;
-    private int? currentPlayerId = null;
-    
-    // Chart data
-    private List<ChartSeries>? performanceSeries;
-    private string[]? performanceXAxisLabels;
-    private ChartOptions chartOptions = new ChartOptions();
-    
-    // Recent rounds and partners
-    private List<RecentRound>? recentRounds;
-    private List<PartnerSummary>? partnerSummary;
 
     protected override async Task OnInitializedAsync()
     {
         Console.WriteLine("[HOME] Attempting API connection...");
         await LoadDashboardData();
-        await LoadCurrentPlayer();
-        await LoadAdditionalData();
-    }
-    
-    private async Task LoadCurrentPlayer()
-    {
-        try
-        {
-            // Get all players and find the one that matches current user
-            var players = await RoundApiService.GetAllRoundsAsync();
-            // For now, we'll get the player ID from the first round if available
-            // This is a workaround until we have a proper "me" endpoint
-            if (players?.Any() == true)
-            {
-                // We need to add a service to get current player properly
-                // For now this is a placeholder
-                Console.WriteLine("[HOME] Need to implement GetCurrentPlayer service");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[HOME] Error loading current player: {ex.Message}");
-        }
     }
 
     private async Task LoadDashboardData()
@@ -337,121 +311,5 @@
             loadingDashboard = false;
             StateHasChanged();
         }
-    }
-    
-    private async Task LoadAdditionalData()
-    {
-        try
-        {
-            // Load ALL rounds first, then take most recent 5 and sort by date descending
-            var allRounds = await RoundApiService.GetAllRoundsAsync();
-            recentRounds = allRounds?
-                .OrderByDescending(r => r.DatePlayed)
-                .Take(5)
-                .Select(r => new RecentRound
-                {
-                    Id = r.RoundId,
-                    GolfCourseName = r.CourseName ?? "Unknown Course",
-                    DatePlayed = r.DatePlayed,
-                    TotalScore = r.TotalScore,
-                    ToPar = r.TotalScore - r.TotalPar
-                }).ToList();
-            
-            // Load performance chart data from recent rounds
-            if (recentRounds?.Any() == true)
-            {
-                var chartData = recentRounds.OrderBy(r => r.DatePlayed).ToList();
-                performanceSeries = new List<ChartSeries>
-                {
-                    new ChartSeries
-                    {
-                        Name = "Score vs Par",
-                        Data = chartData.Select(r => (double)r.ToPar).ToArray()
-                    }
-                };
-                performanceXAxisLabels = chartData.Select(r => r.DatePlayed.ToString("MM/dd")).ToArray();
-            }
-            
-            // Load playing partners summary from dashboard API
-            try
-            {
-                Console.WriteLine($"[HOME] Loading playing partners from API");
-                var partners = await DashboardService.GetPlayingPartnersAsync(5);
-                
-                if (partners?.Any() == true)
-                {
-                    Console.WriteLine($"[HOME] Loaded {partners.Count} playing partners");
-                    partnerSummary = partners.Select(p => new PartnerSummary
-                    {
-                        PartnerId = p.PartnerId,
-                        PartnerName = p.PartnerName,
-                        LastPlayedDate = p.LastPlayedDate,
-                        UserWins = p.UserWins,
-                        PartnerWins = p.PartnerWins,
-                        Ties = p.Ties
-                    }).ToList();
-                    
-                    Console.WriteLine($"[HOME] First partner: {partnerSummary.First().PartnerName} - {partnerSummary.First().UserWins}-{partnerSummary.First().PartnerWins}-{partnerSummary.First().Ties}");
-                }
-                else
-                {
-                    Console.WriteLine($"[HOME] No playing partners found");
-                    partnerSummary = new List<PartnerSummary>();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[HOME] Error loading partners: {ex.Message}");
-                Console.WriteLine($"[HOME] Exception details: {ex}");
-                partnerSummary = new List<PartnerSummary>();
-            }
-            
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[HOME] Error loading additional data: {ex.Message}");
-        }
-    }
-    
-    // Simple data classes for display
-    private class RecentRound
-    {
-        public int Id { get; set; }
-        public string GolfCourseName { get; set; } = "";
-        public DateTime DatePlayed { get; set; }
-        public int TotalScore { get; set; }
-        public int ToPar { get; set; }
-    }
-    
-    private class PartnerSummary
-    {
-        public int PartnerId { get; set; }
-        public string PartnerName { get; set; } = "";
-        public DateTime LastPlayedDate { get; set; }
-        public int UserWins { get; set; }
-        public int PartnerWins { get; set; }
-        public int Ties { get; set; }
-    }
-    
-    // Navigation methods
-    private void NavigateToRounds()
-    {
-        Navigation.NavigateTo("/rounds");
-    }
-    
-    private void NavigateToPlayers()
-    {
-        Navigation.NavigateTo("/players");
-    }
-    
-    private void NavigateToRoundDetail(int roundId)
-    {
-        Navigation.NavigateTo($"/rounds/{roundId}");
-    }
-    
-    private void NavigateToPlayerReport(int playerId)
-    {
-        Navigation.NavigateTo($"/players/{playerId}/report");
     }
 }

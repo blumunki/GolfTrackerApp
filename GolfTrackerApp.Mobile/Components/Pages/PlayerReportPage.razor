@@ -1,11 +1,12 @@
 @page "/player-report"
 @page "/players/{PlayerId}/report"
+@layout MobileLayout
 @using GolfTrackerApp.Mobile.Services
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Models
-@using MudBlazor
 @inject INavigationService NavigationService
 @inject IPlayerReportApiService PlayerReportApiService
+@inject IRoundApiService RoundApiService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
 
@@ -153,8 +154,9 @@
 
 @code {
     [Parameter] public string? PlayerId { get; set; }
-    
+
     private int playerId = 0;
+    private bool useCurrentUser = false;
     private bool loading = true;
     private PlayerReportViewModel? reportData;
     private string debugInfo = "";
@@ -167,19 +169,58 @@
     protected override async Task OnInitializedAsync()
     {
         // Get player ID from the route parameter
-        if (!string.IsNullOrEmpty(PlayerId) && int.TryParse(PlayerId, out var routePlayerId))
+        if (!string.IsNullOrEmpty(PlayerId))
         {
-            playerId = routePlayerId;
+            if (int.TryParse(PlayerId, out var routePlayerId))
+            {
+                playerId = routePlayerId;
+            }
+            else if (PlayerId == "me" || PlayerId == "current")
+            {
+                // Handle "me" as current user - try player ID 0 which API should handle
+                useCurrentUser = true;
+                playerId = 0; // API should return current user's data
+            }
+        }
+        else if (NavigationManager.Uri.Contains("/player-report") && !NavigationManager.Uri.Contains("/players/"))
+        {
+            // Navigated to /player-report without ID - need to get current user's player
+            useCurrentUser = true;
+            await LoadCurrentUserPlayer();
+            return; // Exit early, LoadCurrentUserPlayer will handle loading
         }
 
         if (playerId > 0)
         {
             await LoadPlayerReport();
         }
+        else if (useCurrentUser && playerId == 0)
+        {
+            // Handle "me" parameter - need to get current user's player
+            await LoadCurrentUserPlayer();
+        }
         else
         {
             loading = false;
         }
+    }
+    
+    private Task LoadCurrentUserPlayer()
+    {
+        try
+        {
+            loading = true;
+            debugInfo = "Cannot auto-load current user's player. Please navigate to a specific player from the Players page.";
+            loading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            debugInfo = $"Error loading current user player: {ex.Message}";
+            loading = false;
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
     }
     
     private async Task LoadPlayerReport()
