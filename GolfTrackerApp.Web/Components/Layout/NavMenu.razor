@@ -1,5 +1,7 @@
 ﻿@using MudBlazor
 @using Microsoft.AspNetCore.Authorization @* If not already present globally *@
+@using System.Security.Claims
+@using GolfTrackerApp.Web.Services
 
 @* Remove old nav structure, replace with MudNavMenu *@
 <MudNavMenu>
@@ -13,6 +15,7 @@
             <MudNavLink Href="players" Icon="@Icons.Material.Filled.People">Players</MudNavLink>
             <MudNavLink Href="rounds" Icon="@Icons.Material.Filled.GolfCourse">Rounds</MudNavLink> @* Using GolfCourse icon for rounds *@
             <MudNavLink Href="rounds/record" Icon="@Icons.Material.Filled.AddCircleOutline" IconColor="Color.Success">Record New Round</MudNavLink>
+            <MudNavLink Href="@GetMyStatsUrl()" Icon="@Icons.Material.Filled.BarChart" IconColor="Color.Info">My Stats</MudNavLink>
 
             @* Player Account Links *@
             <MudListSubheader>My Account</MudListSubheader>
@@ -46,14 +49,56 @@
 @code {
     // Keep your existing currentUrl logic for the logout form if you keep that form here.
     private string? currentUrl;
+    private int? _currentPlayerId;
 
     [Inject]
     private NavigationManager NavigationManager { get; set; } = default!;
+    
+    [Inject]
+    private AuthenticationStateProvider AuthenticationStateProvider { get; set; } = default!;
+    
+    [Inject]
+    private IPlayerService PlayerService { get; set; } = default!;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
         NavigationManager.LocationChanged += OnLocationChanged;
+        
+        // Get current player ID for "My Stats" link
+        await LoadCurrentPlayerIdAsync();
+    }
+
+    private async Task LoadCurrentPlayerIdAsync()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            
+            if (user.Identity?.IsAuthenticated == true)
+            {
+                var currentUserId = user.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (!string.IsNullOrEmpty(currentUserId))
+                {
+                    var player = await PlayerService.GetPlayerByApplicationUserIdAsync(currentUserId);
+                    if (player != null)
+                    {
+                        _currentPlayerId = player.PlayerId;
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // If we can't get the player ID, the link just won't work
+            _currentPlayerId = null;
+        }
+    }
+
+    private string GetMyStatsUrl()
+    {
+        return _currentPlayerId.HasValue ? $"/players/{_currentPlayerId.Value}/report" : "/players";
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
