@@ -305,7 +305,7 @@ else
                     // Load performance data and recent rounds in parallel
                     var performanceTask = ReportService.GetPlayerPerformanceForClubAsync(currentUserId, ClubId, 10);
                     var recentRoundsTask = RoundService.GetRecentRoundsForClubAsync(currentUserId, ClubId, 5);
-                    var scoringDistributionTask = ReportService.GetScoringDistributionAsync(player.PlayerId, null, null, null, null, null);
+                    var scoringDistributionTask = ReportService.GetScoringDistributionForClubAsync(player.PlayerId, ClubId, null, null, null, null);
 
                     await Task.WhenAll(performanceTask, recentRoundsTask, scoringDistributionTask);
 

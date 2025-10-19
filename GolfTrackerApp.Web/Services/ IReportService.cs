@@ -13,6 +13,8 @@ public interface IReportService
     Task<PlayerReportViewModel> GetPlayerReportViewModelAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate);
 
     Task<ScoringDistribution> GetScoringDistributionAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate);
+    
+    Task<ScoringDistribution> GetScoringDistributionForClubAsync(int playerId, int clubId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate);
 
     Task<PerformanceByPar> GetPerformanceByParAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate);
 

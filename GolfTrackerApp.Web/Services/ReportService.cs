@@ -282,6 +282,71 @@ public class ReportService : IReportService
         return distribution;
     }
 
+    public async Task<ScoringDistribution> GetScoringDistributionForClubAsync(int playerId, int clubId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    {
+        var query = _context.Rounds
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) 
+                       && r.Status == RoundCompletionStatus.Completed
+                       && r.GolfCourse!.GolfClubId == clubId);
+
+        // Apply filters
+        if (holesPlayed.HasValue && holesPlayed > 0)
+        {
+            query = query.Where(r => r.HolesPlayed == holesPlayed.Value);
+        }
+        if (roundType.HasValue)
+        {
+            query = query.Where(r => r.RoundType == roundType.Value);
+        }
+        if (startDate.HasValue)
+        {
+            query = query.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
+        }
+        if (endDate.HasValue)
+        {
+            query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
+        }
+
+        // Get all scores for the player in filtered rounds
+        var scores = await query
+            .SelectMany(r => r.Scores)
+            .Where(s => s.PlayerId == playerId && s.Strokes > 0)
+            .Include(s => s.Hole)
+            .Where(s => s.Hole != null && s.Hole.Par > 0)
+            .ToListAsync();
+
+        var distribution = new ScoringDistribution();
+
+        foreach (var score in scores)
+        {
+            var scoreToPar = score.Strokes - score.Hole!.Par;
+
+            switch (scoreToPar)
+            {
+                case <= -2:
+                    distribution.EagleCount++;
+                    break;
+                case -1:
+                    distribution.BirdieCount++;
+                    break;
+                case 0:
+                    distribution.ParCount++;
+                    break;
+                case 1:
+                    distribution.BogeyCount++;
+                    break;
+                case 2:
+                    distribution.DoubleBogeyCount++;
+                    break;
+                default:
+                    distribution.TripleBogeyOrWorseCount++;
+                    break;
+            }
+        }
+
+        return distribution;
+    }
+
     public async Task<PerformanceByPar> GetPerformanceByParAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
     {
         // Start with base query for rounds this player participated in
