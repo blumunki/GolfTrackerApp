@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Authentication;
 using System.Text;
 using System.Text.Json;
+using GolfTrackerApp.Mobile.Services.Api;
 
 namespace GolfTrackerApp.Mobile.Services
 {
@@ -26,6 +27,7 @@ namespace GolfTrackerApp.Mobile.Services
         private readonly ConfigurationService _configurationService;
         private readonly ILogger<GoogleAuthenticationService> _logger;
         private readonly AuthenticationStateService _authStateService;
+        private readonly IPlayerApiService _playerApiService;
 
         private string? _googleClientId;
         private string? _googleClientSecret;
@@ -35,13 +37,15 @@ namespace GolfTrackerApp.Mobile.Services
             IConfiguration configuration,
             ConfigurationService configurationService,
             ILogger<GoogleAuthenticationService> logger,
-            AuthenticationStateService authStateService)
+            AuthenticationStateService authStateService,
+            IPlayerApiService playerApiService)
         {
             _httpClient = httpClient;
             _configuration = configuration;
             _configurationService = configurationService;
             _logger = logger;
             _authStateService = authStateService;
+            _playerApiService = playerApiService;
 
             LoadConfiguration();
         }
@@ -141,20 +145,74 @@ namespace GolfTrackerApp.Mobile.Services
 
                             // Send to our API to get JWT token
                             var apiResult = await SendToApi(profileResult.Email!, profileResult.Name!, profileResult.IdToken!, tokenResult.AccessToken);
+                            Console.WriteLine($"[GOOGLE_AUTH] SendToApi result: IsSuccess={apiResult.IsSuccess}");
                             if (apiResult.IsSuccess)
                             {
+                                Console.WriteLine($"[GOOGLE_AUTH] API authentication successful");
                                 tokenResult.JwtToken = apiResult.JwtToken;
                                 tokenResult.UserId = apiResult.UserId;
 
-                                // Set full authentication state
+                                // Fetch player ID BEFORE setting auth state (so we can do it all at once)
+                                int? playerId = null;
+                                Console.WriteLine($"[GOOGLE_AUTH] Fetching player ID for user: {apiResult.UserId}");
+                                try
+                                {
+                                    // Make API call with explicit token (don't trigger AuthenticationStateChanged yet!)
+                                    using var request = new HttpRequestMessage(HttpMethod.Get, "api/players");
+                                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiResult.JwtToken);
+                                    
+                                    var response = await _httpClient.SendAsync(request);
+                                    Console.WriteLine($"[GOOGLE_AUTH] Player API response status: {response.StatusCode}");
+                                    
+                                    if (response.IsSuccessStatusCode)
+                                    {
+                                        var json = await response.Content.ReadAsStringAsync();
+                                        var players = JsonSerializer.Deserialize<List<GolfTrackerApp.Mobile.Models.Player>>(json, new JsonSerializerOptions 
+                                        { 
+                                            PropertyNameCaseInsensitive = true 
+                                        });
+                                        
+                                        Console.WriteLine($"[GOOGLE_AUTH] Retrieved {players?.Count ?? 0} players from API");
+                                        
+                                        var currentUserPlayer = players?.FirstOrDefault(p => 
+                                            !string.IsNullOrEmpty(p.ApplicationUserId) && 
+                                            p.ApplicationUserId.Equals(apiResult.UserId, StringComparison.OrdinalIgnoreCase));
+                                        
+                                        if (currentUserPlayer != null)
+                                        {
+                                            playerId = currentUserPlayer.Id;
+                                            Console.WriteLine($"[GOOGLE_AUTH] Found player ID: {playerId} for user {apiResult.UserId}");
+                                        }
+                                        else
+                                        {
+                                            Console.WriteLine($"[GOOGLE_AUTH] WARNING: No player found for user {apiResult.UserId}");
+                                        }
+                                    }
+                                    else
+                                    {
+                                        var errorBody = await response.Content.ReadAsStringAsync();
+                                        Console.WriteLine($"[GOOGLE_AUTH] Player API error: {errorBody}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"[GOOGLE_AUTH] Error fetching player ID: {ex.Message}");
+                                    _logger.LogError(ex, "Error fetching player ID during authentication");
+                                }
+
+                                // Now set auth state WITH player ID - ONLY ONCE (this triggers AuthenticationStateChanged)
+                                Console.WriteLine($"[GOOGLE_AUTH] Setting auth state with player ID: {playerId?.ToString() ?? "NULL"}");
                                 _authStateService.SetAuthenticationState(
                                     apiResult.JwtToken!, 
                                     apiResult.UserId!, 
                                     profileResult.Email!, 
-                                    profileResult.Name!);
+                                    profileResult.Name!,
+                                    playerId);
 
                                 // Save to secure storage
+                                Console.WriteLine($"[GOOGLE_AUTH] Saving authentication state to storage...");
                                 await _authStateService.SaveTokenSecurelyAsync();
+                                Console.WriteLine($"[GOOGLE_AUTH] Authentication state saved");
                             }
                         }
                     }

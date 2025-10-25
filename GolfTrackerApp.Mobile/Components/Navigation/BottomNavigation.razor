@@ -12,27 +12,27 @@
             <MudIconButton Icon="@Icons.Material.Filled.Home" 
                           Color="@GetNavColor("home")"
                           Size="Size.Large"
-                          OnClick="@(async () => await HandleNavigationAsync("/"))" />
+                          OnClick="@(() => Navigation.NavigateTo("/"))" />
             
             <MudIconButton Icon="@Icons.Material.Filled.SportsGolf" 
                           Color="@GetNavColor("rounds")"
                           Size="Size.Large"
-                          OnClick="@(async () => await HandleNavigationAsync("/rounds"))" />
+                          OnClick="@(() => Navigation.NavigateTo("/rounds"))" />
             
             <MudIconButton Icon="@Icons.Material.Filled.BarChart" 
                           Color="@GetNavColor("player-report")"
                           Size="Size.Large"
-                          OnClick="@(async () => await NavigateToPlayerReportAsync())" />
+                          OnClick="@OnStatsClick" />
             
             <MudIconButton Icon="@Icons.Material.Filled.GolfCourse" 
                           Color="@GetNavColor("golfclubs")"
                           Size="Size.Large"
-                          OnClick="@(async () => await HandleNavigationAsync("/golfclubs"))" />
+                          OnClick="@(() => Navigation.NavigateTo("/golfclubs"))" />
             
             <MudIconButton Icon="@Icons.Material.Filled.Person" 
                           Color="@GetNavColor("profile")"
                           Size="Size.Large"
-                          OnClick="@(async () => await HandleNavigationAsync("/profile"))" />
+                          OnClick="@(() => Navigation.NavigateTo("/profile"))" />
         </div>
     </MudPaper>
 </div>
@@ -53,6 +53,41 @@
 </style>
 
 @code {
+    private void OnStatsClick()
+    {
+        Console.WriteLine($"[BOTTOM_NAV] Stats icon clicked!");
+        
+        var playerId = AuthService.PlayerId;
+        Console.WriteLine($"[BOTTOM_NAV] AuthService.PlayerId = {playerId}");
+        
+        if (playerId.HasValue)
+        {
+            var url = $"/players/{playerId.Value}/report";
+            Console.WriteLine($"[BOTTOM_NAV] Navigating to: {url}");
+            Navigation.NavigateTo(url);
+        }
+        else
+        {
+            Console.WriteLine($"[BOTTOM_NAV] No player ID, navigating to /players");
+            Navigation.NavigateTo("/players");
+        }
+    }
+    
+    private string GetMyStatsUrl()
+    {
+        // Get player ID directly from AuthService - it's stored globally at login
+        var playerId = AuthService.PlayerId;
+        
+        if (playerId.HasValue)
+        {
+            Console.WriteLine($"[NAV] GetMyStatsUrl: Player ID={playerId.Value}, returning /players/{playerId.Value}/report");
+            return $"/players/{playerId.Value}/report";
+        }
+        
+        Console.WriteLine($"[NAV] GetMyStatsUrl: No player ID in AuthService, returning /players");
+        return "/players"; // Fallback to players list
+    }
+    
     private Color GetNavColor(string page)
     {
         try
@@ -76,7 +111,7 @@
                 return "home";
             if (uri.StartsWith("rounds"))
                 return "rounds";
-            if (uri.StartsWith("player-report"))
+            if (uri.StartsWith("player-report") || uri.StartsWith("players/"))
                 return "player-report";
             if (uri.StartsWith("golfclubs"))
                 return "golfclubs";
@@ -88,84 +123,6 @@
         catch
         {
             return "home";
-        }
-    }
-    
-    private async Task HandleNavigationAsync(string route)
-    {
-        try
-        {
-            Console.WriteLine($"[NAV] *** VERSION 2.1 *** ASYNC Button clicked - Navigating to: {route}");
-            
-            Console.WriteLine($"[NAV] Current NavigationManager.Uri: {Navigation.Uri}");
-            
-            // Force a small delay to ensure UI updates
-            await Task.Delay(50);
-            
-            // Navigate to the route
-            Navigation.NavigateTo(route);
-            
-            Console.WriteLine($"[NAV] Navigation completed to: {route}");
-            
-            // Update UI
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[NAV] Navigation error: {ex.Message}");
-            Console.WriteLine($"[NAV] Error stack: {ex.StackTrace}");
-        }
-    }
-    
-    private async Task NavigateToPlayerReportAsync()
-    {
-        try
-        {
-            Console.WriteLine($"[NAV] ========== STATS ICON CLICKED ==========");
-            Console.WriteLine($"[NAV] Auth Status: IsAuthenticated={AuthService.IsAuthenticated}, HasToken={!string.IsNullOrEmpty(AuthService.Token)}");
-            Console.WriteLine($"[NAV] Current URI: {Navigation.Uri}");
-            
-            // Get the user's first player from the API
-            // The API returns only players created by current user
-            Console.WriteLine($"[NAV] Calling PlayerApiService.GetAllPlayersAsync()...");
-            var players = await PlayerApiService.GetAllPlayersAsync();
-            
-            Console.WriteLine($"[NAV] GetAllPlayersAsync returned: {players?.Count ?? 0} players");
-            Console.WriteLine($"[NAV] Current user ID: {AuthService.UserId}");
-            
-            if (players?.Any() == true)
-            {
-                // Find the player that matches the current logged-in user
-                // Look for a player with ApplicationUserId matching the current user's ID
-                var currentUserPlayer = players.FirstOrDefault(p => 
-                    !string.IsNullOrEmpty(p.ApplicationUserId) && 
-                    !string.IsNullOrEmpty(AuthService.UserId) &&
-                    p.ApplicationUserId.Equals(AuthService.UserId, StringComparison.OrdinalIgnoreCase));
-                
-                // If not found by ApplicationUserId, just use the first player as fallback
-                var targetPlayer = currentUserPlayer ?? players.First();
-                
-                Console.WriteLine($"[NAV] Current user's player: {(currentUserPlayer != null ? "FOUND" : "NOT FOUND, using first")}");
-                Console.WriteLine($"[NAV] Target player: ID={targetPlayer.Id}, Name={targetPlayer.FirstName} {targetPlayer.LastName}");
-                Console.WriteLine($"[NAV] Navigating to: /players/{targetPlayer.Id}/report");
-                
-                await Task.Delay(50); // Small delay to ensure state updates
-                Navigation.NavigateTo($"/players/{targetPlayer.Id}/report");
-                Console.WriteLine($"[NAV] Navigation completed");
-                return;
-            }
-            
-            // Fallback: show error
-            Console.WriteLine($"[NAV] WARNING: No players found, cannot navigate to stats");
-            Console.WriteLine($"[NAV] Falling back to /player-report (will show error)");
-            Navigation.NavigateTo("/player-report"); // This will show the "No Player Selected" message
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[NAV] ERROR navigating to player report: {ex.Message}");
-            Console.WriteLine($"[NAV] Exception details: {ex}");
-            Console.WriteLine($"[NAV] Stack trace: {ex.StackTrace}");
-            Navigation.NavigateTo("/player-report");
         }
     }
 }

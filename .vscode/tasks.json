@@ -1,0 +1,27 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "android-deploy",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/GolfTrackerApp.Mobile/GolfTrackerApp.Mobile.csproj",
+                "-f",
+                "net9.0-android",
+                "-c",
+                "Debug"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

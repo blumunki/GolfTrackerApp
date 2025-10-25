@@ -9,6 +9,7 @@
 @inject IRoundApiService RoundApiService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateService AuthService
 
 <MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
     @if (loading)
@@ -205,14 +206,28 @@
         }
     }
     
-    private Task LoadCurrentUserPlayer()
+    private async Task LoadCurrentUserPlayer()
     {
         try
         {
             loading = true;
-            debugInfo = "Cannot auto-load current user's player. Please navigate to a specific player from the Players page.";
-            loading = false;
             StateHasChanged();
+            
+            // Get the current user's player ID from AuthenticationStateService
+            var currentPlayerId = AuthService.PlayerId;
+            
+            if (currentPlayerId.HasValue)
+            {
+                PlayerId = currentPlayerId.Value.ToString();
+                playerId = currentPlayerId.Value; // Set the int field too!
+                await LoadPlayerReport();
+            }
+            else
+            {
+                debugInfo = "Could not determine current user's player ID. Please ensure you are logged in.";
+                loading = false;
+                StateHasChanged();
+            }
         }
         catch (Exception ex)
         {
@@ -220,7 +235,6 @@
             loading = false;
             StateHasChanged();
         }
-        return Task.CompletedTask;
     }
     
     private async Task LoadPlayerReport()

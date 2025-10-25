@@ -121,6 +121,7 @@ public static class MauiProgram
 			var configService = serviceProvider.GetRequiredService<ConfigurationService>();
 			var logger = serviceProvider.GetRequiredService<ILogger<GoogleAuthenticationService>>();
 			var authStateService = serviceProvider.GetRequiredService<AuthenticationStateService>();
+			var playerApiService = serviceProvider.GetRequiredService<IPlayerApiService>();
 			
 			// Create HttpClient with proper configuration for Android/iOS
 			HttpClient httpClient;
@@ -139,7 +140,7 @@ public static class MauiProgram
 #endif
 			httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
 
-			return new GoogleAuthenticationService(httpClient, configuration, configService, logger, authStateService);
+			return new GoogleAuthenticationService(httpClient, configuration, configService, logger, authStateService, playerApiService);
 		});
 
 #if DEBUG
