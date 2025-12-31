@@ -1,5 +1,6 @@
 @using MudBlazor
 @using GolfTrackerApp.Mobile.Services
+@using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Components.Pages
 @using GolfTrackerApp.Mobile.Components.Shared
 @using GolfTrackerApp.Mobile.Components.Navigation
@@ -39,6 +40,13 @@
                     case "rounds":
                         <RoundsPage />
                         break;
+                    case "record-round":
+                        {
+                            Console.WriteLine("[APP] *** Rendering RecordRoundPage component ***");
+                            System.Diagnostics.Debug.WriteLine("[APP] *** Rendering RecordRoundPage component ***");
+                            <RecordRoundPage />
+                            break;
+                        }
                     case "players":
                         <PlayersPage />
                         break;
@@ -134,7 +142,6 @@
 @code {
     private bool isCheckingAuth = true;
     private string currentPage = "home";
-    private string? currentUserId = null;
     
     protected override async Task OnInitializedAsync()
     {
@@ -170,6 +177,7 @@
         
         currentPage = string.IsNullOrEmpty(uri) ? "home" : uri;
         Console.WriteLine($"[APP] Current page from URL: {currentPage}");
+        System.Diagnostics.Debug.WriteLine($"[APP] Current page from URL: {currentPage}");
     }
     
     private void NavigateToPage(string page)

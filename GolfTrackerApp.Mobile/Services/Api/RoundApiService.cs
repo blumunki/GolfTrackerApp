@@ -1,5 +1,9 @@
 using GolfTrackerApp.Mobile.Models;
+using GolfTrackerApp.Mobile.Services;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 
 namespace GolfTrackerApp.Mobile.Services.Api;
@@ -54,28 +58,51 @@ public interface IRoundApiService
     Task<List<RoundResponse>> GetRoundsAsync(int page = 1, int pageSize = 10);
     Task<RoundResponse?> GetRoundByIdAsync(int id);
     Task<List<ScoreResponse>> GetRoundScoresAsync(int roundId);
+    Task<RoundResponse?> CreateRoundAsync(CreateRoundRequest request);
 }
 
 public class RoundApiService : IRoundApiService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<RoundApiService> _logger;
+    private readonly AuthenticationStateService _authService;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public RoundApiService(HttpClient httpClient, ILogger<RoundApiService> logger)
+    public RoundApiService(
+        HttpClient httpClient, 
+        ILogger<RoundApiService> logger,
+        AuthenticationStateService authService)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _authService = authService;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
     }
 
+    private void EnsureAuthorizationHeader()
+    {
+        Debug.WriteLine($"[ROUND_API] EnsureAuthorizationHeader called - IsAuth: {_authService.IsAuthenticated}, HasToken: {!string.IsNullOrEmpty(_authService.Token)}");
+        
+        if (_authService.IsAuthenticated && !string.IsNullOrEmpty(_authService.Token))
+        {
+            Debug.WriteLine($"[ROUND_API] Setting Authorization header with token (length: {_authService.Token.Length})");
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _authService.Token);
+            Debug.WriteLine($"[ROUND_API] Header set. Current auth header: {_httpClient.DefaultRequestHeaders.Authorization?.ToString() ?? "NULL"}");
+        }
+        else
+        {
+            Debug.WriteLine("[ROUND_API] WARNING: Not setting auth header - not authenticated or no token");
+        }
+    }
+
     public async Task<List<RoundResponse>> GetAllRoundsAsync()
     {
         try
         {
+            EnsureAuthorizationHeader();
             var response = await _httpClient.GetAsync("api/rounds");
             response.EnsureSuccessStatusCode();
             
@@ -95,6 +122,7 @@ public class RoundApiService : IRoundApiService
     {
         try
         {
+            EnsureAuthorizationHeader();
             var response = await _httpClient.GetAsync($"api/rounds?page={page}&pageSize={pageSize}");
             response.EnsureSuccessStatusCode();
             
@@ -114,6 +142,7 @@ public class RoundApiService : IRoundApiService
     {
         try
         {
+            EnsureAuthorizationHeader();
             var response = await _httpClient.GetAsync($"api/rounds/{id}");
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -138,6 +167,7 @@ public class RoundApiService : IRoundApiService
     {
         try
         {
+            EnsureAuthorizationHeader();
             var response = await _httpClient.GetAsync($"api/rounds/{roundId}/scores");
             response.EnsureSuccessStatusCode();
             
@@ -150,6 +180,54 @@ public class RoundApiService : IRoundApiService
         {
             _logger.LogError(ex, "Error fetching scores for round {RoundId} from API", roundId);
             return new List<ScoreResponse>();
+        }
+    }
+
+    public async Task<RoundResponse?> CreateRoundAsync(CreateRoundRequest request)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            
+            Debug.WriteLine($"[ROUND_API] Creating round - Auth: {_authService.IsAuthenticated}, Token exists: {!string.IsNullOrEmpty(_authService.Token)}");
+            _logger.LogInformation("[ROUND_API] Creating round - Auth: {IsAuth}, Token: {HasToken}", 
+                _authService.IsAuthenticated, !string.IsNullOrEmpty(_authService.Token));
+            
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            Debug.WriteLine($"[ROUND_API] Request JSON length: {json.Length}");
+            Debug.WriteLine($"[ROUND_API] Request JSON: {json}");
+            Debug.WriteLine($"[ROUND_API] Sending POST to api/rounds");
+            _logger.LogInformation("[ROUND_API] Sending POST to api/rounds");
+            var response = await _httpClient.PostAsync("api/rounds", content);
+            
+            Debug.WriteLine($"[ROUND_API] Response status: {response.StatusCode}");
+            _logger.LogInformation("[ROUND_API] Response status: {Status}", response.StatusCode);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Debug.WriteLine($"[ROUND_API] Error response: {errorContent}");
+            }
+            
+            response.EnsureSuccessStatusCode();
+            
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var createdRound = JsonSerializer.Deserialize<RoundResponse>(responseJson, _jsonOptions);
+            
+            return createdRound;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[ROUND_API] ERROR: {ex.Message}");
+            Debug.WriteLine($"[ROUND_API] ERROR Type: {ex.GetType().Name}");
+            if (ex.InnerException != null)
+            {
+                Debug.WriteLine($"[ROUND_API] INNER ERROR: {ex.InnerException.Message}");
+            }
+            _logger.LogError(ex, "Error creating round via API");
+            throw;
         }
     }
 }

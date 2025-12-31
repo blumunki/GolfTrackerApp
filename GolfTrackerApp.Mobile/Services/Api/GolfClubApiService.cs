@@ -1,5 +1,7 @@
 using GolfTrackerApp.Mobile.Models;
+using GolfTrackerApp.Mobile.Services;
 using Microsoft.Extensions.Logging;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace GolfTrackerApp.Mobile.Services.Api;
@@ -15,22 +17,36 @@ public class GolfClubApiService : IGolfClubApiService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<GolfClubApiService> _logger;
+    private readonly AuthenticationStateService _authService;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public GolfClubApiService(HttpClient httpClient, ILogger<GolfClubApiService> logger)
+    public GolfClubApiService(
+        HttpClient httpClient, 
+        ILogger<GolfClubApiService> logger,
+        AuthenticationStateService authService)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _authService = authService;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
     }
 
+    private void EnsureAuthorizationHeader()
+    {
+        if (_authService.IsAuthenticated && !string.IsNullOrEmpty(_authService.Token))
+        {
+            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _authService.Token);
+        }
+    }
+
     public async Task<List<GolfClub>> GetAllGolfClubsAsync()
     {
         try
         {
+            EnsureAuthorizationHeader();
             var response = await _httpClient.GetAsync("api/golfclubs");
             response.EnsureSuccessStatusCode();
             
@@ -50,6 +66,7 @@ public class GolfClubApiService : IGolfClubApiService
     {
         try
         {
+            EnsureAuthorizationHeader();
             var response = await _httpClient.GetAsync($"api/golfclubs/{id}");
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
@@ -74,6 +91,7 @@ public class GolfClubApiService : IGolfClubApiService
     {
         try
         {
+            EnsureAuthorizationHeader();
             var response = await _httpClient.GetAsync($"api/golfclubs/search?searchTerm={Uri.EscapeDataString(searchTerm)}");
             response.EnsureSuccessStatusCode();
             

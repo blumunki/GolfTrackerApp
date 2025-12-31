@@ -34,5 +34,8 @@ namespace GolfTrackerApp.Mobile.Models
         
         [JsonPropertyName("updatedAt")]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        
+        [JsonIgnore]
+        public string FullName => $"{FirstName} {LastName}";
     }
 }

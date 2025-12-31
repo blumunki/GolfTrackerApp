@@ -2,9 +2,12 @@
 @layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
+@using GolfTrackerApp.Mobile.Services
 @using System.Text.Json
 @inject HttpClient Http
 @inject IRoundApiService RoundApiService
+
+@inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 
 @* Use aliases to resolve namespace conflicts *@
@@ -18,7 +21,7 @@
         <MudIconButton Icon="@Icons.Material.Filled.Add" 
                       Color="Color.Primary" 
                       Size="Size.Large"
-                      OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Record new round coming soon!"))" />
+                      Href="/record-round" />
     </div>
     
     <!-- Search Bar -->
@@ -170,7 +173,7 @@
             <MudButton Variant="Variant.Filled" 
                       Color="Color.Primary" 
                       StartIcon="@Icons.Material.Filled.Add"
-                      OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Record new round coming soon!"))">
+                      Href="/record-round">
                 Record Your First Round
             </MudButton>
         </div>
@@ -532,5 +535,21 @@
             1 => Color.Warning,
             _ => Color.Error
         };
+    }
+    
+    private void NavigateToNewRound()
+    {
+        @* Console.WriteLine("[ROUNDS] Navigate to new round button clicked");
+        System.Diagnostics.Debug.WriteLine("[ROUNDS] Navigate to new round button clicked");
+        Console.WriteLine($"[ROUNDS] Navigating to: /record-round");
+        System.Diagnostics.Debug.WriteLine("[ROUNDS] Navigating to: /record-round");
+        Navigation.NavigateTo("/record-round"); *@
+
+        var targetUrl = $"/record-round";
+        Console.WriteLine($"[ROUNDS] Calling NavigationManager.NavigateTo('{targetUrl}')");
+        System.Diagnostics.Debug.WriteLine($"[ROUNDS] Calling NavigationManager.NavigateTo('{targetUrl}')");
+        NavigationManager.NavigateTo(targetUrl, forceLoad: false);
+        Console.WriteLine($"[ROUNDS] Navigation call completed");
+        System.Diagnostics.Debug.WriteLine($"[ROUNDS] Navigation call completed");
     }
 }

@@ -1,8 +1,8 @@
+using GolfTrackerApp.Mobile.Models;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Net.Http.Headers;
-using GolfTrackerApp.Mobile.Models;
 
 namespace GolfTrackerApp.Mobile.Services.Api;
 
@@ -63,12 +63,6 @@ public class PerformanceByPar
     public double Par5RelativeToPar => Par5Average - 5;
     
     public bool HasValidData => Par3Count > 0 || Par4Count > 0 || Par5Count > 0;
-}
-
-public enum RoundTypeOption
-{
-    Friendly,
-    Competitive
 }
 
 public interface IPlayerReportApiService

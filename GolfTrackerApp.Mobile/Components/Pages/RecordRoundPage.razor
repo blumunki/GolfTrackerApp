@@ -1,0 +1,632 @@
+@page "/record-round"
+@using GolfTrackerApp.Mobile.Components.Layout
+@layout MobileLayout
+@using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services
+@using GolfTrackerApp.Mobile.Services.Api
+@using MudBlazor
+@inject IRoundApiService RoundApiService
+@inject IGolfClubApiService GolfClubApiService
+@inject IGolfCourseApiService GolfCourseApiService
+@inject IPlayerApiService PlayerApiService
+@inject AuthenticationStateService AuthStateService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<style>
+    .hole-score-card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .hole-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+    
+    .hole-number {
+        font-size: 24px;
+        font-weight: bold;
+        color: #1976d2;
+    }
+    
+    .hole-par {
+        font-size: 18px;
+        color: #666;
+    }
+    
+    .score-input-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 20px 0;
+    }
+    
+    .score-display {
+        font-size: 48px;
+        font-weight: bold;
+        min-width: 80px;
+        text-align: center;
+        color: #1976d2;
+    }
+    
+    .navigation-buttons {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 16px;
+    }
+    
+    .player-chip {
+        margin: 4px;
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="pa-4">
+    @if (_isLoading)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (_currentStep == RoundStep.Setup)
+    {
+        <MudText Typo="Typo.h5" Class="mb-4">Record Round</MudText>
+        
+        <MudPaper Class="pa-4 mb-4">
+            <MudDatePicker Label="Date Played" 
+                          @bind-Date="_datePlayed" 
+                          Required="true"
+                          MaxDate="DateTime.Today" />
+            
+            <MudSelect T="int" 
+                      Label="Golf Club" 
+                      Value="_selectedClubId" 
+                      ValueChanged="OnClubSelected"
+                      Required="true"
+                      Class="mt-4">
+                <MudSelectItem T="int" Value="0">Select a club...</MudSelectItem>
+                @foreach (var club in _golfClubs)
+                {
+                    <MudSelectItem T="int" Value="club.GolfClubId">@club.Name</MudSelectItem>
+                }
+            </MudSelect>
+            
+            @if (_selectedClubId > 0)
+            {
+                <MudSelect T="int" 
+                          Label="Golf Course" 
+                          @bind-Value="_selectedCourseId" 
+                          Required="true"
+                          Disabled="!_coursesForSelectedClub.Any()"
+                          Class="mt-4">
+                    <MudSelectItem T="int" Value="0">
+                        @(_coursesForSelectedClub.Any() ? "Select a course..." : "Loading courses...")
+                    </MudSelectItem>
+                    @foreach (var course in _coursesForSelectedClub)
+                    {
+                        <MudSelectItem T="int" Value="course.GolfCourseId">@course.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+            
+            <MudSelect T="int" 
+                      Label="Holes to Play" 
+                      @bind-Value="_holesPlayed" 
+                      Required="true"
+                      Class="mt-4">
+                <MudSelectItem T="int" Value="9">9 holes</MudSelectItem>
+                <MudSelectItem T="int" Value="18">18 holes</MudSelectItem>
+            </MudSelect>
+            
+            <MudSelect T="string" 
+                      Label="Round Type" 
+                      @bind-Value="_roundType" 
+                      Required="true"
+                      Class="mt-4">
+                <MudSelectItem T="string" Value="@("Friendly")">Friendly</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Competitive")">Competitive</MudSelectItem>
+            </MudSelect>
+            
+            <MudTextField T="string" 
+                         Label="Notes (optional)" 
+                         @bind-Value="_notes" 
+                         Lines="3"
+                         Class="mt-4" />
+        </MudPaper>
+        
+        <MudText Typo="Typo.h6" Class="mb-2">Players</MudText>
+        <MudPaper Class="pa-4 mb-4">
+            @if (_selectedPlayers.Any())
+            {
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var player in _selectedPlayers)
+                    {
+                        <MudChip T="string" 
+                                Color="Color.Primary" 
+                                OnClose="() => RemovePlayer(player)">
+                            @player.FullName
+                        </MudChip>
+                    }
+                </div>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    No players selected yet
+                </MudText>
+            }
+            
+            <MudSelect T="int?" 
+                      Label="Add Player" 
+                      Value="_playerToAdd" 
+                      ValueChanged="OnPlayerToAddChanged"
+                      Class="mt-2">
+                <MudSelectItem T="int?" Value="null">Select a player to add...</MudSelectItem>
+                @foreach (var player in _availablePlayers.Where(p => !_selectedPlayers.Any(sp => sp.Id == p.Id)))
+                {
+                    <MudSelectItem T="int?" Value="player.Id">@player.FullName</MudSelectItem>
+                }
+            </MudSelect>
+        </MudPaper>
+        
+        <MudButton Variant="Variant.Filled" 
+                  Color="Color.Primary" 
+                  FullWidth="true"
+                  OnClick="StartScoreEntry"
+                  Disabled="!CanStartScoreEntry()">
+            Start Recording Scores
+        </MudButton>
+    }
+    else if (_currentStep == RoundStep.ScoreEntry)
+    {
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" 
+                          OnClick="BackToSetup" 
+                          Color="Color.Primary" />
+            <MudText Typo="Typo.h6">
+                Hole @(_currentHoleIndex + 1) of @_holes.Count
+            </MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.Save" 
+                          OnClick="SaveRound" 
+                          Color="Color.Success" />
+        </div>
+        
+        @if (_currentHoleIndex < _holes.Count)
+        {
+            var hole = _holes[_currentHoleIndex];
+            
+            <div class="hole-score-card">
+                <div class="hole-header">
+                    <div>
+                        <div class="hole-number">Hole @hole.HoleNumber</div>
+                        <div class="hole-par">Par @hole.Par</div>
+                    </div>
+                    @if (hole.LengthYards.HasValue)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            @hole.LengthYards yards
+                        </MudText>
+                    }
+                </div>
+                
+                @foreach (var player in _selectedPlayers)
+                {
+                    var score = GetScoreForHole(player.Id, hole.HoleId);
+                    
+                    <MudPaper Class="pa-3 mb-3" Elevation="0" Style="background-color: #f5f5f5;">
+                        <MudText Typo="Typo.subtitle1" Class="mb-2">
+                            @player.FullName
+                        </MudText>
+                        
+                        <div class="score-input-container">
+                            <MudIconButton Icon="@Icons.Material.Filled.Remove" 
+                                          Color="Color.Primary" 
+                                          Size="Size.Large"
+                                          OnClick="() => DecrementStrokes(player.Id, hole.HoleId)"
+                                          Disabled="!score.Strokes.HasValue || score.Strokes.Value <= 1" />
+                            
+                            <div class="score-display">
+                                @(score.Strokes?.ToString() ?? "-")
+                            </div>
+                            
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                                          Color="Color.Primary" 
+                                          Size="Size.Large"
+                                          OnClick="() => IncrementStrokes(player.Id, hole.HoleId)" />
+                        </div>
+                        
+                        @if (score.Strokes.HasValue && score.ScoreVsPar.HasValue)
+                        {
+                            var scoreColor = score.ScoreVsPar.Value < 0 ? Color.Success : 
+                                           score.ScoreVsPar.Value == 0 ? Color.Info : 
+                                           Color.Warning;
+                            var scoreText = score.ScoreVsPar.Value < 0 ? $"{score.ScoreVsPar.Value}" : 
+                                          score.ScoreVsPar.Value == 0 ? "Par" : 
+                                          $"+{score.ScoreVsPar.Value}";
+                            
+                            <MudChip T="string" Color="scoreColor" Size="Size.Small">
+                                @scoreText
+                            </MudChip>
+                        }
+                        
+                        <div class="d-flex gap-2 mt-2">
+                            <MudNumericField T="int?" 
+                                           Label="Putts" 
+                                           @bind-Value="score.Putts"
+                                           Min="0"
+                                           Max="10"
+                                           Variant="Variant.Outlined"
+                                           HideSpinButtons="true"
+                                           Style="max-width: 100px;" />
+                            
+                            @if (hole.Par > 3)
+                            {
+                                <MudCheckBox T="bool?" 
+                                           Label="Fairway Hit" 
+                                           @bind-Value="score.FairwayHit"
+                                           Color="Color.Primary" />
+                            }
+                        </div>
+                    </MudPaper>
+                }
+            </div>
+            
+            <div class="navigation-buttons">
+                <MudButton Variant="Variant.Outlined" 
+                          Color="Color.Primary"
+                          OnClick="PreviousHole"
+                          Disabled="_currentHoleIndex == 0"
+                          StartIcon="@Icons.Material.Filled.ArrowBack">
+                    Previous
+                </MudButton>
+                
+                @if (_currentHoleIndex < _holes.Count - 1)
+                {
+                    <MudButton Variant="Variant.Filled" 
+                              Color="Color.Primary"
+                              OnClick="NextHole"
+                              EndIcon="@Icons.Material.Filled.ArrowForward">
+                        Next
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" 
+                              Color="Color.Success"
+                              OnClick="SaveRound"
+                              StartIcon="@Icons.Material.Filled.Check">
+                        Finish
+                    </MudButton>
+                }
+            </div>
+        }
+    }
+    else if (_currentStep == RoundStep.Saving)
+    {
+        <div class="text-center">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <MudText Typo="Typo.h6" Class="mt-4">Saving round...</MudText>
+        </div>
+    }
+</MudContainer>
+
+@code {
+    private enum RoundStep
+    {
+        Setup,
+        ScoreEntry,
+        Saving
+    }
+    
+    private RoundStep _currentStep = RoundStep.Setup;
+    private bool _isLoading = true;
+    
+    // Setup step fields
+    private DateTime? _datePlayed = DateTime.Today;
+    private int _selectedClubId = 0;
+    private int _selectedCourseId = 0;
+    private int _holesPlayed = 18;
+    private string _roundType = "Friendly";
+    private string? _notes;
+    
+    private List<GolfClub> _golfClubs = new();
+    private List<GolfCourse> _coursesForSelectedClub = new();
+    private List<Player> _availablePlayers = new();
+    private List<Player> _selectedPlayers = new();
+    private int? _playerToAdd;
+    
+    // Score entry step
+    private List<CourseHole> _holes = new();
+    private Dictionary<(int playerId, int holeId), HoleScoreEntry> _scores = new();
+    private int _currentHoleIndex = 0;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Console.WriteLine("[RECORD_ROUND] Loading initial data...");
+            System.Diagnostics.Debug.WriteLine("[RECORD_ROUND] Loading initial data...");
+            
+            // Load clubs and players in parallel
+            var clubsTask = GolfClubApiService.GetAllGolfClubsAsync();
+            var playersTask = PlayerApiService.GetAllPlayersAsync();
+            
+            await Task.WhenAll(clubsTask, playersTask);
+            
+            _golfClubs = await clubsTask;
+            _availablePlayers = await playersTask;
+            
+            Console.WriteLine($"[RECORD_ROUND] Loaded {_golfClubs.Count} clubs and {_availablePlayers.Count} players");
+            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Loaded {_golfClubs.Count} clubs and {_availablePlayers.Count} players");
+            
+            // Auto-select current player
+            var currentPlayerId = AuthStateService.PlayerId;
+            Console.WriteLine($"[RECORD_ROUND] Current player ID: {currentPlayerId}");
+            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Current player ID: {currentPlayerId}");
+            
+            if (currentPlayerId.HasValue)
+            {
+                var currentPlayer = _availablePlayers.FirstOrDefault(p => p.Id == currentPlayerId.Value);
+                if (currentPlayer != null)
+                {
+                    _selectedPlayers.Add(currentPlayer);
+                    Console.WriteLine($"[RECORD_ROUND] Auto-selected current player: {currentPlayer.FullName}");
+                    System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Auto-selected current player: {currentPlayer.FullName}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RECORD_ROUND] Error loading data: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Error loading data: {ex.Message}");
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+    
+    private async Task OnClubSelected(int clubId)
+    {
+        Console.WriteLine($"[RECORD_ROUND] Club selected: {clubId}");
+        System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Club selected: {clubId}");
+        _selectedClubId = clubId;
+        _selectedCourseId = 0;
+        _coursesForSelectedClub.Clear();
+        
+        if (clubId > 0)
+        {
+            await LoadCoursesForClub();
+        }
+        
+        StateHasChanged();
+    }
+    
+    private async Task LoadCoursesForClub()
+    {
+        try
+        {
+            Console.WriteLine($"[RECORD_ROUND] Loading courses for club {_selectedClubId}");
+            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Loading courses for club {_selectedClubId}");
+            _coursesForSelectedClub = await GolfCourseApiService.GetCoursesForClubAsync(_selectedClubId);
+            Console.WriteLine($"[RECORD_ROUND] Loaded {_coursesForSelectedClub.Count} courses");
+            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Loaded {_coursesForSelectedClub.Count} courses");
+            _selectedCourseId = 0; // Reset course selection
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[RECORD_ROUND] Error loading courses: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Error loading courses: {ex.Message}");
+            Snackbar.Add($"Error loading courses: {ex.Message}", Severity.Error);
+        }
+    }
+    
+    private void RemovePlayer(Player player)
+    {
+        _selectedPlayers.Remove(player);
+    }
+    
+    private void OnPlayerToAddChanged(int? playerId)
+    {
+        if (playerId.HasValue)
+        {
+            var player = _availablePlayers.FirstOrDefault(p => p.Id == playerId.Value);
+            if (player != null && !_selectedPlayers.Any(p => p.Id == player.Id))
+            {
+                _selectedPlayers.Add(player);
+            }
+        }
+        _playerToAdd = null; // Reset selection
+    }
+    
+    private bool CanStartScoreEntry()
+    {
+        var canStart = _datePlayed.HasValue &&
+                      _selectedCourseId > 0 &&
+                      _selectedPlayers.Any();
+        
+        Console.WriteLine($"[RECORD_ROUND] CanStartScoreEntry: date={_datePlayed.HasValue}, course={_selectedCourseId}, players={_selectedPlayers.Count}, result={canStart}");
+        System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] CanStartScoreEntry: date={_datePlayed.HasValue}, course={_selectedCourseId}, players={_selectedPlayers.Count}, result={canStart}");
+        
+        return canStart;
+    }
+    
+    private async Task StartScoreEntry()
+    {
+        if (!CanStartScoreEntry())
+        {
+            Snackbar.Add("Please complete all required fields", Severity.Warning);
+            return;
+        }
+        
+        try
+        {
+            _isLoading = true;
+            
+            // Load course with holes
+            var courseDetail = await GolfCourseApiService.GetGolfCourseByIdAsync(_selectedCourseId);
+            if (courseDetail == null || !courseDetail.Holes.Any())
+            {
+                Snackbar.Add("Error: Course has no holes configured", Severity.Error);
+                return;
+            }
+            
+            // Get holes to play (starting from hole 1, can be extended later for custom starting holes)
+            _holes = courseDetail.Holes
+                .OrderBy(h => h.HoleNumber)
+                .Take(_holesPlayed)
+                .ToList();
+            
+            // Initialize score entries for all player/hole combinations
+            _scores.Clear();
+            foreach (var player in _selectedPlayers)
+            {
+                foreach (var hole in _holes)
+                {
+                    _scores[(player.Id, hole.HoleId)] = new HoleScoreEntry
+                    {
+                        HoleId = hole.HoleId,
+                        HoleNumber = hole.HoleNumber,
+                        Par = hole.Par,
+                        StrokeIndex = hole.StrokeIndex
+                    };
+                }
+            }
+            
+            _currentStep = RoundStep.ScoreEntry;
+            _currentHoleIndex = 0;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error starting score entry: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+    
+    private HoleScoreEntry GetScoreForHole(int playerId, int holeId)
+    {
+        return _scores[(playerId, holeId)];
+    }
+    
+    private void IncrementStrokes(int playerId, int holeId)
+    {
+        var score = _scores[(playerId, holeId)];
+        score.Strokes = (score.Strokes ?? 0) + 1;
+    }
+    
+    private void DecrementStrokes(int playerId, int holeId)
+    {
+        var score = _scores[(playerId, holeId)];
+        if (score.Strokes.HasValue && score.Strokes.Value > 1)
+        {
+            score.Strokes = score.Strokes.Value - 1;
+        }
+    }
+    
+    private void NextHole()
+    {
+        if (_currentHoleIndex < _holes.Count - 1)
+        {
+            _currentHoleIndex++;
+        }
+    }
+    
+    private void PreviousHole()
+    {
+        if (_currentHoleIndex > 0)
+        {
+            _currentHoleIndex--;
+        }
+    }
+    
+    private void BackToSetup()
+    {
+        _currentStep = RoundStep.Setup;
+    }
+    
+    private async Task SaveRound()
+    {
+        try
+        {
+            _currentStep = RoundStep.Saving;
+            
+            // Create the round request
+            var request = new CreateRoundRequest
+            {
+                GolfCourseId = _selectedCourseId,
+                DatePlayed = _datePlayed!.Value,
+                StartingHole = 1,
+                HolesPlayed = _holesPlayed,
+                RoundType = RoundTypeOption.Friendly,
+                Notes = _notes,
+                Status = RoundCompletionStatus.Completed,
+                CreatedByApplicationUserId = AuthStateService.UserId ?? string.Empty,
+                RoundPlayers = _selectedPlayers.Select(p => new CreateRoundPlayerRequest
+                {
+                    PlayerId = p.Id
+                }).ToList(),
+                Scores = _scores.Values
+                    .Where(s => s.Strokes.HasValue)
+                    .Select(s => new CreateScoreRequest
+                    {
+                        PlayerId = _selectedPlayers.First().Id, // This needs to be matched properly
+                        HoleId = s.HoleId,
+                        Strokes = s.Strokes!.Value,
+                        Putts = s.Putts,
+                        FairwayHit = s.FairwayHit
+                    }).ToList()
+            };
+            
+            // Actually need to organize scores by player
+            request.Scores = new List<CreateScoreRequest>();
+            foreach (var player in _selectedPlayers)
+            {
+                foreach (var hole in _holes)
+                {
+                    var score = _scores[(player.Id, hole.HoleId)];
+                    if (score.Strokes.HasValue)
+                    {
+                        request.Scores.Add(new CreateScoreRequest
+                        {
+                            PlayerId = player.Id,
+                            HoleId = hole.HoleId,
+                            Strokes = score.Strokes.Value,
+                            Putts = score.Putts,
+                            FairwayHit = score.FairwayHit
+                        });
+                    }
+                }
+            }
+            
+            var result = await RoundApiService.CreateRoundAsync(request);
+            
+            if (result != null)
+            {
+                Snackbar.Add("Round saved successfully!", Severity.Success);
+                Navigation.NavigateTo("/rounds", forceLoad: true);
+            }
+            else
+            {
+                Snackbar.Add("Failed to save round", Severity.Error);
+                _currentStep = RoundStep.ScoreEntry;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving round: {ex.Message}", Severity.Error);
+            _currentStep = RoundStep.ScoreEntry;
+        }
+    }
+}

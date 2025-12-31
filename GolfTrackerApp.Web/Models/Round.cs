@@ -38,8 +38,7 @@ namespace GolfTrackerApp.Web.Models
         public int HolesPlayed { get; set; } = 18; // Default to 18
 
         [Required]
-        [StringLength(50)]
-        public RoundTypeOption RoundType { get; set; } = RoundTypeOption.Friendly; // Or use the Enum: public RoundTypeOption Type {get; set;}
+        public RoundTypeOption RoundType { get; set; } = RoundTypeOption.Friendly;
 
         public string? Notes { get; set; } // e.g., weather, conditions
 

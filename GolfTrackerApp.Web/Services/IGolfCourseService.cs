@@ -10,6 +10,7 @@ namespace GolfTrackerApp.Web.Services
         Task<List<GolfCourse>> GetAllGolfCoursesAsync();
         Task<List<GolfCourse>> SearchGolfCoursesAsync(string searchTerm);
         Task<GolfCourse?> GetGolfCourseByIdAsync(int id);
+        Task<List<GolfCourse>> GetCoursesForClubAsync(int clubId);
         Task<GolfCourse> AddGolfCourseAsync(GolfCourse golfCourse);
         Task<GolfCourse?> UpdateGolfCourseAsync(GolfCourse golfCourse);
         Task<bool> DeleteGolfCourseAsync(int id);

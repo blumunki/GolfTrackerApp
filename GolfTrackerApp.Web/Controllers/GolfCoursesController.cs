@@ -35,7 +35,7 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<GolfCourse>> GetGolfCourse(int id)
+    public async Task<ActionResult> GetGolfCourse(int id)
     {
         try
         {
@@ -44,7 +44,26 @@ public class GolfCoursesController : ControllerBase
             {
                 return NotFound($"Golf course with ID {id} not found");
             }
-            return Ok(course);
+            
+            // Return DTO to avoid circular reference with GolfClub
+            var response = new
+            {
+                course.GolfCourseId,
+                course.GolfClubId,
+                course.Name,
+                course.DefaultPar,
+                course.NumberOfHoles,
+                Holes = course.Holes?.Select(h => new
+                {
+                    h.HoleId,
+                    h.HoleNumber,
+                    h.Par,
+                    h.StrokeIndex,
+                    h.LengthYards
+                }).ToList()
+            };
+            
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -70,6 +89,32 @@ public class GolfCoursesController : ControllerBase
         {
             _logger.LogError(ex, "Error searching golf courses with term: {SearchTerm}", searchTerm);
             return StatusCode(500, "An error occurred while searching golf courses");
+        }
+    }
+
+    [HttpGet("byclub/{clubId}")]
+    public async Task<ActionResult<List<object>>> GetCoursesByClub(int clubId)
+    {
+        try
+        {
+            var courses = await _golfCourseService.GetCoursesForClubAsync(clubId);
+            
+            // Return courses without circular references by projecting to anonymous objects
+            var result = courses.Select(c => new 
+            {
+                c.GolfCourseId,
+                c.GolfClubId,
+                c.Name,
+                c.DefaultPar,
+                c.NumberOfHoles
+            }).ToList();
+            
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving courses for club {ClubId}", clubId);
+            return StatusCode(500, "An error occurred while retrieving golf courses");
         }
     }
 

@@ -8,7 +8,7 @@ namespace GolfTrackerApp.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class RoundsController : ControllerBase
+public class RoundsController : BaseApiController
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<RoundsController> _logger;
@@ -126,7 +126,7 @@ public class RoundsController : ControllerBase
 
     [HttpPost]
     [Authorize]
-    public async Task<ActionResult<Round>> CreateRound([FromBody] Round round)
+    public async Task<ActionResult<RoundResponse>> CreateRound([FromBody] Round round)
     {
         try
         {
@@ -138,7 +138,43 @@ public class RoundsController : ControllerBase
             _context.Rounds.Add(round);
             await _context.SaveChangesAsync();
             
-            return CreatedAtAction(nameof(GetRound), new { id = round.RoundId }, round);
+            // Reload with related data to calculate response
+            var savedRound = await _context.Rounds
+                .Include(r => r.GolfCourse)
+                    .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.RoundPlayers)
+                    .ThenInclude(rp => rp!.Player)
+                .Include(r => r.Scores)
+                .FirstOrDefaultAsync(r => r.RoundId == round.RoundId);
+            
+            if (savedRound == null)
+            {
+                return StatusCode(500, "Round was saved but could not be retrieved");
+            }
+            
+            // Map to DTO to avoid circular references
+            var response = new RoundResponse
+            {
+                RoundId = savedRound.RoundId,
+                GolfCourseId = savedRound.GolfCourseId,
+                DatePlayed = savedRound.DatePlayed,
+                StartingHole = savedRound.StartingHole,
+                HolesPlayed = savedRound.HolesPlayed,
+                RoundType = savedRound.RoundType.ToString(),
+                Notes = savedRound.Notes,
+                Status = savedRound.Status.ToString(),
+                CreatedByApplicationUserId = savedRound.CreatedByApplicationUserId,
+                CourseName = savedRound.GolfCourse?.Name ?? "Unknown",
+                ClubName = savedRound.GolfCourse?.GolfClub?.Name ?? "Unknown",
+                TotalScore = savedRound.Scores.Sum(s => s.Strokes),
+                TotalPar = savedRound.GolfCourse?.DefaultPar ?? 0,
+                PlayerCount = savedRound.RoundPlayers.Count,
+                PlayingPartners = savedRound.RoundPlayers
+                    .Select(rp => rp.Player != null ? $"{rp.Player.FirstName} {rp.Player.LastName}" : "Unknown")
+                    .ToList()
+            };
+            
+            return CreatedAtAction(nameof(GetRound), new { id = savedRound.RoundId }, response);
         }
         catch (Exception ex)
         {

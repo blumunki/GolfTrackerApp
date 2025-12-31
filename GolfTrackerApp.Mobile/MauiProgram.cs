@@ -78,14 +78,20 @@ public static class MauiProgram
 		});
 #endif
 
-		// Configure HTTP clients for API services
-		builder.Services.AddHttpClient<IGolfClubApiService, GolfClubApiService>(httpClientBuilder)
+	// Configure HTTP clients for API services
+	builder.Services.AddHttpClient<IGolfClubApiService, GolfClubApiService>(httpClientBuilder)
 #if DEBUG
-			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+		.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
 #endif
-			;
+		;
 
-		builder.Services.AddHttpClient<IPlayerApiService, PlayerApiService>(httpClientBuilder)
+	builder.Services.AddHttpClient<IGolfCourseApiService, GolfCourseApiService>(httpClientBuilder)
+#if DEBUG
+		.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+		;
+
+	builder.Services.AddHttpClient<IPlayerApiService, PlayerApiService>(httpClientBuilder)
 #if DEBUG
 			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
 #endif

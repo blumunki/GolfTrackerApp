@@ -57,10 +57,17 @@ namespace GolfTrackerApp.Web.Services
                                 .ToListAsync();
         }
 
+        public async Task<List<GolfCourse>> GetCoursesForClubAsync(int clubId)
+        {
+            return await _context.GolfCourses
+                .Where(c => c.GolfClubId == clubId)
+                .ToListAsync();
+        }
+
         public async Task<GolfCourse?> GetGolfCourseByIdAsync(int id)
         {
             return await _context.GolfCourses
-                                .Include(gc => gc.GolfClub) // Optionally include club details
+                                .Include(gc => gc.Holes) // Include holes for score entry
                                 .FirstOrDefaultAsync(gc => gc.GolfCourseId == id);
         }
 
