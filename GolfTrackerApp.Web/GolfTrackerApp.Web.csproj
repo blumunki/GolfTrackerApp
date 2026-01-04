@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <None Update="Data/golfapp.db" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <None Update="web.config" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
