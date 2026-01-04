@@ -1,0 +1,42 @@
+name: Deploy Web App to Azure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'GolfTrackerApp.Web/**' # Only trigger if changes happen in the Web folder
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: 'webapp-golftracker'    # Your Azure App Service Name
+  PROJECT_PATH: 'GolfTrackerApp.Web'         # <--- POINTING TO YOUR SUBFOLDER
+  DOTNET_VERSION: '9.0.x'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET Core
+        uses: actions/setup-dotnet@v1
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build with dotnet
+        # Builds specifically the Web project, not the Mobile one
+        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release
+
+      - name: dotnet publish
+        # Publishes the output to a 'publish' folder
+        run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ${{ env.PROJECT_PATH }}/publish
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          # Points Azure to the folder we just published to
+          package: ${{ env.PROJECT_PATH }}/publish
