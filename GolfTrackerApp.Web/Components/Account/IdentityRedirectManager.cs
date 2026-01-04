@@ -77,9 +77,17 @@ internal sealed class IdentityRedirectManager
         RedirectTo(newUri);
     }
 
-    public void RedirectToWithStatus(string uri, string message, HttpContext context)
+    public void RedirectToWithStatus(string uri, string message, HttpContext? context)
     {
-        context.Response.Cookies.Append(StatusCookieName, message, StatusCookieBuilder.Build(context));
+        // Use the provided context, or fall back to the accessor
+        context ??= _httpContextAccessor.HttpContext;
+        
+        // Only set the status cookie if we have a valid HttpContext
+        if (context is not null)
+        {
+            context.Response.Cookies.Append(StatusCookieName, message, StatusCookieBuilder.Build(context));
+        }
+        
         RedirectTo(uri);
     }
 
@@ -87,6 +95,6 @@ internal sealed class IdentityRedirectManager
 
     public void RedirectToCurrentPage() => RedirectTo(CurrentPath);
 
-    public void RedirectToCurrentPageWithStatus(string message, HttpContext context)
+    public void RedirectToCurrentPageWithStatus(string message, HttpContext? context)
         => RedirectToWithStatus(CurrentPath, message, context);
 }
