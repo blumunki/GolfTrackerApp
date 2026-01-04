@@ -79,13 +79,17 @@ internal sealed class IdentityRedirectManager
 
     public void RedirectToWithStatus(string uri, string message, HttpContext? context)
     {
-        // Use the provided context, or fall back to the accessor
-        context ??= _httpContextAccessor.HttpContext;
+        // Try to get HttpContext from parameter or accessor
+        var httpContext = context;
+        if (httpContext is null)
+        {
+            httpContext = _httpContextAccessor.HttpContext;
+        }
         
         // Only set the status cookie if we have a valid HttpContext
-        if (context is not null)
+        if (httpContext is not null)
         {
-            context.Response.Cookies.Append(StatusCookieName, message, StatusCookieBuilder.Build(context));
+            httpContext.Response.Cookies.Append(StatusCookieName, message, StatusCookieBuilder.Build(httpContext));
         }
         
         RedirectTo(uri);
