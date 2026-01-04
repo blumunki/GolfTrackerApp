@@ -7,6 +7,8 @@
 @using Microsoft.AspNetCore.WebUtilities
 @using GolfTrackerApp.Web.Data
 
+@attribute [StreamRendering]
+
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
