@@ -89,11 +89,22 @@ builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuth
 
 builder.Services.Configure<CircuitOptions>(options => options.DetailedErrors = true);
 
+// Configure database provider based on environment
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var databaseProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
 
-
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
+{
+    if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlServer(connectionString);
+    }
+    else
+    {
+        options.UseSqlite(connectionString);
+    }
+});
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
@@ -111,29 +122,53 @@ builder.Services.AddMudServices();
 
 var app = builder.Build();
 
+// Initialize database (migrations and seeding)
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
+    
+    try
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        
+        if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+        {
+            // For SQL Server (production), use EnsureCreated since migrations are SQLite-specific
+            // This creates the schema based on the current model if it doesn't exist
+            logger.LogInformation("Ensuring SQL Server database schema exists...");
+            context.Database.EnsureCreated();
+            logger.LogInformation("SQL Server database schema ready.");
+        }
+        else
+        {
+            // For SQLite (development), use migrations
+            logger.LogInformation("Applying SQLite database migrations...");
+            context.Database.Migrate();
+            logger.LogInformation("SQLite database migrations applied successfully.");
+        }
+
+        // Seed roles and admin user
+        logger.LogInformation("Seeding database...");
+        await SeedData.InitializeAsync(services);
+        logger.LogInformation("Database seeding completed.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred during database initialization.");
+        // In production, you may want to throw to prevent app from starting with bad DB state
+        if (!app.Environment.IsDevelopment())
+        {
+            throw;
+        }
+    }
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
-        // Seed the database
-    using (var scope = app.Services.CreateScope())
-    {
-        var services = scope.ServiceProvider;
-        try
-        {
-            // Ensure database is created/migrated
-            var context = services.GetRequiredService<ApplicationDbContext>();
-            context.Database.Migrate(); // or context.Database.EnsureCreated();
-
-            // Seed roles and admin user
-            await SeedData.InitializeAsync(services);
-        }
-        catch (Exception ex)
-        {
-            var logger = services.GetRequiredService<ILogger<Program>>();
-            logger.LogError(ex, "An error occurred seeding the DB.");
-        }
-    }
 }
 else
 {
