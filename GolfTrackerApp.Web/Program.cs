@@ -38,12 +38,19 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddSignInManager()
 .AddDefaultTokenProviders();
 
-builder.Services.AddAuthentication()
-    .AddGoogle(googleOptions =>
-    {
-        googleOptions.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
-        googleOptions.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
-    });
+// Add Google Authentication (only if credentials are configured)
+var googleClientId = builder.Configuration["Authentication:Google:ClientId"];
+var googleClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+
+if (!string.IsNullOrEmpty(googleClientId) && !string.IsNullOrEmpty(googleClientSecret))
+{
+    builder.Services.AddAuthentication()
+        .AddGoogle(googleOptions =>
+        {
+            googleOptions.ClientId = googleClientId;
+            googleOptions.ClientSecret = googleClientSecret;
+        });
+}
 
 // Add JWT Authentication for mobile app API
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "your-super-secret-jwt-key-that-is-at-least-32-characters-long";
