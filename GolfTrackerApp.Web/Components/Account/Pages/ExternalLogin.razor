@@ -7,7 +7,7 @@
 @using Microsoft.AspNetCore.WebUtilities
 @using GolfTrackerApp.Web.Data
 
-@attribute [StreamRendering]
+@rendermode InteractiveServer
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
@@ -84,14 +84,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // HttpContext is null when running in SignalR circuit (interactive mode).
-        // This page requires HttpContext for external login processing, so we must
-        // skip initialization when it's not available. The work is done during SSR.
-        if (HttpContext is null)
-        {
-            return;
-        }
-
         if (RemoteError is not null)
         {
             RedirectManager.RedirectToWithStatus("Account/Login", $"Error from external provider: {RemoteError}", HttpContext);
