@@ -4,6 +4,7 @@
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
+@inject ILogger<ExternalLoginPicker> Logger
 
 @if (externalLogins.Length == 0)
 {
@@ -43,6 +44,20 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        externalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).ToArray();
+        Logger.LogInformation("ExternalLoginPicker.OnInitializedAsync called. ReturnUrl={ReturnUrl}", ReturnUrl);
+        
+        try
+        {
+            externalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).ToArray();
+            Logger.LogInformation(
+                "ExternalLoginPicker: Found {Count} external login providers: {Providers}",
+                externalLogins.Length,
+                string.Join(", ", externalLogins.Select(p => p.Name)));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ExternalLoginPicker: Error getting external authentication schemes");
+            externalLogins = [];
+        }
     }
 }

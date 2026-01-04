@@ -84,39 +84,72 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // DIAGNOSTIC: Log the rendering context to understand production behavior
+        var hasHttpContext = HttpContext is not null;
+        var isInteractiveCircuit = !hasHttpContext;
+        
+        Logger.LogInformation(
+            "ExternalLogin.OnInitializedAsync called. HasHttpContext={HasHttpContext}, IsCircuit={IsCircuit}, Action={Action}, RemoteError={RemoteError}",
+            hasHttpContext, isInteractiveCircuit, Action, RemoteError);
+
+        // When running in SignalR circuit (interactive mode), HttpContext is null.
+        // The initial OAuth processing happens during SSR when HttpContext is available.
+        // In circuit mode, we should already have the externalLoginInfo from SSR,
+        // so we can safely skip re-initialization.
+        if (HttpContext is null)
+        {
+            Logger.LogInformation("ExternalLogin: Skipping initialization in SignalR circuit (HttpContext is null)");
+            return;
+        }
+
         if (RemoteError is not null)
         {
+            Logger.LogWarning("ExternalLogin: Remote error from provider: {RemoteError}", RemoteError);
             RedirectManager.RedirectToWithStatus("Account/Login", $"Error from external provider: {RemoteError}", HttpContext);
             return;
         }
 
+        Logger.LogInformation("ExternalLogin: Attempting to get external login info...");
         externalLoginInfo = await SignInManager.GetExternalLoginInfoAsync();
+        
         if (externalLoginInfo is null)
         {
+            Logger.LogWarning("ExternalLogin: Failed to get external login info");
             RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
             return;
         }
 
+        Logger.LogInformation(
+            "ExternalLogin: Got external login info. Provider={Provider}, ProviderKey={ProviderKey}",
+            externalLoginInfo.LoginProvider, externalLoginInfo.ProviderKey);
+
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
+            Logger.LogInformation("ExternalLogin: Processing GET request. Action={Action}", Action);
+            
             if (Action == LoginCallbackAction)
             {
                 await OnLoginCallbackAsync();
                 return;
             }
 
+            Logger.LogInformation("ExternalLogin: No LoginCallback action, redirecting to login");
             RedirectManager.RedirectTo("Account/Login");
         }
     }
 
     private async Task OnLoginCallbackAsync()
     {
+        Logger.LogInformation("ExternalLogin.OnLoginCallbackAsync called. HasExternalLoginInfo={HasInfo}", externalLoginInfo is not null);
+        
         if (externalLoginInfo is null)
         {
+            Logger.LogWarning("ExternalLogin.OnLoginCallbackAsync: externalLoginInfo is null");
             RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
             return;
         }
 
+        Logger.LogInformation("ExternalLogin.OnLoginCallbackAsync: Attempting sign in with provider {Provider}", externalLoginInfo.LoginProvider);
         var result = await SignInManager.ExternalLoginSignInAsync(
             externalLoginInfo.LoginProvider,
             externalLoginInfo.ProviderKey,
@@ -148,12 +181,18 @@
 
     private async Task OnValidSubmitAsync()
     {
+        Logger.LogInformation(
+            "ExternalLogin.OnValidSubmitAsync called. HasHttpContext={HasContext}, HasExternalLoginInfo={HasInfo}, Email={Email}",
+            HttpContext is not null, externalLoginInfo is not null, Input.Email);
+        
         if (externalLoginInfo is null)
         {
-            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information during confirmation.", HttpContext);
+            Logger.LogWarning("ExternalLogin.OnValidSubmitAsync: externalLoginInfo is null, cannot complete registration");
+            RedirectManager.RedirectTo("Account/Login");
             return;
         }
 
+        Logger.LogInformation("ExternalLogin.OnValidSubmitAsync: Creating user with email {Email}", Input.Email);
         var emailStore = GetEmailStore();
         var user = CreateUser();
 
