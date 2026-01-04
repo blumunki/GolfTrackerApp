@@ -32,41 +32,45 @@ namespace GolfTrackerApp.Web.Data
             builder.Entity<RoundPlayer>()
                 .HasKey(rp => new { rp.RoundId, rp.PlayerId });
 
-            // Configure relationships (optional, EF Core conventions often handle these)
-            // Example: Define one-to-many relationship between GolfCourse and Hole
+            // Configure relationships
             builder.Entity<Hole>()
                 .HasOne(h => h.GolfCourse)
                 .WithMany(gc => gc.Holes)
-                .HasForeignKey(h => h.GolfCourseId);
-
-            // Example: Define one-to-many from Player to Score
-            builder.Entity<Score>()
-                .HasOne(s => s.Player)
-                .WithMany(p => p.Scores)
-                .HasForeignKey(s => s.PlayerId);
-
-            // Example: Define one-to-many from Round to Score
-            builder.Entity<Score>()
-                .HasOne(s => s.Round)
-                .WithMany(r => r.Scores)
-                .HasForeignKey(s => s.RoundId);
-
-            // Example: Define one-to-many from Hole to Score
-            builder.Entity<Score>()
-                .HasOne(s => s.Hole)
-                .WithMany(h => h.Scores)
-                .HasForeignKey(s => s.HoleId);
+                .HasForeignKey(h => h.GolfCourseId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             // Configure the many-to-many relationship between Round and Player via RoundPlayer
+            // Use Restrict to avoid multiple cascade paths (SQL Server requirement)
             builder.Entity<RoundPlayer>()
                 .HasOne(rp => rp.Round)
                 .WithMany(r => r.RoundPlayers)
-                .HasForeignKey(rp => rp.RoundId);
+                .HasForeignKey(rp => rp.RoundId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<RoundPlayer>()
                 .HasOne(rp => rp.Player)
                 .WithMany(p => p.RoundPlayers)
-                .HasForeignKey(rp => rp.PlayerId);
+                .HasForeignKey(rp => rp.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            
+            // Use Restrict for Score relationships to avoid cascade conflicts with SQL Server
+            builder.Entity<Score>()
+                .HasOne(s => s.Player)
+                .WithMany(p => p.Scores)
+                .HasForeignKey(s => s.PlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Score>()
+                .HasOne(s => s.Round)
+                .WithMany(r => r.Scores)
+                .HasForeignKey(s => s.RoundId)
+                .OnDelete(DeleteBehavior.Cascade); // Keep cascade - when round deleted, delete scores
+
+            builder.Entity<Score>()
+                .HasOne(s => s.Hole)
+                .WithMany(h => h.Scores)
+                .HasForeignKey(s => s.HoleId)
+                .OnDelete(DeleteBehavior.Restrict);
             
             builder.Entity<GolfCourse>()
                 .HasOne(gc => gc.GolfClub)
