@@ -33,17 +33,17 @@
             logging in.
         </MudAlert>
 
-        <EditForm Model="Input" OnValidSubmit="OnValidSubmitAsync" FormName="confirmation" method="post">
+        <EditForm Model="FormInput" OnValidSubmit="OnValidSubmitAsync" FormName="confirmation" method="post">
             <DataAnnotationsValidator />
 
             <MudTextField 
-                @bind-Value="Input.Email"
+                @bind-Value="FormInput.Email"
                 Label="Email"
                 Variant="Variant.Outlined"
                 Class="mb-4"
                 InputType="InputType.Email"
                 Immediate="true"
-                For="@(() => Input.Email)" />
+                For="@(() => FormInput.Email)" />
 
             <MudButton 
                 ButtonType="ButtonType.Submit" 
@@ -67,7 +67,9 @@
     private HttpContext? HttpContext { get; set; }
 
     [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = new();
+    private InputModel? Input { get; set; }
+    
+    private InputModel FormInput => Input ??= new();
 
     [SupplyParameterFromQuery]
     private string? RemoteError { get; set; }
@@ -159,7 +161,7 @@
         // If the user does not have an account, try to get their email
         if (externalLoginInfo.Principal.HasClaim(c => c.Type == ClaimTypes.Email))
         {
-            Input.Email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
+            FormInput.Email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
         }
     }
 
@@ -175,8 +177,8 @@
         var emailStore = GetEmailStore();
         var user = CreateUser();
 
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+        await UserStore.SetUserNameAsync(user, FormInput.Email, CancellationToken.None);
+        await emailStore.SetEmailAsync(user, FormInput.Email, CancellationToken.None);
 
         var result = await UserManager.CreateAsync(user);
         if (result.Succeeded)
@@ -194,13 +196,13 @@
                     NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
                     new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
                 
-                await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+                await EmailSender.SendConfirmationLinkAsync(user, FormInput.Email, HtmlEncoder.Default.Encode(callbackUrl));
 
                 if (UserManager.Options.SignIn.RequireConfirmedAccount)
                 {
                     RedirectManager.RedirectTo(
                         "Account/RegisterConfirmation", 
-                        new Dictionary<string, object?> { ["email"] = Input.Email });
+                        new Dictionary<string, object?> { ["email"] = FormInput.Email });
                     return;
                 }
 
