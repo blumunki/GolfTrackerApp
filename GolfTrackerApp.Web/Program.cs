@@ -101,17 +101,27 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 var databaseProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// Use DbContextFactory to avoid threading issues in Blazor Server
+// The lifetime parameter also registers ApplicationDbContext as a scoped service (for Identity)
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
 {
     if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
     {
-        options.UseSqlServer(connectionString);
+        options.UseSqlServer(connectionString, sqlOptions =>
+        {
+            // Enable retry on failure for transient errors
+            sqlOptions.EnableRetryOnFailure(
+                maxRetryCount: 5,
+                maxRetryDelay: TimeSpan.FromSeconds(30),
+                errorNumbersToAdd: null);
+            sqlOptions.CommandTimeout(60);
+        });
     }
     else
     {
         options.UseSqlite(connectionString);
     }
-});
+}, ServiceLifetime.Scoped);
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();

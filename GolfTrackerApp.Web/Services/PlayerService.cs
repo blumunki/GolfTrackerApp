@@ -11,20 +11,21 @@ namespace GolfTrackerApp.Web.Services
 {
     public class PlayerService : IPlayerService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILogger<PlayerService> _logger;
-
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public PlayerService(ApplicationDbContext context, ILogger<PlayerService> logger, IHttpContextAccessor httpContextAccessor)
+        public PlayerService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<PlayerService> logger, IHttpContextAccessor httpContextAccessor)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<Player> AddPlayerAsync(Player player)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Only try to get user from HttpContext if CreatedByApplicationUserId is not already set
             if (string.IsNullOrEmpty(player.CreatedByApplicationUserId))
             {
@@ -81,6 +82,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<bool> DeletePlayerAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var player = await _context.Players.FindAsync(id);
             if (player == null)
             {
@@ -96,6 +99,8 @@ namespace GolfTrackerApp.Web.Services
         // In GolfTrackerApp.Web/Services/PlayerService.cs
         public async Task<List<Player>> GetAllPlayersAsync(string requestingUserId, bool isUserAdmin)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             IQueryable<Player> query = _context.Players.Include(p => p.ApplicationUser);
 
             if (!isUserAdmin)
@@ -115,17 +120,23 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Player?> GetPlayerByIdAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Players.Include(p => p.ApplicationUser).FirstOrDefaultAsync(p => p.PlayerId == id);
         }
 
         public async Task<Player?> GetPlayerByApplicationUserIdAsync(string applicationUserId)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Players.Include(p => p.ApplicationUser)
                                    .FirstOrDefaultAsync(p => p.ApplicationUserId == applicationUserId);
         }
 
         public async Task<Player?> UpdatePlayerAsync(Player playerUpdateData) // playerUpdateData comes from the UI
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var existingPlayer = await _context.Players
                                         .Include(p => p.ApplicationUser) // Include for checking ApplicationUserId changes
                                         .FirstOrDefaultAsync(p => p.PlayerId == playerUpdateData.PlayerId);
@@ -177,6 +188,8 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task<List<Player>> SearchPlayersAsync(string requestingUserId, bool isUserAdmin, string searchTerm)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Start with the same authorization query from GetAllPlayersAsync
             IQueryable<Player> query = _context.Players.Include(p => p.ApplicationUser);
 

@@ -10,15 +10,17 @@ namespace GolfTrackerApp.Web.Services
 {
     public class ScoreService : IScoreService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public ScoreService(ApplicationDbContext context)
+        public ScoreService(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<Score> AddScoreAsync(Score score)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Add validation for PlayerId, RoundId, HoleId if needed
             _context.Scores.Add(score);
             await _context.SaveChangesAsync();
@@ -27,6 +29,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Score>> AddScoresAsync(IEnumerable<Score> scores)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             _context.Scores.AddRange(scores);
             await _context.SaveChangesAsync();
             return scores.ToList();
@@ -34,6 +38,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<bool> DeleteScoreAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var score = await _context.Scores.FindAsync(id);
             if (score == null) return false;
             _context.Scores.Remove(score);
@@ -43,6 +49,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Score?> GetScoreByIdAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Scores
                                  .Include(s => s.Player)
                                  .Include(s => s.Round)
@@ -52,6 +60,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Score>> GetScoresForPlayerInRoundAsync(int roundId, int playerId)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Scores
                                  .Where(s => s.RoundId == roundId && s.PlayerId == playerId)
                                  .Include(s => s.Hole) // So you know which hole the score is for
@@ -61,6 +71,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Score>> GetScoresForRoundAsync(int roundId)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Scores
                                  .Where(s => s.RoundId == roundId)
                                  .Include(s => s.Player)
@@ -71,6 +83,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Score?> UpdateScoreAsync(Score score)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var existingScore = await _context.Scores.FindAsync(score.ScoreId);
             if (existingScore == null) return null;
             // Add validation if critical FKs are being changed
@@ -80,6 +94,8 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task SaveScorecardAsync(int roundId, Dictionary<int, List<HoleScoreEntryModel>> scorecard)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // First, remove any existing scores for this round to handle edits
             var existingScores = _context.Scores.Where(s => s.RoundId == roundId);
             _context.Scores.RemoveRange(existingScores);

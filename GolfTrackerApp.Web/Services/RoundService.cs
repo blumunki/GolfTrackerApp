@@ -11,17 +11,19 @@ namespace GolfTrackerApp.Web.Services
     public class RoundService : IRoundService
     {
 
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILogger<PlayerService> _logger;
 
-        public RoundService(ApplicationDbContext context, ILogger<PlayerService> logger)
+        public RoundService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<PlayerService> logger)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _logger = logger;
         }
 
         public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             if (string.IsNullOrEmpty(round.CreatedByApplicationUserId))
             {
                 throw new InvalidOperationException("Round must have a CreatedByApplicationUserId.");
@@ -66,6 +68,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<bool> DeleteRoundAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var round = await _context.Rounds.Include(r => r.RoundPlayers).Include(r => r.Scores).FirstOrDefaultAsync(r => r.RoundId == id);
             if (round == null) return false;
 
@@ -78,6 +82,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Round>> GetAllRoundsAsync(string requestingUserId, bool isUserAdmin)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             IQueryable<Round> query = _context.Rounds
                                         .Include(r => r.GolfCourse!)
                                             .ThenInclude(gc => gc!.GolfClub)
@@ -101,6 +107,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Round?> GetRoundByIdAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Rounds
                                 .Include(r => r.GolfCourse!)
                                     .ThenInclude(gc => gc!.GolfClub)
@@ -115,6 +123,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Round>> GetRoundsForPlayerAsync(int playerId, string requestingUserId, bool isUserAdmin)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var playerToListRoundsFor = await _context.Players.FindAsync(playerId);
             if (playerToListRoundsFor == null)
             {
@@ -162,6 +172,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Round?> UpdateRoundAsync(Round round, IEnumerable<int>? playerIdsToUpdate = null)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var existingRound = await _context.Rounds
                                               .Include(r => r.RoundPlayers)
                                               .FirstOrDefaultAsync(r => r.RoundId == round.RoundId);
@@ -199,6 +211,8 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task<Round> CreateRoundWithPlayersAsync(Round round, List<int> playerIds)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             if (playerIds == null || !playerIds.Any())
             {
                 throw new ArgumentException("A round must have at least one player.", nameof(playerIds));
@@ -225,6 +239,8 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task<List<Round>> GetRecentRoundsAsync(string requestingUserId, bool isUserAdmin, int count)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Find the PlayerId for the current ApplicationUser
             var currentPlayer = await _context.Players
                 .AsNoTracking()
@@ -239,7 +255,8 @@ namespace GolfTrackerApp.Web.Services
             IQueryable<Round> query = _context.Rounds
                                         .Include(r => r.GolfCourse!)
                                             .ThenInclude(gc => gc!.GolfClub)
-                                        .Include(r => r.Scores);
+                                        .Include(r => r.Scores!)
+                                            .ThenInclude(s => s.Hole);
 
             // The filter is now applied to EVERYONE, including admins.
             query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == currentPlayer.PlayerId));
@@ -250,6 +267,8 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task<List<Round>> SearchRoundsAsync(string requestingUserId, bool isUserAdmin, string searchTerm)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Start with the same authorization query from GetAllRoundsAsync
             IQueryable<Round> query = _context.Rounds
                                         .Include(r => r.GolfCourse!)
@@ -280,6 +299,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Scorecard> PrepareScorecardAsync(int courseId, int startingHole, int holesPlayed, List<Player> players)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var allCourseHoles = await _context.Holes
                 .AsNoTracking()
                 .Where(h => h.GolfCourseId == courseId)
@@ -335,6 +356,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Round>> GetRecentRoundsForClubAsync(string requestingUserId, int clubId, int count)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Get the player for this user
             var player = await _context.Players
                 .FirstOrDefaultAsync(p => p.ApplicationUserId == requestingUserId);
@@ -355,6 +378,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Round>> GetRecentRoundsForCourseAsync(string requestingUserId, int courseId, int count)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Get the player for this user
             var player = await _context.Players
                 .FirstOrDefaultAsync(p => p.ApplicationUserId == requestingUserId);

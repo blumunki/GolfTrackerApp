@@ -8,15 +8,17 @@ namespace GolfTrackerApp.Web.Services
 {
     public class GolfClubService : IGolfClubService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public GolfClubService(ApplicationDbContext context)
+        public GolfClubService(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<GolfClub> AddGolfClubAsync(GolfClub golfClub)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             _context.GolfClubs.Add(golfClub);
             await _context.SaveChangesAsync();
             return golfClub;
@@ -24,6 +26,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<bool> DeleteGolfClubAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var golfClub = await _context.GolfClubs.FindAsync(id);
             if (golfClub == null)
             {
@@ -38,11 +42,15 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<GolfClub>> GetAllGolfClubsAsync()
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.GolfClubs.OrderBy(c => c.Name).ToListAsync();
         }
 
         public async Task<GolfClub?> GetGolfClubByIdAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Include courses if needed when viewing a single club's details
             return await _context.GolfClubs
                                  .Include(c => c.GolfCourses)
@@ -51,6 +59,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<GolfClub?> UpdateGolfClubAsync(GolfClub golfClub)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var existingClub = await _context.GolfClubs.FindAsync(golfClub.GolfClubId);
             if (existingClub == null)
             {
@@ -62,6 +72,8 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task<List<GolfClub>> SearchGolfClubsAsync(string searchTerm)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var query = _context.GolfClubs.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))

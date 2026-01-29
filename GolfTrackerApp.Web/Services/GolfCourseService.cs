@@ -9,15 +9,17 @@ namespace GolfTrackerApp.Web.Services
 {
     public class GolfCourseService : IGolfCourseService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public GolfCourseService(ApplicationDbContext context)
+        public GolfCourseService(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<GolfCourse> AddGolfCourseAsync(GolfCourse golfCourse)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // You might want to add validation here to ensure golfCourse.GolfClubId refers to an existing GolfClub
             var clubExists = await _context.GolfClubs.AnyAsync(c => c.GolfClubId == golfCourse.GolfClubId);
             if (!clubExists)
@@ -32,6 +34,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<bool> DeleteGolfCourseAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Include the related Holes when fetching the course
             var golfCourse = await _context.GolfCourses
                                         .Include(c => c.Holes)
@@ -52,6 +56,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<GolfCourse>> GetAllGolfCoursesAsync()
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.GolfCourses
                                 .Include(gc => gc.GolfClub) // Optionally include club details
                                 .ToListAsync();
@@ -59,6 +65,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<GolfCourse>> GetCoursesForClubAsync(int clubId)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.GolfCourses
                 .Where(c => c.GolfClubId == clubId)
                 .ToListAsync();
@@ -66,6 +74,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<GolfCourse?> GetGolfCourseByIdAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.GolfCourses
                                 .Include(gc => gc.Holes) // Include holes for score entry
                                 .FirstOrDefaultAsync(gc => gc.GolfCourseId == id);
@@ -73,6 +83,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<GolfCourse?> UpdateGolfCourseAsync(GolfCourse golfCourse)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var existingCourse = await _context.GolfCourses.FindAsync(golfCourse.GolfCourseId);
             if (existingCourse == null)
             {
@@ -95,6 +107,8 @@ namespace GolfTrackerApp.Web.Services
         }
         public async Task<List<GolfCourse>> SearchGolfCoursesAsync(string searchTerm)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var query = _context.GolfCourses
                 .Include(gc => gc.GolfClub)
                 .AsQueryable();

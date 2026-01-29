@@ -6,15 +6,17 @@ namespace GolfTrackerApp.Web.Services;
 
 public class ReportService : IReportService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-    public ReportService(ApplicationDbContext context)
+    public ReportService(IDbContextFactory<ApplicationDbContext> contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         var query = _context.Rounds
             .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
 
@@ -61,6 +63,8 @@ public class ReportService : IReportService
 
     public async Task<List<PlayingPartnerSummary>> GetPlayingPartnerSummaryAsync(string currentUserId, int count)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         // Find the PlayerId for the current ApplicationUser
         var currentPlayer = await _context.Players
             .AsNoTracking()
@@ -147,6 +151,8 @@ public class ReportService : IReportService
 
     public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceSummaryAsync(string currentUserId, int roundCount)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         var player = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
         if (player is null)
         {
@@ -172,6 +178,8 @@ public class ReportService : IReportService
 
     public async Task<PlayerReportViewModel> GetPlayerReportViewModelAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         var playerTask = _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.PlayerId == playerId);
         
         // Load courses with GolfClub for web app compatibility, but break circular references
@@ -217,6 +225,8 @@ public class ReportService : IReportService
 
     public async Task<ScoringDistribution> GetScoringDistributionAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         var query = _context.Rounds
             .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
 
@@ -284,6 +294,8 @@ public class ReportService : IReportService
 
     public async Task<ScoringDistribution> GetScoringDistributionForClubAsync(int playerId, int clubId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         var query = _context.Rounds
             .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) 
                        && r.Status == RoundCompletionStatus.Completed
@@ -349,6 +361,8 @@ public class ReportService : IReportService
 
     public async Task<PerformanceByPar> GetPerformanceByParAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         // Start with base query for rounds this player participated in
         var roundsQuery = _context.Rounds
             .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
@@ -422,6 +436,8 @@ public class ReportService : IReportService
 
     public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceForClubAsync(string currentUserId, int clubId, int roundCount)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         // Get the player for this user
         var player = await _context.Players
             .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
@@ -453,6 +469,8 @@ public class ReportService : IReportService
 
     public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceForCourseAsync(string currentUserId, int courseId, int roundCount)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         // Get the player for this user
         var player = await _context.Players
             .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
@@ -484,6 +502,8 @@ public class ReportService : IReportService
 
     public async Task<DashboardStats> GetDashboardStatsAsync(string currentUserId)
     {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
         var player = await _context.Players
             .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
 

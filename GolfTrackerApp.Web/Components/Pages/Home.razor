@@ -234,7 +234,7 @@
                                                             @round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes)
                                                         </MudText>
                                                         @{
-                                                            var totalPar = round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Hole!.Par);
+                                                            var totalPar = round.Scores.Where(s => s.PlayerId == _currentPlayerId && s.Hole != null).Sum(s => s.Hole!.Par);
                                                             var totalScore = round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes);
                                                             var toPar = totalScore - totalPar;
                                                         }

@@ -10,15 +10,17 @@ namespace GolfTrackerApp.Web.Services
 {
     public class HoleService : IHoleService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public HoleService(ApplicationDbContext context)
+        public HoleService(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
         public async Task<Hole> AddHoleAsync(Hole hole)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Ensure GolfCourseId is valid
             if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == hole.GolfCourseId))
             {
@@ -31,6 +33,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<List<Hole>> AddHolesAsync(IEnumerable<Hole> holes)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             // Optional: Add validation for each hole in the list
             _context.Holes.AddRange(holes);
             await _context.SaveChangesAsync();
@@ -39,6 +43,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<bool> DeleteHoleAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var hole = await _context.Holes.FindAsync(id);
             if (hole == null) return false;
             _context.Holes.Remove(hole);
@@ -48,11 +54,15 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Hole?> GetHoleByIdAsync(int id)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Holes.Include(h => h.GolfCourse).FirstOrDefaultAsync(h => h.HoleId == id);
         }
 
         public async Task<List<Hole>> GetHolesForCourseAsync(int golfCourseId)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             return await _context.Holes
                                  .Where(h => h.GolfCourseId == golfCourseId)
                                  .OrderBy(h => h.HoleNumber)
@@ -61,6 +71,8 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Hole?> UpdateHoleAsync(Hole hole)
         {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var existingHole = await _context.Holes.FindAsync(hole.HoleId);
             if (existingHole == null) return null;
 

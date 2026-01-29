@@ -7,7 +7,7 @@ namespace GolfTrackerApp.Web.Services
 {
     public class RoundWorkflowService : IRoundWorkflowService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly IPlayerService _playerService;
         private readonly IGolfClubService _golfClubService;
         private readonly IGolfCourseService _golfCourseService;
@@ -18,7 +18,7 @@ namespace GolfTrackerApp.Web.Services
         private readonly IScoreService _scoreService;
 
         public RoundWorkflowService(
-            ApplicationDbContext context,
+            IDbContextFactory<ApplicationDbContext> contextFactory,
             IPlayerService playerService,
             IGolfClubService golfClubService,
             IGolfCourseService golfCourseService,
@@ -27,7 +27,7 @@ namespace GolfTrackerApp.Web.Services
             IScoreService scoreService,
             ILogger<RoundWorkflowService> logger)
         {
-            _context = context;
+            _contextFactory = contextFactory;
             _playerService = playerService;
             _golfClubService = golfClubService;
             _golfCourseService = golfCourseService;
@@ -78,6 +78,8 @@ namespace GolfTrackerApp.Web.Services
             }
 
             // Load existing scores if any
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
             var scores = await _context.Scores
                 .Include(s => s.Hole)
                 .Where(s => s.RoundId == roundId)
