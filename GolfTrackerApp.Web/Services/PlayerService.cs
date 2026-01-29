@@ -25,16 +25,20 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Player> AddPlayerAsync(Player player)
         {
-            var user = _httpContextAccessor.HttpContext?.User;
-            var currentUserId = user?.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            if (string.IsNullOrEmpty(currentUserId))
+            // Only try to get user from HttpContext if CreatedByApplicationUserId is not already set
+            if (string.IsNullOrEmpty(player.CreatedByApplicationUserId))
             {
-                _logger.LogError("AddPlayerAsync: Cannot determine current user ID from HttpContext.");
-                throw new InvalidOperationException("User must be logged in to create a player.");
-            }
+                var user = _httpContextAccessor.HttpContext?.User;
+                var currentUserId = user?.FindFirstValue(ClaimTypes.NameIdentifier);
 
-            player.CreatedByApplicationUserId = currentUserId;
+                if (string.IsNullOrEmpty(currentUserId))
+                {
+                    _logger.LogError("AddPlayerAsync: Cannot determine current user ID from HttpContext and CreatedByApplicationUserId was not provided.");
+                    throw new InvalidOperationException("User must be logged in to create a player.");
+                }
+
+                player.CreatedByApplicationUserId = currentUserId;
+            }
 
             // Ensure CreatedByApplicationUserId is set if it's a managed player
             if (string.IsNullOrEmpty(player.ApplicationUserId) && string.IsNullOrEmpty(player.CreatedByApplicationUserId))
