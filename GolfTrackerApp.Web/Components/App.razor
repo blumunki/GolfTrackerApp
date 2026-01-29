@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using Microsoft.AspNetCore.Components.Web
+
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -11,15 +13,27 @@
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
-    @* Ensure HeadOutlet uses the global render mode if needed, or is set per page/component *@
-    <HeadOutlet @rendermode="RenderMode.InteractiveServer" /> 
+    <HeadOutlet @rendermode="@PageRenderMode" />
 </head>
 <body>
-    @* MudThemeProvider will be in MainLayout.razor *@
-
-    <Routes @rendermode="RenderMode.InteractiveServer" /> @* Explicitly setting render mode here *@
+    <Routes @rendermode="@PageRenderMode" />
 
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
 </body>
 </html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    /// <summary>
+    /// Determines the render mode based on the current route.
+    /// Identity/Account pages use static SSR (null) to ensure HttpContext is available.
+    /// All other pages use InteractiveServer for full interactivity.
+    /// </summary>
+    private IComponentRenderMode? PageRenderMode =>
+        HttpContext?.Request.Path.StartsWithSegments("/Account") == true
+            ? null  // Static SSR for Identity pages - HttpContext required
+            : RenderMode.InteractiveServer;  // Interactive for all other pages
+}

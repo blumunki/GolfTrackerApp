@@ -22,26 +22,19 @@ public static class IdentityComponentsEndpointRouteBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
-        var loggerFactory = endpoints.ServiceProvider.GetRequiredService<ILoggerFactory>();
-        var endpointLogger = loggerFactory.CreateLogger("IdentityEndpoints");
-
         var accountGroup = endpoints.MapGroup("/Account");
 
         accountGroup.MapPost("/ExternalLogin/Callback", async (HttpContext context) =>
         {
-            endpointLogger.LogInformation("ExternalLogin/Callback endpoint called");
-            
             var signInManager = context.RequestServices
                 .GetRequiredService<SignInManager<ApplicationUser>>();
                 
             var info = await signInManager.GetExternalLoginInfoAsync();
             if (info is null)
             {
-                endpointLogger.LogWarning("ExternalLogin/Callback: Failed to get external login info");
                 throw new InvalidOperationException("Error loading external login info.");
             }
 
-            endpointLogger.LogInformation("ExternalLogin/Callback: Got info for provider {Provider}", info.LoginProvider);
             return TypedResults.Redirect("/Account/ExternalLogins");
         });
 
@@ -51,10 +44,6 @@ public static class IdentityComponentsEndpointRouteBuilderExtensions
             [FromForm] string provider,
             [FromForm] string returnUrl) =>
         {
-            endpointLogger.LogInformation(
-                "PerformExternalLogin called. Provider={Provider}, ReturnUrl={ReturnUrl}, RequestPath={Path}",
-                provider, returnUrl, context.Request.Path);
-
             IEnumerable<KeyValuePair<string, StringValues>> query = [
                 new("ReturnUrl", returnUrl),
                 new("Action", ExternalLogin.LoginCallbackAction)];
@@ -64,13 +53,8 @@ public static class IdentityComponentsEndpointRouteBuilderExtensions
                 "/Account/ExternalLogin",
                 QueryString.Create(query));
 
-            endpointLogger.LogInformation(
-                "PerformExternalLogin: Configuring challenge for provider {Provider} with redirectUrl={RedirectUrl}",
-                provider, redirectUrl);
-
             var properties = signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
             
-            endpointLogger.LogInformation("PerformExternalLogin: Issuing Challenge to {Provider}", provider);
             return TypedResults.Challenge(properties, [provider]);
         });
 
@@ -102,9 +86,6 @@ public static class IdentityComponentsEndpointRouteBuilderExtensions
             return TypedResults.Challenge(properties, [provider]);
         });
 
-        // loggerFactory already declared at top of method for endpointLogger
-        var downloadLogger = loggerFactory.CreateLogger("DownloadPersonalData");
-
         manageGroup.MapPost("/DownloadPersonalData", async (
             HttpContext context,
             [FromServices] UserManager<ApplicationUser> userManager,
@@ -117,7 +98,6 @@ public static class IdentityComponentsEndpointRouteBuilderExtensions
             }
 
             var userId = await userManager.GetUserIdAsync(user);
-            downloadLogger.LogInformation("User with ID '{UserId}' asked for their personal data.", userId);
 
             // Only include personal data for download
             var personalData = new Dictionary<string, string>();

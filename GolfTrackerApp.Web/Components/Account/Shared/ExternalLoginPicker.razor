@@ -44,19 +44,13 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        Logger.LogInformation("ExternalLoginPicker.OnInitializedAsync called. ReturnUrl={ReturnUrl}", ReturnUrl);
-        
         try
         {
             externalLogins = (await SignInManager.GetExternalAuthenticationSchemesAsync()).ToArray();
-            Logger.LogInformation(
-                "ExternalLoginPicker: Found {Count} external login providers: {Providers}",
-                externalLogins.Length,
-                string.Join(", ", externalLogins.Select(p => p.Name)));
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "ExternalLoginPicker: Error getting external authentication schemes");
+            Logger.LogError(ex, "Error getting external authentication schemes");
             externalLogins = [];
         }
     }
