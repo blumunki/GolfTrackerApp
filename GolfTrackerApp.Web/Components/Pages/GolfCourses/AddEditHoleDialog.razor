@@ -17,7 +17,7 @@
             <MudNumericField @bind-Value="HoleModel.Par" For="@(() => HoleModel.Par)" Label="Par" Required="true" Min="3" Max="6" Class="mt-3" />
             <MudNumericField @bind-Value="HoleModel.LengthYards" For="@(() => HoleModel.LengthYards)" Label="Length (Yards)" Class="mt-3" />
             <MudNumericField @bind-Value="HoleModel.StrokeIndex" For="@(() => HoleModel.StrokeIndex)" Label="Stroke Index" Min="1" Max="18" Class="mt-3" />
-            <button type="submit" style="display:none;"></button>
+            <button type="submit" class="golf-hidden-submit"></button>
         </EditForm>
     </DialogContent>
     <DialogActions>

@@ -44,14 +44,14 @@ else
                 <MudTh>Course</MudTh>
                 <MudTh>Type</MudTh>
                 <MudTh>Players</MudTh>
-                <MudTh Style="text-align:right">Actions</MudTh>
+                <MudTh Class="golf-text-right">Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Date">@context.DatePlayed.ToString("dd/MM/yyyy")</MudTd>
                 <MudTd DataLabel="Course">@($"{context.GolfCourse?.GolfClub?.Name} - {context.GolfCourse?.Name}")</MudTd>
                 <MudTd DataLabel="Type">@context.RoundType</MudTd>
                 <MudTd DataLabel="Players">@context.RoundPlayers.Count</MudTd>
-                <MudTd Style="text-align:right">
+                <MudTd Class="golf-text-right">
                     <MudTooltip Text="View Details">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewRoundDetails(context.RoundId))" />
                     </MudTooltip>

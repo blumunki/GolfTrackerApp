@@ -52,14 +52,14 @@ else
                 <MudTh>Handicap</MudTh>
                 <MudTh>User Type</MudTh>
                 <MudTh>Registered Email</MudTh>
-                <MudTh Style="text-align:right">Actions</MudTh>
+                <MudTh Class="golf-text-right">Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Name">@context.FirstName @context.LastName</MudTd>
                 <MudTd DataLabel="Handicap">@(context.Handicap.HasValue ? context.Handicap.Value.ToString("N1") : "N/A")</MudTd>
                 <MudTd DataLabel="User Type">@(string.IsNullOrEmpty(context.ApplicationUserId) ? "Managed" : "Registered")</MudTd>
                 <MudTd DataLabel="Registered Email">@(context.ApplicationUser?.Email ?? "N/A")</MudTd>
-                <MudTd Style="text-align:right">
+                <MudTd Class="golf-text-right">
                     <MudTooltip Text="View Performance Report">
                         <MudIconButton Icon="@Icons.Material.Filled.Timeline" Size="Size.Small" Color="Color.Info" Href="@($"/players/{context.PlayerId}/report")" />
                     </MudTooltip>

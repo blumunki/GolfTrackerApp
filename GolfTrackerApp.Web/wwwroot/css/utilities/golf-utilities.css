@@ -1,0 +1,235 @@
+/* =============================================================================
+   Golf Utility Classes
+   
+   Reusable utility classes for common styling patterns.
+   These replace inline styles throughout the application.
+   ============================================================================= */
+
+/* ============================================================================
+   Typography Utilities
+   ============================================================================ */
+
+/* Font Weights */
+.golf-font-light { font-weight: var(--golf-font-weight-light); }
+.golf-font-normal { font-weight: var(--golf-font-weight-normal); }
+.golf-font-medium { font-weight: var(--golf-font-weight-medium); }
+.golf-font-semibold { font-weight: var(--golf-font-weight-semibold); }
+.golf-font-bold { font-weight: var(--golf-font-weight-bold); }
+
+/* Text Alignment */
+.golf-text-left { text-align: left; }
+.golf-text-center { text-align: center; }
+.golf-text-right { text-align: right; }
+
+/* Font Sizes */
+.golf-text-xs { font-size: var(--golf-font-size-xs); }
+.golf-text-sm { font-size: var(--golf-font-size-sm); }
+.golf-text-base { font-size: var(--golf-font-size-base); }
+.golf-text-lg { font-size: var(--golf-font-size-lg); }
+.golf-text-xl { font-size: var(--golf-font-size-xl); }
+.golf-text-2xl { font-size: var(--golf-font-size-2xl); }
+
+/* ============================================================================
+   Layout Utilities
+   ============================================================================ */
+
+/* Full Width/Height */
+.golf-full-width { width: 100%; }
+.golf-full-height { height: 100%; }
+
+/* Fixed Heights (for cards, charts, etc.) */
+.golf-h-56 { height: 56px; }
+.golf-h-300 { height: 300px; }
+.golf-h-350 { height: 350px; }
+.golf-h-450 { height: 450px; }
+
+/* Flex Utilities */
+.golf-flex { display: flex; }
+.golf-flex-col { display: flex; flex-direction: column; }
+.golf-flex-row { display: flex; flex-direction: row; }
+.golf-flex-center { display: flex; justify-content: center; align-items: center; }
+.golf-flex-grow { flex-grow: 1; }
+.golf-justify-center { justify-content: center; }
+.golf-justify-between { justify-content: space-between; }
+.golf-items-center { align-items: center; }
+
+/* ============================================================================
+   Card Utilities
+   ============================================================================ */
+
+/* Dashboard Cards */
+.golf-card-dashboard {
+    height: 100%;
+    transition: var(--golf-transition-medium);
+}
+
+.golf-card-dashboard:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--golf-shadow-lg);
+}
+
+/* Stat Cards */
+.golf-stat-card {
+    height: 100%;
+    text-align: center;
+    padding: var(--golf-spacing-4);
+    border-radius: var(--golf-border-radius-md);
+    transition: var(--golf-transition-medium);
+}
+
+/* ============================================================================
+   Button Utilities
+   ============================================================================ */
+
+/* Large Action Buttons (for homepage CTAs, etc.) */
+.golf-btn-large {
+    height: 56px;
+    font-size: 16px;
+    width: 100%;
+}
+
+.golf-btn-cta {
+    height: 56px;
+    font-size: 18px;
+    padding: 0 32px;
+}
+
+/* ============================================================================
+   Table Utilities
+   ============================================================================ */
+
+/* Right-aligned table cells */
+.golf-table-actions {
+    text-align: right;
+}
+
+/* ============================================================================
+   Chart Container Utilities
+   ============================================================================ */
+
+/* Standard chart container */
+.golf-chart-container {
+    height: 300px;
+    padding: 0 10px 20px 10px;
+}
+
+/* Chart container with centered content */
+.golf-chart-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+}
+
+/* Donut/Pie chart specific sizing */
+.golf-chart-donut {
+    width: 300px;
+    height: 300px;
+}
+
+.golf-chart-donut-lg {
+    width: 350px;
+    height: 350px;
+}
+
+/* ============================================================================
+   Report Card Utilities
+   ============================================================================ */
+
+/* Report cards with charts */
+.golf-report-card {
+    height: 450px;
+    display: flex;
+    flex-direction: column;
+}
+
+.golf-report-card-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.golf-report-card-chart {
+    flex-grow: 1;
+    min-height: 300px;
+    max-height: 350px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.golf-report-card-empty {
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Par performance cards */
+.golf-par-card {
+    height: 100%;
+}
+
+/* ============================================================================
+   Border Utilities
+   ============================================================================ */
+
+.golf-border { border: 1px solid var(--golf-border-light); }
+.golf-border-medium { border: 1px solid var(--golf-border-medium); }
+.golf-border-left-primary { border-left: 4px solid var(--golf-primary); }
+
+/* ============================================================================
+   Animation Utilities
+   ============================================================================ */
+
+/* Staggered animation delays for list items */
+.golf-animate-delay-1 { animation-delay: 0.1s; }
+.golf-animate-delay-2 { animation-delay: 0.2s; }
+.golf-animate-delay-3 { animation-delay: 0.3s; }
+.golf-animate-delay-4 { animation-delay: 0.4s; }
+.golf-animate-delay-5 { animation-delay: 0.5s; }
+
+/* ============================================================================
+   Special Text Utilities
+   ============================================================================ */
+
+/* Muted placeholder text */
+.golf-text-muted {
+    color: var(--golf-text-light);
+}
+
+/* Monospace text (for codes, keys, etc.) */
+.golf-text-mono {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    background-color: var(--golf-background-tertiary);
+    padding: 2px 6px;
+    border-radius: var(--golf-border-radius-sm);
+}
+
+/* ============================================================================
+   Form Utilities
+   ============================================================================ */
+
+/* Hidden submit button for dialog forms */
+.golf-hidden-submit {
+    display: none;
+}
+
+/* Inline form */
+.golf-form-inline {
+    display: inline-block;
+}
+
+/* ============================================================================
+   Scorecard Cell Utilities (moved from inline styles)
+   ============================================================================ */
+
+/* Score cell - no value */
+.golf-score-empty {
+    color: var(--golf-text-light);
+}
+
+/* Score totals row */
+.golf-score-total {
+    font-weight: var(--golf-font-weight-bold);
+}

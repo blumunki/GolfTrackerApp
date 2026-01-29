@@ -69,7 +69,7 @@ else
             <MudTh>Stroke Index</MudTh>
             <AuthorizeView>
                 <Authorized Context="authContext">
-                    <MudTh Style="text-align:right">Actions</MudTh>
+                    <MudTh Class="golf-text-right">Actions</MudTh>
                 </Authorized>
             </AuthorizeView>
         </HeaderContent>
@@ -80,7 +80,7 @@ else
             <MudTd DataLabel="SI">@context.StrokeIndex</MudTd>
             <AuthorizeView>
                 <Authorized Context="authContext">
-                    <MudTd Style="text-align:right">
+                    <MudTd Class="golf-text-right">
                         <MudTooltip Text="Edit Hole">
                             <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditHoleDialog(context))" />
                         </MudTooltip>
@@ -104,15 +104,15 @@ else
                     @if (_scoringDistribution is not null && _scoringDistribution.TotalHoles > 0)
                     {
                         <MudItem xs="12" md="6">
-                            <MudCard Elevation="2" Class="d-flex flex-column" Style="height: 100%;">
+                            <MudCard Elevation="2" Class="d-flex flex-column golf-full-height">
                                 <MudCardHeader>
                                     <CardHeaderContent>
                                         <MudText Typo="Typo.h6">Scoring Distribution</MudText>
                                     </CardHeaderContent>
                                 </MudCardHeader>
                                 <MudCardContent Class="flex-grow-1">
-                                    <div style="height: 300px; display: flex; justify-content: center; align-items: center;">
-                                        <div style="width: 300px; height: 300px;">
+                                    <div class="golf-chart-wrapper">
+                                        <div class="golf-chart-donut">
                                             <MudChart ChartType="ChartType.Pie" 
                                                       InputData="@_pieChartData" 
                                                       InputLabels="@_pieChartLabels" 
@@ -129,7 +129,7 @@ else
                     @if (recentRounds.Any())
                     {
                         <MudItem xs="12" md="6">
-                            <MudCard Elevation="2" Style="height: 100%;">
+                            <MudCard Elevation="2" Class="golf-full-height">
                                 <MudCardHeader>
                                     <CardHeaderContent>
                                         <MudText Typo="Typo.h6">Recent Rounds</MudText>

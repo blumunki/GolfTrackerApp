@@ -71,7 +71,7 @@ else
     {
         <MudPaper Class="pa-4 mt-4" Elevation="2">
             <MudText Typo="Typo.h6" Class="mb-4">Performance Over Time</MudText>
-            <div style="height: 300px; padding: 0 10px 20px 10px;">
+            <div class="golf-chart-container">
                 <MudChart ChartType="ChartType.Line" 
                           ChartSeries="@_series" 
                           XAxisLabels="@_xAxisLabels" 
@@ -86,13 +86,13 @@ else
         <MudGrid Spacing="2" Class="mt-3">
             <!-- Scoring Distribution Pie Chart -->
             <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Elevation="2" Style="height: 450px; display: flex; flex-direction: column;">
+                <MudPaper Class="pa-4 golf-report-card" Elevation="2">
                     <MudText Typo="Typo.h6" Class="mb-4">Scoring Distribution</MudText>
                     @if (_scoringDistribution?.TotalHoles > 0)
                     {
-                        <div style="flex-grow: 1; display: flex; flex-direction: column;">
-                            <div style="flex-grow: 1; min-height: 300px; max-height: 350px; display: flex; justify-content: center; align-items: center;">
-                                <div style="width: 350px; height: 350px;">
+                        <div class="golf-report-card-content">
+                            <div class="golf-report-card-chart">
+                                <div class="golf-chart-donut-lg">
                                     <MudChart ChartType="ChartType.Pie" 
                                               InputData="@_pieChartData" 
                                               InputLabels="@_pieChartLabels" 
@@ -105,7 +105,7 @@ else
                     }
                     else
                     {
-                        <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+                        <div class="golf-report-card-empty">
                             <MudAlert Severity="Severity.Info">No scoring data available for the selected filters.</MudAlert>
                         </div>
                     }
@@ -114,17 +114,17 @@ else
 
             <!-- Performance by Par Cards -->
             <MudItem xs="12" md="6">
-                <MudPaper Class="pa-4" Elevation="2" Style="height: 450px; display: flex; flex-direction: column;">
+                <MudPaper Class="pa-4 golf-report-card" Elevation="2">
                     <MudText Typo="Typo.h6" Class="mb-4">Performance by Par</MudText>
                     @if (_performanceByPar?.HasValidData == true)
                     {
-                        <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+                        <div class="golf-report-card-content golf-justify-center">
                             <!-- Card-based visualization instead of problematic bar chart -->
                             <MudGrid Spacing="2" Class="flex-grow-1">
                                 @if (_performanceByPar.Par3Count > 0)
                                 {
                                     <MudItem xs="12" sm="4">
-                                        <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
+                                        <MudCard Elevation="1" Class="pa-3 golf-full-height">
                                             <MudCardContent Class="text-center">
                                                 <MudText Typo="Typo.h6" Color="Color.Primary">Par 3</MudText>
                                                 <MudText Typo="Typo.h4" Class="mt-2">
@@ -140,7 +140,7 @@ else
                                 @if (_performanceByPar.Par4Count > 0)
                                 {
                                     <MudItem xs="12" sm="4">
-                                        <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
+                                        <MudCard Elevation="1" Class="pa-3 golf-full-height">
                                             <MudCardContent Class="text-center">
                                                 <MudText Typo="Typo.h6" Color="Color.Primary">Par 4</MudText>
                                                 <MudText Typo="Typo.h4" Class="mt-2">
@@ -156,7 +156,7 @@ else
                                 @if (_performanceByPar.Par5Count > 0)
                                 {
                                     <MudItem xs="12" sm="4">
-                                        <MudCard Elevation="1" Class="pa-3" Style="height: 100%;">
+                                        <MudCard Elevation="1" Class="pa-3 golf-full-height">
                                             <MudCardContent Class="text-center">
                                                 <MudText Typo="Typo.h6" Color="Color.Primary">Par 5</MudText>
                                                 <MudText Typo="Typo.h4" Class="mt-2">
@@ -185,7 +185,7 @@ else
                     }
                     else
                     {
-                        <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center;">
+                        <div class="golf-report-card-empty">
                             <MudAlert Severity="Severity.Info">No par performance data available for the selected filters.</MudAlert>
                         </div>
                     }

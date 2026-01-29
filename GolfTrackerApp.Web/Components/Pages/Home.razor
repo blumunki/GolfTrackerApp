@@ -30,7 +30,7 @@
             {
                 <div class="golf-loading-container">
                     <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
-                    <MudText Typo="Typo.body1" Style="margin-top: 16px;">Loading your golf dashboard...</MudText>
+                    <MudText Typo="Typo.body1" Class="mt-4">Loading your golf dashboard...</MudText>
                 </div>
             }
             else
@@ -59,7 +59,7 @@
                     <!-- Statistics Overview -->
                     <div class="golf-stats-container">
                         <MudGrid Spacing="3" Class="justify-center">
-                            <MudItem xs="6" sm="3" Style="animation-delay: 0.1s;">
+                            <MudItem xs="6" sm="3" Class="golf-animate-delay-1">
                                 <div class="golf-stat-card">
                                     <div class="golf-stat-icon">🏌️</div>
                                     <div class="golf-stat-value">@dashboardStats.TotalRounds</div>
@@ -72,7 +72,7 @@
                                     }
                                 </div>
                             </MudItem>
-                            <MudItem xs="6" sm="3" Style="animation-delay: 0.2s;">
+                            <MudItem xs="6" sm="3" Class="golf-animate-delay-2">
                                 <div class="golf-stat-card">
                                     <div class="golf-stat-icon">🏆</div>
                                     <div class="golf-stat-value">@(dashboardStats.BestScore?.ToString() ?? "-")</div>
@@ -85,7 +85,7 @@
                                     }
                                 </div>
                             </MudItem>
-                            <MudItem xs="6" sm="3" Style="animation-delay: 0.3s;">
+                            <MudItem xs="6" sm="3" Class="golf-animate-delay-3">
                                 <div class="golf-stat-card">
                                     <div class="golf-stat-icon">📊</div>
                                     <div class="golf-stat-value">@(dashboardStats.AverageToPar?.ToString("F1") ?? "-")</div>
@@ -98,7 +98,7 @@
                                     }
                                 </div>
                             </MudItem>
-                            <MudItem xs="6" sm="3" Style="animation-delay: 0.4s;">
+                            <MudItem xs="6" sm="3" Class="golf-animate-delay-4">
                                 <div class="golf-stat-card">
                                     <div class="golf-stat-icon">⭐</div>
                                     <div class="golf-stat-value">@dashboardStats.FavoriteCourseRounds</div>
@@ -121,7 +121,7 @@
                 <MudGrid Spacing="4">
                     <!-- Quick Actions -->
                     <MudItem xs="12" md="6">
-                        <MudCard Elevation="3" Class="golf-dashboard-card golf-quick-actions" Style="height: 100%;">
+                        <MudCard Elevation="3" Class="golf-dashboard-card golf-quick-actions golf-full-height">
                             <MudCardHeader>
                                 <CardHeaderContent>
                                     <MudText Typo="Typo.h6">⚡ Quick Actions</MudText>
@@ -130,23 +130,17 @@
                             <MudCardContent Class="d-flex flex-column justify-center align-center gap-4 pa-6 flex-grow-1">
                                 <MudButton Href="/rounds/record"
                                            Variant="Variant.Outlined"
-                                           Class="golf-action-button"
-                                           StartIcon="@Icons.Material.Filled.EditNote"
-                                           Style="width: 100%; height: 56px; font-size: 16px;">
+                                           Class="golf-action-button golf-btn-large">
                                     📝 Record a Round
                                 </MudButton>
                                 <MudButton Variant="Variant.Outlined"
-                                           Class="golf-action-button"
-                                           StartIcon="@Icons.Material.Filled.RadioButtonChecked"
-                                           Style="width: 100%; height: 56px; font-size: 16px;"
+                                           Class="golf-action-button golf-btn-large"
                                            Disabled="true">
                                     🔴 Live Scoring (Coming Soon)
                                 </MudButton>
                                 <MudButton Href="@($"/players/{_currentPlayerId}/report")"
                                            Variant="Variant.Outlined"
-                                           Class="golf-action-button"
-                                           StartIcon="@Icons.Material.Filled.Analytics"
-                                           Style="width: 100%; height: 56px; font-size: 16px;">
+                                           Class="golf-action-button golf-btn-large">
                                     📈 View Full Report
                                 </MudButton>
                             </MudCardContent>
@@ -155,7 +149,7 @@
 
                     <!-- Performance Chart -->
                     <MudItem xs="12" md="6">
-                        <MudCard Elevation="3" Class="golf-dashboard-card" Style="height: 100%;">
+                        <MudCard Elevation="3" Class="golf-dashboard-card golf-full-height">
                             <MudCardHeader>
                                 <CardHeaderContent>
                                     <MudText Typo="Typo.h6">📈 Recent Form</MudText>
@@ -192,7 +186,7 @@
 
                     <!-- Recent Rounds -->
                     <MudItem xs="12" md="6">
-                        <MudCard Elevation="3" Class="golf-dashboard-card" Style="height: 100%;">
+                        <MudCard Elevation="3" Class="golf-dashboard-card golf-full-height">
                             <MudCardHeader>
                                 <CardHeaderContent>
                                     <MudText Typo="Typo.h6">🏌️ Recent Rounds</MudText>
@@ -253,7 +247,7 @@
 
                     <!-- Playing Partners -->
                     <MudItem xs="12" md="6">
-                        <MudCard Elevation="3" Class="golf-dashboard-card" Style="height: 100%;">
+                        <MudCard Elevation="3" Class="golf-dashboard-card golf-full-height">
                             <MudCardHeader>
                                 <CardHeaderContent>
                                     <MudText Typo="Typo.h6">👥 Playing Partners</MudText>
@@ -315,7 +309,7 @@
             {
                 <div class="golf-loading-container">
                     <MudProgressCircular Color="Color.Primary" Size="Size.Large" Indeterminate="true" />
-                    <MudText Typo="Typo.body1" Style="margin-top: 16px;">Loading...</MudText>
+                    <MudText Typo="Typo.body1" Class="mt-4">Loading...</MudText>
                 </div>
             }
             else
@@ -337,7 +331,7 @@
                                            Href="/Account/Register"
                                            StartIcon="@Icons.Material.Filled.PersonAdd"
                                            FullWidth="true"
-                                           Style="height: 56px; font-size: 18px;">
+                                           Class="golf-btn-cta">
                                     Start Tracking Free
                                 </MudButton>
                             </MudItem>
@@ -348,7 +342,7 @@
                                            Href="/Account/Login"
                                            StartIcon="@Icons.Material.Filled.Login"
                                            FullWidth="true"
-                                           Style="height: 56px; font-size: 18px;">
+                                           Class="golf-btn-cta">
                                     Already Have Account?
                                 </MudButton>
                             </MudItem>
@@ -484,7 +478,7 @@
                                    Size="Size.Large"
                                    Href="/Account/Register"
                                    StartIcon="@Icons.Material.Filled.GolfCourse"
-                                   Style="height: 56px; font-size: 18px; padding: 0 32px;">
+                                   Class="golf-btn-cta">
                             Start Your Golf Journey Today
                         </MudButton>
                     </MudContainer>

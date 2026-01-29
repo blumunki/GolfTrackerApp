@@ -75,14 +75,14 @@ else
                 <MudTh>Club</MudTh>
                 <MudTh>Holes</MudTh>
                 <MudTh>Par</MudTh>
-                <MudTh Style="text-align:right">Actions</MudTh>
+                <MudTh Class="golf-text-right">Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Course Name"><MudLink Href="@($"/golfcourses/{context.GolfCourseId}/details")">@context.Name</MudLink></MudTd>
                 <MudTd DataLabel="Club">@context.GolfClub?.Name</MudTd>
                 <MudTd DataLabel="Holes">@context.NumberOfHoles</MudTd>
                 <MudTd DataLabel="Par">@context.DefaultPar</MudTd>
-                <MudTd Style="text-align:right">
+                <MudTd Class="golf-text-right">
                     <AuthorizeView>
                         <Authorized Context="authContext">
                             <MudTooltip Text="Edit Course">

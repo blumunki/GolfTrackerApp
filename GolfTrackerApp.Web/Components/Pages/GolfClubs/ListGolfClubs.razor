@@ -81,7 +81,7 @@ else
                         <MudTh>Courses</MudTh>
                     </NotAuthorized>
                 </AuthorizeView>
-                <MudTh Style="text-align:right">Actions</MudTh>
+                <MudTh Class="golf-text-right">Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
                 <MudTd DataLabel="Name">
@@ -95,7 +95,7 @@ else
                         <MudTd DataLabel="Courses">@(context.GolfCourses?.Count ?? 0)</MudTd>
                     </NotAuthorized>
                 </AuthorizeView>
-                <MudTd Style="text-align:right">
+                <MudTd Class="golf-text-right">
                     <MudTooltip Text="View Details">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
                                        Size="Size.Small" 

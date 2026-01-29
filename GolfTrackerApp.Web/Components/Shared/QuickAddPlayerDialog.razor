@@ -11,7 +11,7 @@
             <DataAnnotationsValidator />
             <MudTextField @bind-Value="_newPlayer.FirstName" For="@(() => _newPlayer.FirstName)" Label="First Name" Required="true" />
             <MudTextField @bind-Value="_newPlayer.LastName" For="@(() => _newPlayer.LastName)" Label="Last Name" Required="true" Class="mt-3" />
-            <button type="submit" style="display:none;"></button>
+            <button type="submit" class="golf-hidden-submit"></button>
         </EditForm>
     </DialogContent>
     <DialogActions>

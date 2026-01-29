@@ -44,15 +44,15 @@ else
             <thead>
                 <tr>
                     <th class="golf-scorecard-header golf-scorecard-hole-header">
-                        <MudText Typo="Typo.body2" Style="font-weight: bold;">Hole</MudText>
+                        <MudText Typo="Typo.body2" Class="golf-font-bold">Hole</MudText>
                     </th>
                     <th class="golf-scorecard-header golf-scorecard-par-header">
-                        <MudText Typo="Typo.body2" Style="font-weight: bold;">Par</MudText>
+                        <MudText Typo="Typo.body2" Class="golf-font-bold">Par</MudText>
                     </th>
                     @foreach (var player in GetPlayerRows())
                     {
                         <th class="golf-scorecard-header golf-scorecard-player-header">
-                            <MudText Typo="Typo.body2" Style="font-weight: bold; text-align: center;">@player.PlayerName</MudText>
+                            <MudText Typo="Typo.body2" Class="golf-font-bold golf-text-center">@player.PlayerName</MudText>
                         </th>
                     }
                 </tr>
@@ -66,12 +66,12 @@ else
                     <tr class="@rowClass">
                         <!-- Hole Number -->
                         <td class="golf-scorecard-cell golf-scorecard-hole-cell">
-                            <MudText Typo="Typo.body2" Style="font-weight: bold;">@hole.HoleNumber</MudText>
+                            <MudText Typo="Typo.body2" Class="golf-font-bold">@hole.HoleNumber</MudText>
                         </td>
                         
                         <!-- Par -->
                         <td class="golf-scorecard-cell golf-scorecard-par-cell">
-                            <MudText Typo="Typo.body2" Style="font-weight: bold;">@hole.Par</MudText>
+                            <MudText Typo="Typo.body2" Class="golf-font-bold">@hole.Par</MudText>
                         </td>
                         
                         <!-- Player Scores -->
@@ -90,7 +90,7 @@ else
                                     }
                                     else
                                     {
-                                        <span style="color: #ccc;">-</span>
+                                        <span class="golf-score-empty">-</span>
                                     }
                                 </div>
                             </td>
@@ -101,10 +101,10 @@ else
                 <!-- Front 9 Total Row -->
                 <tr class="golf-total-row golf-front-nine-total">
                     <td class="golf-scorecard-cell golf-scorecard-total-label">
-                        <MudText Typo="Typo.body2" Style="font-weight: bold;">Out</MudText>
+                        <MudText Typo="Typo.body2" Class="golf-font-bold">Out</MudText>
                     </td>
                     <td class="golf-scorecard-cell golf-scorecard-total-par">
-                        <MudText Typo="Typo.body2" Style="font-weight: bold;">
+                        <MudText Typo="Typo.body2" Class="golf-font-bold">
                             @_playedHoles.Where(h => h.HoleNumber <= 9).Sum(h => h.Par)
                         </MudText>
                     </td>
@@ -115,7 +115,7 @@ else
                         var frontNineVsPar = frontNineTotal - frontNinePar;
                         
                         <td class="golf-scorecard-cell">
-                            <MudText Typo="Typo.body2" Style="font-weight: bold;">
+                            <MudText Typo="Typo.body2" Class="golf-font-bold">
                                 @if (frontNineTotal > 0)
                                 {
                                     <span class="@GetVsParClass(frontNineVsPar)">@frontNineTotal</span>
@@ -134,10 +134,10 @@ else
                 {
                     <tr class="golf-total-row golf-back-nine-total">
                         <td class="golf-scorecard-cell golf-scorecard-total-label">
-                            <MudText Typo="Typo.body2" Style="font-weight: bold;">In</MudText>
+                            <MudText Typo="Typo.body2" Class="golf-font-bold">In</MudText>
                         </td>
                         <td class="golf-scorecard-cell golf-scorecard-total-par">
-                            <MudText Typo="Typo.body2" Style="font-weight: bold;">
+                            <MudText Typo="Typo.body2" Class="golf-font-bold">
                                 @_playedHoles.Where(h => h.HoleNumber > 9).Sum(h => h.Par)
                             </MudText>
                         </td>
@@ -148,7 +148,7 @@ else
                             var backNineVsPar = backNineTotal - backNinePar;
                             
                             <td class="golf-scorecard-cell">
-                                <MudText Typo="Typo.body2" Style="font-weight: bold;">
+                                <MudText Typo="Typo.body2" Class="golf-font-bold">
                                     @if (backNineTotal > 0)
                                     {
                                         <span class="@GetVsParClass(backNineVsPar)">@backNineTotal</span>
@@ -166,10 +166,10 @@ else
                 <!-- Grand Total Row -->
                 <tr class="golf-total-row golf-grand-total">
                     <td class="golf-scorecard-cell golf-scorecard-total-label">
-                        <MudText Typo="Typo.body2" Style="font-weight: bold;">Total</MudText>
+                        <MudText Typo="Typo.body2" Class="golf-font-bold">Total</MudText>
                     </td>
                     <td class="golf-scorecard-cell golf-scorecard-total-par">
-                        <MudText Typo="Typo.body2" Style="font-weight: bold;">
+                        <MudText Typo="Typo.body2" Class="golf-font-bold">
                             @_playedHoles.Sum(h => h.Par)
                         </MudText>
                     </td>
@@ -180,7 +180,7 @@ else
                         var totalVsPar = grandTotal - totalPar;
                         
                         <td class="golf-scorecard-cell">
-                            <MudText Typo="Typo.body2" Style="font-weight: bold;">
+                            <MudText Typo="Typo.body2" Class="golf-font-bold">
                                 @if (grandTotal > 0)
                                 {
                                     <span class="@GetVsParClass(totalVsPar)">@grandTotal</span>
@@ -217,7 +217,7 @@ else
                     var positionText = i == 0 ? "🏆" : $"{i + 1}.";
                     
                     <MudItem xs="12" sm="6" md="4">
-                        <MudCard Elevation="0" Class="pa-2" Style="border: 1px solid #e0e0e0;">
+                        <MudCard Elevation="0" Class="pa-2 golf-border">
                             <MudText Typo="Typo.body1">
                                 <strong>@positionText @player!.FirstName @player.LastName</strong>
                             </MudText>
