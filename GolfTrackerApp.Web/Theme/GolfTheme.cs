@@ -3,8 +3,8 @@ using MudBlazor;
 namespace GolfTrackerApp.Web.Theme;
 
 /// <summary>
-/// Custom MudBlazor theme for the Golf Tracker App.
-/// This centralizes all color and typography settings for the application.
+/// Premium MudBlazor theme for the Golf Tracker App.
+/// Designed for a professional, modern appearance with refined colors and typography.
 /// </summary>
 public static class GolfTheme
 {
@@ -12,89 +12,89 @@ public static class GolfTheme
     {
         PaletteLight = new PaletteLight
         {
-            // Primary Golf Green
-            Primary = "#3d7c3f",
+            // Primary - Deep Forest Green (Premium Golf)
+            Primary = "#2e7d32",
             PrimaryContrastText = "#ffffff",
-            PrimaryDarken = "#2c5530",
-            PrimaryLighten = "#5e9c61",
+            PrimaryDarken = "#1b5e20",
+            PrimaryLighten = "#4caf50",
             
-            // Secondary Lime Green
-            Secondary = "#8bc34a",
-            SecondaryContrastText = "#ffffff",
-            SecondaryDarken = "#5a7b2a",
-            SecondaryLighten = "#a5d76a",
+            // Secondary - Gold/Amber (Tournament Feel)
+            Secondary = "#ffc107",
+            SecondaryContrastText = "#212121",
+            SecondaryDarken = "#ff8f00",
+            SecondaryLighten = "#ffd54f",
             
-            // Tertiary (accent)
-            Tertiary = "#ff9800",
+            // Tertiary
+            Tertiary = "#1976d2",
             TertiaryContrastText = "#ffffff",
             
             // Status Colors
-            Success = "#4caf50",
+            Success = "#43a047",
             SuccessContrastText = "#ffffff",
-            Warning = "#ff9800",
+            Warning = "#fb8c00",
             WarningContrastText = "#ffffff",
-            Error = "#f44336",
+            Error = "#e53935",
             ErrorContrastText = "#ffffff",
-            Info = "#2196f3",
+            Info = "#1e88e5",
             InfoContrastText = "#ffffff",
             
-            // Backgrounds
+            // Backgrounds - Subtle and clean
             Background = "#fafafa",
             BackgroundGray = "#f5f5f5",
             Surface = "#ffffff",
             
-            // Text
-            TextPrimary = "#424242",
-            TextSecondary = "#666666",
-            TextDisabled = "#999999",
+            // Text - High contrast for readability
+            TextPrimary = "#212121",
+            TextSecondary = "#757575",
+            TextDisabled = "#9e9e9e",
             
-            // App Bar
-            AppbarBackground = "#3d7c3f",
+            // App Bar - Premium green
+            AppbarBackground = "#2e7d32",
             AppbarText = "#ffffff",
             
             // Drawer
             DrawerBackground = "#ffffff",
-            DrawerText = "#424242",
-            DrawerIcon = "#3d7c3f",
+            DrawerText = "#212121",
+            DrawerIcon = "#2e7d32",
             
-            // Dividers and Lines
+            // Dividers
             Divider = "#e0e0e0",
-            DividerLight = "#eeeeee",
+            DividerLight = "#f5f5f5",
             
-            // Action Colors
-            ActionDefault = "#757575",
+            // Actions
+            ActionDefault = "#616161",
             ActionDisabled = "#bdbdbd",
-            ActionDisabledBackground = "#e0e0e0",
+            ActionDisabledBackground = "#eeeeee",
             
             // Table
             TableHover = "#f5f5f5",
             TableStriped = "#fafafa",
             
             // Overlay
-            OverlayDark = "rgba(0,0,0,0.5)",
-            OverlayLight = "rgba(255,255,255,0.5)"
+            OverlayDark = "rgba(0,0,0,0.6)",
+            OverlayLight = "rgba(255,255,255,0.8)"
         },
         
         PaletteDark = new PaletteDark
         {
             // Primary Golf Green (lighter for dark mode)
-            Primary = "#5e9c61",
-            PrimaryContrastText = "#ffffff",
-            PrimaryDarken = "#3d7c3f",
+            Primary = "#66bb6a",
+            PrimaryContrastText = "#000000",
+            PrimaryDarken = "#43a047",
             PrimaryLighten = "#81c784",
             
             // Secondary
-            Secondary = "#aed581",
+            Secondary = "#ffd54f",
             SecondaryContrastText = "#212121",
             
             // Tertiary
-            Tertiary = "#ffb74d",
-            TertiaryContrastText = "#212121",
+            Tertiary = "#64b5f6",
+            TertiaryContrastText = "#000000",
             
             // Status Colors
             Success = "#81c784",
             Warning = "#ffb74d",
-            Error = "#e57373",
+            Error = "#ef5350",
             Info = "#64b5f6",
             
             // Backgrounds

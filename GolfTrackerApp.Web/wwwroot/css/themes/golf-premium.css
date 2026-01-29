@@ -1,0 +1,211 @@
+/* =============================================================================
+   Golf Premium Theme
+   
+   A modern, professional design system inspired by premium SaaS applications.
+   Features: Refined gradients, glassmorphism, subtle animations, and premium feel.
+   ============================================================================= */
+
+:root {
+    /* =========================================================================
+       PREMIUM COLOR PALETTE
+       Modern, sophisticated colors with excellent contrast
+       ========================================================================= */
+    
+    /* Primary Brand - Deep Forest Green (Premium Golf) */
+    --gp-primary-50: #e8f5e9;
+    --gp-primary-100: #c8e6c9;
+    --gp-primary-200: #a5d6a7;
+    --gp-primary-300: #81c784;
+    --gp-primary-400: #66bb6a;
+    --gp-primary-500: #2e7d32;    /* Main primary */
+    --gp-primary-600: #1b5e20;
+    --gp-primary-700: #155724;
+    --gp-primary-800: #0d3b14;
+    --gp-primary-900: #052208;
+    
+    /* Accent - Gold/Amber (Tournament Feel) */
+    --gp-accent-50: #fff8e1;
+    --gp-accent-100: #ffecb3;
+    --gp-accent-200: #ffe082;
+    --gp-accent-300: #ffd54f;
+    --gp-accent-400: #ffca28;
+    --gp-accent-500: #ffc107;     /* Main accent */
+    --gp-accent-600: #ffb300;
+    --gp-accent-700: #ff8f00;
+    --gp-accent-800: #ff6f00;
+    --gp-accent-900: #e65100;
+    
+    /* Neutral - Sophisticated Grays */
+    --gp-neutral-50: #fafafa;
+    --gp-neutral-100: #f5f5f5;
+    --gp-neutral-200: #eeeeee;
+    --gp-neutral-300: #e0e0e0;
+    --gp-neutral-400: #bdbdbd;
+    --gp-neutral-500: #9e9e9e;
+    --gp-neutral-600: #757575;
+    --gp-neutral-700: #616161;
+    --gp-neutral-800: #424242;
+    --gp-neutral-900: #212121;
+    
+    /* Semantic Colors */
+    --gp-success-50: #e8f5e9;
+    --gp-success-500: #4caf50;
+    --gp-success-600: #43a047;
+    --gp-success-700: #388e3c;
+    
+    --gp-warning-50: #fff3e0;
+    --gp-warning-500: #ff9800;
+    --gp-warning-600: #fb8c00;
+    --gp-warning-700: #f57c00;
+    
+    --gp-error-50: #ffebee;
+    --gp-error-500: #f44336;
+    --gp-error-600: #e53935;
+    --gp-error-700: #d32f2f;
+    
+    --gp-info-50: #e3f2fd;
+    --gp-info-500: #2196f3;
+    --gp-info-600: #1e88e5;
+    --gp-info-700: #1976d2;
+    
+    /* =========================================================================
+       SCORE COLORS (Golf-specific)
+       ========================================================================= */
+    --gp-eagle: #1565c0;
+    --gp-eagle-bg: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    --gp-birdie: #2e7d32;
+    --gp-birdie-bg: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    --gp-par: #424242;
+    --gp-par-bg: #ffffff;
+    --gp-bogey: #ef6c00;
+    --gp-bogey-bg: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    --gp-double: #c62828;
+    --gp-double-bg: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    
+    /* =========================================================================
+       TYPOGRAPHY
+       ========================================================================= */
+    --gp-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --gp-font-family-display: 'Poppins', 'Inter', sans-serif;
+    --gp-font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    
+    /* Font Sizes - Fluid Typography */
+    --gp-text-xs: 0.75rem;      /* 12px */
+    --gp-text-sm: 0.875rem;     /* 14px */
+    --gp-text-base: 1rem;       /* 16px */
+    --gp-text-lg: 1.125rem;     /* 18px */
+    --gp-text-xl: 1.25rem;      /* 20px */
+    --gp-text-2xl: 1.5rem;      /* 24px */
+    --gp-text-3xl: 1.875rem;    /* 30px */
+    --gp-text-4xl: 2.25rem;     /* 36px */
+    --gp-text-5xl: 3rem;        /* 48px */
+    --gp-text-6xl: 3.75rem;     /* 60px */
+    
+    /* Font Weights */
+    --gp-font-light: 300;
+    --gp-font-normal: 400;
+    --gp-font-medium: 500;
+    --gp-font-semibold: 600;
+    --gp-font-bold: 700;
+    --gp-font-extrabold: 800;
+    
+    /* Line Heights */
+    --gp-leading-tight: 1.25;
+    --gp-leading-snug: 1.375;
+    --gp-leading-normal: 1.5;
+    --gp-leading-relaxed: 1.625;
+    
+    /* Letter Spacing */
+    --gp-tracking-tighter: -0.05em;
+    --gp-tracking-tight: -0.025em;
+    --gp-tracking-normal: 0;
+    --gp-tracking-wide: 0.025em;
+    --gp-tracking-wider: 0.05em;
+    --gp-tracking-widest: 0.1em;
+    
+    /* =========================================================================
+       SPACING SCALE
+       ========================================================================= */
+    --gp-space-0: 0;
+    --gp-space-1: 0.25rem;   /* 4px */
+    --gp-space-2: 0.5rem;    /* 8px */
+    --gp-space-3: 0.75rem;   /* 12px */
+    --gp-space-4: 1rem;      /* 16px */
+    --gp-space-5: 1.25rem;   /* 20px */
+    --gp-space-6: 1.5rem;    /* 24px */
+    --gp-space-8: 2rem;      /* 32px */
+    --gp-space-10: 2.5rem;   /* 40px */
+    --gp-space-12: 3rem;     /* 48px */
+    --gp-space-16: 4rem;     /* 64px */
+    --gp-space-20: 5rem;     /* 80px */
+    --gp-space-24: 6rem;     /* 96px */
+    
+    /* =========================================================================
+       EFFECTS & DECORATIONS
+       ========================================================================= */
+    
+    /* Border Radius */
+    --gp-radius-none: 0;
+    --gp-radius-sm: 0.25rem;
+    --gp-radius-md: 0.5rem;
+    --gp-radius-lg: 0.75rem;
+    --gp-radius-xl: 1rem;
+    --gp-radius-2xl: 1.5rem;
+    --gp-radius-3xl: 2rem;
+    --gp-radius-full: 9999px;
+    
+    /* Shadows - Layered for depth */
+    --gp-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --gp-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --gp-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --gp-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+    --gp-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    --gp-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    --gp-shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+    
+    /* Premium Colored Shadows */
+    --gp-shadow-primary: 0 10px 40px -10px rgba(46, 125, 50, 0.5);
+    --gp-shadow-accent: 0 10px 40px -10px rgba(255, 193, 7, 0.4);
+    --gp-shadow-glow: 0 0 40px rgba(46, 125, 50, 0.15);
+    
+    /* Glassmorphism */
+    --gp-glass-bg: rgba(255, 255, 255, 0.7);
+    --gp-glass-bg-dark: rgba(255, 255, 255, 0.9);
+    --gp-glass-border: rgba(255, 255, 255, 0.3);
+    --gp-glass-blur: blur(20px);
+    --gp-glass-blur-heavy: blur(40px);
+    
+    /* Gradients */
+    --gp-gradient-primary: linear-gradient(135deg, var(--gp-primary-500) 0%, var(--gp-primary-600) 100%);
+    --gp-gradient-accent: linear-gradient(135deg, var(--gp-accent-400) 0%, var(--gp-accent-600) 100%);
+    --gp-gradient-hero: linear-gradient(135deg, #0d3b14 0%, #1b5e20 50%, #2e7d32 100%);
+    --gp-gradient-hero-radial: radial-gradient(ellipse at top, #2e7d32 0%, #155724 50%, #0d3b14 100%);
+    --gp-gradient-surface: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    --gp-gradient-card: linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.95) 100%);
+    --gp-gradient-mesh: 
+        radial-gradient(at 40% 20%, rgba(46, 125, 50, 0.1) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgba(255, 193, 7, 0.08) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, rgba(46, 125, 50, 0.05) 0px, transparent 50%);
+    
+    /* Transitions */
+    --gp-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --gp-transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --gp-transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+    --gp-transition-slower: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+    --gp-transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    
+    /* Z-Index Scale */
+    --gp-z-base: 0;
+    --gp-z-dropdown: 100;
+    --gp-z-sticky: 200;
+    --gp-z-fixed: 300;
+    --gp-z-modal-backdrop: 400;
+    --gp-z-modal: 500;
+    --gp-z-popover: 600;
+    --gp-z-tooltip: 700;
+}
+
+/* =========================================================================
+   GOOGLE FONTS IMPORT
+   ========================================================================= */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap');

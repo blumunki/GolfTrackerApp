@@ -4,7 +4,8 @@
    This file imports all component and page-specific CSS modules
    ============================================================================= */
 
-/* Import Theme Variables First */
+/* Import Premium Theme Variables First */
+@import url('./css/themes/golf-premium.css');
 @import url('./css/themes/golf-variables.css');
 
 /* Import Layout Styles */
@@ -12,6 +13,7 @@
 @import url('./css/layout/navigation.css');
 
 /* Import Component Styles */
+@import url('./css/components/golf-premium-components.css');
 @import url('./css/components/golf-scorecard.css');
 @import url('./css/components/golf-dashboard.css');
 
@@ -23,11 +25,11 @@
 
 /* Global Base Styles */
 html, body {
-    font-family: 'Roboto', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--gp-font-family, 'Inter', 'Roboto', sans-serif);
 }
 
 a, .btn-link {
-    color: #006bb7;
+    color: var(--gp-primary-600);
 }
 
 .btn-primary {
