@@ -260,16 +260,11 @@ else
         isLoading = true;
         try
         {
-            // Load all data in parallel for efficiency
-            var viewModelTask = ReportService.GetPlayerReportViewModelAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
-            var scoringDistributionTask = ReportService.GetScoringDistributionAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
-            var performanceByParTask = ReportService.GetPerformanceByParAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
-
-            await Task.WhenAll(viewModelTask, scoringDistributionTask, performanceByParTask);
-
-            _viewModel = await viewModelTask;
-            _scoringDistribution = await scoringDistributionTask;
-            _performanceByPar = await performanceByParTask;
+            // Load data sequentially to avoid DbContext threading issues
+            // Each service method creates its own DbContext, but running in sequence is safer
+            _viewModel = await ReportService.GetPlayerReportViewModelAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
+            _scoringDistribution = await ReportService.GetScoringDistributionAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
+            _performanceByPar = await ReportService.GetPerformanceByParAsync(PlayerId, _selectedCourseId, _selectedHolesPlayed, _selectedRoundType, _startDate, _endDate);
 
             // Set up breadcrumbs
             if (_viewModel.Player is not null)

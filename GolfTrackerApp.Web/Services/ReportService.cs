@@ -180,7 +180,8 @@ public class ReportService : IReportService
     {
         await using var _context = await _contextFactory.CreateDbContextAsync();
         
-        var playerTask = _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.PlayerId == playerId);
+        // Await player query first to avoid concurrent operations on same context
+        var player = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.PlayerId == playerId);
         
         // Load courses with GolfClub for web app compatibility, but break circular references
         var coursesQuery = _context.GolfCourses
@@ -211,13 +212,11 @@ public class ReportService : IReportService
             }
         }).ToList();
 
-        await playerTask;
-
         var performanceData = await GetPlayerPerformanceAsync(playerId, courseId, holesPlayed, roundType, startDate, endDate);
 
         return new PlayerReportViewModel
         {
-            Player = await playerTask,
+            Player = player,
             FilterCourses = courses,
             PerformanceData = performanceData
         };
