@@ -609,6 +609,23 @@
                 .Distinct()
                 .Count();
 
+            // Group courses by club for the display
+            var coursesByClub = allCourses.GroupBy(c => c.GolfClubId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // Assign courses to clubs for display
+            foreach (var club in allClubs)
+            {
+                if (coursesByClub.TryGetValue(club.GolfClubId, out var courses))
+                {
+                    club.GolfCourses = courses;
+                }
+                else
+                {
+                    club.GolfCourses = new List<GolfCourse>();
+                }
+            }
+
             recentGolfClubs = allClubs
                 .OrderBy(c => c.Name)
                 .Take(6)

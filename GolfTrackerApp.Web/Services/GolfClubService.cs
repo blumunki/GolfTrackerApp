@@ -74,7 +74,9 @@ namespace GolfTrackerApp.Web.Services
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
-            var query = _context.GolfClubs.AsQueryable();
+            var query = _context.GolfClubs
+                .Include(c => c.GolfCourses)
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
