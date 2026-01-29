@@ -33,17 +33,23 @@
             logging in.
         </MudAlert>
 
-        <EditForm Model="FormInput" OnValidSubmit="OnValidSubmitAsync" FormName="confirmation" method="post">
+        <EditForm Model="CurrentInput" OnValidSubmit="OnValidSubmitAsync" FormName="confirmation" method="post">
             <DataAnnotationsValidator />
 
-            <MudTextField 
-                @bind-Value="FormInput.Email"
-                Label="Email"
-                Variant="Variant.Outlined"
-                Class="mb-4"
-                InputType="InputType.Email"
-                Immediate="true"
-                For="@(() => FormInput.Email)" />
+            <div class="mud-input-control mud-input-input-control mb-4">
+                <div class="mud-input-control-input-container">
+                    <div class="mud-input mud-input-outlined">
+                        <InputText @bind-Value="CurrentInput.Email" 
+                                   name="Input.Email"
+                                   class="mud-input-slot mud-input-root mud-input-root-outlined" 
+                                   type="email" 
+                                   placeholder=" " />
+                        <div class="mud-input-outlined-border"></div>
+                    </div>
+                    <label class="mud-input-label mud-input-label-animated mud-input-label-outlined" for="Input.Email">Email</label>
+                </div>
+            </div>
+            <ValidationMessage For="@(() => CurrentInput.Email)" class="mud-input-helper-text mud-input-error" />
 
             <MudButton 
                 ButtonType="ButtonType.Submit" 
@@ -66,10 +72,10 @@
     [CascadingParameter]
     private HttpContext? HttpContext { get; set; }
 
-    [SupplyParameterFromForm]
+    [SupplyParameterFromForm(FormName = "confirmation")]
     private InputModel? Input { get; set; }
     
-    private InputModel FormInput => Input ??= new();
+    private InputModel CurrentInput => Input ??= new();
 
     [SupplyParameterFromQuery]
     private string? RemoteError { get; set; }
@@ -161,7 +167,7 @@
         // If the user does not have an account, try to get their email
         if (externalLoginInfo.Principal.HasClaim(c => c.Type == ClaimTypes.Email))
         {
-            FormInput.Email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
+            CurrentInput.Email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
         }
     }
 
@@ -177,8 +183,8 @@
         var emailStore = GetEmailStore();
         var user = CreateUser();
 
-        await UserStore.SetUserNameAsync(user, FormInput.Email, CancellationToken.None);
-        await emailStore.SetEmailAsync(user, FormInput.Email, CancellationToken.None);
+        await UserStore.SetUserNameAsync(user, CurrentInput.Email, CancellationToken.None);
+        await emailStore.SetEmailAsync(user, CurrentInput.Email, CancellationToken.None);
 
         var result = await UserManager.CreateAsync(user);
         if (result.Succeeded)
@@ -196,13 +202,13 @@
                     NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
                     new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
                 
-                await EmailSender.SendConfirmationLinkAsync(user, FormInput.Email, HtmlEncoder.Default.Encode(callbackUrl));
+                await EmailSender.SendConfirmationLinkAsync(user, CurrentInput.Email, HtmlEncoder.Default.Encode(callbackUrl));
 
                 if (UserManager.Options.SignIn.RequireConfirmedAccount)
                 {
                     RedirectManager.RedirectTo(
                         "Account/RegisterConfirmation", 
-                        new Dictionary<string, object?> { ["email"] = FormInput.Email });
+                        new Dictionary<string, object?> { ["email"] = CurrentInput.Email });
                     return;
                 }
 
