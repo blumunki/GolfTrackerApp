@@ -1,0 +1,78 @@
+@using GolfTrackerApp.Web.Models
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+            <MudIcon Icon="@Icons.Material.Filled.MergeType" Color="Color.Info" />
+            <MudText Typo="Typo.h6">Transfer Player Data</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Transfer score data from a managed player to <strong>@TargetUserName</strong>'s profile.
+                Duplicate rounds will be automatically skipped.
+            </MudAlert>
+            
+            <MudSelect T="int?" 
+                       Label="Select Player to Transfer"
+                       @bind-Value="_selectedPlayerId"
+                       Variant="Variant.Outlined"
+                       Required="true">
+                @foreach (var player in MergeablePlayers)
+                {
+                    <MudSelectItem T="int?" Value="@player.PlayerId">
+                        @player.FirstName @player.LastName
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            
+            <MudTextField @bind-Value="_message"
+                          Label="Message (optional)"
+                          Variant="Variant.Outlined"
+                          Lines="2"
+                          Placeholder="Add a note about this transfer request..." />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton OnClick="Submit" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Primary"
+                   Disabled="@(!_selectedPlayerId.HasValue)">
+            Send Request
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance? MudDialog { get; set; }
+    
+    [Parameter] 
+    public List<Player> MergeablePlayers { get; set; } = new();
+    
+    [Parameter] 
+    public string TargetUserName { get; set; } = string.Empty;
+    
+    [Parameter] 
+    public string TargetUserId { get; set; } = string.Empty;
+    
+    private int? _selectedPlayerId;
+    private string? _message;
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private void Submit()
+    {
+        if (_selectedPlayerId.HasValue)
+        {
+            MudDialog?.Close(DialogResult.Ok(new MergePlayerDialogResult
+            {
+                SelectedPlayerId = _selectedPlayerId.Value,
+                Message = _message
+            }));
+        }
+    }
+}

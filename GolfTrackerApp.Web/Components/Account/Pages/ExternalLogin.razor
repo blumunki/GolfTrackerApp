@@ -6,6 +6,8 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using GolfTrackerApp.Web.Data
+@using GolfTrackerApp.Web.Services
+@using GolfTrackerApp.Web.Models
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
@@ -14,6 +16,7 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<ExternalLogin> Logger
+@inject IPlayerService PlayerService
 
 <PageTitle>Register</PageTitle>
 
@@ -154,6 +157,10 @@
                 "{Name} logged in with {LoginProvider} provider.",
                 externalLoginInfo.Principal.Identity?.Name,
                 externalLoginInfo.LoginProvider);
+            
+            // Ensure existing user has a player profile
+            await EnsurePlayerProfileExistsAsync(externalLoginInfo);
+            
             RedirectManager.RedirectTo(ReturnUrl);
             return;
         }
@@ -193,6 +200,9 @@
             if (result.Succeeded)
             {
                 Logger.LogInformation("User created an account using {Name} provider.", externalLoginInfo.LoginProvider);
+
+                // Auto-create player profile for new user
+                await CreatePlayerProfileForUserAsync(user, externalLoginInfo);
 
                 var userId = await UserManager.GetUserIdAsync(user);
                 var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
@@ -241,6 +251,104 @@
             throw new NotSupportedException("The default UI requires a user store with email support.");
         }
         return (IUserEmailStore<ApplicationUser>)UserStore;
+    }
+
+    private async Task CreatePlayerProfileForUserAsync(ApplicationUser user, ExternalLoginInfo externalLoginInfo)
+    {
+        try
+        {
+            // Extract name from claims
+            var claims = externalLoginInfo.Principal.Claims;
+            var givenName = claims.FirstOrDefault(c => c.Type == ClaimTypes.GivenName)?.Value 
+                         ?? claims.FirstOrDefault(c => c.Type == "given_name")?.Value;
+            var familyName = claims.FirstOrDefault(c => c.Type == ClaimTypes.Surname)?.Value 
+                          ?? claims.FirstOrDefault(c => c.Type == "family_name")?.Value;
+            
+            // Fallback: try to parse the full name
+            if (string.IsNullOrWhiteSpace(givenName) && string.IsNullOrWhiteSpace(familyName))
+            {
+                var fullName = claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value 
+                            ?? claims.FirstOrDefault(c => c.Type == "name")?.Value;
+                
+                if (!string.IsNullOrWhiteSpace(fullName))
+                {
+                    var nameParts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                    givenName = nameParts.Length > 0 ? nameParts[0] : null;
+                    familyName = nameParts.Length > 1 ? nameParts[1] : null;
+                }
+            }
+            
+            // Final fallback: use email prefix if no name available
+            if (string.IsNullOrWhiteSpace(givenName))
+            {
+                givenName = user.Email?.Split('@')[0] ?? "User";
+            }
+            
+            if (string.IsNullOrWhiteSpace(familyName))
+            {
+                familyName = "";
+            }
+            
+            var player = new Player
+            {
+                FirstName = givenName.Trim(),
+                LastName = familyName.Trim(),
+                ApplicationUserId = user.Id,
+                CreatedByApplicationUserId = user.Id,
+                Handicap = null
+            };
+            
+            await PlayerService.AddPlayerAsync(player);
+            Logger.LogInformation("Created player profile for new user {Email}: {FirstName} {LastName}", 
+                user.Email, player.FirstName, player.LastName);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail registration if player creation fails - log and continue
+            Logger.LogError(ex, "Failed to create player profile for user {Email}", user.Email);
+        }
+    }
+
+    private async Task EnsurePlayerProfileExistsAsync(ExternalLoginInfo externalLoginInfo)
+    {
+        try
+        {
+            // Find the existing user by their external login
+            var user = await UserManager.FindByLoginAsync(externalLoginInfo.LoginProvider, externalLoginInfo.ProviderKey);
+            if (user == null)
+            {
+                Logger.LogWarning("Could not find user for external login");
+                return;
+            }
+
+            // Check if player profile already exists
+            var existingPlayer = await PlayerService.GetPlayerByApplicationUserIdAsync(user.Id);
+            if (existingPlayer != null)
+            {
+                // Player profile already exists
+                return;
+            }
+
+            // Create player profile using email prefix as temporary name
+            var emailPrefix = user.Email?.Split('@')[0] ?? "User";
+            
+            var player = new Player
+            {
+                FirstName = emailPrefix,
+                LastName = "(Update your name)",
+                ApplicationUserId = user.Id,
+                CreatedByApplicationUserId = user.Id,
+                Handicap = null
+            };
+            
+            await PlayerService.AddPlayerAsync(player);
+            Logger.LogInformation("Created player profile for existing user {Email} who was missing one", user.Email);
+        }
+        catch (Exception ex)
+        {
+            // Don't fail login if player creation fails - log and continue
+            Logger.LogError(ex, "Failed to ensure player profile exists");
+        }
     }
 
     private sealed class InputModel

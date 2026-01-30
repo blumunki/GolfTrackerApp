@@ -90,6 +90,17 @@ namespace GolfTrackerApp.Web.Services
                 _logger.LogWarning("DeletePlayerAsync: Player with ID {PlayerId} not found for deletion.", id);
                 return false;
             }
+
+            // Delete related merge requests that reference this player as the source
+            var relatedMergeRequests = await _context.PlayerMergeRequests
+                .Where(m => m.SourcePlayerId == id)
+                .ToListAsync();
+            if (relatedMergeRequests.Any())
+            {
+                _context.PlayerMergeRequests.RemoveRange(relatedMergeRequests);
+                _logger.LogInformation("Deleted {Count} merge requests referencing player {PlayerId}", relatedMergeRequests.Count, id);
+            }
+
             _context.Players.Remove(player);
             await _context.SaveChangesAsync();
             _logger.LogInformation("Player {PlayerId} deleted: {FirstName} {LastName}", player.PlayerId, player.FirstName, player.LastName);

@@ -1,0 +1,22 @@
+/* Notification Badge Component Styles */
+
+.notification-popover {
+    z-index: 10000;
+}
+
+.notification-item {
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+}
+
+.notification-item:hover {
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+.unread-notification {
+    background-color: rgba(25, 118, 210, 0.08);
+}
+
+.unread-notification:hover {
+    background-color: rgba(25, 118, 210, 0.12);
+}

@@ -2,6 +2,8 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject IPlayerService PlayerService
+@inject IConnectionService ConnectionService
+@inject IMergeService MergeService
 @inject NavigationManager NavigationManager
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -16,89 +18,484 @@
 
 <MudText Typo="Typo.h4" GutterBottom="true">Players</MudText>
 
-<MudButton Variant="Variant.Filled" 
-           Color="Color.Primary" 
-           OnClick="GoToAddPlayerPage" 
-           StartIcon="@Icons.Material.Filled.PersonAdd" 
-           Class="mb-3">
-    Add New Player
-</MudButton>
+@* My Profile Section *@
+<MudPaper Class="pa-4 mb-4" Elevation="1">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Size="Size.Large" Color="Color.Primary" />
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h6">My Profile</MudText>
+                @if (_myProfile != null)
+                {
+                    <MudText Typo="Typo.body1">@_myProfile.FirstName @_myProfile.LastName</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Handicap: @(_myProfile.Handicap.HasValue ? _myProfile.Handicap.Value.ToString("N1") : "Not set")
+                    </MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Warning">No player profile found</MudText>
+                }
+            </MudStack>
+        </MudStack>
+        @if (_myProfile != null)
+        {
+            <MudStack Row="true" Spacing="2">
+                <MudTooltip Text="View My Performance Report">
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Info" 
+                               StartIcon="@Icons.Material.Filled.Timeline"
+                               Href="@($"/players/{_myProfile.PlayerId}/report")">
+                        My Report
+                    </MudButton>
+                </MudTooltip>
+                <MudTooltip Text="Edit My Profile">
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               OnClick="@(() => EditPlayer(_myProfile.PlayerId))">
+                        Edit Profile
+                    </MudButton>
+                </MudTooltip>
+            </MudStack>
+        }
+    </MudStack>
+</MudPaper>
 
-@if (isLoading)
+@* Pending Merge Requests Section *@
+@if (_pendingMergeRequests.Any())
 {
-    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
-}
-else
-{
-    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
-        <MudTextField @bind-Value="searchString" 
-                      Label="Filter by Name..." 
-                      Variant="Variant.Outlined" 
-                      Adornment="Adornment.Start" 
-                      AdornmentIcon="@Icons.Material.Filled.Search" 
-                      DebounceInterval="300" 
-                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
+    <MudPaper Class="pa-4 mb-4" Elevation="1" Style="border-left: 4px solid var(--mud-palette-info);">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.MergeType" Class="mr-2" Color="Color.Info" />
+                Data Transfer Requests
+            </MudText>
+            <MudBadge Content="@_pendingMergeRequests.Count" Color="Color.Info" Overlap="false" />
+        </MudStack>
+        <MudStack Spacing="2">
+            @foreach (var request in _pendingMergeRequests)
+            {
+                <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudStack>
+                            <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                                @(request.RequestingUser?.UserName ?? "Unknown") wants to transfer data
+                            </MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                Player: @(request.SourcePlayer?.FirstName) @(request.SourcePlayer?.LastName)
+                            </MudText>
+                            @if (!string.IsNullOrEmpty(request.Message))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-1">
+                                    "@request.Message"
+                                </MudText>
+                            }
+                        </MudStack>
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Success" 
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Check"
+                                       OnClick="@(() => AcceptMergeRequest(request))">
+                                Accept
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Error" 
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Close"
+                                       OnClick="@(() => DeclineMergeRequest(request))">
+                                Decline
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudStack>
     </MudPaper>
-
-    @if (players is null || !players.Any())
-    {
-        <MudText>No players found for your search criteria.</MudText>
-    }
-    else
-    {
-        <MudTable Items="@players" Hover="true" Striped="true" Dense="true" Elevation="1">
-            <HeaderContent>
-                <MudTh>Name</MudTh>
-                <MudTh>Handicap</MudTh>
-                <MudTh>User Type</MudTh>
-                <MudTh>Registered Email</MudTh>
-                <MudTh Class="golf-text-right">Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Name">@context.FirstName @context.LastName</MudTd>
-                <MudTd DataLabel="Handicap">@(context.Handicap.HasValue ? context.Handicap.Value.ToString("N1") : "N/A")</MudTd>
-                <MudTd DataLabel="User Type">@(string.IsNullOrEmpty(context.ApplicationUserId) ? "Managed" : "Registered")</MudTd>
-                <MudTd DataLabel="Registered Email">@(context.ApplicationUser?.Email ?? "N/A")</MudTd>
-                <MudTd Class="golf-text-right">
-                    <MudTooltip Text="View Performance Report">
-                        <MudIconButton Icon="@Icons.Material.Filled.Timeline" Size="Size.Small" Color="Color.Info" Href="@($"/players/{context.PlayerId}/report")" />
-                    </MudTooltip>
-                    <MudTooltip Text="Edit Player">
-                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditPlayer(context.PlayerId))" />
-                    </MudTooltip>
-                    <MudTooltip Text="Delete Player">
-                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeletePlayer(context))" />
-                    </MudTooltip>
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <MudTablePager />
-            </PagerContent>
-        </MudTable>
-    }
 }
+
+@* Pending Connection Requests Section *@
+@if (_pendingRequests.Any())
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="1">
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">
+                <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                Pending Connection Requests
+            </MudText>
+            <MudBadge Content="@_pendingRequests.Count" Color="Color.Primary" Overlap="false" />
+        </MudStack>
+        <MudStack Spacing="2">
+            @foreach (var request in _pendingRequests)
+            {
+                <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                        <MudStack>
+                            <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                                @(request.RequestingUser?.UserName ?? "Unknown User")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @request.RequestingUser?.Email
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="2">
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Success" 
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Check"
+                                       OnClick="@(() => AcceptRequest(request))">
+                                Accept
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Error" 
+                                       Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Close"
+                                       OnClick="@(() => DeclineRequest(request))">
+                                Decline
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudStack>
+    </MudPaper>
+}
+
+@* Connections Section *@
+<MudExpansionPanels Class="mb-4">
+    <MudExpansionPanel Text="@($"My Connections ({_connections.Count})")"
+                       Icon="@Icons.Material.Filled.People"
+                       Expanded="true">
+        <MudStack Spacing="3">
+            @* Search for new connections *@
+            <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Find Users to Connect With</MudText>
+                <MudTextField @bind-Value="_userSearchTerm"
+                              Label="Search by name or email..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              OnKeyUp="@OnUserSearchKeyUp"
+                              Immediate="true" />
+                
+                @if (_userSearchResults.Any())
+                {
+                    <MudList T="UserSearchResult" Class="mt-2">
+                        @foreach (var user in _userSearchResults)
+                        {
+                            <MudListItem T="UserSearchResult">
+                                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                    <MudStack>
+                                        <MudText>@user.DisplayName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@user.Email</MudText>
+                                    </MudStack>
+                                    @if (user.ExistingConnectionStatus == ConnectionStatus.Accepted)
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small">Connected</MudChip>
+                                    }
+                                    else if (user.ExistingConnectionStatus == ConnectionStatus.Pending)
+                                    {
+                                        @if (user.IsRequestSentByCurrentUser)
+                                        {
+                                            <MudChip T="string" Color="Color.Warning" Size="Size.Small">Request Sent</MudChip>
+                                        }
+                                        else
+                                        {
+                                            <MudButton Size="Size.Small" 
+                                                       Variant="Variant.Filled" 
+                                                       Color="Color.Success"
+                                                       OnClick="@(() => AcceptFromSearch(user))">
+                                                Accept Request
+                                            </MudButton>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MudButton Size="Size.Small" 
+                                                   Variant="Variant.Filled" 
+                                                   Color="Color.Primary"
+                                                   StartIcon="@Icons.Material.Filled.PersonAdd"
+                                                   OnClick="@(() => SendConnectionRequest(user))">
+                                            Connect
+                                        </MudButton>
+                                    }
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+
+            @* Existing connections list *@
+            @if (_connections.Any())
+            {
+                <MudSimpleTable Dense="true" Hover="true" Striped="true">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Connected Since</th>
+                            <th style="text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var connection in _connections)
+                        {
+                            var connectedUser = connection.RequestingUserId == _currentUserId 
+                                ? connection.TargetUser 
+                                : connection.RequestingUser;
+                            var connectedUserId = connectedUser?.Id ?? "";
+                            var connectedPlayer = connectedUserId != "" && _connectedUserProfiles.ContainsKey(connectedUserId) 
+                                ? _connectedUserProfiles[connectedUserId] 
+                                : null;
+                            var displayName = connectedPlayer != null 
+                                ? $"{connectedPlayer.FirstName} {connectedPlayer.LastName}" 
+                                : (connectedUser?.UserName ?? "Unknown");
+                            <tr>
+                                <td>@displayName</td>
+                                <td>@(connectedUser?.Email ?? "N/A")</td>
+                                <td>@(connection.RespondedAt?.ToString("d MMM yyyy") ?? "N/A")</td>
+                                <td style="text-align: right;">
+                                    <MudTooltip Text="View Performance Report">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Timeline" 
+                                                       Size="Size.Small" 
+                                                       Color="Color.Info"
+                                                       Disabled="@(string.IsNullOrEmpty(connectedUserId))"
+                                                       OnClick="@(async () => { if (!string.IsNullOrEmpty(connectedUserId)) await ViewConnectedPlayerReport(connectedUserId); })" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Transfer managed player data to this user">
+                                        <MudIconButton Icon="@Icons.Material.Filled.MergeType" 
+                                                       Size="Size.Small" 
+                                                       Color="Color.Primary"
+                                                       OnClick="@(() => OpenMergeDialog(connectedUserId, displayName))" />
+                                    </MudTooltip>
+                                    <MudTooltip Text="Remove Connection">
+                                        <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" 
+                                                       Size="Size.Small" 
+                                                       Color="Color.Error"
+                                                       OnClick="@(() => RemoveConnection(connection))" />
+                                    </MudTooltip>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="text-center py-4">
+                    No connections yet. Search for users above to connect.
+                </MudText>
+            }
+
+            @* Sent requests awaiting response *@
+            @if (_sentRequests.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-4">Pending Sent Requests</MudText>
+                <MudSimpleTable Dense="true" Hover="true">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Sent</th>
+                            <th style="text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var request in _sentRequests)
+                        {
+                            <tr>
+                                <td>@(request.TargetUser?.UserName ?? "Unknown")</td>
+                                <td>@request.RequestedAt.ToString("d MMM yyyy")</td>
+                                <td style="text-align: right;">
+                                    <MudTooltip Text="Cancel Request">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" 
+                                                       Size="Size.Small" 
+                                                       Color="Color.Warning"
+                                                       OnClick="@(() => CancelRequest(request))" />
+                                    </MudTooltip>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+        </MudStack>
+    </MudExpansionPanel>
+</MudExpansionPanels>
+
+@* Managed Players Section *@
+<MudExpansionPanels Class="mb-4">
+    <MudExpansionPanel Text="@($"Managed Players ({_managedPlayers?.Count ?? 0})")"
+                       Icon="@Icons.Material.Filled.Groups"
+                       Expanded="true">
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Primary" 
+                   OnClick="GoToAddPlayerPage" 
+                   StartIcon="@Icons.Material.Filled.PersonAdd" 
+                   Class="mb-3">
+            Add New Player
+        </MudButton>
+
+        @if (isLoading)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+        }
+        else
+        {
+            <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+                <MudTextField @bind-Value="searchString" 
+                              Label="Filter by Name..." 
+                              Variant="Variant.Outlined" 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search" 
+                              DebounceInterval="300" 
+                              OnDebounceIntervalElapsed="OnSearchTextChanged" />
+            </MudPaper>
+
+            @if (_managedPlayers is null || !_managedPlayers.Any())
+            {
+                <MudText Color="Color.Secondary" Class="py-4">No managed players. Add players you play with to track their scores.</MudText>
+            }
+            else
+            {
+                <MudTable Items="@_managedPlayers" Hover="true" Striped="true" Dense="true" Elevation="1">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh>
+                        <MudTh>Handicap</MudTh>
+                        <MudTh Class="golf-text-right">Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Name">@context.FirstName @context.LastName</MudTd>
+                        <MudTd DataLabel="Handicap">@(context.Handicap.HasValue ? context.Handicap.Value.ToString("N1") : "N/A")</MudTd>
+                        <MudTd Class="golf-text-right">
+                            <MudTooltip Text="View Performance Report">
+                                <MudIconButton Icon="@Icons.Material.Filled.Timeline" Size="Size.Small" Color="Color.Info" Href="@($"/players/{context.PlayerId}/report")" />
+                            </MudTooltip>
+                            <MudTooltip Text="Edit Player">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditPlayer(context.PlayerId))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Delete Player">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeletePlayer(context))" />
+                            </MudTooltip>
+                        </MudTd>
+                    </RowTemplate>
+                    <PagerContent>
+                        <MudTablePager />
+                    </PagerContent>
+                </MudTable>
+            }
+        }
+    </MudExpansionPanel>
+</MudExpansionPanels>
 
 @code {
-    private List<Player>? players;
+    private List<Player>? _managedPlayers;
+    private Player? _myProfile;
     private bool isLoading = true;
     private string searchString = "";
+    private string? _currentUserId;
+    
+    // Connection-related fields
+    private List<PlayerConnection> _pendingRequests = new();
+    private List<PlayerConnection> _connections = new();
+    private List<PlayerConnection> _sentRequests = new();
+    private Dictionary<string, Player> _connectedUserProfiles = new();
+    private string _userSearchTerm = "";
+    private List<UserSearchResult> _userSearchResults = new();
+    private System.Timers.Timer? _searchDebounceTimer;
+    
+    // Merge-related fields
+    private List<PlayerMergeRequest> _pendingMergeRequests = new();
+    private List<PlayerMergeRequest> _sentMergeRequests = new();
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPlayers();
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        
+        await LoadMyProfile();
+        await LoadManagedPlayers();
+        await LoadConnections();
+        await LoadMergeRequests();
     }
 
-    private async Task LoadPlayers()
+    private async Task LoadMyProfile()
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            _myProfile = await PlayerService.GetPlayerByApplicationUserIdAsync(_currentUserId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading profile: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadConnections()
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            _pendingRequests = await ConnectionService.GetPendingRequestsReceivedAsync(_currentUserId);
+            _connections = await ConnectionService.GetConnectionsAsync(_currentUserId);
+            _sentRequests = await ConnectionService.GetPendingRequestsSentAsync(_currentUserId);
+            
+            // Load player profiles for connected users
+            _connectedUserProfiles.Clear();
+            foreach (var connection in _connections)
+            {
+                var connectedUserId = connection.RequestingUserId == _currentUserId 
+                    ? connection.TargetUserId 
+                    : connection.RequestingUserId;
+                    
+                if (!_connectedUserProfiles.ContainsKey(connectedUserId))
+                {
+                    var player = await PlayerService.GetPlayerByApplicationUserIdAsync(connectedUserId);
+                    if (player != null)
+                    {
+                        _connectedUserProfiles[connectedUserId] = player;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading connections: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadMergeRequests()
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            _pendingMergeRequests = await MergeService.GetPendingMergeRequestsReceivedAsync(_currentUserId);
+            _sentMergeRequests = await MergeService.GetPendingMergeRequestsSentAsync(_currentUserId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading merge requests: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task LoadManagedPlayers()
     {
         isLoading = true;
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
-            var isCurrentUserAdmin = user.IsInRole("Admin");
+            if (string.IsNullOrEmpty(_currentUserId)) return;
 
-            players = await PlayerService.SearchPlayersAsync(currentUserId, isCurrentUserAdmin, searchString);
+            // Get only managed players (players without ApplicationUserId that this user created)
+            var allPlayers = await PlayerService.SearchPlayersAsync(_currentUserId, false, searchString);
+            _managedPlayers = allPlayers
+                .Where(p => string.IsNullOrEmpty(p.ApplicationUserId))
+                .ToList();
         }
         catch (Exception ex)
         {
@@ -110,12 +507,169 @@ else
     private async Task OnSearchTextChanged(string text)
     {
         searchString = text;
-        await LoadPlayers();
+        await LoadManagedPlayers();
+    }
+
+    private void OnUserSearchKeyUp(KeyboardEventArgs e)
+    {
+        _searchDebounceTimer?.Stop();
+        _searchDebounceTimer?.Dispose();
+        
+        _searchDebounceTimer = new System.Timers.Timer(300);
+        _searchDebounceTimer.Elapsed += async (sender, args) =>
+        {
+            _searchDebounceTimer?.Stop();
+            await InvokeAsync(async () =>
+            {
+                await SearchUsers();
+                StateHasChanged();
+            });
+        };
+        _searchDebounceTimer.AutoReset = false;
+        _searchDebounceTimer.Start();
+    }
+
+    private async Task SearchUsers()
+    {
+        if (string.IsNullOrEmpty(_currentUserId) || string.IsNullOrWhiteSpace(_userSearchTerm))
+        {
+            _userSearchResults = new();
+            return;
+        }
+        
+        try
+        {
+            _userSearchResults = await ConnectionService.SearchUsersAsync(_userSearchTerm, _currentUserId);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error searching users: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SendConnectionRequest(UserSearchResult user)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            await ConnectionService.SendConnectionRequestAsync(_currentUserId, user.UserId);
+            Snackbar.Add($"Connection request sent to {user.DisplayName}", Severity.Success);
+            user.ExistingConnectionStatus = ConnectionStatus.Pending;
+            user.IsRequestSentByCurrentUser = true;
+            await LoadConnections();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error sending request: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task AcceptRequest(PlayerConnection request)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            await ConnectionService.AcceptConnectionRequestAsync(request.Id, _currentUserId);
+            Snackbar.Add("Connection accepted!", Severity.Success);
+            await LoadConnections();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error accepting request: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task AcceptFromSearch(UserSearchResult user)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        var pendingRequest = _pendingRequests.FirstOrDefault(r => r.RequestingUserId == user.UserId);
+        if (pendingRequest != null)
+        {
+            await AcceptRequest(pendingRequest);
+            user.ExistingConnectionStatus = ConnectionStatus.Accepted;
+        }
+    }
+
+    private async Task DeclineRequest(PlayerConnection request)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            await ConnectionService.DeclineConnectionRequestAsync(request.Id, _currentUserId);
+            Snackbar.Add("Connection request declined.", Severity.Info);
+            await LoadConnections();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error declining request: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CancelRequest(PlayerConnection request)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            await ConnectionService.CancelConnectionRequestAsync(request.Id, _currentUserId);
+            Snackbar.Add("Connection request cancelled.", Severity.Info);
+            await LoadConnections();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error cancelling request: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RemoveConnection(PlayerConnection connection)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), "Are you sure you want to remove this connection?" },
+            { nameof(ConfirmDialog.ButtonText), "Remove" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Remove", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await ConnectionService.RemoveConnectionAsync(connection.Id, _currentUserId);
+                Snackbar.Add("Connection removed.", Severity.Info);
+                await LoadConnections();
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error removing connection: {ex.Message}", Severity.Error);
+            }
+        }
     }
 
     private void GoToAddPlayerPage() => NavigationManager.NavigateTo("/players/add");
 
     private void EditPlayer(int playerId) => NavigationManager.NavigateTo($"/players/edit/{playerId}");
+
+    private async Task ViewConnectedPlayerReport(string userId)
+    {
+        // Look up the player profile for this connected user
+        var player = await PlayerService.GetPlayerByApplicationUserIdAsync(userId);
+        if (player != null)
+        {
+            NavigationManager.NavigateTo($"/players/{player.PlayerId}/report");
+        }
+        else
+        {
+            Snackbar.Add("This user does not have a player profile yet.", Severity.Warning);
+        }
+    }
 
     private async Task PrepareDeletePlayer(Player player)
     {
@@ -142,7 +696,7 @@ else
             if (deleted)
             {
                 Snackbar.Add("Player deleted successfully.", Severity.Success);
-                await LoadPlayers();
+                await LoadManagedPlayers();
             }
             else
             {
@@ -152,6 +706,96 @@ else
         catch (Exception ex)
         {
             Snackbar.Add($"Error deleting player: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // Merge methods
+    private async Task OpenMergeDialog(string? targetUserId, string? targetUserName)
+    {
+        if (string.IsNullOrEmpty(_currentUserId) || string.IsNullOrEmpty(targetUserId)) return;
+        
+        try
+        {
+            var mergeablePlayers = await MergeService.GetMergeablePlayers(_currentUserId, targetUserId);
+            
+            if (!mergeablePlayers.Any())
+            {
+                Snackbar.Add("No managed players available to transfer.", Severity.Info);
+                return;
+            }
+            
+            var parameters = new DialogParameters<MergePlayerDialog>
+            {
+                { nameof(MergePlayerDialog.MergeablePlayers), mergeablePlayers },
+                { nameof(MergePlayerDialog.TargetUserName), targetUserName ?? "Unknown" },
+                { nameof(MergePlayerDialog.TargetUserId), targetUserId }
+            };
+            
+            var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+            var dialog = await DialogService.ShowAsync<MergePlayerDialog>("Transfer Player Data", parameters, options);
+            var result = await dialog.Result;
+            
+            if (result is not null && !result.Canceled && result.Data is MergePlayerDialogResult mergeResult)
+            {
+                await SendMergeRequest(mergeResult.SelectedPlayerId, targetUserId, mergeResult.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task SendMergeRequest(int sourcePlayerId, string targetUserId, string? message)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            await MergeService.RequestMergeAsync(_currentUserId, sourcePlayerId, targetUserId, message);
+            Snackbar.Add("Data transfer request sent!", Severity.Success);
+            await LoadMergeRequests();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error sending request: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task AcceptMergeRequest(PlayerMergeRequest request)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            var result = await MergeService.AcceptMergeRequestAsync(request.Id, _currentUserId);
+            if (result != null)
+            {
+                var skippedText = result.RoundsSkipped > 0 ? $" ({result.RoundsSkipped} skipped as duplicates)" : "";
+                Snackbar.Add($"Data transferred! {result.RoundsMerged} rounds merged{skippedText}.", Severity.Success);
+                await LoadMergeRequests();
+                await LoadManagedPlayers();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeclineMergeRequest(PlayerMergeRequest request)
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) return;
+        
+        try
+        {
+            await MergeService.DeclineMergeRequestAsync(request.Id, _currentUserId);
+            Snackbar.Add("Transfer request declined.", Severity.Info);
+            await LoadMergeRequests();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
         }
     }
 }

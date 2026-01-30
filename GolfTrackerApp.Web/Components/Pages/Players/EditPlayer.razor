@@ -1,7 +1,6 @@
 @page "/players/edit/{PlayerId:int}"
-@attribute [Authorize(Roles = "Admin")] // Or adjust authorization as needed
+@attribute [Authorize]
 @inject IPlayerService PlayerService
-@inject UserManager<ApplicationUser> UserManager 
 @inject NavigationManager NavigationManager
 @inject ILogger<EditPlayer> Logger
 @inject AuthenticationStateProvider AuthenticationStateProvider 
@@ -10,7 +9,6 @@
 @using GolfTrackerApp.Web.Data 
 @using GolfTrackerApp.Web.Services 
 @using GolfTrackerApp.Web.Components.Pages.Players 
-@using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims 
 
@@ -33,7 +31,7 @@ else
     <EditForm Model="@playerToEdit" OnValidSubmit="HandleValidSubmit">
         <DataAnnotationsValidator />
         <MudCard>
-            <PlayerFormComponent @ref="_playerFormComponent" PlayerModel="@playerToEdit" InitialUserEmail="@initialEmail" />
+            <PlayerFormComponent @ref="_playerFormComponent" PlayerModel="@playerToEdit" />
             <MudCardActions>
                 <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Class="ml-auto">Update Player</MudButton>
                 <MudButton Variant="Variant.Outlined" OnClick="Cancel" Class="mx-2">Cancel</MudButton>
@@ -60,7 +58,6 @@ else
     private PlayerFormComponent _playerFormComponent = default!;
 
     private bool isLoading = true;
-    private string initialEmail = string.Empty;
     private string? errorMessage;
     private string? infoMessage;
 
@@ -79,18 +76,13 @@ else
             playerToEdit = await PlayerService.GetPlayerByIdAsync(PlayerId);
             if (playerToEdit != null)
             {
-                // This is your robust authorization check - preserved.
+                // Authorization check
                 if (!isCurrentUserAdmin && 
                     (playerToEdit.CreatedByApplicationUserId != currentUserId) && 
                     (playerToEdit.ApplicationUserId != currentUserId))
                 {
                     errorMessage = "You are not authorized to edit this player profile.";
                     playerToEdit = null; // Prevent form from rendering
-                }
-                else if (!string.IsNullOrEmpty(playerToEdit.ApplicationUserId))
-                {
-                    var linkedUser = await UserManager.FindByIdAsync(playerToEdit.ApplicationUserId);
-                    initialEmail = linkedUser?.Email ?? string.Empty;
                 }
             }
             else
@@ -115,30 +107,8 @@ else
 
         try
         {
-            // This is your existing robust logic, adapted for the new component structure.
-            var emailToLink = _playerFormComponent.IsRegisteredUserCandidate ? _playerFormComponent.UserEmailToLink : null;
-
-            if (!string.IsNullOrWhiteSpace(emailToLink))
-            {
-                var systemUserToLink = await UserManager.FindByEmailAsync(emailToLink);
-                if (systemUserToLink == null)
-                {
-                    errorMessage = $"User with email '{emailToLink}' not found.";
-                    return;
-                }
-
-                var existingPlayerProfile = await PlayerService.GetPlayerByApplicationUserIdAsync(systemUserToLink.Id);
-                if (existingPlayerProfile != null && existingPlayerProfile.PlayerId != playerToEdit.PlayerId)
-                {
-                    errorMessage = $"User '{emailToLink}' is already linked to another player.";
-                    return;
-                }
-                playerToEdit.ApplicationUserId = systemUserToLink.Id;
-            }
-            else
-            {
-                playerToEdit.ApplicationUserId = null;
-            }
+            // Don't modify ApplicationUserId - it's managed by the system
+            // User linking is done via the connection/merge process
 
             await PlayerService.UpdatePlayerAsync(playerToEdit);
             Snackbar.Add("Player updated successfully!", Severity.Success);

@@ -1,7 +1,6 @@
 @page "/players/add"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize]
 @inject IPlayerService PlayerService
-@inject UserManager<ApplicationUser> UserManager
 @inject NavigationManager NavigationManager
 @inject ILogger<AddPlayer> Logger
 @inject AuthenticationStateProvider AuthenticationStateProvider
@@ -10,7 +9,6 @@
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Data
 @using GolfTrackerApp.Web.Components.Pages.Players
-@using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
 
@@ -79,50 +77,23 @@ else
         infoMessage = null;
 
         var playerToCreate = newPlayer;
-        var emailToLink = _playerFormComponent.IsRegisteredUserCandidate ? _playerFormComponent.UserEmailToLink : null;
 
         try
         {
-            if (!string.IsNullOrWhiteSpace(emailToLink))
+            // Managed players have no ApplicationUserId
+            playerToCreate.ApplicationUserId = null;
+
+            // Check for duplicate managed player names
+            var allPlayersByCurrentUser = await PlayerService.GetAllPlayersAsync(_currentUserId, false);
+            if (allPlayersByCurrentUser.Any(p => string.IsNullOrEmpty(p.ApplicationUserId) &&
+                                            p.FirstName.Equals(playerToCreate.FirstName, StringComparison.OrdinalIgnoreCase) &&
+                                            p.LastName.Equals(playerToCreate.LastName, StringComparison.OrdinalIgnoreCase)))
             {
-                var systemUserToLink = await UserManager.FindByEmailAsync(emailToLink);
-                if (systemUserToLink == null)
-                {
-                    infoMessage = $"System user with email '{emailToLink}' not found. Player will be created as a 'managed' player owned by you.";
-                    playerToCreate.ApplicationUserId = null;
-                }
-                else
-                {
-                    var existingPlayerProfileForUser = await PlayerService.GetPlayerByApplicationUserIdAsync(systemUserToLink.Id);
-                    if (existingPlayerProfileForUser != null)
-                    {
-                        errorMessage = $"The system user '{systemUserToLink.Email}' is already linked to another player profile.";
-                        return;
-                    }
-                    playerToCreate.ApplicationUserId = systemUserToLink.Id;
-                    infoMessage = $"Player will be linked to system user '{systemUserToLink.Email}'.";
-                }
-            }
-            else
-            {
-                playerToCreate.ApplicationUserId = null;
+                errorMessage = $"You already manage a player named '{playerToCreate.FirstName} {playerToCreate.LastName}'.";
+                return;
             }
 
-            // The duplicate check logic can also be simplified or removed,
-            // as the service layer now handles this robustly.
-            if (string.IsNullOrEmpty(playerToCreate.ApplicationUserId))
-            {
-                var allPlayersByCurrentUser = await PlayerService.GetAllPlayersAsync(_currentUserId, false);
-                if (allPlayersByCurrentUser.Any(p => string.IsNullOrEmpty(p.ApplicationUserId) &&
-                                                p.FirstName.Equals(playerToCreate.FirstName, StringComparison.OrdinalIgnoreCase) &&
-                                                p.LastName.Equals(playerToCreate.LastName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    errorMessage = $"You already manage a player named '{playerToCreate.FirstName} {playerToCreate.LastName}'.";
-                    return;
-                }
-            }
-
-            // Now, the service will handle setting CreatedByApplicationUserId
+            // The service will handle setting CreatedByApplicationUserId
             await PlayerService.AddPlayerAsync(playerToCreate);
             Snackbar.Add("Player created successfully!", Severity.Success);
             NavigationManager.NavigateTo("/players");

@@ -20,6 +20,7 @@
         <AuthorizeView>
             <Authorized>
                 <MudText Typo="Typo.body1" Class="mr-2">Hello, @context.User.Identity?.Name!</MudText>
+                <GolfTrackerApp.Web.Components.Shared.NotificationBadge />
                 <MudTooltip Text="Manage Account">
                     <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Href="Account/Manage" Color="Color.Inherit" />
                 </MudTooltip>

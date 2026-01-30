@@ -134,6 +134,9 @@ builder.Services.AddScoped<IRoundService, RoundService>();
 builder.Services.AddScoped<IScoreService, ScoreService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IRoundWorkflowService, RoundWorkflowService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IConnectionService, ConnectionService>();
+builder.Services.AddScoped<IMergeService, MergeService>();
 
 builder.Services.AddMudServices();
 

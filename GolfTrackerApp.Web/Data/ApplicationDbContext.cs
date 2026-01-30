@@ -23,6 +23,11 @@ namespace GolfTrackerApp.Web.Data
         public DbSet<Round> Rounds { get; set; }
         public DbSet<Score> Scores { get; set; }
         public DbSet<RoundPlayer> RoundPlayers { get; set; }
+        
+        // Connection and notification tables
+        public DbSet<PlayerConnection> PlayerConnections { get; set; }
+        public DbSet<PlayerMergeRequest> PlayerMergeRequests { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -77,9 +82,57 @@ namespace GolfTrackerApp.Web.Data
                 .WithMany(club => club.GolfCourses)
                 .HasForeignKey(gc => gc.GolfClubId);
 
-            // Add any other specific configurations if needed
-            // For example, to prevent cascade delete on a specific relationship if necessary:
-            // builder.Entity<SomeEntity>().HasOne(e => e.OtherEntity).WithMany().OnDelete(DeleteBehavior.Restrict);
+            // PlayerConnection configuration
+            builder.Entity<PlayerConnection>()
+                .HasIndex(pc => new { pc.RequestingUserId, pc.TargetUserId })
+                .IsUnique(); // Prevent duplicate connection requests
+
+            builder.Entity<PlayerConnection>()
+                .HasOne(pc => pc.RequestingUser)
+                .WithMany()
+                .HasForeignKey(pc => pc.RequestingUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<PlayerConnection>()
+                .HasOne(pc => pc.TargetUser)
+                .WithMany()
+                .HasForeignKey(pc => pc.TargetUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // PlayerMergeRequest configuration
+            builder.Entity<PlayerMergeRequest>()
+                .HasOne(mr => mr.RequestingUser)
+                .WithMany()
+                .HasForeignKey(mr => mr.RequestingUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<PlayerMergeRequest>()
+                .HasOne(mr => mr.TargetUser)
+                .WithMany()
+                .HasForeignKey(mr => mr.TargetUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<PlayerMergeRequest>()
+                .HasOne(mr => mr.SourcePlayer)
+                .WithMany()
+                .HasForeignKey(mr => mr.SourcePlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<PlayerMergeRequest>()
+                .HasOne(mr => mr.TargetPlayer)
+                .WithMany()
+                .HasForeignKey(mr => mr.TargetPlayerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Notification configuration
+            builder.Entity<Notification>()
+                .HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt }); // Index for efficient queries
+
+            builder.Entity<Notification>()
+                .HasOne(n => n.User)
+                .WithMany()
+                .HasForeignKey(n => n.UserId)
+                .OnDelete(DeleteBehavior.Cascade); // Delete notifications when user is deleted
         }
     }
 }
