@@ -19,7 +19,7 @@
 
 <PageTitle>Player Performance Report</PageTitle>
 
-@if (isLoading)
+@if (_isInitialLoading)
 {
     <MudProgressCircular Indeterminate="true" />
 }
@@ -31,7 +31,7 @@ else
     <MudPaper Elevation="2" Class="pa-3 mb-3">
         <MudGrid Spacing="2">
             <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="int?" Label="Filter by Course" @bind-Value="SelectedCourseId" Clearable="true">
+                <MudSelect T="int?" Label="Filter by Course" @bind-Value="SelectedCourseId" Clearable="true" Disabled="_isFilterLoading">
                     @foreach (var course in _viewModel.FilterCourses.OrderBy(c => c.GolfClub!.Name).ThenBy(c => c.Name))
                     {
                         <MudSelectItem T="int?" Value="@course.GolfCourseId">@($"{course.GolfClub!.Name} - {course.Name}")</MudSelectItem>
@@ -39,31 +39,31 @@ else
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="int?" Label="Holes Played" @bind-Value="SelectedHolesPlayed" Clearable="true">
+                <MudSelect T="int?" Label="Holes Played" @bind-Value="SelectedHolesPlayed" Clearable="true" Disabled="_isFilterLoading">
                     <MudSelectItem T="int?" Value="9">9 Holes</MudSelectItem>
                     <MudSelectItem T="int?" Value="18">18 Holes</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudSelect T="RoundTypeOption?" Label="Filter by Round Type" @bind-Value="SelectedRoundType" Clearable="true">
+                <MudSelect T="RoundTypeOption?" Label="Filter by Round Type" @bind-Value="SelectedRoundType" Clearable="true" Disabled="_isFilterLoading">
                     <MudSelectItem T="RoundTypeOption?" Value="@RoundTypeOption.Friendly">Friendly</MudSelectItem>
                     <MudSelectItem T="RoundTypeOption?" Value="@RoundTypeOption.Competitive">Competitive</MudSelectItem>
                 </MudSelect>
             </MudItem>
 
             <MudItem xs="12" sm="6" md="3">
-                <MudDatePicker Label="Start Date" @bind-Date="StartDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" />
+                <MudDatePicker Label="Start Date" @bind-Date="StartDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" Disabled="_isFilterLoading" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudDatePicker Label="End Date" @bind-Date="EndDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" />
+                <MudDatePicker Label="End Date" @bind-Date="EndDate" Clearable="true" Culture="_ukCulture" DateFormat="dd/MM/yyyy" Disabled="_isFilterLoading" />
             </MudItem>
             <MudItem xs="12" sm="6" md="3">
-                <MudSwitch @bind-Value="ShowScoreVsPar" Label="Show Score vs Par" Color="Color.Primary"/>
+                <MudSwitch @bind-Value="ShowScoreVsPar" Label="Show Score vs Par" Color="Color.Primary" Disabled="_isFilterLoading"/>
             </MudItem>
         </MudGrid>
     </MudPaper>
 
-    @if (isLoading)
+    @if (_isFilterLoading)
     {
         <MudProgressLinear Indeterminate="true" Class="my-4" />
     }
@@ -206,27 +206,96 @@ else
     // The ViewModel holds all our data
     private PlayerReportViewModel _viewModel = new();
 
-    private bool isLoading = true;
+    private bool _isInitialLoading = true;
+    private bool _isFilterLoading = false;
     private CultureInfo _ukCulture = new("en-GB");
 
     // Filter properties remain here, as they are part of the UI state
     private int? _selectedCourseId;
-    public int? SelectedCourseId { get => _selectedCourseId; set { if (_selectedCourseId != value) { _selectedCourseId = value; _ = OnFilterChanged(); } } }
+    public int? SelectedCourseId 
+    { 
+        get => _selectedCourseId; 
+        set 
+        { 
+            if (_selectedCourseId != value) 
+            { 
+                _selectedCourseId = value; 
+                InvokeAsync(OnFilterChanged); 
+            } 
+        } 
+    }
 
     private int? _selectedHolesPlayed;
-    public int? SelectedHolesPlayed { get => _selectedHolesPlayed; set { if (_selectedHolesPlayed != value) { _selectedHolesPlayed = value; _ = OnFilterChanged(); } } }
+    public int? SelectedHolesPlayed 
+    { 
+        get => _selectedHolesPlayed; 
+        set 
+        { 
+            if (_selectedHolesPlayed != value) 
+            { 
+                _selectedHolesPlayed = value; 
+                InvokeAsync(OnFilterChanged); 
+            } 
+        } 
+    }
 
     private RoundTypeOption? _selectedRoundType;
-    public RoundTypeOption? SelectedRoundType { get => _selectedRoundType; set { if (_selectedRoundType != value) { _selectedRoundType = value; _ = OnFilterChanged(); } } }
+    public RoundTypeOption? SelectedRoundType 
+    { 
+        get => _selectedRoundType; 
+        set 
+        { 
+            if (_selectedRoundType != value) 
+            { 
+                _selectedRoundType = value; 
+                InvokeAsync(OnFilterChanged); 
+            } 
+        } 
+    }
 
     private DateTime? _startDate;
-    public DateTime? StartDate { get => _startDate; set { if (_startDate != value) { _startDate = value; _ = OnFilterChanged(); } } }
+    public DateTime? StartDate 
+    { 
+        get => _startDate; 
+        set 
+        { 
+            if (_startDate != value) 
+            { 
+                _startDate = value; 
+                InvokeAsync(OnFilterChanged); 
+            } 
+        } 
+    }
 
     private DateTime? _endDate;
-    public DateTime? EndDate { get => _endDate; set { if (_endDate != value) { _endDate = value; _ = OnFilterChanged(); } } }
+    public DateTime? EndDate 
+    { 
+        get => _endDate; 
+        set 
+        { 
+            if (_endDate != value) 
+            { 
+                _endDate = value; 
+                InvokeAsync(OnFilterChanged); 
+            } 
+        } 
+    }
 
     private bool _showScoreVsPar = true;
-    public bool ShowScoreVsPar { get => _showScoreVsPar; set { if (_showScoreVsPar != value) { _showScoreVsPar = value; _ = OnFilterChanged(); } } }
+    public bool ShowScoreVsPar 
+    { 
+        get => _showScoreVsPar; 
+        set 
+        { 
+            if (_showScoreVsPar != value) 
+            { 
+                _showScoreVsPar = value; 
+                // This is just a display toggle, no need to reload data - just update the charts
+                UpdateChartDisplayMode();
+                StateHasChanged();
+            } 
+        } 
+    }
 
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
@@ -246,18 +315,46 @@ else
     private string[] _barChartLabels = Array.Empty<string>();
     private AxisChartOptions _axisChartOptions = new();
 
-    private List<BreadcrumbItem> _breadcrumbs = new(); // <-- ADD THIS FIELD
+    private List<BreadcrumbItem> _breadcrumbs = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadReportData();
+        _isInitialLoading = false;
     }
 
-    private async Task OnFilterChanged() => await LoadReportData();
+    private async Task OnFilterChanged()
+    {
+        _isFilterLoading = true;
+        StateHasChanged();
+        
+        try
+        {
+            await LoadReportData();
+        }
+        finally
+        {
+            _isFilterLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Updates chart display mode without reloading data.
+    /// Called when ShowScoreVsPar toggle changes.
+    /// </summary>
+    private void UpdateChartDisplayMode()
+    {
+        // Re-prepare charts with current data but new display mode
+        if (_viewModel?.PerformanceData != null)
+        {
+            PrepareChartData(_viewModel.PerformanceData);
+        }
+        PrepareBarChartData(_performanceByPar);
+    }
 
     private async Task LoadReportData()
     {
-        isLoading = true;
         try
         {
             // Load data sequentially to avoid DbContext threading issues
@@ -285,7 +382,6 @@ else
         {
             Snackbar.Add($"Error loading report data: {ex.Message}", Severity.Error);
         }
-        isLoading = false;
     }
 
     private void PrepareChartData(List<PlayerPerformanceDataPoint> data)
