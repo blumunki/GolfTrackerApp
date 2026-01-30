@@ -147,160 +147,166 @@ public class MergeService : IMergeService
     private async Task<(int roundsMerged, int roundsSkipped)> MergePlayerDataAsync(
         ApplicationDbContext context, int sourcePlayerId, int targetPlayerId)
     {
-        int roundsMerged = 0;
-        int roundsSkipped = 0;
+        // Use execution strategy to support SQL Server retrying execution strategy with transactions
+        var strategy = context.Database.CreateExecutionStrategy();
 
-        // Use explicit transaction for safety
-        await using var transaction = await context.Database.BeginTransactionAsync();
-
-        try
+        return await strategy.ExecuteAsync(async () =>
         {
-            // Get all scores for source player, grouped by round
-            var sourceScores = await context.Scores
-                .Include(s => s.Round)
-                .Where(s => s.PlayerId == sourcePlayerId)
-                .ToListAsync();
+            int roundsMerged = 0;
+            int roundsSkipped = 0;
 
-            // Get rounds where target player already has scores (to detect duplicates)
-            var targetExistingRoundIds = await context.Scores
-                .Where(s => s.PlayerId == targetPlayerId)
-                .Select(s => s.RoundId)
-                .Distinct()
-                .ToListAsync();
+            // Use explicit transaction for safety - wrapped in execution strategy
+            await using var transaction = await context.Database.BeginTransactionAsync();
 
-            var roundsToProcess = sourceScores
-                .GroupBy(s => s.RoundId)
-                .ToList();
-
-            // Identify rounds to merge (excluding duplicates)
-            var affectedRoundIds = roundsToProcess
-                .Where(g => !targetExistingRoundIds.Contains(g.Key))
-                .Select(g => g.Key)
-                .ToList();
-
-            // Check for rounds that would be skipped
-            foreach (var roundGroup in roundsToProcess)
+            try
             {
-                if (targetExistingRoundIds.Contains(roundGroup.Key))
+                // Get all scores for source player, grouped by round
+                var sourceScores = await context.Scores
+                    .Include(s => s.Round)
+                    .Where(s => s.PlayerId == sourcePlayerId)
+                    .ToListAsync();
+
+                // Get rounds where target player already has scores (to detect duplicates)
+                var targetExistingRoundIds = await context.Scores
+                    .Where(s => s.PlayerId == targetPlayerId)
+                    .Select(s => s.RoundId)
+                    .Distinct()
+                    .ToListAsync();
+
+                var roundsToProcess = sourceScores
+                    .GroupBy(s => s.RoundId)
+                    .ToList();
+
+                // Identify rounds to merge (excluding duplicates)
+                var affectedRoundIds = roundsToProcess
+                    .Where(g => !targetExistingRoundIds.Contains(g.Key))
+                    .Select(g => g.Key)
+                    .ToList();
+
+                // Check for rounds that would be skipped
+                foreach (var roundGroup in roundsToProcess)
                 {
-                    roundsSkipped++;
+                    if (targetExistingRoundIds.Contains(roundGroup.Key))
+                    {
+                        roundsSkipped++;
+                    }
                 }
-            }
 
-            // PHASE 1: INSERT new RoundPlayer records for target player FIRST
-            // Check which RoundPlayer entries need to be created
-            var existingTargetRoundPlayerIds = await context.Set<RoundPlayer>()
-                .Where(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == targetPlayerId)
-                .Select(rp => rp.RoundId)
-                .ToListAsync();
+                // PHASE 1: INSERT new RoundPlayer records for target player FIRST
+                // Check which RoundPlayer entries need to be created
+                var existingTargetRoundPlayerIds = await context.Set<RoundPlayer>()
+                    .Where(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == targetPlayerId)
+                    .Select(rp => rp.RoundId)
+                    .ToListAsync();
 
-            var roundIdsNeedingNewRoundPlayer = affectedRoundIds
-                .Where(rid => !existingTargetRoundPlayerIds.Contains(rid))
-                .ToList();
+                var roundIdsNeedingNewRoundPlayer = affectedRoundIds
+                    .Where(rid => !existingTargetRoundPlayerIds.Contains(rid))
+                    .ToList();
 
-            // Create new RoundPlayer entries for target player
-            var newRoundPlayers = roundIdsNeedingNewRoundPlayer
-                .Select(roundId => new RoundPlayer { RoundId = roundId, PlayerId = targetPlayerId })
-                .ToList();
+                // Create new RoundPlayer entries for target player
+                var newRoundPlayers = roundIdsNeedingNewRoundPlayer
+                    .Select(roundId => new RoundPlayer { RoundId = roundId, PlayerId = targetPlayerId })
+                    .ToList();
 
-            if (newRoundPlayers.Any())
-            {
-                context.Set<RoundPlayer>().AddRange(newRoundPlayers);
+                if (newRoundPlayers.Any())
+                {
+                    context.Set<RoundPlayer>().AddRange(newRoundPlayers);
+                    await context.SaveChangesAsync();
+                    
+                    _logger.LogInformation("Phase 1: Created {Count} new RoundPlayer records for target player {PlayerId}",
+                        newRoundPlayers.Count, targetPlayerId);
+                }
+
+                // PHASE 2: VALIDATE - Verify target player now has RoundPlayer entries for all affected rounds
+                var targetRoundPlayerCount = await context.Set<RoundPlayer>()
+                    .CountAsync(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == targetPlayerId);
+
+                if (targetRoundPlayerCount != affectedRoundIds.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"Validation failed: Expected {affectedRoundIds.Count} RoundPlayer records for target, found {targetRoundPlayerCount}. Rolling back.");
+                }
+
+                _logger.LogInformation("Phase 2: Validated {Count} RoundPlayer records exist for target player",
+                    targetRoundPlayerCount);
+
+                // PHASE 3: Transfer scores to target player
+                foreach (var roundGroup in roundsToProcess)
+                {
+                    if (targetExistingRoundIds.Contains(roundGroup.Key))
+                    {
+                        continue; // Skip duplicates
+                    }
+
+                    foreach (var score in roundGroup)
+                    {
+                        score.PlayerId = targetPlayerId;
+                    }
+
+                    roundsMerged++;
+                }
+
                 await context.SaveChangesAsync();
                 
-                _logger.LogInformation("Phase 1: Created {Count} new RoundPlayer records for target player {PlayerId}",
-                    newRoundPlayers.Count, targetPlayerId);
-            }
+                _logger.LogInformation("Phase 3: Transferred scores for {Count} rounds to target player",
+                    roundsMerged);
 
-            // PHASE 2: VALIDATE - Verify target player now has RoundPlayer entries for all affected rounds
-            var targetRoundPlayerCount = await context.Set<RoundPlayer>()
-                .CountAsync(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == targetPlayerId);
-
-            if (targetRoundPlayerCount != affectedRoundIds.Count)
-            {
-                throw new InvalidOperationException(
-                    $"Validation failed: Expected {affectedRoundIds.Count} RoundPlayer records for target, found {targetRoundPlayerCount}. Rolling back.");
-            }
-
-            _logger.LogInformation("Phase 2: Validated {Count} RoundPlayer records exist for target player",
-                targetRoundPlayerCount);
-
-            // PHASE 3: Transfer scores to target player
-            foreach (var roundGroup in roundsToProcess)
-            {
-                if (targetExistingRoundIds.Contains(roundGroup.Key))
-                {
-                    continue; // Skip duplicates
-                }
-
-                foreach (var score in roundGroup)
-                {
-                    score.PlayerId = targetPlayerId;
-                }
-
-                roundsMerged++;
-            }
-
-            await context.SaveChangesAsync();
-            
-            _logger.LogInformation("Phase 3: Transferred scores for {Count} rounds to target player",
-                roundsMerged);
-
-            // PHASE 4: VALIDATE scores were transferred correctly
-            var transferredScoreCount = await context.Scores
-                .CountAsync(s => affectedRoundIds.Contains(s.RoundId) && s.PlayerId == targetPlayerId);
-            
-            var expectedScoreCount = sourceScores
-                .Where(s => affectedRoundIds.Contains(s.RoundId))
-                .Count();
-
-            if (transferredScoreCount < expectedScoreCount)
-            {
-                throw new InvalidOperationException(
-                    $"Validation failed: Expected at least {expectedScoreCount} scores for target, found {transferredScoreCount}. Rolling back.");
-            }
-
-            _logger.LogInformation("Phase 4: Validated {Count} scores now belong to target player",
-                transferredScoreCount);
-
-            // PHASE 5: DELETE old RoundPlayer records for source player (only after validation)
-            var sourceRoundPlayersToRemove = await context.Set<RoundPlayer>()
-                .Where(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == sourcePlayerId)
-                .ToListAsync();
-
-            if (sourceRoundPlayersToRemove.Any())
-            {
-                context.Set<RoundPlayer>().RemoveRange(sourceRoundPlayersToRemove);
-                await context.SaveChangesAsync();
+                // PHASE 4: VALIDATE scores were transferred correctly
+                var transferredScoreCount = await context.Scores
+                    .CountAsync(s => affectedRoundIds.Contains(s.RoundId) && s.PlayerId == targetPlayerId);
                 
-                _logger.LogInformation("Phase 5: Removed {Count} old RoundPlayer records for source player {PlayerId}",
-                    sourceRoundPlayersToRemove.Count, sourcePlayerId);
+                var expectedScoreCount = sourceScores
+                    .Where(s => affectedRoundIds.Contains(s.RoundId))
+                    .Count();
+
+                if (transferredScoreCount < expectedScoreCount)
+                {
+                    throw new InvalidOperationException(
+                        $"Validation failed: Expected at least {expectedScoreCount} scores for target, found {transferredScoreCount}. Rolling back.");
+                }
+
+                _logger.LogInformation("Phase 4: Validated {Count} scores now belong to target player",
+                    transferredScoreCount);
+
+                // PHASE 5: DELETE old RoundPlayer records for source player (only after validation)
+                var sourceRoundPlayersToRemove = await context.Set<RoundPlayer>()
+                    .Where(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == sourcePlayerId)
+                    .ToListAsync();
+
+                if (sourceRoundPlayersToRemove.Any())
+                {
+                    context.Set<RoundPlayer>().RemoveRange(sourceRoundPlayersToRemove);
+                    await context.SaveChangesAsync();
+                    
+                    _logger.LogInformation("Phase 5: Removed {Count} old RoundPlayer records for source player {PlayerId}",
+                        sourceRoundPlayersToRemove.Count, sourcePlayerId);
+                }
+
+                // PHASE 6: Final validation - ensure we haven't lost any data
+                var finalTargetRoundPlayerCount = await context.Set<RoundPlayer>()
+                    .CountAsync(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == targetPlayerId);
+
+                if (finalTargetRoundPlayerCount != affectedRoundIds.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"Final validation failed: Expected {affectedRoundIds.Count} RoundPlayer records, found {finalTargetRoundPlayerCount}. Rolling back.");
+                }
+
+                // All validations passed - commit the transaction
+                await transaction.CommitAsync();
+                
+                _logger.LogInformation("Merge completed successfully. {Merged} rounds merged, {Skipped} skipped.",
+                    roundsMerged, roundsSkipped);
+
+                return (roundsMerged, roundsSkipped);
             }
-
-            // PHASE 6: Final validation - ensure we haven't lost any data
-            var finalTargetRoundPlayerCount = await context.Set<RoundPlayer>()
-                .CountAsync(rp => affectedRoundIds.Contains(rp.RoundId) && rp.PlayerId == targetPlayerId);
-
-            if (finalTargetRoundPlayerCount != affectedRoundIds.Count)
+            catch (Exception ex)
             {
-                throw new InvalidOperationException(
-                    $"Final validation failed: Expected {affectedRoundIds.Count} RoundPlayer records, found {finalTargetRoundPlayerCount}. Rolling back.");
+                _logger.LogError(ex, "Merge failed, rolling back transaction");
+                await transaction.RollbackAsync();
+                throw;
             }
-
-            // All validations passed - commit the transaction
-            await transaction.CommitAsync();
-            
-            _logger.LogInformation("Merge completed successfully. {Merged} rounds merged, {Skipped} skipped.",
-                roundsMerged, roundsSkipped);
-
-            return (roundsMerged, roundsSkipped);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Merge failed, rolling back transaction");
-            await transaction.RollbackAsync();
-            throw;
-        }
+        });
     }
 
     public async Task<PlayerMergeRequest?> DeclineMergeRequestAsync(int mergeRequestId, string userId)
