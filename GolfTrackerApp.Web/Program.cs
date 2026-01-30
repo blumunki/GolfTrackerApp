@@ -155,10 +155,13 @@ using (var scope = app.Services.CreateScope())
         
         if (dbProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
         {
-            // For SQL Server (production), use EnsureCreated since migrations are SQLite-specific
-            // This creates the schema based on the current model if it doesn't exist
+            // For SQL Server (production), ensure the database exists first
             logger.LogInformation("Ensuring SQL Server database schema exists...");
             context.Database.EnsureCreated();
+            
+            // Check and create missing tables for new features
+            await EnsureNewTablesExistAsync(context, logger);
+            
             logger.LogInformation("SQL Server database schema ready.");
         }
         else
@@ -216,3 +219,108 @@ app.MapAdditionalIdentityEndpoints();
 app.MapControllers();
 
 app.Run();
+
+/// <summary>
+/// Ensures new tables exist in SQL Server that were added after initial EnsureCreated.
+/// EnsureCreated only works when the database doesn't exist at all.
+/// This method checks for and creates missing tables.
+/// </summary>
+static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogger logger)
+{
+    var connection = context.Database.GetDbConnection();
+    await connection.OpenAsync();
+    
+    try
+    {
+        // Check if Notifications table exists
+        var notificationsExists = await TableExistsAsync(connection, "Notifications");
+        if (!notificationsExists)
+        {
+            logger.LogInformation("Creating Notifications table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [Notifications] (
+                    [Id] INT IDENTITY(1,1) NOT NULL,
+                    [UserId] NVARCHAR(450) NOT NULL,
+                    [Type] INT NOT NULL,
+                    [Title] NVARCHAR(100) NOT NULL,
+                    [Message] NVARCHAR(500) NOT NULL,
+                    [ActionUrl] NVARCHAR(200) NULL,
+                    [RelatedEntityId] INT NULL,
+                    [IsRead] BIT NOT NULL,
+                    [CreatedAt] DATETIME2 NOT NULL,
+                    CONSTRAINT [PK_Notifications] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_Notifications_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_Notifications_UserId_IsRead_CreatedAt] ON [Notifications] ([UserId], [IsRead], [CreatedAt]);
+            ");
+            logger.LogInformation("Notifications table created.");
+        }
+
+        // Check if PlayerConnections table exists
+        var connectionsExists = await TableExistsAsync(connection, "PlayerConnections");
+        if (!connectionsExists)
+        {
+            logger.LogInformation("Creating PlayerConnections table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [PlayerConnections] (
+                    [Id] INT IDENTITY(1,1) NOT NULL,
+                    [RequestingUserId] NVARCHAR(450) NOT NULL,
+                    [TargetUserId] NVARCHAR(450) NOT NULL,
+                    [Status] INT NOT NULL,
+                    [RequestedAt] DATETIME2 NOT NULL,
+                    [RespondedAt] DATETIME2 NULL,
+                    CONSTRAINT [PK_PlayerConnections] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_PlayerConnections_AspNetUsers_RequestingUserId] FOREIGN KEY ([RequestingUserId]) REFERENCES [AspNetUsers]([Id]),
+                    CONSTRAINT [FK_PlayerConnections_AspNetUsers_TargetUserId] FOREIGN KEY ([TargetUserId]) REFERENCES [AspNetUsers]([Id])
+                );
+                CREATE UNIQUE INDEX [IX_PlayerConnections_RequestingUserId_TargetUserId] ON [PlayerConnections] ([RequestingUserId], [TargetUserId]);
+                CREATE INDEX [IX_PlayerConnections_TargetUserId] ON [PlayerConnections] ([TargetUserId]);
+            ");
+            logger.LogInformation("PlayerConnections table created.");
+        }
+
+        // Check if PlayerMergeRequests table exists
+        var mergeRequestsExists = await TableExistsAsync(connection, "PlayerMergeRequests");
+        if (!mergeRequestsExists)
+        {
+            logger.LogInformation("Creating PlayerMergeRequests table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [PlayerMergeRequests] (
+                    [Id] INT IDENTITY(1,1) NOT NULL,
+                    [RequestingUserId] NVARCHAR(450) NOT NULL,
+                    [TargetUserId] NVARCHAR(450) NOT NULL,
+                    [SourcePlayerId] INT NOT NULL,
+                    [TargetPlayerId] INT NOT NULL,
+                    [Status] INT NOT NULL,
+                    [RequestedAt] DATETIME2 NOT NULL,
+                    [CompletedAt] DATETIME2 NULL,
+                    [Message] NVARCHAR(500) NULL,
+                    [RoundsMerged] INT NOT NULL,
+                    [RoundsSkipped] INT NOT NULL,
+                    CONSTRAINT [PK_PlayerMergeRequests] PRIMARY KEY ([Id]),
+                    CONSTRAINT [FK_PlayerMergeRequests_AspNetUsers_RequestingUserId] FOREIGN KEY ([RequestingUserId]) REFERENCES [AspNetUsers]([Id]),
+                    CONSTRAINT [FK_PlayerMergeRequests_AspNetUsers_TargetUserId] FOREIGN KEY ([TargetUserId]) REFERENCES [AspNetUsers]([Id]),
+                    CONSTRAINT [FK_PlayerMergeRequests_Players_SourcePlayerId] FOREIGN KEY ([SourcePlayerId]) REFERENCES [Players]([PlayerId]),
+                    CONSTRAINT [FK_PlayerMergeRequests_Players_TargetPlayerId] FOREIGN KEY ([TargetPlayerId]) REFERENCES [Players]([PlayerId])
+                );
+                CREATE INDEX [IX_PlayerMergeRequests_RequestingUserId] ON [PlayerMergeRequests] ([RequestingUserId]);
+                CREATE INDEX [IX_PlayerMergeRequests_SourcePlayerId] ON [PlayerMergeRequests] ([SourcePlayerId]);
+                CREATE INDEX [IX_PlayerMergeRequests_TargetPlayerId] ON [PlayerMergeRequests] ([TargetPlayerId]);
+                CREATE INDEX [IX_PlayerMergeRequests_TargetUserId] ON [PlayerMergeRequests] ([TargetUserId]);
+            ");
+            logger.LogInformation("PlayerMergeRequests table created.");
+        }
+    }
+    finally
+    {
+        await connection.CloseAsync();
+    }
+}
+
+static async Task<bool> TableExistsAsync(System.Data.Common.DbConnection connection, string tableName)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{tableName}'";
+    var result = await command.ExecuteScalarAsync();
+    return Convert.ToInt32(result) > 0;
+}
