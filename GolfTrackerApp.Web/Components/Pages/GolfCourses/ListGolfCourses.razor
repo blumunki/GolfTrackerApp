@@ -17,7 +17,7 @@
 
 <MudText Typo="Typo.h4" GutterBottom="true">Golf Courses</MudText>
 
-<AuthorizeView>
+<AuthorizeView Roles="Admin">
     <Authorized>
         <MudButton Variant="Variant.Filled" 
                    Color="Color.Primary" 
@@ -27,17 +27,6 @@
             Add New Course
         </MudButton>
     </Authorized>
-    <NotAuthorized>
-        <MudText Typo="Typo.body1" Class="mb-4">
-            Browse our collection of golf courses. Join our community to add courses and track your performance.
-        </MudText>
-        <MudAlert Severity="Severity.Info" Class="mb-4" Icon="@Icons.Material.Filled.Info">
-            <MudText><strong>Want to manage courses or track your rounds?</strong></MudText>
-            <MudText>
-                <MudLink Href="/Account/Register">Register for free</MudLink> to add courses and access detailed round tracking.
-            </MudText>
-        </MudAlert>
-    </NotAuthorized>
 </AuthorizeView>
 
 @if (isLoading)
@@ -83,7 +72,10 @@ else
                 <MudTd DataLabel="Holes">@context.NumberOfHoles</MudTd>
                 <MudTd DataLabel="Par">@context.DefaultPar</MudTd>
                 <MudTd Class="golf-text-right">
-                    <AuthorizeView>
+                    <MudTooltip Text="View Details">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/golfcourses/{context.GolfCourseId}/details"))" />
+                    </MudTooltip>
+                    <AuthorizeView Roles="Admin">
                         <Authorized Context="authContext">
                             <MudTooltip Text="Edit Course">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="@(() => EditCourse(context.GolfCourseId))" />
@@ -92,11 +84,6 @@ else
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteCourse(context))" />
                             </MudTooltip>
                         </Authorized>
-                        <NotAuthorized Context="authContext">
-                            <MudTooltip Text="View Details">
-                                <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => NavigationManager.NavigateTo($"/golfcourses/{context.GolfCourseId}/details"))" />
-                            </MudTooltip>
-                        </NotAuthorized>
                     </AuthorizeView>
                 </MudTd>
             </RowTemplate>

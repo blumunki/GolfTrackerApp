@@ -18,7 +18,7 @@
 <MudText Typo="Typo.h4" GutterBottom="true">Golf Clubs</MudText>
 
 @* Show different content based on authentication status *@
-<AuthorizeView>
+<AuthorizeView Roles="Admin">
     <Authorized>
         <MudButton Variant="Variant.Filled" 
                    Color="Color.Primary" 
@@ -28,17 +28,6 @@
             Add New Golf Club
         </MudButton>
     </Authorized>
-    <NotAuthorized>
-        <MudText Typo="Typo.body1" Class="mb-4">
-            Discover the golf clubs and courses in our network. Join our community to track your performance and access detailed statistics.
-        </MudText>
-        <MudAlert Severity="Severity.Info" Class="mb-4" Icon="@Icons.Material.Filled.Info">
-            <MudText><strong>Want to add your club or track your rounds?</strong></MudText>
-            <MudText>
-                <MudLink Href="/Account/Register">Register for free</MudLink> to add clubs, track your performance, and access detailed statistics.
-            </MudText>
-        </MudAlert>
-    </NotAuthorized>
 </AuthorizeView>
 
 @if (isLoading)
@@ -102,8 +91,8 @@ else
                                        OnClick="@(() => ViewClubDetails(context.GolfClubId))" />
                     </MudTooltip>
                     
-                    @* Admin actions only for authenticated users *@
-                    <AuthorizeView>
+                    @* Admin actions only for admin users *@
+                    <AuthorizeView Roles="Admin">
                         <Authorized Context="authContext">
                             <MudTooltip Text="Edit Club">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" 

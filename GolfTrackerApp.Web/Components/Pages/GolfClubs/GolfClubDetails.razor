@@ -38,7 +38,7 @@ else
             <MudItem xs="12" sm="8" md="9">
                 <MudText Typo="Typo.h4">@golfClub.Name</MudText>
             </MudItem>
-            <AuthorizeView>
+            <AuthorizeView Roles="Admin">
                 <Authorized>
                     <MudItem xs="12" sm="4" md="3" Class="d-flex justify-content-xs-start justify-content-sm-end">
                         <MudButton Variant="Variant.Outlined" 
@@ -47,16 +47,6 @@ else
                                    StartIcon="@Icons.Material.Filled.Edit">Edit Club</MudButton>
                     </MudItem>
                 </Authorized>
-                <NotAuthorized>
-                    <MudItem xs="12" sm="4" md="3" Class="d-flex justify-content-xs-start justify-content-sm-end">
-                        <MudButton Variant="Variant.Filled" 
-                                   Color="Color.Success" 
-                                   Href="/Account/Register"
-                                   StartIcon="@Icons.Material.Filled.PersonAdd">
-                            Join to Manage
-                        </MudButton>
-                    </MudItem>
-                </NotAuthorized>
             </AuthorizeView>
         </MudGrid>
     </MudPaper>
@@ -81,7 +71,7 @@ else
             <MudItem>
                 <MudText Typo="Typo.h5">Courses at this Club</MudText>
             </MudItem>
-            <AuthorizeView>
+            <AuthorizeView Roles="Admin">
                 <Authorized>
                     <MudItem Class="d-flex justify-content-end">
                         <MudButton Variant="Variant.Filled" 
@@ -90,13 +80,6 @@ else
                                    StartIcon="@Icons.Material.Filled.Add">Add New Course</MudButton>
                     </MudItem>
                 </Authorized>
-                <NotAuthorized>
-                    <MudItem Class="d-flex justify-content-end">
-                        <MudText Typo="Typo.body2" Class="mt-2">
-                            <MudLink Href="/Account/Register">Register</MudLink> to add courses and track your rounds
-                        </MudText>
-                    </MudItem>
-                </NotAuthorized>
             </AuthorizeView>
         </MudGrid>
 
@@ -108,7 +91,7 @@ else
                     <MudListItem T="object" OnClick="@(() => ViewCourseDetails(course.GolfCourseId))" Text="@($"{course.Name} (Par: {course.DefaultPar}, Holes: {course.NumberOfHoles})")">
                         <NestedList>
                             <MudListItem T="object" OnClick="@(() => ViewCourseDetails(course.GolfCourseId))" Icon="@Icons.Material.Filled.Visibility" IconColor="Color.Primary">View Holes / Details</MudListItem>
-                            <AuthorizeView>
+                            <AuthorizeView Roles="Admin">
                                 <Authorized>
                                     <MudListItem T="object" OnClick="@(() => EditThisCourse(course.GolfCourseId))" Icon="@Icons.Material.Filled.Edit" IconColor="Color.Secondary">Edit Course</MudListItem>
                                     <MudListItem T="object" OnClick="@(() => PrepareDeleteCourse(course))" Icon="@Icons.Material.Filled.Delete" IconColor="Color.Error">Delete Course</MudListItem>

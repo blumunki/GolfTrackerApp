@@ -40,23 +40,13 @@ else
                 <MudText Typo="Typo.h5">@course.Name</MudText>
                 <MudText Typo="Typo.body1">Par: @course.DefaultPar | Holes: @course.NumberOfHoles</MudText>
             </MudItem>
-            <AuthorizeView>
+            <AuthorizeView Roles="Admin">
                 <Authorized>
                     <MudItem Class="d-flex justify-content-end align-center gap-2">
                         <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="OpenAddHoleDialog" StartIcon="@Icons.Material.Filled.Add">Add Hole</MudButton>
                         <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => NavigationManager.NavigateTo($"/golfcourses/edit/{course.GolfCourseId}"))">Edit Course</MudButton>
                     </MudItem>
                 </Authorized>
-                <NotAuthorized>
-                    <MudItem Class="d-flex justify-content-end align-center gap-2">
-                        <MudButton Variant="Variant.Filled" 
-                                   Color="Color.Success" 
-                                   Href="/Account/Register"
-                                   StartIcon="@Icons.Material.Filled.PersonAdd">
-                            Join to Manage
-                        </MudButton>
-                    </MudItem>
-                </NotAuthorized>
             </AuthorizeView>
         </MudGrid>
     </MudPaper>
@@ -67,7 +57,7 @@ else
             <MudTh>Par</MudTh>
             <MudTh>Length (Yards)</MudTh>
             <MudTh>Stroke Index</MudTh>
-            <AuthorizeView>
+            <AuthorizeView Roles="Admin">
                 <Authorized Context="authContext">
                     <MudTh Class="golf-text-right">Actions</MudTh>
                 </Authorized>
@@ -78,7 +68,7 @@ else
             <MudTd DataLabel="Par">@context.Par</MudTd>
             <MudTd DataLabel="Length">@context.LengthYards</MudTd>
             <MudTd DataLabel="SI">@context.StrokeIndex</MudTd>
-            <AuthorizeView>
+            <AuthorizeView Roles="Admin">
                 <Authorized Context="authContext">
                     <MudTd Class="golf-text-right">
                         <MudTooltip Text="Edit Hole">
