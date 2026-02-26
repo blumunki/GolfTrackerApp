@@ -24,4 +24,7 @@ public interface IReportService
     
     // Dashboard statistics
     Task<DashboardStats> GetDashboardStatsAsync(string currentUserId);
+    
+    // Course history for dashboard
+    Task<List<CourseHistoryItem>> GetCourseHistoryAsync(string currentUserId, int count = 6);
 }

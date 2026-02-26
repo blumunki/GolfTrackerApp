@@ -117,4 +117,60 @@ public class ReportsController : BaseApiController
             return StatusCode(500, "An error occurred while retrieving recent rounds");
         }
     }
+
+    [HttpGet("course-history")]
+    public async Task<ActionResult<List<CourseHistoryItem>>> GetCourseHistory([FromQuery] int limit = 6)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var history = await _reportService.GetCourseHistoryAsync(userId, limit);
+            return Ok(history);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving course history");
+            return StatusCode(500, "An error occurred while retrieving course history");
+        }
+    }
+
+    [HttpGet("scoring-distribution")]
+    public async Task<ActionResult<ScoringDistribution>> GetScoringDistribution()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var currentPlayer = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
+            if (currentPlayer == null)
+                return Ok(new ScoringDistribution());
+
+            var distribution = await _reportService.GetScoringDistributionAsync(currentPlayer.PlayerId, null, null, null, null, null);
+            return Ok(distribution);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving scoring distribution");
+            return StatusCode(500, "An error occurred while retrieving scoring distribution");
+        }
+    }
+
+    [HttpGet("performance-by-par")]
+    public async Task<ActionResult<PerformanceByPar>> GetPerformanceByPar()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var currentPlayer = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
+            if (currentPlayer == null)
+                return Ok(new PerformanceByPar());
+
+            var performance = await _reportService.GetPerformanceByParAsync(currentPlayer.PlayerId, null, null, null, null, null);
+            return Ok(performance);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving performance by par");
+            return StatusCode(500, "An error occurred while retrieving performance by par");
+        }
+    }
 }

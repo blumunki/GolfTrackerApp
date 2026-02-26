@@ -14,4 +14,10 @@ public class DashboardStats
     public DateTime? LastRoundDate { get; set; }
     public int CurrentStreak { get; set; } // Rounds in a row below/above average
     public bool IsImprovingStreak { get; set; } // True if improving, false if declining
+    
+    // Enhanced dashboard fields
+    public int UniqueCoursesPlayed { get; set; }
+    public int UniqueClubsVisited { get; set; }
+    public int NineHoleRounds { get; set; }
+    public int EighteenHoleRounds { get; set; }
 }

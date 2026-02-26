@@ -19,7 +19,11 @@ public class DashboardStats
     public int FavoriteCourseRounds { get; set; }
     public bool IsImprovingStreak { get; set; }
     public int CurrentStreak { get; set; }
-    public int CoursesPlayed { get; set; } // Add missing property
+    public int CoursesPlayed { get; set; }
+    public int UniqueCoursesPlayed { get; set; }
+    public int UniqueClubsVisited { get; set; }
+    public int NineHoleRounds { get; set; }
+    public int EighteenHoleRounds { get; set; }
 }
 
 public class PlayingPartnerSummary
@@ -75,6 +79,50 @@ public class FavoriteCourse
     public decimal AverageScore { get; set; }
 }
 
+public class CourseHistoryItem
+{
+    public int GolfCourseId { get; set; }
+    public string CourseName { get; set; } = string.Empty;
+    public string ClubName { get; set; } = string.Empty;
+    public DateTime LastPlayedDate { get; set; }
+    public int MostRecentScore { get; set; }
+    public int MostRecentToPar { get; set; }
+    public int BestScore { get; set; }
+    public int BestToPar { get; set; }
+    public int TimesPlayed { get; set; }
+}
+
+public class ScoringDistributionData
+{
+    public int EagleCount { get; set; }
+    public int BirdieCount { get; set; }
+    public int ParCount { get; set; }
+    public int BogeyCount { get; set; }
+    public int DoubleBogeyCount { get; set; }
+    public int TripleBogeyOrWorseCount { get; set; }
+    public int TotalHoles => EagleCount + BirdieCount + ParCount + BogeyCount + DoubleBogeyCount + TripleBogeyOrWorseCount;
+    public double EaglePercentage => TotalHoles > 0 ? (double)EagleCount / TotalHoles * 100 : 0;
+    public double BirdiePercentage => TotalHoles > 0 ? (double)BirdieCount / TotalHoles * 100 : 0;
+    public double ParPercentage => TotalHoles > 0 ? (double)ParCount / TotalHoles * 100 : 0;
+    public double BogeyPercentage => TotalHoles > 0 ? (double)BogeyCount / TotalHoles * 100 : 0;
+    public double DoubleBogeyPercentage => TotalHoles > 0 ? (double)DoubleBogeyCount / TotalHoles * 100 : 0;
+    public double TripleBogeyOrWorsePercentage => TotalHoles > 0 ? (double)TripleBogeyOrWorseCount / TotalHoles * 100 : 0;
+}
+
+public class PerformanceByParData
+{
+    public double Par3Average { get; set; }
+    public double Par4Average { get; set; }
+    public double Par5Average { get; set; }
+    public int Par3Count { get; set; }
+    public int Par4Count { get; set; }
+    public int Par5Count { get; set; }
+    public double Par3RelativeToPar => Par3Average - 3;
+    public double Par4RelativeToPar => Par4Average - 4;
+    public double Par5RelativeToPar => Par5Average - 5;
+    public bool HasValidData => Par3Count > 0 || Par4Count > 0 || Par5Count > 0;
+}
+
 public interface IDashboardApiService
 {
     Task<DashboardStats?> GetDashboardStatsAsync();
@@ -84,6 +132,9 @@ public interface IDashboardApiService
     Task<List<RecentActivity>> GetRecentActivityAsync(int limit = 5);
     Task<List<ScoreDistribution>> GetScoreDistributionAsync();
     Task<List<FavoriteCourse>> GetFavoriteCoursesAsync(int limit = 5);
+    Task<List<CourseHistoryItem>> GetCourseHistoryAsync(int limit = 6);
+    Task<ScoringDistributionData?> GetScoringDistributionDataAsync();
+    Task<PerformanceByParData?> GetPerformanceByParAsync();
 }
 
 public class DashboardApiService : IDashboardApiService
@@ -294,6 +345,57 @@ public class DashboardApiService : IDashboardApiService
         {
             _logger.LogError(ex, "Error fetching favorite courses from API");
             return new List<FavoriteCourse>();
+        }
+    }
+
+    public async Task<List<CourseHistoryItem>> GetCourseHistoryAsync(int limit = 6)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.GetAsync($"api/reports/course-history?limit={limit}");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<CourseHistoryItem>>(json, _jsonOptions) ?? new List<CourseHistoryItem>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching course history from API");
+            return new List<CourseHistoryItem>();
+        }
+    }
+
+    public async Task<ScoringDistributionData?> GetScoringDistributionDataAsync()
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.GetAsync("api/reports/scoring-distribution");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<ScoringDistributionData>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching scoring distribution from API");
+            return null;
+        }
+    }
+
+    public async Task<PerformanceByParData?> GetPerformanceByParAsync()
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.GetAsync("api/reports/performance-by-par");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<PerformanceByParData>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching performance by par from API");
+            return null;
         }
     }
 }

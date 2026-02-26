@@ -529,7 +529,11 @@ public class ReportService : IReportService
         var stats = new DashboardStats
         {
             TotalRounds = rounds.Count,
-            LastRoundDate = rounds.Max(r => r.DatePlayed)
+            LastRoundDate = rounds.Max(r => r.DatePlayed),
+            UniqueCoursesPlayed = rounds.Select(r => r.GolfCourseId).Distinct().Count(),
+            UniqueClubsVisited = rounds.Where(r => r.GolfCourse?.GolfClub != null).Select(r => r.GolfCourse!.GolfClub!.GolfClubId).Distinct().Count(),
+            NineHoleRounds = rounds.Count(r => r.HolesPlayed == 9),
+            EighteenHoleRounds = rounds.Count(r => r.HolesPlayed == 18)
         };
 
         // Calculate scores and find best round
@@ -584,5 +588,71 @@ public class ReportService : IReportService
         }
 
         return stats;
+    }
+
+    public async Task<List<CourseHistoryItem>> GetCourseHistoryAsync(string currentUserId, int count = 6)
+    {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+
+        var player = await _context.Players
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
+
+        if (player == null)
+            return new List<CourseHistoryItem>();
+
+        var rounds = await _context.Rounds
+            .AsNoTracking()
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId)
+                       && r.Status == RoundCompletionStatus.Completed)
+            .Include(r => r.Scores)
+            .ThenInclude(s => s.Hole)
+            .Include(r => r.GolfCourse)
+            .ThenInclude(gc => gc!.GolfClub)
+            .ToListAsync();
+
+        if (!rounds.Any())
+            return new List<CourseHistoryItem>();
+
+        var courseGroups = rounds
+            .GroupBy(r => r.GolfCourseId)
+            .Select(g =>
+            {
+                var courseRounds = g.OrderByDescending(r => r.DatePlayed).ToList();
+                var mostRecent = courseRounds.First();
+
+                // Calculate scores for each round at this course
+                var roundScores = courseRounds.Select(r => new
+                {
+                    Round = r,
+                    TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
+                    TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par)
+                }).Where(rs => rs.TotalScore > 0).ToList();
+
+                if (!roundScores.Any())
+                    return null;
+
+                var mostRecentScore = roundScores.First();
+                var bestRound = roundScores.OrderBy(rs => rs.TotalScore).First();
+
+                return new CourseHistoryItem
+                {
+                    GolfCourseId = g.Key,
+                    CourseName = mostRecent.GolfCourse?.Name ?? "Unknown",
+                    ClubName = mostRecent.GolfCourse?.GolfClub?.Name ?? "Unknown",
+                    LastPlayedDate = mostRecent.DatePlayed,
+                    MostRecentScore = mostRecentScore.TotalScore,
+                    MostRecentToPar = mostRecentScore.TotalScore - mostRecentScore.TotalPar,
+                    BestScore = bestRound.TotalScore,
+                    BestToPar = bestRound.TotalScore - bestRound.TotalPar,
+                    TimesPlayed = roundScores.Count
+                };
+            })
+            .Where(item => item != null)
+            .OrderByDescending(item => item!.LastPlayedDate)
+            .Take(count)
+            .ToList();
+
+        return courseGroups!;
     }
 }

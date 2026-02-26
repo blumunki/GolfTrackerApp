@@ -409,7 +409,7 @@ body {
 }
 
 .gp-dashboard-header {
-    margin-bottom: var(--gp-space-8);
+    margin-bottom: var(--gp-space-6);
 }
 
 .gp-dashboard-title {
@@ -417,11 +417,11 @@ body {
     font-size: var(--gp-text-3xl);
     font-weight: var(--gp-font-bold);
     color: var(--gp-neutral-900);
-    margin-bottom: var(--gp-space-2);
+    margin-bottom: var(--gp-space-1);
 }
 
 .gp-dashboard-subtitle {
-    font-size: var(--gp-text-lg);
+    font-size: var(--gp-text-base);
     color: var(--gp-neutral-500);
 }
 
@@ -439,6 +439,392 @@ body {
 @media (min-width: 1024px) {
     .gp-dashboard-grid {
         grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Clickable stat cards - extends .gp-stat-card */
+.gp-stat-card-clickable {
+    cursor: pointer;
+}
+
+/* =========================================================================
+   COURSE DIARY (Horizontal scroll)
+   ========================================================================= */
+.gp-course-diary-scroll {
+    display: flex;
+    gap: var(--gp-space-4);
+    overflow-x: auto;
+    padding: var(--gp-space-1) var(--gp-space-1) var(--gp-space-3);
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: var(--gp-primary-200) transparent;
+}
+
+.gp-course-diary-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+.gp-course-diary-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.gp-course-diary-scroll::-webkit-scrollbar-thumb {
+    background: var(--gp-primary-200);
+    border-radius: var(--gp-radius-full);
+}
+
+.gp-course-diary-card {
+    flex: 0 0 220px;
+    background: white;
+    border-radius: var(--gp-radius-xl);
+    border: 1px solid var(--gp-neutral-100);
+    box-shadow: var(--gp-shadow-sm);
+    overflow: hidden;
+    scroll-snap-align: start;
+    transition: all var(--gp-transition-base);
+    position: relative;
+}
+
+.gp-course-diary-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gp-gradient-primary);
+    opacity: 0;
+    transition: opacity var(--gp-transition-base);
+}
+
+.gp-course-diary-card:hover {
+    border-color: var(--gp-primary-200);
+    box-shadow: var(--gp-shadow-lg);
+    transform: translateY(-3px);
+}
+
+.gp-course-diary-card:hover::before {
+    opacity: 1;
+}
+
+.gp-course-diary-header {
+    padding: var(--gp-space-3) var(--gp-space-4) var(--gp-space-2);
+    background: linear-gradient(135deg, var(--gp-primary-50) 0%, #f0f7f0 100%);
+    border-bottom: 1px solid var(--gp-neutral-100);
+}
+
+.gp-course-diary-club {
+    font-size: var(--gp-text-xs);
+    font-weight: var(--gp-font-semibold);
+    color: var(--gp-primary-600);
+    text-transform: uppercase;
+    letter-spacing: var(--gp-tracking-wider);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gp-course-diary-name {
+    font-size: var(--gp-text-sm);
+    font-weight: var(--gp-font-bold);
+    color: var(--gp-neutral-900);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gp-course-diary-body {
+    padding: var(--gp-space-3) var(--gp-space-4);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--gp-space-2);
+}
+
+.gp-course-diary-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+}
+
+.gp-course-diary-stat-label {
+    font-size: var(--gp-text-xs);
+    color: var(--gp-neutral-500);
+    text-transform: uppercase;
+    letter-spacing: var(--gp-tracking-wider);
+    font-weight: var(--gp-font-medium);
+}
+
+.gp-course-diary-stat-value {
+    font-size: var(--gp-text-2xl);
+    font-weight: var(--gp-font-bold);
+    color: var(--gp-neutral-800);
+    line-height: 1.2;
+}
+
+.gp-course-diary-stat-value.gp-course-diary-best {
+    color: var(--gp-primary-500);
+}
+
+.gp-course-diary-stat-par {
+    font-size: var(--gp-text-xs);
+    font-weight: var(--gp-font-semibold);
+    border-radius: var(--gp-radius-full);
+    padding: 1px 6px;
+}
+
+.gp-course-diary-stat-par.good {
+    background: var(--gp-success-50);
+    color: var(--gp-success-700);
+}
+
+.gp-course-diary-stat-par.over {
+    background: var(--gp-warning-50);
+    color: var(--gp-warning-700);
+}
+
+.gp-course-diary-divider {
+    width: 1px;
+    height: 40px;
+    background: var(--gp-neutral-200);
+    flex-shrink: 0;
+}
+
+.gp-course-diary-footer {
+    padding: var(--gp-space-2) var(--gp-space-4);
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--gp-text-xs);
+    color: var(--gp-neutral-500);
+    border-top: 1px solid var(--gp-neutral-100);
+    background: var(--gp-neutral-50);
+}
+
+/* =========================================================================
+   SCORING BREAKDOWN (Stacked Bar)
+   ========================================================================= */
+.gp-scoring-breakdown {
+    padding: var(--gp-space-2) 0;
+}
+
+.gp-scoring-bar {
+    display: flex;
+    height: 28px;
+    border-radius: var(--gp-radius-full);
+    overflow: hidden;
+    box-shadow: var(--gp-shadow-inner);
+    margin-bottom: var(--gp-space-4);
+}
+
+.gp-scoring-segment {
+    transition: all var(--gp-transition-base);
+    min-width: 2px;
+    position: relative;
+}
+
+.gp-scoring-segment:hover {
+    filter: brightness(1.1);
+    transform: scaleY(1.1);
+}
+
+.gp-scoring-legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--gp-space-2);
+}
+
+.gp-scoring-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--gp-space-1);
+    padding: var(--gp-space-1) var(--gp-space-2);
+    border-radius: var(--gp-radius-md);
+    transition: background var(--gp-transition-fast);
+}
+
+.gp-scoring-legend-item:hover {
+    background: var(--gp-neutral-50);
+}
+
+.gp-scoring-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: var(--gp-radius-full);
+    flex-shrink: 0;
+}
+
+.gp-scoring-legend-label {
+    font-size: var(--gp-text-xs);
+    font-weight: var(--gp-font-medium);
+    color: var(--gp-neutral-700);
+}
+
+.gp-scoring-legend-value {
+    font-size: var(--gp-text-xs);
+    font-weight: var(--gp-font-bold);
+    color: var(--gp-neutral-900);
+    margin-left: auto;
+}
+
+.gp-scoring-legend-count {
+    font-size: var(--gp-text-xs);
+    color: var(--gp-neutral-400);
+}
+
+/* =========================================================================
+   PAR PERFORMANCE BARS
+   ========================================================================= */
+.gp-par-performance {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gp-space-5);
+    padding: var(--gp-space-2) 0;
+}
+
+.gp-par-row {
+    display: flex;
+    align-items: center;
+    gap: var(--gp-space-3);
+}
+
+.gp-par-label {
+    display: flex;
+    align-items: center;
+    gap: var(--gp-space-2);
+    font-size: var(--gp-text-sm);
+    font-weight: var(--gp-font-semibold);
+    color: var(--gp-neutral-700);
+    min-width: 64px;
+}
+
+.gp-par-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: var(--gp-radius-full);
+    flex-shrink: 0;
+}
+
+.gp-par-bar-track {
+    flex: 1;
+    height: 20px;
+    background: var(--gp-neutral-100);
+    border-radius: var(--gp-radius-full);
+    position: relative;
+    overflow: visible;
+}
+
+.gp-par-bar {
+    height: 100%;
+    border-radius: var(--gp-radius-full);
+    transition: width var(--gp-transition-slow);
+    opacity: 0.8;
+}
+
+.gp-par-line {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    background: var(--gp-neutral-900);
+    opacity: 0.3;
+    z-index: 1;
+}
+
+.gp-par-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 48px;
+}
+
+.gp-par-avg {
+    font-size: var(--gp-text-base);
+    font-weight: var(--gp-font-bold);
+    color: var(--gp-neutral-900);
+    line-height: 1.2;
+}
+
+.gp-par-rel {
+    font-size: var(--gp-text-xs);
+    font-weight: var(--gp-font-semibold);
+    border-radius: var(--gp-radius-full);
+    padding: 0 6px;
+}
+
+.gp-par-rel-good {
+    background: var(--gp-success-50);
+    color: var(--gp-success-700);
+}
+
+.gp-par-rel-over {
+    background: var(--gp-warning-50);
+    color: var(--gp-warning-700);
+}
+
+/* =========================================================================
+   INSIGHTS GRID
+   ========================================================================= */
+.gp-insights-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gp-space-3);
+}
+
+.gp-insight-item {
+    display: flex;
+    align-items: center;
+    gap: var(--gp-space-3);
+    padding: var(--gp-space-3);
+    border-radius: var(--gp-radius-lg);
+    border: 1px solid var(--gp-neutral-100);
+    transition: all var(--gp-transition-fast);
+}
+
+.gp-insight-item:hover {
+    border-color: var(--gp-primary-100);
+    background: var(--gp-neutral-50);
+}
+
+.gp-insight-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--gp-radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.gp-insight-content {
+    min-width: 0;
+}
+
+.gp-insight-title {
+    font-size: var(--gp-text-xs);
+    color: var(--gp-neutral-500);
+    font-weight: var(--gp-font-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--gp-tracking-wider);
+}
+
+.gp-insight-value {
+    font-size: var(--gp-text-lg);
+    font-weight: var(--gp-font-bold);
+    color: var(--gp-neutral-900);
+    line-height: 1.3;
+}
+
+@media (max-width: 599px) {
+    .gp-insights-grid {
+        grid-template-columns: 1fr;
+    }
+    .gp-scoring-legend {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .gp-course-diary-card {
+        flex: 0 0 180px;
     }
 }
 
@@ -614,10 +1000,20 @@ body {
     border-radius: var(--gp-radius-xl) !important;
 }
 
-/* Chart styling - don't override MudBlazor's internal chart sizing */
+/* Chart styling - ensure MudChart fills its container */
 .chart-container {
     width: 100%;
     overflow: hidden;
+}
+
+.mud-chart {
+    width: 100% !important;
+    display: block;
+}
+
+.mud-chart svg.mud-chart-line {
+    width: 100% !important;
+    display: block;
 }
 
 /* Ensure stat cards stretch to equal height within their grid row */

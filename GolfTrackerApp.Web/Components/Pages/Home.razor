@@ -24,7 +24,7 @@
 <AuthorizeView>
     <Authorized>
         <!-- ================================================================
-             PREMIUM AUTHENTICATED DASHBOARD
+             AUTHENTICATED DASHBOARD
              ================================================================ -->
         <div class="gp-dashboard">
             @if (isLoading)
@@ -41,7 +41,12 @@
                     <div class="d-flex justify-space-between align-center flex-wrap gap-4">
                         <div>
                             <MudText Typo="Typo.h4" Class="gp-dashboard-title">Welcome back! 👋</MudText>
-                            <MudText Typo="Typo.body1" Class="gp-dashboard-subtitle">Track your progress and celebrate your achievements</MudText>
+                            @if (dashboardStats.TotalRounds > 0)
+                            {
+                                <MudText Typo="Typo.body1" Class="gp-dashboard-subtitle">
+                                    @dashboardStats.TotalRounds rounds across @dashboardStats.UniqueCoursesPlayed courses at @dashboardStats.UniqueClubsVisited clubs
+                                </MudText>
+                            }
                         </div>
                         <MudButton Href="/rounds/record"
                                    Variant="Variant.Filled"
@@ -75,24 +80,21 @@
                 }
                 else
                 {
-                    <!-- Stats Cards Grid -->
+                    <!-- ========== ROW 1: Hero Stat Cards ========== -->
                     <MudGrid Spacing="4" Class="mb-6">
                         <MudItem xs="6" sm="6" md="3">
-                            <div class="gp-stat-card gp-animate-fade-in-up gp-animate-stagger-1">
-                                <div class="gp-stat-icon">🏌️</div>
+                            <div class="gp-stat-card gp-stat-card-clickable gp-animate-fade-in-up gp-animate-stagger-1" @onclick="@(() => NavigationManager.NavigateTo("/rounds"))">
+                                <div class="gp-stat-icon" style="background: #e8f5e9; color: #2e7d32;">🏌️</div>
                                 <div class="gp-stat-value">@dashboardStats.TotalRounds</div>
                                 <div class="gp-stat-label">Rounds Played</div>
-                                @if (dashboardStats.LastRoundDate.HasValue)
-                                {
-                                    <div class="gp-stat-trend gp-stat-trend-neutral">
-                                        📅 @dashboardStats.LastRoundDate.Value.ToString("MMM dd")
-                                    </div>
-                                }
+                                <div class="gp-stat-trend gp-stat-trend-neutral">
+                                    @dashboardStats.UniqueCoursesPlayed courses · @dashboardStats.UniqueClubsVisited clubs
+                                </div>
                             </div>
                         </MudItem>
                         <MudItem xs="6" sm="6" md="3">
-                            <div class="gp-stat-card gp-animate-fade-in-up gp-animate-stagger-2">
-                                <div class="gp-stat-icon">🏆</div>
+                            <div class="gp-stat-card gp-stat-card-clickable gp-animate-fade-in-up gp-animate-stagger-2" @onclick="@(() => NavigationManager.NavigateTo($"/players/{_currentPlayerId}/report"))">
+                                <div class="gp-stat-icon" style="background: #e3f2fd; color: #1565c0;">🏆</div>
                                 <div class="gp-stat-value">@(dashboardStats.BestScore?.ToString() ?? "—")</div>
                                 <div class="gp-stat-label">Best Score</div>
                                 @if (dashboardStats.LowestToPar.HasValue)
@@ -104,28 +106,30 @@
                             </div>
                         </MudItem>
                         <MudItem xs="6" sm="6" md="3">
-                            <div class="gp-stat-card gp-animate-fade-in-up gp-animate-stagger-3">
-                                <div class="gp-stat-icon">📊</div>
+                            <div class="gp-stat-card gp-stat-card-clickable gp-animate-fade-in-up gp-animate-stagger-3" @onclick="@(() => NavigationManager.NavigateTo($"/players/{_currentPlayerId}/report"))">
+                                <div class="gp-stat-icon" style="background: #fff3e0; color: #e65100;">📊</div>
                                 <div class="gp-stat-value">@(dashboardStats.AverageToPar?.ToString("+0.0;-0.0;E") ?? "—")</div>
                                 <div class="gp-stat-label">Avg. to Par</div>
                                 @if (dashboardStats.IsImprovingStreak)
                                 {
-                                    <div class="gp-stat-trend gp-stat-trend-up">
-                                        ↗️ Improving
-                                    </div>
+                                    <div class="gp-stat-trend gp-stat-trend-up">↗️ Improving</div>
+                                }
+                                else if (dashboardStats.TotalRounds >= 5)
+                                {
+                                    <div class="gp-stat-trend gp-stat-trend-neutral">📈 @dashboardStats.TotalRounds rounds tracked</div>
                                 }
                             </div>
                         </MudItem>
                         <MudItem xs="6" sm="6" md="3">
-                            <div class="gp-stat-card gp-animate-fade-in-up gp-animate-stagger-4">
-                                <div class="gp-stat-icon">⭐</div>
+                            <div class="gp-stat-card gp-stat-card-clickable gp-animate-fade-in-up gp-animate-stagger-4" @onclick="@(() => NavigationManager.NavigateTo("/golfclubs"))">
+                                <div class="gp-stat-icon" style="background: #f3e5f5; color: #7b1fa2;">⭐</div>
                                 <div class="gp-stat-value">@dashboardStats.FavoriteCourseRounds</div>
                                 <div class="gp-stat-label">Most Played</div>
                                 @if (!string.IsNullOrEmpty(dashboardStats.FavoriteCourseName))
                                 {
                                     <div class="gp-stat-trend gp-stat-trend-neutral" title="@dashboardStats.FavoriteCourseName">
-                                        @(dashboardStats.FavoriteCourseName.Length > 18 ? 
-                                          dashboardStats.FavoriteCourseName[..18] + "..." : 
+                                        @(dashboardStats.FavoriteCourseName.Length > 22 ? 
+                                          dashboardStats.FavoriteCourseName[..22] + "…" : 
                                           dashboardStats.FavoriteCourseName)
                                     </div>
                                 }
@@ -133,58 +137,14 @@
                         </MudItem>
                     </MudGrid>
 
-                    <!-- Main Dashboard Grid -->
-                    <MudGrid Spacing="4">
-                        <!-- Quick Actions Card -->
-                        <MudItem xs="12" md="4">
-                            <MudCard Class="gp-card h-100 gp-animate-fade-in-up gp-animate-stagger-2" Elevation="0">
-                                <MudCardHeader>
-                                    <CardHeaderContent>
-                                        <MudText Typo="Typo.h6">⚡ Quick Actions</MudText>
-                                    </CardHeaderContent>
-                                </MudCardHeader>
-                                <MudCardContent Class="d-flex flex-column gap-3">
-                                    <MudButton Href="/rounds/record"
-                                               Variant="Variant.Outlined"
-                                               Color="Color.Primary"
-                                               FullWidth="true"
-                                               StartIcon="@Icons.Material.Filled.Edit"
-                                               Class="justify-start">
-                                        Record a Round
-                                    </MudButton>
-                                    <MudButton Variant="Variant.Outlined"
-                                               FullWidth="true"
-                                               StartIcon="@Icons.Material.Filled.FiberManualRecord"
-                                               Disabled="true"
-                                               Class="justify-start">
-                                        Live Scoring (Coming Soon)
-                                    </MudButton>
-                                    <MudButton Href="@($"/players/{_currentPlayerId}/report")"
-                                               Variant="Variant.Outlined"
-                                               Color="Color.Primary"
-                                               FullWidth="true"
-                                               StartIcon="@Icons.Material.Filled.Analytics"
-                                               Class="justify-start">
-                                        View Full Report
-                                    </MudButton>
-                                    <MudButton Href="/golfclubs"
-                                               Variant="Variant.Outlined"
-                                               Color="Color.Primary"
-                                               FullWidth="true"
-                                               StartIcon="@Icons.Material.Filled.Explore"
-                                               Class="justify-start">
-                                        Explore Courses
-                                    </MudButton>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
-
-                        <!-- Performance Chart -->
+                    <!-- ========== ROW 2: Performance Chart + Par Performance ========== -->
+                    <MudGrid Spacing="4" Class="mb-6">
                         <MudItem xs="12" md="8">
-                            <MudCard Class="gp-card h-100 gp-animate-fade-in-up gp-animate-stagger-3" Elevation="0">
+                            <MudCard Class="gp-card gp-animate-fade-in-up h-100" Elevation="0">
                                 <MudCardHeader>
                                     <CardHeaderContent>
-                                        <MudText Typo="Typo.h6">📈 Recent Performance</MudText>
+                                        <MudText Typo="Typo.h6">📈 Performance Trend</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">Last 10 rounds — Score vs Par</MudText>
                                     </CardHeaderContent>
                                     <CardHeaderActions>
                                         <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" 
@@ -193,20 +153,22 @@
                                                        Size="Size.Small" />
                                     </CardHeaderActions>
                                 </MudCardHeader>
-                                <MudCardContent Class="pa-4">
+                                <MudCardContent Class="pa-4" Style="width: 100%; overflow: hidden;">
                                     @if (_performanceSeries is not null && _performanceSeries.Any())
                                     {
-                                        <MudChart ChartType="ChartType.Line" 
-                                                 ChartSeries="@_performanceSeries" 
-                                                 XAxisLabels="@_performanceXAxisLabels" 
-                                                 Width="100%" 
-                                                 Height="280px"
-                                                 ChartOptions="@_chartOptions"
-                                                 AxisChartOptions="@_axisChartOptions" />
+                                        <div style="width: 100%; min-height: 280px;">
+                                            <MudChart ChartType="ChartType.Line" 
+                                                     ChartSeries="@_performanceSeries" 
+                                                     XAxisLabels="@_performanceXAxisLabels" 
+                                                     Width="100%" 
+                                                     Height="280px"
+                                                     ChartOptions="@_chartOptions"
+                                                     AxisChartOptions="@_axisChartOptions" />
+                                        </div>
                                     }
                                     else
                                     {
-                                        <div class="text-center pa-8">
+                                        <div class="text-center pa-6">
                                             <MudIcon Icon="@Icons.Material.Filled.Timeline" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
                                             <MudText Color="Color.Secondary">Play a few rounds to see your trends</MudText>
                                         </div>
@@ -214,10 +176,247 @@
                                 </MudCardContent>
                             </MudCard>
                         </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudCard Class="gp-card gp-animate-fade-in-up h-100" Elevation="0">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">🎯 Par Performance</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    @if (_performanceByPar is not null && _performanceByPar.HasValidData)
+                                    {
+                                        <div class="gp-par-performance">
+                                            @{
+                                                var parData = new[] {
+                                                    (Label: "Par 3", Avg: _performanceByPar.Par3Average, RelToPar: _performanceByPar.Par3RelativeToPar, Count: _performanceByPar.Par3Count, Color: "#2e7d32", BasePar: 3),
+                                                    (Label: "Par 4", Avg: _performanceByPar.Par4Average, RelToPar: _performanceByPar.Par4RelativeToPar, Count: _performanceByPar.Par4Count, Color: "#1565c0", BasePar: 4),
+                                                    (Label: "Par 5", Avg: _performanceByPar.Par5Average, RelToPar: _performanceByPar.Par5RelativeToPar, Count: _performanceByPar.Par5Count, Color: "#7b1fa2", BasePar: 5),
+                                                };
+                                            }
+                                            @foreach (var p in parData)
+                                            {
+                                                @if (p.Count > 0)
+                                                {
+                                                    <div class="gp-par-row">
+                                                        <div class="gp-par-label">
+                                                            <span class="gp-par-dot" style="background: @p.Color;"></span>
+                                                            @p.Label
+                                                        </div>
+                                                        <div class="gp-par-bar-track">
+                                                            @{
+                                                                var barWidth = Math.Min(100, (p.Avg / (p.BasePar + 2)) * 100);
+                                                                var parLinePos = (double)p.BasePar / (p.BasePar + 2) * 100;
+                                                            }
+                                                            <div class="gp-par-bar" style="width: @(barWidth.ToString("F0"))%; background: @p.Color;"></div>
+                                                            <div class="gp-par-line" style="left: @(parLinePos.ToString("F0"))%;" title="Par @p.BasePar"></div>
+                                                        </div>
+                                                        <div class="gp-par-stats">
+                                                            <span class="gp-par-avg">@p.Avg.ToString("F1")</span>
+                                                            <span class="gp-par-rel @(p.RelToPar <= 0 ? "gp-par-rel-good" : "gp-par-rel-over")">
+                                                                @(p.RelToPar >= 0 ? "+" : "")@p.RelToPar.ToString("F1")
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }
+                                        </div>
+                                        <div class="mt-3">
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
+                                                Vertical line = par · Based on @((_performanceByPar.Par3Count + _performanceByPar.Par4Count + _performanceByPar.Par5Count).ToString("N0")) holes
+                                            </MudText>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-center pa-6">
+                                            <MudIcon Icon="@Icons.Material.Filled.FlagCircle" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+                                            <MudText Color="Color.Secondary">Record more rounds for par analysis</MudText>
+                                        </div>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
 
+                    <!-- ========== ROW 3: Course Diary ========== -->
+                    @if (_courseHistory is not null && _courseHistory.Any())
+                    {
+                        <div class="gp-animate-fade-in-up mb-6">
+                            <div class="d-flex justify-space-between align-center mb-3">
+                                <div>
+                                    <MudText Typo="Typo.h6">🗺️ Your Course Diary</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">Recent courses with your best & latest scores</MudText>
+                                </div>
+                                <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/golfclubs" EndIcon="@Icons.Material.Filled.ArrowForward" Size="Size.Small">
+                                    All Courses
+                                </MudButton>
+                            </div>
+                            <div class="gp-course-diary-scroll">
+                                @foreach (var course in _courseHistory)
+                                {
+                                    <div class="gp-course-diary-card">
+                                        <div class="gp-course-diary-header">
+                                            <div class="gp-course-diary-club">@course.ClubName</div>
+                                            <div class="gp-course-diary-name">@course.CourseName</div>
+                                        </div>
+                                        <div class="gp-course-diary-body">
+                                            <div class="gp-course-diary-stat">
+                                                <span class="gp-course-diary-stat-label">Latest</span>
+                                                <span class="gp-course-diary-stat-value">@course.MostRecentScore</span>
+                                                <span class="gp-course-diary-stat-par @(course.MostRecentToPar <= 0 ? "good" : "over")">
+                                                    @(course.MostRecentToPar >= 0 ? "+" : "")@course.MostRecentToPar
+                                                </span>
+                                            </div>
+                                            <div class="gp-course-diary-divider"></div>
+                                            <div class="gp-course-diary-stat">
+                                                <span class="gp-course-diary-stat-label">Best</span>
+                                                <span class="gp-course-diary-stat-value gp-course-diary-best">@course.BestScore</span>
+                                                <span class="gp-course-diary-stat-par @(course.BestToPar <= 0 ? "good" : "over")">
+                                                    @(course.BestToPar >= 0 ? "+" : "")@course.BestToPar
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="gp-course-diary-footer">
+                                            <span>@course.TimesPlayed round@(course.TimesPlayed != 1 ? "s" : "")</span>
+                                            <span>@course.LastPlayedDate.ToString("dd MMM yyyy")</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <!-- ========== ROW 4: Scoring Distribution + Quick Insights ========== -->
+                    <MudGrid Spacing="4" Class="mb-6">
+                        <!-- Scoring Distribution -->
+                        <MudItem xs="12" md="6">
+                            <MudCard Class="gp-card gp-animate-fade-in-up h-100" Elevation="0">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">🎨 Scoring Breakdown</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">How you score across all holes</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    @if (_scoringDistribution is not null && _scoringDistribution.TotalHoles > 0)
+                                    {
+                                        <div class="gp-scoring-breakdown">
+                                            <!-- Stacked Bar -->
+                                            <div class="gp-scoring-bar">
+                                                @if (_scoringDistribution.EagleCount > 0)
+                                                {
+                                                    <div class="gp-scoring-segment" style="width: @(_scoringDistribution.EaglePercentage.ToString("F1"))%; background: #1565c0;" title="Eagle: @_scoringDistribution.EagleCount"></div>
+                                                }
+                                                @if (_scoringDistribution.BirdieCount > 0)
+                                                {
+                                                    <div class="gp-scoring-segment" style="width: @(_scoringDistribution.BirdiePercentage.ToString("F1"))%; background: #2e7d32;" title="Birdie: @_scoringDistribution.BirdieCount"></div>
+                                                }
+                                                @if (_scoringDistribution.ParCount > 0)
+                                                {
+                                                    <div class="gp-scoring-segment" style="width: @(_scoringDistribution.ParPercentage.ToString("F1"))%; background: #43a047;" title="Par: @_scoringDistribution.ParCount"></div>
+                                                }
+                                                @if (_scoringDistribution.BogeyCount > 0)
+                                                {
+                                                    <div class="gp-scoring-segment" style="width: @(_scoringDistribution.BogeyPercentage.ToString("F1"))%; background: #ef6c00;" title="Bogey: @_scoringDistribution.BogeyCount"></div>
+                                                }
+                                                @if (_scoringDistribution.DoubleBogeyCount > 0)
+                                                {
+                                                    <div class="gp-scoring-segment" style="width: @(_scoringDistribution.DoubleBogeyPercentage.ToString("F1"))%; background: #c62828;" title="Double: @_scoringDistribution.DoubleBogeyCount"></div>
+                                                }
+                                                @if (_scoringDistribution.TripleBogeyOrWorseCount > 0)
+                                                {
+                                                    <div class="gp-scoring-segment" style="width: @(_scoringDistribution.TripleBogeyOrWorsePercentage.ToString("F1"))%; background: #880e4f;" title="Triple+: @_scoringDistribution.TripleBogeyOrWorseCount"></div>
+                                                }
+                                            </div>
+                                            <!-- Legend -->
+                                            <div class="gp-scoring-legend">
+                                                @{
+                                                    var scoringItems = new[] {
+                                                        (Label: "Eagle", Count: _scoringDistribution.EagleCount, Pct: _scoringDistribution.EaglePercentage, Color: "#1565c0"),
+                                                        (Label: "Birdie", Count: _scoringDistribution.BirdieCount, Pct: _scoringDistribution.BirdiePercentage, Color: "#2e7d32"),
+                                                        (Label: "Par", Count: _scoringDistribution.ParCount, Pct: _scoringDistribution.ParPercentage, Color: "#43a047"),
+                                                        (Label: "Bogey", Count: _scoringDistribution.BogeyCount, Pct: _scoringDistribution.BogeyPercentage, Color: "#ef6c00"),
+                                                        (Label: "Double", Count: _scoringDistribution.DoubleBogeyCount, Pct: _scoringDistribution.DoubleBogeyPercentage, Color: "#c62828"),
+                                                        (Label: "Triple+", Count: _scoringDistribution.TripleBogeyOrWorseCount, Pct: _scoringDistribution.TripleBogeyOrWorsePercentage, Color: "#880e4f"),
+                                                    };
+                                                }
+                                                @foreach (var item in scoringItems.Where(i => i.Count > 0))
+                                                {
+                                                    <div class="gp-scoring-legend-item">
+                                                        <span class="gp-scoring-legend-dot" style="background: @item.Color;"></span>
+                                                        <span class="gp-scoring-legend-label">@item.Label</span>
+                                                        <span class="gp-scoring-legend-value">@item.Pct.ToString("F1")%</span>
+                                                        <span class="gp-scoring-legend-count">(@item.Count)</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2" Align="Align.Center">
+                                                @_scoringDistribution.TotalHoles.ToString("N0") holes analysed
+                                            </MudText>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="text-center pa-6">
+                                            <MudIcon Icon="@Icons.Material.Filled.PieChart" Size="Size.Large" Color="Color.Secondary" Class="mb-3" />
+                                            <MudText Color="Color.Secondary">Score some rounds to see your breakdown</MudText>
+                                        </div>
+                                    }
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+
+                        <!-- Round Type Insights -->
+                        <MudItem xs="12" md="6">
+                            <MudCard Class="gp-card gp-animate-fade-in-up h-100" Elevation="0">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">📋 Round Insights</MudText>
+                                    </CardHeaderContent>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <div class="gp-insights-grid">
+                                        <!-- 9 vs 18 hole split -->
+                                        <div class="gp-insight-item">
+                                            <div class="gp-insight-icon" style="background: #e8f5e9; color: #2e7d32;">⛳</div>
+                                            <div class="gp-insight-content">
+                                                <div class="gp-insight-title">18-Hole Rounds</div>
+                                                <div class="gp-insight-value">@dashboardStats.EighteenHoleRounds</div>
+                                            </div>
+                                        </div>
+                                        <div class="gp-insight-item">
+                                            <div class="gp-insight-icon" style="background: #e3f2fd; color: #1565c0;">🏳️</div>
+                                            <div class="gp-insight-content">
+                                                <div class="gp-insight-title">9-Hole Rounds</div>
+                                                <div class="gp-insight-value">@dashboardStats.NineHoleRounds</div>
+                                            </div>
+                                        </div>
+                                        <div class="gp-insight-item">
+                                            <div class="gp-insight-icon" style="background: #fff3e0; color: #e65100;">📅</div>
+                                            <div class="gp-insight-content">
+                                                <div class="gp-insight-title">Last Played</div>
+                                                <div class="gp-insight-value">@(dashboardStats.LastRoundDate?.ToString("dd MMM") ?? "—")</div>
+                                            </div>
+                                        </div>
+                                        <div class="gp-insight-item">
+                                            <div class="gp-insight-icon" style="background: #f3e5f5; color: #7b1fa2;">🎯</div>
+                                            <div class="gp-insight-content">
+                                                <div class="gp-insight-title">Average Score</div>
+                                                <div class="gp-insight-value">@(dashboardStats.AverageScore?.ToString("F1") ?? "—")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    </MudGrid>
+
+                    <!-- ========== ROW 5: Recent Rounds + Playing Partners ========== -->
+                    <MudGrid Spacing="4">
                         <!-- Recent Rounds -->
                         <MudItem xs="12" md="6">
-                            <MudCard Class="gp-card h-100 gp-animate-fade-in-up gp-animate-stagger-4" Elevation="0">
+                            <MudCard Class="gp-card h-100 gp-animate-fade-in-up" Elevation="0">
                                 <MudCardHeader>
                                     <CardHeaderContent>
                                         <MudText Typo="Typo.h6">🏌️ Recent Rounds</MudText>
@@ -245,12 +444,23 @@
                                                 var totalScore = round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes);
                                                 var totalPar = round.Scores.Where(s => s.PlayerId == _currentPlayerId && s.Hole != null).Sum(s => s.Hole!.Par);
                                                 var toPar = totalScore - totalPar;
+                                                var clubName = round.GolfCourse?.GolfClub?.Name;
+                                                var courseName = round.GolfCourse?.Name;
                                                 
                                                 <MudListItem T="Round" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
                                                     <div class="d-flex justify-space-between align-center w-100">
                                                         <div>
-                                                            <MudText Typo="Typo.body2" Class="font-weight-medium">@round.GolfCourse?.Name</MudText>
-                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@round.DatePlayed.ToString("MMM dd, yyyy")</MudText>
+                                                            <MudText Typo="Typo.body2" Class="font-weight-medium">
+                                                                @if (!string.IsNullOrEmpty(clubName))
+                                                                {
+                                                                    @clubName<text> – </text>@courseName
+                                                                }
+                                                                else
+                                                                {
+                                                                    @courseName
+                                                                }
+                                                            </MudText>
+                                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@round.DatePlayed.ToString("ddd, dd MMM yyyy")</MudText>
                                                         </div>
                                                         <div class="text-right">
                                                             <MudText Typo="Typo.body1" Class="font-weight-bold">@totalScore</MudText>
@@ -269,7 +479,7 @@
 
                         <!-- Playing Partners -->
                         <MudItem xs="12" md="6">
-                            <MudCard Class="gp-card h-100 gp-animate-fade-in-up gp-animate-stagger-5" Elevation="0">
+                            <MudCard Class="gp-card h-100 gp-animate-fade-in-up" Elevation="0">
                                 <MudCardHeader>
                                     <CardHeaderContent>
                                         <MudText Typo="Typo.h6">👥 Playing Partners</MudText>
@@ -533,6 +743,9 @@
     private List<ChartSeries> _performanceSeries = new();
     private string[] _performanceXAxisLabels = Array.Empty<string>();
     private List<Round>? recentRounds;
+    private List<CourseHistoryItem>? _courseHistory;
+    private ScoringDistribution? _scoringDistribution;
+    private PerformanceByPar? _performanceByPar;
 
     // Data for public landing page
     private int totalGolfClubs = 0;
@@ -574,15 +787,21 @@
                 // Load data for all cards in parallel for efficiency
                 var dashboardStatsTask = ReportService.GetDashboardStatsAsync(currentUserId);
                 var partnerTask = ReportService.GetPlayingPartnerSummaryAsync(currentUserId, 5);
-                var performanceTask = ReportService.GetPlayerPerformanceSummaryAsync(currentUserId, 7);
+                var performanceTask = ReportService.GetPlayerPerformanceSummaryAsync(currentUserId, 10);
                 var recentRoundsTask = RoundService.GetRecentRoundsAsync(currentUserId, isAdmin, 5);
+                var courseHistoryTask = ReportService.GetCourseHistoryAsync(currentUserId, 6);
+                var scoringDistTask = ReportService.GetScoringDistributionAsync(player.PlayerId, null, null, null, null, null);
+                var parPerfTask = ReportService.GetPerformanceByParAsync(player.PlayerId, null, null, null, null, null);
 
-                await Task.WhenAll(dashboardStatsTask, partnerTask, performanceTask, recentRoundsTask);
+                await Task.WhenAll(dashboardStatsTask, partnerTask, performanceTask, recentRoundsTask, courseHistoryTask, scoringDistTask, parPerfTask);
 
                 dashboardStats = dashboardStatsTask.Result;
                 partnerSummary = partnerTask.Result;
                 PreparePerformanceChart(performanceTask.Result);
                 recentRounds = recentRoundsTask.Result;
+                _courseHistory = courseHistoryTask.Result;
+                _scoringDistribution = scoringDistTask.Result;
+                _performanceByPar = parPerfTask.Result;
             }
         }
         else
