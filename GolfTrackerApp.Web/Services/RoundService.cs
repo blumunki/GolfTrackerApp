@@ -70,7 +70,7 @@ namespace GolfTrackerApp.Web.Services
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
-            var round = await _context.Rounds.Include(r => r.RoundPlayers).Include(r => r.Scores).FirstOrDefaultAsync(r => r.RoundId == id);
+            var round = await _context.Rounds.Include(r => r.RoundPlayers).Include(r => r.Scores).AsSplitQuery().FirstOrDefaultAsync(r => r.RoundId == id);
             if (round == null) return false;
 
             _context.Scores.RemoveRange(round.Scores); // Remove dependent scores
@@ -89,7 +89,8 @@ namespace GolfTrackerApp.Web.Services
                                             .ThenInclude(gc => gc!.GolfClub)
                                         .Include(r => r.RoundPlayers!)
                                             .ThenInclude(rp => rp!.Player!) // Ensure Player is included for filtering
-                                                .ThenInclude(p => p!.ApplicationUser); // For checking linked user
+                                                .ThenInclude(p => p!.ApplicationUser)
+                                        .AsSplitQuery(); // For checking linked user
 
             if (!isUserAdmin)
             {
@@ -118,6 +119,7 @@ namespace GolfTrackerApp.Web.Services
                                     .ThenInclude(s => s!.Hole)
                                 .Include(r => r.RoundPlayers!)
                                     .ThenInclude(rp => rp!.Player)
+                                .AsSplitQuery()
                                 .FirstOrDefaultAsync(r => r.RoundId == id);
         }
 
@@ -256,7 +258,8 @@ namespace GolfTrackerApp.Web.Services
                                         .Include(r => r.GolfCourse!)
                                             .ThenInclude(gc => gc!.GolfClub)
                                         .Include(r => r.Scores!)
-                                            .ThenInclude(s => s.Hole);
+                                            .ThenInclude(s => s.Hole)
+                                        .AsSplitQuery();
 
             // The filter is now applied to EVERYONE, including admins.
             query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == currentPlayer.PlayerId));
@@ -276,7 +279,8 @@ namespace GolfTrackerApp.Web.Services
                                         .Include(r => r.RoundPlayers!)
                                             .ThenInclude(rp => rp!.Player!)
                                         .Include(r => r.Scores!)
-                                            .ThenInclude(s => s.Hole!);
+                                            .ThenInclude(s => s.Hole!)
+                                        .AsSplitQuery();
 
             if (!isUserAdmin)
             {
@@ -377,6 +381,7 @@ namespace GolfTrackerApp.Web.Services
                 .Include(r => r.GolfCourse)
                     .ThenInclude(gc => gc!.Holes)
                 .Include(r => r.Scores)
+                .AsSplitQuery()
                 .OrderByDescending(r => r.DatePlayed)
                 .Take(count)
                 .ToListAsync();
@@ -401,6 +406,7 @@ namespace GolfTrackerApp.Web.Services
                 .Include(r => r.GolfCourse)
                     .ThenInclude(gc => gc!.Holes)
                 .Include(r => r.Scores)
+                .AsSplitQuery()
                 .OrderByDescending(r => r.DatePlayed)
                 .Take(count)
                 .ToListAsync();

@@ -60,6 +60,7 @@ public class RoundsController : BaseApiController
                 .Include(r => r.RoundPlayers)
                     .ThenInclude(rp => rp!.Player)
                 .Include(r => r.Scores)
+                .AsSplitQuery()
                 .OrderByDescending(r => r.DatePlayed)
                 .ToListAsync();
 
@@ -92,23 +93,57 @@ public class RoundsController : BaseApiController
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<Round>> GetRound(int id)
+    public async Task<ActionResult<RoundResponse>> GetRound(int id)
     {
         try
         {
+            // Determine the current user's player ID for per-user score
+            var userId = GetCurrentUserId();
+            var currentPlayer = await _context.Players
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
+            var currentPlayerId = currentPlayer?.PlayerId;
+
             var round = await _context.Rounds
                 .Include(r => r.GolfCourse)
-                .ThenInclude(gc => gc!.GolfClub)
+                    .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.GolfCourse)
+                    .ThenInclude(gc => gc!.Holes)
                 .Include(r => r.RoundPlayers)
-                .ThenInclude(rp => rp!.Player)
+                    .ThenInclude(rp => rp!.Player)
                 .Include(r => r.Scores)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(r => r.RoundId == id);
                 
             if (round == null)
             {
                 return NotFound($"Round with ID {id} not found");
             }
-            return Ok(round);
+
+            var response = new RoundResponse
+            {
+                RoundId = round.RoundId,
+                GolfCourseId = round.GolfCourseId,
+                DatePlayed = round.DatePlayed,
+                StartingHole = round.StartingHole,
+                HolesPlayed = round.HolesPlayed,
+                RoundType = round.RoundType.ToString(),
+                Notes = round.Notes,
+                Status = round.Status.ToString(),
+                CreatedByApplicationUserId = round.CreatedByApplicationUserId,
+                CourseName = round.GolfCourse?.Name ?? "Unknown",
+                ClubName = round.GolfCourse?.GolfClub?.Name ?? "Unknown",
+                TotalScore = currentPlayerId.HasValue
+                    ? round.Scores.Where(s => s.PlayerId == currentPlayerId.Value).Sum(s => s.Strokes)
+                    : round.Scores.Sum(s => s.Strokes),
+                TotalPar = ComputeRoundPar(round),
+                PlayerCount = round.RoundPlayers.Count,
+                PlayingPartners = round.RoundPlayers
+                    .Select(rp => rp.Player != null ? $"{rp.Player.FirstName} {rp.Player.LastName}" : "Unknown")
+                    .ToList()
+            };
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
@@ -176,9 +211,12 @@ public class RoundsController : BaseApiController
             var savedRound = await _context.Rounds
                 .Include(r => r.GolfCourse)
                     .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.GolfCourse)
+                    .ThenInclude(gc => gc!.Holes)
                 .Include(r => r.RoundPlayers)
                     .ThenInclude(rp => rp!.Player)
                 .Include(r => r.Scores)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(r => r.RoundId == round.RoundId);
             
             if (savedRound == null)
@@ -201,7 +239,7 @@ public class RoundsController : BaseApiController
                 CourseName = savedRound.GolfCourse?.Name ?? "Unknown",
                 ClubName = savedRound.GolfCourse?.GolfClub?.Name ?? "Unknown",
                 TotalScore = savedRound.Scores.Sum(s => s.Strokes),
-                TotalPar = savedRound.GolfCourse?.DefaultPar ?? 0,
+                TotalPar = ComputeRoundPar(savedRound),
                 PlayerCount = savedRound.RoundPlayers.Count,
                 PlayingPartners = savedRound.RoundPlayers
                     .Select(rp => rp.Player != null ? $"{rp.Player.FirstName} {rp.Player.LastName}" : "Unknown")

@@ -793,6 +793,7 @@ public class ReportService : IReportService
             .ThenInclude(s => s.Hole)
             .Include(r => r.RoundPlayers)
             .ThenInclude(rp => rp.Player)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(r => r.RoundId == roundId);
 
         if (round == null) return null;
