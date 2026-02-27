@@ -97,6 +97,12 @@ public static class MauiProgram
 #endif
 			;
 
+	builder.Services.AddHttpClient<IConnectionApiService, ConnectionApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
 		builder.Services.AddHttpClient<IRoundApiService, RoundApiService>(httpClientBuilder)
 #if DEBUG
 			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)

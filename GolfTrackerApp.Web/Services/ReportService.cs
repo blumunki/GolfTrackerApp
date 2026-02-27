@@ -832,4 +832,95 @@ public class ReportService : IReportService
 
         return detail;
     }
+
+    public async Task<PlayerQuickStats> GetPlayerQuickStatsAsync(int playerId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var rounds = await context.Rounds
+            .AsNoTracking()
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed)
+            .Select(r => new
+            {
+                r.DatePlayed,
+                TotalScore = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Strokes),
+                TotalPar = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Hole!.Par)
+            })
+            .ToListAsync();
+
+        if (!rounds.Any())
+        {
+            return new PlayerQuickStats { PlayerId = playerId };
+        }
+
+        var validScores = rounds.Where(r => r.TotalScore > 0).ToList();
+
+        return new PlayerQuickStats
+        {
+            PlayerId = playerId,
+            RoundCount = rounds.Count,
+            BestScore = validScores.Any() ? validScores.Min(r => r.TotalScore) : null,
+            AverageScore = validScores.Any() ? validScores.Average(r => (double)r.TotalScore) : null,
+            LastPlayed = rounds.Max(r => r.DatePlayed),
+            AverageVsPar = validScores.Any() ? validScores.Average(r => (double)(r.TotalScore - r.TotalPar)) : null
+        };
+    }
+
+    public async Task<Dictionary<int, PlayerQuickStats>> GetBatchPlayerQuickStatsAsync(IEnumerable<int> playerIds)
+    {
+        var ids = playerIds.ToList();
+        if (!ids.Any()) return new Dictionary<int, PlayerQuickStats>();
+
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        // Step 1: Get round IDs and dates for these players (SQLite-friendly, no APPLY)
+        var roundPlayerData = await context.RoundPlayers
+            .AsNoTracking()
+            .Where(rp => ids.Contains(rp.PlayerId))
+            .Join(context.Rounds.Where(r => r.Status == RoundCompletionStatus.Completed),
+                  rp => rp.RoundId, r => r.RoundId,
+                  (rp, r) => new { rp.PlayerId, r.RoundId, r.DatePlayed })
+            .ToListAsync();
+
+        var roundIds = roundPlayerData.Select(r => r.RoundId).Distinct().ToList();
+
+        // Step 2: Get scores for those rounds and players
+        var scores = await context.Scores
+            .AsNoTracking()
+            .Where(s => roundIds.Contains(s.RoundId) && ids.Contains(s.PlayerId))
+            .Select(s => new { s.PlayerId, s.RoundId, s.Strokes, HolePar = s.Hole!.Par })
+            .ToListAsync();
+
+        // Step 3: Compute stats in memory
+        var scoresByPlayerRound = scores
+            .GroupBy(s => new { s.PlayerId, s.RoundId })
+            .Select(g => new
+            {
+                g.Key.PlayerId,
+                g.Key.RoundId,
+                TotalScore = g.Sum(s => s.Strokes),
+                TotalPar = g.Sum(s => s.HolePar)
+            })
+            .ToList();
+
+        var result = new Dictionary<int, PlayerQuickStats>();
+        foreach (var id in ids)
+        {
+            var playerRoundDates = roundPlayerData.Where(r => r.PlayerId == id).ToList();
+            var playerScores = scoresByPlayerRound.Where(s => s.PlayerId == id).ToList();
+            var validScores = playerScores.Where(s => s.TotalScore > 0).ToList();
+
+            result[id] = new PlayerQuickStats
+            {
+                PlayerId = id,
+                RoundCount = playerRoundDates.Count,
+                BestScore = validScores.Any() ? validScores.Min(r => r.TotalScore) : null,
+                AverageScore = validScores.Any() ? validScores.Average(r => (double)r.TotalScore) : null,
+                LastPlayed = playerRoundDates.Any() ? playerRoundDates.Max(r => r.DatePlayed) : null,
+                AverageVsPar = validScores.Any() ? validScores.Average(r => (double)(r.TotalScore - r.TotalPar)) : null
+            };
+        }
+
+        return result;
+    }
 }

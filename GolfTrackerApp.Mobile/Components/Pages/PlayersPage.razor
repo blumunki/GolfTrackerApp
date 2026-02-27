@@ -3,281 +3,424 @@
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Services
-@using System.Text.Json
-@inject HttpClient Http
-@inject IPlayerApiService PlayerApiService
-@inject IJSRuntime JSRuntime
+@inject IPlayerApiService PlayerApi
+@inject IConnectionApiService ConnectionApi
+@inject AuthenticationStateService AuthState
 @inject NavigationManager NavigationManager
-@inject INavigationService NavigationService
+@inject IJSRuntime JSRuntime
+@inject ILogger<PlayersPage> Logger
 
-<MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
-    <!-- Header and Add Actions -->
-    <div class="d-flex align-center justify-space-between mb-4">
-        <MudText Typo="Typo.h4" Color="Color.Primary">👥 Players</MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.Add" 
-                      Color="Color.Primary" 
-                      Size="Size.Large"
-                      OnClick="@(() => ShowAddPlayerDialog())" />
-    </div>
-    
-    <!-- Search Bar -->
-    <MudPaper Class="pa-3 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);">
-        <MudTextField @bind-Value="searchString" 
-                      Label="Search players by name..." 
-                      Variant="Variant.Outlined" 
-                      Adornment="Adornment.Start" 
-                      AdornmentIcon="@Icons.Material.Filled.Search" 
-                      DebounceInterval="300" 
-                      OnDebounceIntervalElapsed="OnSearchTextChanged"
-                      Margin="Margin.Dense"
-                      FullWidth="true" />
-    </MudPaper>
-    
+<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
     @if (loading)
     {
-        <div class="text-center pa-4">
+        <div style="text-align:center; padding:48px;">
             <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
-            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading players...</MudText>
-        </div>
-    }
-    else if (filteredPlayers?.Any() == true)
-    {
-        <MudList T="object" Class="players-list">
-            @foreach (var player in filteredPlayers)
-            {
-                <MudListItem T="object" Class="player-list-item">
-                    <MudCard Elevation="2" 
-                             Class="mb-3 player-card" 
-                             Style="border-left: 4px solid #667eea; cursor: pointer; transition: all 0.2s ease;"
-                             @onclick="@(() => ShowPlayerDetails(player))">
-                        <MudCardContent Class="pa-3">
-                            <div class="d-flex justify-space-between align-start">
-                                <!-- Main Player Info -->
-                                <div class="flex-grow-1">
-                                    <div class="d-flex align-center mb-2">
-                                        <MudAvatar Color="Color.Primary" Size="Size.Medium" Class="mr-3">
-                                            @(GetPlayerInitials(player))
-                                        </MudAvatar>
-                                        <div>
-                                            <MudText Typo="Typo.h6" Style="font-weight: 600;">
-                                                @player.FirstName @player.LastName
-                                            </MudText>
-                                            @if (player.Handicap.HasValue)
-                                            {
-                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                    Handicap: @player.Handicap.Value.ToString("F1")
-                                                </MudText>
-                                            }
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="d-flex align-center gap-4">
-                                        @if (!string.IsNullOrEmpty(player.Email))
-                                        {
-                                            <div class="d-flex align-center">
-                                                <MudIcon Icon="@Icons.Material.Filled.Email" 
-                                                        Size="Size.Small" 
-                                                        Class="mr-1" 
-                                                        Color="Color.Info" />
-                                                <MudText Typo="Typo.caption">
-                                                    @player.Email
-                                                </MudText>
-                                            </div>
-                                        }
-                                        
-                                        @if (!string.IsNullOrEmpty(player.Phone))
-                                        {
-                                            <div class="d-flex align-center">
-                                                <MudIcon Icon="@Icons.Material.Filled.Phone" 
-                                                        Size="Size.Small" 
-                                                        Class="mr-1" 
-                                                        Color="Color.Success" />
-                                                <MudText Typo="Typo.caption">
-                                                    @player.Phone
-                                                </MudText>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                                
-                                <!-- Quick Actions -->
-                                <div class="d-flex flex-column align-center ml-2">
-                                    <MudIconButton Icon="@Icons.Material.Filled.Assessment" 
-                                                  Color="Color.Primary" 
-                                                  Size="Size.Small"
-                                                  title="View Report"
-                                                  OnClick="@(() => ViewPlayerReport(player))" />
-                                    <MudMenu>
-                                        <ActivatorContent>
-                                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" 
-                                                          Color="Color.Secondary" 
-                                                          Size="Size.Small" />
-                                        </ActivatorContent>
-                                        <ChildContent>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" 
-                                                         OnClick="@(() => ShowPlayerDetails(player))">
-                                                View Details
-                                            </MudMenuItem>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Assessment" 
-                                                         OnClick="@(() => ViewPlayerReport(player))">
-                                                View Report
-                                            </MudMenuItem>
-                                            @if (IsPlayerManaged(player))
-                                            {
-                                                <MudMenuItem Icon="@Icons.Material.Filled.Edit" 
-                                                             OnClick="@(() => EditPlayer(player))">
-                                                    Edit Player
-                                                </MudMenuItem>
-                                                <MudDivider />
-                                                <MudMenuItem Icon="@Icons.Material.Filled.Delete" 
-                                                             OnClick="@(() => DeletePlayer(player))"
-                                                             Style="color: var(--mud-palette-error);">
-                                                    Delete Player
-                                                </MudMenuItem>
-                                            }
-                                        </ChildContent>
-                                    </MudMenu>
-                                </div>
-                            </div>
-                        </MudCardContent>
-                    </MudCard>
-                </MudListItem>
-            }
-        </MudList>
-        
-        @if (totalPlayers > filteredPlayers.Count)
-        {
-            <div class="text-center mt-4">
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    Showing @filteredPlayers.Count of @totalPlayers players
-                </MudText>
-            </div>
-        }
-    }
-    else if (!loading && players?.Any() == true)
-    {
-        <!-- No search results -->
-        <div class="text-center pa-4">
-            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
-            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No players found</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Try adjusting your search terms</MudText>
+            <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading players...</MudText>
         </div>
     }
     else
     {
-        <!-- No players at all -->
-        <div class="text-center pa-4">
-            <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Large" Color="Color.Secondary" />
-            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No players added yet</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                Add players to start tracking rounds and performance!
-            </MudText>
-            <MudButton Variant="Variant.Filled" 
-                      Color="Color.Primary" 
-                      StartIcon="@Icons.Material.Filled.Add"
-                      OnClick="@(() => ShowAddPlayerDialog())">
-                Add Your First Player
-            </MudButton>
+        @* My Profile Header *@
+        <div style="background:linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%); color:white; border-radius:0 0 20px 20px; padding:20px 16px 16px; margin-bottom:16px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg, #667eea, #764ba2); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700; flex-shrink:0;">
+                    @if (myProfile != null)
+                    {
+                        @($"{myProfile.FirstName?[..1]}{myProfile.LastName?[..1]}")
+                    }
+                    else
+                    {
+                        <span>?</span>
+                    }
+                </div>
+                <div style="flex:1; min-width:0;">
+                    @if (myProfile != null)
+                    {
+                        <div style="font-size:1.2rem; font-weight:700;">@myProfile.FirstName @myProfile.LastName</div>
+                        <div style="font-size:0.8rem; color:rgba(255,255,255,0.7); display:flex; flex-wrap:wrap; gap:10px; margin-top:2px;">
+                            <span>Handicap: @(myProfile.Handicap.HasValue ? myProfile.Handicap.Value.ToString("N1") : "N/A")</span>
+                            @if (myStats != null && myStats.RoundCount > 0)
+                            {
+                                <span>@myStats.RoundCount rounds</span>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="font-size:1.2rem; font-weight:700;">My Profile</div>
+                        <div style="font-size:0.8rem; color:rgba(255,200,100,0.9);">No player profile found</div>
+                    }
+                </div>
+            </div>
+
+            @if (myStats != null && myStats.RoundCount > 0)
+            {
+                <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-top:14px;">
+                    <div style="text-align:center; padding:8px 4px; background:rgba(255,255,255,0.08); border-radius:10px;">
+                        <div style="font-size:1.1rem; font-weight:800;">@myStats.RoundCount</div>
+                        <div style="font-size:0.55rem; font-weight:600; text-transform:uppercase; color:rgba(255,255,255,0.6);">Rounds</div>
+                    </div>
+                    <div style="text-align:center; padding:8px 4px; background:rgba(255,255,255,0.08); border-radius:10px;">
+                        <div style="font-size:1.1rem; font-weight:800;">@(myStats.BestScore?.ToString() ?? "-")</div>
+                        <div style="font-size:0.55rem; font-weight:600; text-transform:uppercase; color:rgba(255,255,255,0.6);">Best</div>
+                    </div>
+                    <div style="text-align:center; padding:8px 4px; background:rgba(255,255,255,0.08); border-radius:10px;">
+                        <div style="font-size:1.1rem; font-weight:800;">@(myStats.AverageScore.HasValue ? myStats.AverageScore.Value.ToString("F1") : "-")</div>
+                        <div style="font-size:0.55rem; font-weight:600; text-transform:uppercase; color:rgba(255,255,255,0.6);">Avg</div>
+                    </div>
+                    <div style="text-align:center; padding:8px 4px; background:rgba(255,255,255,0.08); border-radius:10px;">
+                        <div style="font-size:1.1rem; font-weight:800;">@(myStats.LastPlayed.HasValue ? myStats.LastPlayed.Value.ToString("dd MMM") : "-")</div>
+                        <div style="font-size:0.55rem; font-weight:600; text-transform:uppercase; color:rgba(255,255,255,0.6);">Last</div>
+                    </div>
+                </div>
+            }
+
+            @if (myProfile != null)
+            {
+                <div style="display:flex; gap:8px; margin-top:12px;">
+                    <div style="flex:1; text-align:center; padding:8px; background:rgba(255,255,255,0.1); border-radius:10px; cursor:pointer; font-size:0.8rem; font-weight:600;"
+                         @onclick="ViewMyReport">
+                        My Report
+                    </div>
+                </div>
+            }
         </div>
+
+        @if (pendingReceived.Any() || pendingMergesReceived.Any())
+        {
+            <div style="margin:0 12px 12px; background:#fef3c7; border:1px solid #fbbf24; border-radius:12px; padding:12px 14px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.NotificationsActive" Style="color:#d97706; font-size:20px;" />
+                    <div style="flex:1;">
+                        @if (pendingReceived.Any())
+                        {
+                            <div style="font-size:0.85rem; font-weight:600; color:#92400e;">
+                                @pendingReceived.Count connection request@(pendingReceived.Count != 1 ? "s" : "")
+                            </div>
+                        }
+                        @if (pendingMergesReceived.Any())
+                        {
+                            <div style="font-size:0.85rem; font-weight:600; color:#92400e;">
+                                @pendingMergesReceived.Count merge request@(pendingMergesReceived.Count != 1 ? "s" : "")
+                            </div>
+                        }
+                    </div>
+                    <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small"
+                                   OnClick="@(() => { activeTab = 1; StateHasChanged(); })" />
+                </div>
+            </div>
+        }
+
+        @* Tab Switcher *@
+        <div style="display:flex; margin:0 12px 12px; background:#f3f4f6; border-radius:12px; padding:3px;">
+            <div style="flex:1; text-align:center; padding:10px 8px; border-radius:10px; font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; @(activeTab == 0 ? "background:#ffffff; color:#1a1a2e; box-shadow:0 1px 3px rgba(0,0,0,0.1);" : "color:#6b7280;")"
+                 @onclick="@(() => { activeTab = 0; StateHasChanged(); })">
+                My Players
+            </div>
+            <div style="flex:1; text-align:center; padding:10px 8px; border-radius:10px; font-size:0.85rem; font-weight:600; cursor:pointer; transition:all 0.2s; position:relative; @(activeTab == 1 ? "background:#ffffff; color:#1a1a2e; box-shadow:0 1px 3px rgba(0,0,0,0.1);" : "color:#6b7280;")"
+                 @onclick="@(() => { activeTab = 1; StateHasChanged(); })">
+                Connections
+                @if (pendingReceived.Any() || pendingMergesReceived.Any())
+                {
+                    <span style="position:absolute; top:4px; right:12px; width:8px; height:8px; border-radius:50%; background:#ef4444;"></span>
+                }
+            </div>
+        </div>
+
+        <div style="padding:0 12px;">
+            @if (activeTab == 0)
+            {
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e;">Managed Players</div>
+                    <div style="padding:6px 12px; background:linear-gradient(135deg, #667eea, #764ba2); color:white; border-radius:20px; font-size:0.75rem; font-weight:600; cursor:pointer;"
+                         @onclick="ShowAddPlayerDialog">
+                        + Add Player
+                    </div>
+                </div>
+
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:10px 12px; margin-bottom:12px;">
+                    <MudTextField @bind-Value="searchString"
+                                  Placeholder="Search players..."
+                                  Variant="Variant.Text"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                  DebounceInterval="300"
+                                  OnDebounceIntervalElapsed="OnSearchTextChanged"
+                                  Margin="Margin.Dense"
+                                  FullWidth="true" />
+                </div>
+
+                @if (filteredPlayers?.Any() == true)
+                {
+                    @foreach (var player in filteredPlayers)
+                    {
+                        var stats = playerStatsCache.GetValueOrDefault(player.Id);
+                        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin-bottom:8px; cursor:pointer;"
+                             @onclick="@(() => ViewPlayerReport(player))">
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                                <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg, #667eea, #764ba2); display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; color:white; flex-shrink:0;">
+                                    @GetInitials(player)
+                                </div>
+                                <div style="flex:1; min-width:0;">
+                                    <div style="font-size:0.95rem; font-weight:700; color:#1a1a2e;">@player.FirstName @player.LastName</div>
+                                    <div style="font-size:0.75rem; color:#6b7280;">
+                                        @if (player.Handicap.HasValue)
+                                        {
+                                            <span>Handicap: @player.Handicap.Value.ToString("F1")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Managed Player</span>
+                                        }
+                                    </div>
+                                </div>
+                                <MudMenu>
+                                    <ActivatorContent>
+                                        <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Style="color:#9ca3af;" />
+                                    </ActivatorContent>
+                                    <ChildContent>
+                                        <MudMenuItem OnClick="@(() => ViewPlayerReport(player))">
+                                            View Report
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => EditPlayer(player))">
+                                            Edit
+                                        </MudMenuItem>
+                                        <MudMenuItem OnClick="@(() => DeletePlayer(player))" Style="color:var(--mud-palette-error);">
+                                            Delete
+                                        </MudMenuItem>
+                                    </ChildContent>
+                                </MudMenu>
+                            </div>
+
+                            @if (stats != null && stats.RoundCount > 0)
+                            {
+                                <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;">
+                                    <div style="text-align:center; padding:6px 2px; background:#f8fafc; border-radius:8px;">
+                                        <div style="font-size:0.95rem; font-weight:800; color:#1a1a2e;">@stats.RoundCount</div>
+                                        <div style="font-size:0.5rem; font-weight:600; color:#9ca3af; text-transform:uppercase;">Rounds</div>
+                                    </div>
+                                    <div style="text-align:center; padding:6px 2px; background:#f0fdf4; border-radius:8px;">
+                                        <div style="font-size:0.95rem; font-weight:800; color:#16a34a;">@(stats.BestScore?.ToString() ?? "-")</div>
+                                        <div style="font-size:0.5rem; font-weight:600; color:#9ca3af; text-transform:uppercase;">Best</div>
+                                    </div>
+                                    <div style="text-align:center; padding:6px 2px; background:#eff6ff; border-radius:8px;">
+                                        <div style="font-size:0.95rem; font-weight:800; color:#2563eb;">@(stats.AverageScore.HasValue ? stats.AverageScore.Value.ToString("F1") : "-")</div>
+                                        <div style="font-size:0.5rem; font-weight:600; color:#9ca3af; text-transform:uppercase;">Avg</div>
+                                    </div>
+                                    <div style="text-align:center; padding:6px 2px; background:#fefce8; border-radius:8px;">
+                                        <div style="font-size:0.95rem; font-weight:800; color:#d97706;">@(stats.LastPlayed.HasValue ? stats.LastPlayed.Value.ToString("dd MMM") : "-")</div>
+                                        <div style="font-size:0.5rem; font-weight:600; color:#9ca3af; text-transform:uppercase;">Last</div>
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div style="text-align:center; padding:6px; background:#f8fafc; border-radius:8px; font-size:0.75rem; color:#9ca3af;">
+                                    No rounds recorded yet
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else if (!loading && players?.Any() == true)
+                {
+                    <div style="text-align:center; padding:24px;">
+                        <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">No players match your search</MudText>
+                    </div>
+                }
+                else
+                {
+                    <div style="text-align:center; padding:32px;">
+                        <MudText Typo="Typo.h6" Color="Color.Secondary">No managed players yet</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">Add players you play with to track their rounds</MudText>
+                    </div>
+                }
+            }
+            else
+            {
+                @if (pendingReceived.Any())
+                {
+                    <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e; margin-bottom:8px;">Pending Requests</div>
+                    @foreach (var req in pendingReceived)
+                    {
+                        <div style="background:#ffffff; border:1px solid #fbbf24; border-radius:12px; padding:14px 16px; margin-bottom:8px;">
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                                <div style="width:40px; height:40px; border-radius:50%; background:#fef3c7; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;">&#x1F514;</div>
+                                <div style="flex:1;">
+                                    <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e;">@req.ConnectedUserName</div>
+                                    <div style="font-size:0.75rem; color:#6b7280;">Wants to connect</div>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <div style="flex:1; text-align:center; padding:8px; background:#dcfce7; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight:600; color:#16a34a;"
+                                     @onclick="@(() => AcceptConnection(req.Id))">
+                                    Accept
+                                </div>
+                                <div style="flex:1; text-align:center; padding:8px; background:#fef2f2; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight:600; color:#dc2626;"
+                                     @onclick="@(() => DeclineConnection(req.Id))">
+                                    Decline
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+
+                @if (pendingMergesReceived.Any())
+                {
+                    <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e; margin-bottom:8px; margin-top:12px;">Merge Requests</div>
+                    @foreach (var merge in pendingMergesReceived)
+                    {
+                        <div style="background:#ffffff; border:1px solid #a78bfa; border-radius:12px; padding:14px 16px; margin-bottom:8px;">
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+                                <div style="width:40px; height:40px; border-radius:50%; background:#ede9fe; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;">&#x1F500;</div>
+                                <div style="flex:1;">
+                                    <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e;">@merge.RequestingUserName</div>
+                                    <div style="font-size:0.75rem; color:#6b7280;">Wants to merge data</div>
+                                </div>
+                            </div>
+                            @if (!string.IsNullOrEmpty(merge.Message))
+                            {
+                                <div style="font-size:0.8rem; color:#4b5563; background:#f9fafb; padding:8px; border-radius:8px; margin-bottom:8px; font-style:italic;">
+                                    @merge.Message
+                                </div>
+                            }
+                            <div style="display:flex; gap:8px;">
+                                <div style="flex:1; text-align:center; padding:8px; background:#dcfce7; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight:600; color:#16a34a;"
+                                     @onclick="@(() => AcceptMerge(merge.Id))">
+                                    Accept
+                                </div>
+                                <div style="flex:1; text-align:center; padding:8px; background:#fef2f2; border-radius:8px; cursor:pointer; font-size:0.8rem; font-weight:600; color:#dc2626;"
+                                     @onclick="@(() => DeclineMerge(merge.Id))">
+                                    Decline
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+
+                <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e; margin-bottom:8px; margin-top:@(pendingReceived.Any() || pendingMergesReceived.Any() ? "12px" : "0");">
+                    Connected Players (@connections.Count)
+                </div>
+
+                @if (connections.Any())
+                {
+                    @foreach (var conn in connections)
+                    {
+                        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin-bottom:8px; display:flex; align-items:center; gap:12px;">
+                            <div style="width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg, #10b981, #059669); display:flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; color:white; flex-shrink:0;">
+                                @GetUserInitials(conn.ConnectedUserName)
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-size:0.95rem; font-weight:700; color:#1a1a2e;">@conn.ConnectedUserName</div>
+                                <div style="font-size:0.75rem; color:#6b7280;">
+                                    Connected @(conn.ConnectedSince.HasValue ? conn.ConnectedSince.Value.ToString("dd MMM yyyy") : "")
+                                </div>
+                            </div>
+                            <MudMenu>
+                                <ActivatorContent>
+                                    <MudIconButton Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Style="color:#9ca3af;" />
+                                </ActivatorContent>
+                                <ChildContent>
+                                    <MudMenuItem OnClick="@(() => RemoveConnection(conn.Id))" Style="color:var(--mud-palette-error);">
+                                        Remove Connection
+                                    </MudMenuItem>
+                                </ChildContent>
+                            </MudMenu>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div style="text-align:center; padding:20px; background:#f8fafc; border-radius:12px; margin-bottom:12px;">
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">No connections yet</MudText>
+                    </div>
+                }
+
+                @if (pendingSent.Any())
+                {
+                    <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e; margin-bottom:8px; margin-top:12px;">Sent Requests</div>
+                    @foreach (var req in pendingSent)
+                    {
+                        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; margin-bottom:6px; display:flex; align-items:center; gap:10px;">
+                            <div style="width:36px; height:36px; border-radius:50%; background:#dbeafe; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; color:#2563eb; flex-shrink:0;">
+                                @GetUserInitials(req.ConnectedUserName)
+                            </div>
+                            <div style="flex:1;">
+                                <div style="font-size:0.85rem; font-weight:600; color:#1a1a2e;">@req.ConnectedUserName</div>
+                                <div style="font-size:0.7rem; color:#9ca3af;">Pending</div>
+                            </div>
+                            <div style="padding:4px 10px; background:#f3f4f6; border-radius:12px; font-size:0.7rem; font-weight:600; color:#6b7280;">
+                                Pending
+                            </div>
+                        </div>
+                    }
+                }
+
+                <div style="font-size:0.9rem; font-weight:700; color:#1a1a2e; margin-bottom:8px; margin-top:16px;">Find Players</div>
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:10px 12px; margin-bottom:10px;">
+                    <MudTextField @bind-Value="userSearchString"
+                                  Placeholder="Search by name or email..."
+                                  Variant="Variant.Text"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.PersonSearch"
+                                  DebounceInterval="500"
+                                  OnDebounceIntervalElapsed="OnUserSearchChanged"
+                                  Margin="Margin.Dense"
+                                  FullWidth="true" />
+                </div>
+
+                @if (searchingUsers)
+                {
+                    <div style="text-align:center; padding:16px;">
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Primary" />
+                    </div>
+                }
+                else if (userSearchResults.Any())
+                {
+                    @foreach (var user in userSearchResults)
+                    {
+                        <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; margin-bottom:6px; display:flex; align-items:center; gap:10px;">
+                            <div style="width:36px; height:36px; border-radius:50%; background:#f0f4ff; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; color:#667eea; flex-shrink:0;">
+                                @GetUserInitials(user.DisplayName)
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="font-size:0.85rem; font-weight:600; color:#1a1a2e;">@user.DisplayName</div>
+                                @if (!string.IsNullOrEmpty(user.Email))
+                                {
+                                    <div style="font-size:0.7rem; color:#9ca3af; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">@user.Email</div>
+                                }
+                            </div>
+                            @if (user.ExistingConnectionStatus == "Accepted")
+                            {
+                                <div style="padding:4px 10px; background:#dcfce7; border-radius:12px; font-size:0.7rem; font-weight:600; color:#16a34a;">Connected</div>
+                            }
+                            else if (user.ExistingConnectionStatus == "Pending")
+                            {
+                                <div style="padding:4px 10px; background:#fef3c7; border-radius:12px; font-size:0.7rem; font-weight:600; color:#d97706;">Pending</div>
+                            }
+                            else
+                            {
+                                <div style="padding:6px 14px; background:linear-gradient(135deg, #667eea, #764ba2); border-radius:16px; font-size:0.75rem; font-weight:600; color:white; cursor:pointer;"
+                                     @onclick="@(() => SendConnectionRequest(user.UserId))">
+                                    Connect
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(userSearchString) && userSearchString.Length >= 2)
+                {
+                    <div style="text-align:center; padding:16px; font-size:0.85rem; color:#6b7280;">
+                        No users found
+                    </div>
+                }
+            }
+        </div>
+        <div style="height:24px;"></div>
     }
 </MudContainer>
 
-<!-- Player Details Dialog -->
-<MudDialog @bind-Visible="showDetailsDialog" Options="detailsDialogOptions">
-    <DialogContent>
-        @if (selectedPlayer != null)
-        {
-            <!-- Player Header -->
-            <div class="mb-4">
-                <div class="d-flex align-center mb-3">
-                    <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-4">
-                        @(GetPlayerInitials(selectedPlayer))
-                    </MudAvatar>
-                    <div>
-                        <MudText Typo="Typo.h5" Color="Color.Primary">
-                            @selectedPlayer.FirstName @selectedPlayer.LastName
-                        </MudText>
-                        @if (selectedPlayer.Handicap.HasValue)
-                        {
-                            <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
-                                Handicap: @selectedPlayer.Handicap.Value.ToString("F1")
-                            </MudText>
-                        }
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Player Details Cards -->
-            <MudGrid Spacing="2">
-                <MudItem xs="12" md="6">
-                    <MudCard Elevation="1" Class="pa-3">
-                        <MudText Typo="Typo.h6" Class="mb-3">📧 Contact Information</MudText>
-                        @if (!string.IsNullOrEmpty(selectedPlayer.Email))
-                        {
-                            <div class="d-flex justify-space-between mb-2">
-                                <MudText Typo="Typo.body2">Email:</MudText>
-                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.Email</MudText>
-                            </div>
-                        }
-                        @if (!string.IsNullOrEmpty(selectedPlayer.Phone))
-                        {
-                            <div class="d-flex justify-space-between mb-2">
-                                <MudText Typo="Typo.body2">Phone:</MudText>
-                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.Phone</MudText>
-                            </div>
-                        }
-                        @if (selectedPlayer.DateOfBirth.HasValue)
-                        {
-                            <div class="d-flex justify-space-between mb-2">
-                                <MudText Typo="Typo.body2">Date of Birth:</MudText>
-                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.DateOfBirth.Value.ToString("MMM dd, yyyy")</MudText>
-                            </div>
-                        }
-                    </MudCard>
-                </MudItem>
-                
-                <MudItem xs="12" md="6">
-                    <MudCard Elevation="1" Class="pa-3">
-                        <MudText Typo="Typo.h6" Class="mb-3">🏌️ Golf Information</MudText>
-                        @if (selectedPlayer.Handicap.HasValue)
-                        {
-                            <div class="d-flex justify-space-between mb-2">
-                                <MudText Typo="Typo.body2">Handicap:</MudText>
-                                <MudText Typo="Typo.body2" Style="font-weight: 500;">@selectedPlayer.Handicap.Value.ToString("F1")</MudText>
-                            </div>
-                        }
-                        
-                        <!-- Placeholder for future stats -->
-                        <div class="d-flex justify-space-between mb-2">
-                            <MudText Typo="Typo.body2">Status:</MudText>
-                            <MudText Typo="Typo.body2" Style="font-weight: 500;">@(IsPlayerManaged(selectedPlayer) ? "Managed" : "Playing Partner")</MudText>
-                        </div>
-                    </MudCard>
-                </MudItem>
-            </MudGrid>
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton Color="Color.Secondary" OnClick="CloseDetailsDialog">Close</MudButton>
-        <MudButton Color="Color.Info" 
-                  Variant="Variant.Outlined" 
-                  StartIcon="@Icons.Material.Filled.Assessment"
-                  OnClick="@(() => ViewPlayerReport(selectedPlayer!))">
-            View Report
-        </MudButton>
-        @if (IsPlayerManaged(selectedPlayer))
-        {
-            <MudButton Color="Color.Primary" 
-                      Variant="Variant.Filled" 
-                      StartIcon="@Icons.Material.Filled.Edit"
-                      OnClick="@(() => EditPlayer(selectedPlayer!))">
-                Edit
-            </MudButton>
-        }
-    </DialogActions>
-</MudDialog>
-
-<!-- Add/Edit Player Dialog -->
 <MudDialog @bind-Visible="showEditDialog" Options="editDialogOptions">
     <DialogContent>
         @if (editingPlayer != null)
@@ -285,58 +428,33 @@
             <MudText Typo="Typo.h6" Class="mb-4">
                 @(isEditMode ? "Edit Player" : "Add New Player")
             </MudText>
-            
             <MudGrid Spacing="3">
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="editingPlayer.FirstName" 
-                                  Label="First Name" 
-                                  Variant="Variant.Outlined" 
-                                  Required="true"
-                                  For="@(() => editingPlayer.FirstName)" />
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="editingPlayer.FirstName"
+                                  Label="First Name"
+                                  Variant="Variant.Outlined"
+                                  Required="true" />
                 </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="editingPlayer.LastName" 
-                                  Label="Last Name" 
-                                  Variant="Variant.Outlined" 
-                                  Required="true"
-                                  For="@(() => editingPlayer.LastName)" />
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="editingPlayer.LastName"
+                                  Label="Last Name"
+                                  Variant="Variant.Outlined"
+                                  Required="true" />
                 </MudItem>
                 <MudItem xs="12">
-                    <MudTextField @bind-Value="editingPlayer.Email" 
-                                  Label="Email" 
-                                  Variant="Variant.Outlined" 
-                                  InputType="InputType.Email"
-                                  For="@(() => editingPlayer.Email)" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudTextField @bind-Value="editingPlayer.Phone" 
-                                  Label="Phone" 
-                                  Variant="Variant.Outlined" 
-                                  For="@(() => editingPlayer.Phone)" />
-                </MudItem>
-                <MudItem xs="12" sm="6">
-                    <MudNumericField @bind-Value="editingPlayer.Handicap" 
-                                     Label="Handicap" 
-                                     Variant="Variant.Outlined" 
+                    <MudNumericField @bind-Value="editingPlayer.Handicap"
+                                     Label="Handicap"
+                                     Variant="Variant.Outlined"
                                      Format="F1"
-                                     Min="0"
-                                     Max="54"
-                                     For="@(() => editingPlayer.Handicap)" />
-                </MudItem>
-                <MudItem xs="12">
-                    <MudDatePicker @bind-Date="editingPlayer.DateOfBirth" 
-                                   Label="Date of Birth" 
-                                   Variant="Variant.Outlined" 
-                                   DateFormat="dd/MM/yyyy"
-                                   For="@(() => editingPlayer.DateOfBirth)" />
+                                     Min="0" Max="54" />
                 </MudItem>
             </MudGrid>
         }
     </DialogContent>
     <DialogActions>
         <MudButton Color="Color.Secondary" OnClick="CancelEdit">Cancel</MudButton>
-        <MudButton Color="Color.Primary" 
-                  Variant="Variant.Filled" 
+        <MudButton Color="Color.Primary"
+                  Variant="Variant.Filled"
                   OnClick="SavePlayer"
                   Disabled="@(string.IsNullOrWhiteSpace(editingPlayer?.FirstName) || string.IsNullOrWhiteSpace(editingPlayer?.LastName))">
             @(isEditMode ? "Update" : "Add") Player
@@ -345,56 +463,105 @@
 </MudDialog>
 
 @code {
+    private bool loading = true;
+    private int activeTab = 0;
+    private string searchString = "";
+    private string userSearchString = "";
+    private bool searchingUsers = false;
+
+    private Player? myProfile;
+    private PlayerQuickStatsDto? myStats;
+
     private List<Player>? players;
     private List<Player>? filteredPlayers;
-    private bool loading = true;
-    private bool showDetailsDialog = false;
+    private Dictionary<int, PlayerQuickStatsDto> playerStatsCache = new();
+
+    private List<ConnectionDto> connections = new();
+    private List<ConnectionDto> pendingReceived = new();
+    private List<ConnectionDto> pendingSent = new();
+    private List<UserSearchResultDto> userSearchResults = new();
+
+    private List<MergeResponseDto> pendingMergesReceived = new();
+
     private bool showEditDialog = false;
-    private Player? selectedPlayer;
     private Player? editingPlayer;
     private bool isEditMode = false;
-    private string searchString = "";
-    private int totalPlayers = 0;
-    
-    private DialogOptions detailsDialogOptions = new() 
-    { 
-        MaxWidth = MaxWidth.Medium, 
-        FullWidth = true,
-        CloseButton = true
-    };
-    
-    private DialogOptions editDialogOptions = new() 
-    { 
-        MaxWidth = MaxWidth.Small, 
-        FullWidth = true
-    };
+    private DialogOptions editDialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadPlayers();
+        await LoadAll();
     }
 
-    private async Task LoadPlayers()
+    private async Task LoadAll()
     {
+        loading = true;
+        StateHasChanged();
+
         try
         {
-            loading = true;
-            players = await PlayerApiService.GetAllPlayersAsync();
-            totalPlayers = players?.Count ?? 0;
+            var profileTask = ConnectionApi.GetMyProfileAsync();
+            var playersTask = PlayerApi.GetAllPlayersAsync();
+            var connectionsTask = ConnectionApi.GetConnectionsAsync();
+            var pendingReceivedTask = ConnectionApi.GetPendingRequestsReceivedAsync();
+            var pendingSentTask = ConnectionApi.GetPendingRequestsSentAsync();
+            var pendingMergesTask = ConnectionApi.GetPendingMergeRequestsReceivedAsync();
+
+            await Task.WhenAll(profileTask, playersTask, connectionsTask,
+                pendingReceivedTask, pendingSentTask, pendingMergesTask);
+
+            myProfile = await profileTask;
+            players = await playersTask;
+            connections = await connectionsTask;
+            pendingReceived = await pendingReceivedTask;
+            pendingSent = await pendingSentTask;
+            pendingMergesReceived = await pendingMergesTask;
+
             ApplySearchFilter();
+
+            if (myProfile != null)
+            {
+                myStats = await ConnectionApi.GetPlayerQuickStatsAsync(myProfile.Id);
+            }
+
+            await LoadPlayerStats();
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Error loading players: {ex.Message}");
-            players = new List<Player>();
-            filteredPlayers = new List<Player>();
-            totalPlayers = 0;
+            Logger.LogError(ex, "Error loading players data");
+            players ??= new();
         }
         finally
         {
             loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task LoadPlayerStats()
+    {
+        if (players == null) return;
+        playerStatsCache.Clear();
+
+        var tasks = players.Take(20).Select(async p =>
+        {
+            var stats = await ConnectionApi.GetPlayerQuickStatsAsync(p.Id);
+            if (stats != null)
+                playerStatsCache[p.Id] = stats;
+        });
+        await Task.WhenAll(tasks);
+    }
+
+    private void ApplySearchFilter()
+    {
+        if (players == null) { filteredPlayers = new(); return; }
+        if (string.IsNullOrWhiteSpace(searchString)) { filteredPlayers = players; return; }
+
+        var term = searchString.Trim().ToLowerInvariant();
+        filteredPlayers = players.Where(p =>
+            (p.FirstName?.ToLowerInvariant().Contains(term) == true) ||
+            (p.LastName?.ToLowerInvariant().Contains(term) == true)
+        ).ToList();
     }
 
     private async Task OnSearchTextChanged(string text)
@@ -404,78 +571,43 @@
         await Task.CompletedTask;
     }
 
-    private void ApplySearchFilter()
+    private async Task OnUserSearchChanged(string text)
     {
-        if (players == null)
+        userSearchString = text;
+        if (string.IsNullOrWhiteSpace(text) || text.Length < 2)
         {
-            filteredPlayers = new List<Player>();
+            userSearchResults = new();
+            StateHasChanged();
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(searchString))
-        {
-            filteredPlayers = players;
-        }
-        else
-        {
-            var searchTerm = searchString.Trim().ToLowerInvariant();
-            filteredPlayers = players.Where(p =>
-                (p.FirstName?.ToLowerInvariant().Contains(searchTerm) == true) ||
-                (p.LastName?.ToLowerInvariant().Contains(searchTerm) == true) ||
-                (p.Email?.ToLowerInvariant().Contains(searchTerm) == true)
-            ).ToList();
-        }
-        
+        searchingUsers = true;
         StateHasChanged();
+        try
+        {
+            userSearchResults = await ConnectionApi.SearchUsersAsync(text);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error searching users");
+            userSearchResults = new();
+        }
+        finally
+        {
+            searchingUsers = false;
+            StateHasChanged();
+        }
     }
 
-    private string GetPlayerInitials(Player player)
+    private void ViewMyReport()
     {
-        var firstInitial = !string.IsNullOrEmpty(player.FirstName) ? player.FirstName.Substring(0, 1) : "?";
-        var lastInitial = !string.IsNullOrEmpty(player.LastName) ? player.LastName.Substring(0, 1) : "?";
-        return $"{firstInitial}{lastInitial}";
+        if (myProfile != null)
+            NavigationManager.NavigateTo($"/players/{myProfile.Id}/report");
     }
 
-    private bool IsPlayerManaged(Player? player)
+    private void ViewPlayerReport(Player player)
     {
-        if (player == null) return false;
-        // Players created by the current user (managed players) can be edited/deleted
-        // For now, assume all players are managed - in real implementation, 
-        // you'd check if player.CreatedByApplicationUserId matches current user
-        return true;
-    }
-
-    private async Task ShowPlayerDetails(Player player)
-    {
-        selectedPlayer = player;
-        showDetailsDialog = true;
-        await Task.CompletedTask;
-    }
-
-    private void CloseDetailsDialog()
-    {
-        showDetailsDialog = false;
-        selectedPlayer = null;
-    }
-
-    private async Task ViewPlayerReport(Player player)
-    {
-        Console.WriteLine($"[PLAYERS] ========== PLAYER REPORT NAVIGATION ==========");
-        Console.WriteLine($"[PLAYERS] Player ID: {player.Id}");
-        Console.WriteLine($"[PLAYERS] Player Name: {player.FirstName} {player.LastName}");
-        Console.WriteLine($"[PLAYERS] Target URL: /players/{player.Id}/report");
-        
-        // Close dialogs first
-        CloseDetailsDialog();
-        
-        // Small delay to ensure dialog closes before navigation
-        await Task.Delay(100);
-        
-        // Navigate using the route that PlayerReportPage expects
-        var targetUrl = $"/players/{player.Id}/report";
-        Console.WriteLine($"[PLAYERS] Calling NavigationManager.NavigateTo('{targetUrl}')");
-        NavigationManager.NavigateTo(targetUrl, forceLoad: false);
-        Console.WriteLine($"[PLAYERS] Navigation call completed");
+        NavigationManager.NavigateTo($"/players/{player.Id}/report");
     }
 
     private void ShowAddPlayerDialog()
@@ -492,101 +624,109 @@
             Id = player.Id,
             FirstName = player.FirstName,
             LastName = player.LastName,
-            Email = player.Email,
-            Phone = player.Phone,
-            Handicap = player.Handicap,
-            DateOfBirth = player.DateOfBirth
+            Handicap = player.Handicap
         };
         isEditMode = true;
         showEditDialog = true;
-        CloseDetailsDialog();
     }
 
     private void CancelEdit()
     {
         showEditDialog = false;
         editingPlayer = null;
-        isEditMode = false;
     }
 
     private async Task SavePlayer()
     {
         if (editingPlayer == null) return;
-
         try
         {
-            loading = true;
-            
             if (isEditMode)
             {
-                var success = await PlayerApiService.UpdatePlayerAsync(editingPlayer.Id, editingPlayer);
-                if (success)
-                {
-                    await JSRuntime.InvokeVoidAsync("alert", "Player updated successfully!");
-                    await LoadPlayers();
-                }
-                else
-                {
-                    await JSRuntime.InvokeVoidAsync("alert", "Failed to update player. Please try again.");
-                }
+                await PlayerApi.UpdatePlayerAsync(editingPlayer.Id, editingPlayer);
             }
             else
             {
-                var createdPlayer = await PlayerApiService.CreatePlayerAsync(editingPlayer);
-                if (createdPlayer != null)
-                {
-                    await JSRuntime.InvokeVoidAsync("alert", "Player added successfully!");
-                    await LoadPlayers();
-                }
-                else
-                {
-                    await JSRuntime.InvokeVoidAsync("alert", "Failed to add player. Please try again.");
-                }
+                await PlayerApi.CreatePlayerAsync(editingPlayer);
             }
-            
             CancelEdit();
+            await LoadAll();
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Error saving player: {ex.Message}");
-            await JSRuntime.InvokeVoidAsync("alert", "An error occurred while saving the player.");
-        }
-        finally
-        {
-            loading = false;
-            StateHasChanged();
+            Logger.LogError(ex, "Error saving player");
         }
     }
 
     private async Task DeletePlayer(Player player)
     {
-        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete {player.FirstName} {player.LastName}?");
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm",
+            $"Delete {player.FirstName} {player.LastName}? This cannot be undone.");
         if (!confirmed) return;
 
         try
         {
-            loading = true;
-            var success = await PlayerApiService.DeletePlayerAsync(player.Id);
-            
-            if (success)
-            {
-                await JSRuntime.InvokeVoidAsync("alert", "Player deleted successfully!");
-                await LoadPlayers();
-            }
-            else
-            {
-                await JSRuntime.InvokeVoidAsync("alert", "Failed to delete player. Please try again.");
-            }
+            await PlayerApi.DeletePlayerAsync(player.Id);
+            await LoadAll();
         }
         catch (Exception ex)
         {
-            await JSRuntime.InvokeVoidAsync("console.error", $"Error deleting player: {ex.Message}");
-            await JSRuntime.InvokeVoidAsync("alert", "An error occurred while deleting the player.");
+            Logger.LogError(ex, "Error deleting player");
         }
-        finally
+    }
+
+    private async Task SendConnectionRequest(string targetUserId)
+    {
+        var success = await ConnectionApi.SendConnectionRequestAsync(targetUserId);
+        if (success)
         {
-            loading = false;
+            if (!string.IsNullOrWhiteSpace(userSearchString))
+                userSearchResults = await ConnectionApi.SearchUsersAsync(userSearchString);
+            pendingSent = await ConnectionApi.GetPendingRequestsSentAsync();
             StateHasChanged();
         }
+    }
+
+    private async Task AcceptConnection(int connectionId)
+    {
+        var success = await ConnectionApi.AcceptConnectionAsync(connectionId);
+        if (success) await LoadAll();
+    }
+
+    private async Task DeclineConnection(int connectionId)
+    {
+        var success = await ConnectionApi.DeclineConnectionAsync(connectionId);
+        if (success) await LoadAll();
+    }
+
+    private async Task RemoveConnection(int connectionId)
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Remove this connection?");
+        if (!confirmed) return;
+        var success = await ConnectionApi.RemoveConnectionAsync(connectionId);
+        if (success) await LoadAll();
+    }
+
+    private async Task AcceptMerge(int mergeId)
+    {
+        var success = await ConnectionApi.AcceptMergeAsync(mergeId);
+        if (success) await LoadAll();
+    }
+
+    private async Task DeclineMerge(int mergeId)
+    {
+        var success = await ConnectionApi.DeclineMergeAsync(mergeId);
+        if (success) await LoadAll();
+    }
+
+    private string GetInitials(Player p) =>
+        $"{(string.IsNullOrEmpty(p.FirstName) ? "?" : p.FirstName[..1])}{(string.IsNullOrEmpty(p.LastName) ? "?" : p.LastName[..1])}";
+
+    private string GetUserInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ').Where(s => !string.IsNullOrEmpty(s)).ToArray();
+        if (parts.Length >= 2) return $"{parts[0][..1]}{parts[1][..1]}".ToUpper();
+        return name[..1].ToUpper();
     }
 }

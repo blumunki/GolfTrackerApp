@@ -33,4 +33,8 @@ public interface IReportService
     
     // Round drill-down
     Task<RoundDetailSummary?> GetRoundDetailAsync(int roundId, int playerId);
+    
+    // Quick stats for player cards
+    Task<PlayerQuickStats> GetPlayerQuickStatsAsync(int playerId);
+    Task<Dictionary<int, PlayerQuickStats>> GetBatchPlayerQuickStatsAsync(IEnumerable<int> playerIds);
 }
