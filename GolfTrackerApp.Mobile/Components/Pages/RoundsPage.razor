@@ -25,9 +25,9 @@
     </div>
     
     <!-- Search Bar -->
-    <MudPaper Class="pa-3 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);">
+    <MudPaper Class="pa-3 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border-radius: 12px;">
         <MudTextField @bind-Value="searchString" 
-                      Label="Search by course or club..." 
+                      Label="Search course, club or player..." 
                       Variant="Variant.Outlined" 
                       Adornment="Adornment.Start" 
                       AdornmentIcon="@Icons.Material.Filled.Search" 
@@ -35,6 +35,23 @@
                       OnDebounceIntervalElapsed="OnSearchTextChanged"
                       Margin="Margin.Dense"
                       FullWidth="true" />
+        
+        @if (showPlayerFilter)
+        {
+            <MudSelect T="string" @bind-Value="selectedPlayerFilter" Label="Filter by Player" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Clearable="true" Class="mt-2" @bind-Value:after="ApplySearchFilter">
+                @foreach (var playerName in availablePlayerNames)
+                {
+                    <MudSelectItem T="string" Value="@playerName">@playerName</MudSelectItem>
+                }
+            </MudSelect>
+        }
+        
+        <div class="d-flex align-center mt-2">
+            <MudIconButton Icon="@(showPlayerFilter ? Icons.Material.Filled.FilterListOff : Icons.Material.Filled.FilterList)" 
+                          Size="Size.Small" Color="Color.Primary" OnClick="() => showPlayerFilter = !showPlayerFilter" />
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@(filteredRounds?.Count ?? 0) rounds</MudText>
+        </div>
     </MudPaper>
     
     @if (loading)
@@ -52,7 +69,7 @@
                 <MudListItem T="object" Class="round-list-item">
                     <MudCard Elevation="2" 
                              Class="mb-3 round-card" 
-                             Style="border-left: 4px solid #667eea; cursor: pointer; transition: all 0.2s ease;"
+                             Style="border-left: 4px solid #667eea; cursor: pointer; transition: all 0.2s ease; border-radius: 12px;"
                              @onclick="@(() => ShowRoundDetails(round))">
                         <MudCardContent Class="pa-3">
                             <div class="d-flex justify-space-between align-start">
@@ -75,10 +92,10 @@
                                                 Color="Color.Success" />
                                         <div class="flex-grow-1">
                                             <MudText Typo="Typo.body2" Style="font-weight: 500;">
-                                                @round.ClubName
+                                                @round.CourseName
                                             </MudText>
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                @round.CourseName
+                                                @round.ClubName
                                             </MudText>
                                         </div>
                                     </div>
@@ -94,47 +111,36 @@
                                             </MudText>
                                         </div>
                                         
-                                        <div class="d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.People" 
-                                                    Size="Size.Small" 
-                                                    Class="mr-1" 
-                                                    Color="Color.Warning" />
-                                            <MudText Typo="Typo.caption">
-                                                @GetPlayerCountDisplay(round) players
-                                            </MudText>
-                                        </div>
+                                        @if (round.PlayingPartners?.Any() == true)
+                                        {
+                                            <div class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.People" 
+                                                        Size="Size.Small" 
+                                                        Class="mr-1" 
+                                                        Color="Color.Warning" />
+                                                <MudText Typo="Typo.caption">
+                                                    @GetPlayerCountDisplay(round)
+                                                </MudText>
+                                            </div>
+                                        }
                                     </div>
                                 </div>
                                 
-                                <!-- Quick Actions -->
-                                <div class="d-flex flex-column align-center ml-2">
-                                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
-                                                  Color="Color.Primary" 
-                                                  Size="Size.Small"
-                                                  OnClick="@(() => ShowRoundDetails(round))" />
-                                    <MudMenu>
-                                        <ActivatorContent>
-                                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" 
-                                                          Color="Color.Secondary" 
-                                                          Size="Size.Small" />
-                                        </ActivatorContent>
-                                        <ChildContent>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" 
-                                                         OnClick="@(() => ShowRoundDetails(round))">
-                                                View Details
-                                            </MudMenuItem>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" 
-                                                         OnClick="@(() => EditRoundFromMenu(round))">
-                                                Edit Round
-                                            </MudMenuItem>
-                                            <MudDivider />
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Delete" 
-                                                         OnClick="@(() => DeleteRoundFromMenu(round))"
-                                                         Style="color: var(--mud-palette-error);">
-                                                Delete Round
-                                            </MudMenuItem>
-                                        </ChildContent>
-                                    </MudMenu>
+                                <!-- Score Badge -->
+                                <div class="d-flex flex-column align-center ml-2" style="min-width: 60px;">
+                                    @if (round.TotalScore > 0)
+                                    {
+                                        var vsPar = round.TotalScore - round.Par;
+                                        var vsParText = vsPar > 0 ? $"+{vsPar}" : (vsPar == 0 ? "E" : vsPar.ToString());
+                                        var scoreColor = vsPar < 0 ? Color.Success : (vsPar == 0 ? Color.Info : Color.Error);
+                                        
+                                        <MudText Typo="Typo.h5" Style="font-weight: 800; color: #1a1a2e; line-height: 1;">
+                                            @round.TotalScore
+                                        </MudText>
+                                        <MudChip T="string" Size="Size.Small" Color="@scoreColor" Style="margin-top: 2px;">
+                                            @vsParText
+                                        </MudChip>
+                                    }
                                 </div>
                             </div>
                         </MudCardContent>
@@ -348,6 +354,9 @@
     private LocalRound? selectedRound;
     private string searchString = "";
     private int totalRounds = 0;
+    private bool showPlayerFilter = false;
+    private string? selectedPlayerFilter;
+    private List<string> availablePlayerNames = new();
     
     private DialogOptions detailsDialogOptions = new() 
     { 
@@ -388,6 +397,14 @@
             }).OrderByDescending(r => r.DatePlayed).ToList();
             
             totalRounds = rounds?.Count ?? 0;
+            
+            // Build available player names for filter
+            availablePlayerNames = rounds?
+                .SelectMany(r => r.PlayingPartners ?? new List<string>())
+                .Distinct()
+                .OrderBy(n => n)
+                .ToList() ?? new List<string>();
+            
             ApplySearchFilter();
         }
         catch (Exception ex)
@@ -419,19 +436,26 @@
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(searchString))
-        {
-            filteredRounds = rounds;
-        }
-        else
+        IEnumerable<LocalRound> results = rounds;
+
+        if (!string.IsNullOrWhiteSpace(searchString))
         {
             var searchTerm = searchString.Trim().ToLowerInvariant();
-            filteredRounds = rounds.Where(r =>
+            results = results.Where(r =>
                 r.CourseName.ToLowerInvariant().Contains(searchTerm) ||
-                r.ClubName.ToLowerInvariant().Contains(searchTerm)
-            ).ToList();
+                r.ClubName.ToLowerInvariant().Contains(searchTerm) ||
+                (r.PlayingPartners?.Any(p => p.ToLowerInvariant().Contains(searchTerm)) == true)
+            );
         }
         
+        // Player filter
+        if (!string.IsNullOrEmpty(selectedPlayerFilter))
+        {
+            results = results.Where(r => 
+                r.PlayingPartners?.Contains(selectedPlayerFilter) == true);
+        }
+        
+        filteredRounds = results.ToList();
         StateHasChanged();
     }
 

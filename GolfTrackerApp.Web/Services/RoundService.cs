@@ -274,7 +274,9 @@ namespace GolfTrackerApp.Web.Services
                                         .Include(r => r.GolfCourse!)
                                             .ThenInclude(gc => gc!.GolfClub)
                                         .Include(r => r.RoundPlayers!)
-                                            .ThenInclude(rp => rp!.Player!);
+                                            .ThenInclude(rp => rp!.Player!)
+                                        .Include(r => r.Scores!)
+                                            .ThenInclude(s => s.Hole!);
 
             if (!isUserAdmin)
             {
@@ -290,7 +292,9 @@ namespace GolfTrackerApp.Web.Services
                 string pattern = $"%{searchTerm}%";
                 query = query.Where(r =>
                     (r.GolfCourse != null && EF.Functions.Like(r.GolfCourse.Name, pattern)) ||
-                    (r.GolfCourse != null && r.GolfCourse.GolfClub != null && EF.Functions.Like(r.GolfCourse.GolfClub.Name, pattern))
+                    (r.GolfCourse != null && r.GolfCourse.GolfClub != null && EF.Functions.Like(r.GolfCourse.GolfClub.Name, pattern)) ||
+                    r.RoundPlayers.Any(rp => rp.Player != null && 
+                        (EF.Functions.Like(rp.Player.FirstName, pattern) || EF.Functions.Like(rp.Player.LastName, pattern)))
                 );
             }
 

@@ -16,46 +16,48 @@
 <style>
     .hole-score-card {
         background: white;
-        border-radius: 12px;
-        padding: 16px;
+        border-radius: 16px;
+        padding: 20px;
         margin-bottom: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e5e7eb;
     }
     
     .hole-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
         padding-bottom: 12px;
-        border-bottom: 2px solid #f0f0f0;
+        border-bottom: 2px solid #f3f4f6;
     }
     
     .hole-number {
-        font-size: 24px;
-        font-weight: bold;
-        color: #1976d2;
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1a1a2e;
     }
     
     .hole-par {
-        font-size: 18px;
-        color: #666;
+        font-size: 1rem;
+        color: #6b7280;
+        font-weight: 500;
     }
     
     .score-input-container {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 12px;
-        padding: 20px 0;
+        gap: 16px;
+        padding: 16px 0;
     }
     
     .score-display {
-        font-size: 48px;
-        font-weight: bold;
+        font-size: 3rem;
+        font-weight: 800;
         min-width: 80px;
         text-align: center;
-        color: #1976d2;
+        color: #1a1a2e;
     }
     
     .navigation-buttons {
@@ -65,8 +67,35 @@
         margin-top: 16px;
     }
     
-    .player-chip {
-        margin: 4px;
+    .setup-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .setup-card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #f3f4f6;
+        font-weight: 600;
+        font-size: 1rem;
+        color: #1a1a2e;
+    }
+    
+    .hole-progress {
+        background: linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 12px 20px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 </style>
 
@@ -77,9 +106,14 @@
     }
     else if (_currentStep == RoundStep.Setup)
     {
-        <MudText Typo="Typo.h5" Class="mb-4">Record Round</MudText>
+        <MudText Typo="Typo.h5" Class="mb-4" Style="font-weight: 700; color: #1a1a2e;">Record Round</MudText>
         
-        <MudPaper Class="pa-4 mb-4">
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true" Class="mb-3" Icon="@Icons.Material.Filled.SportsGolf">
+            Score hole-by-hole as you play — perfect for live rounds on the course!
+        </MudAlert>
+        
+        <div class="setup-card">
+            <div class="setup-card-header">📅 When &amp; Where</div>
             <MudDatePicker Label="Date Played" 
                           @bind-Date="_datePlayed" 
                           Required="true"
@@ -139,10 +173,10 @@
                          @bind-Value="_notes" 
                          Lines="3"
                          Class="mt-4" />
-        </MudPaper>
+        </div>
         
-        <MudText Typo="Typo.h6" Class="mb-2">Players</MudText>
-        <MudPaper Class="pa-4 mb-4">
+        <div class="setup-card">
+            <div class="setup-card-header">👥 Players</div>
             @if (_selectedPlayers.Any())
             {
                 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -174,7 +208,7 @@
                     <MudSelectItem T="int?" Value="player.Id">@player.FullName</MudSelectItem>
                 }
             </MudSelect>
-        </MudPaper>
+        </div>
         
         <MudButton Variant="Variant.Filled" 
                   Color="Color.Primary" 
@@ -186,16 +220,16 @@
     }
     else if (_currentStep == RoundStep.ScoreEntry)
     {
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="hole-progress">
             <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" 
                           OnClick="BackToSetup" 
-                          Color="Color.Primary" />
-            <MudText Typo="Typo.h6">
+                          Color="Color.Inherit" Size="Size.Small" />
+            <MudText Typo="Typo.body1" Style="font-weight: 700;">
                 Hole @(_currentHoleIndex + 1) of @_holes.Count
             </MudText>
             <MudIconButton Icon="@Icons.Material.Filled.Save" 
                           OnClick="SaveRound" 
-                          Color="Color.Success" />
+                          Color="Color.Inherit" Size="Size.Small" />
         </div>
         
         @if (_currentHoleIndex < _holes.Count)
@@ -220,8 +254,8 @@
                 {
                     var score = GetScoreForHole(player.Id, hole.HoleId);
                     
-                    <MudPaper Class="pa-3 mb-3" Elevation="0" Style="background-color: #f5f5f5;">
-                        <MudText Typo="Typo.subtitle1" Class="mb-2">
+                    <MudPaper Class="pa-3 mb-3" Elevation="0" Style="background-color: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb;">
+                        <MudText Typo="Typo.subtitle1" Class="mb-2" Style="font-weight: 600; color: #1a1a2e;">
                             @player.FullName
                         </MudText>
                         

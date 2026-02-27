@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject IRoundService RoundService
+@inject IPlayerService PlayerService
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISnackbar Snackbar
@@ -9,12 +10,18 @@
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Authorization
 @using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Data
 @using GolfTrackerApp.Web.Services
 @using GolfTrackerApp.Web.Components.Shared
 
 <PageTitle>Golf Rounds</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Golf Rounds</MudText>
+<div class="gp-list-header">
+    <h4>Golf Rounds</h4>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/rounds/record" Size="Size.Small">
+        Record Round
+    </MudButton>
+</div>
 
 @if (isLoading)
 {
@@ -22,36 +29,95 @@
 }
 else
 {
-    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
-        <MudTextField @bind-Value="searchString" 
-                      Label="Filter by Course or Club..." 
-                      Variant="Variant.Outlined" 
-                      Adornment="Adornment.Start" 
-                      AdornmentIcon="@Icons.Material.Filled.Search" 
-                      DebounceInterval="300" 
-                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
-    </MudPaper>
+    <div class="gp-filter-bar">
+        <MudGrid Spacing="2">
+            <MudItem xs="12" sm="6" md="4">
+                <MudTextField @bind-Value="searchString" 
+                              Label="Search course, club or player..." 
+                              Variant="Variant.Outlined" 
+                              Adornment="Adornment.Start" 
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              Margin="Margin.Dense"
+                              DebounceInterval="300" 
+                              OnDebounceIntervalElapsed="OnSearchTextChanged" />
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudSelect T="int?" @bind-Value="selectedPlayerFilterId" Label="Filter by Player" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Clearable="true" @bind-Value:after="OnPlayerFilterChanged">
+                    @foreach (var p in allPlayers)
+                    {
+                        <MudSelectItem T="int?" Value="@((int?)p.PlayerId)">@p.FirstName @p.LastName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="4">
+                <MudSelect T="string" @bind-Value="selectedRoundType" Label="Round Type" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Clearable="true" @bind-Value:after="ApplyFilters">
+                    <MudSelectItem T="string" Value="@("Friendly")">Friendly</MudSelectItem>
+                    <MudSelectItem T="string" Value="@("Competitive")">Competitive</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+    </div>
 
-    @if (rounds is null || !rounds.Any())
+    @if (filteredRounds is null || !filteredRounds.Any())
     {
-        <MudText>No rounds found for your search criteria.</MudText>
+        <div class="gp-empty-state">
+            <div class="empty-icon">🏌️</div>
+            <MudText Typo="Typo.h6" Color="Color.Secondary">No rounds found</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">Try adjusting your filters or record a new round</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Href="/rounds/record" StartIcon="@Icons.Material.Filled.Add">Record a Round</MudButton>
+        </div>
     }
     else
     {
-        <MudTable Items="@rounds" Hover="true" Striped="true" Dense="true" Elevation="1">
+        <MudTable Items="@filteredRounds" Hover="true" Dense="false" Elevation="0" Class="round-card-modern" RowClass="cursor-pointer"
+                  OnRowClick="@((TableRowClickEventArgs<Round> args) => { if (args.Item is not null) ViewRoundDetails(args.Item.RoundId); })">
             <HeaderContent>
                 <MudTh>Date</MudTh>
                 <MudTh>Course</MudTh>
+                <MudTh>Score</MudTh>
                 <MudTh>Type</MudTh>
                 <MudTh>Players</MudTh>
-                <MudTh Class="golf-text-right">Actions</MudTh>
+                <MudTh Style="text-align: right;">Actions</MudTh>
             </HeaderContent>
             <RowTemplate>
-                <MudTd DataLabel="Date">@context.DatePlayed.ToString("dd/MM/yyyy")</MudTd>
-                <MudTd DataLabel="Course">@($"{context.GolfCourse?.GolfClub?.Name} - {context.GolfCourse?.Name}")</MudTd>
-                <MudTd DataLabel="Type">@context.RoundType</MudTd>
-                <MudTd DataLabel="Players">@context.RoundPlayers.Count</MudTd>
-                <MudTd Class="golf-text-right">
+                <MudTd DataLabel="Date">
+                    <span class="round-card-date">@context.DatePlayed.ToString("dd MMM yyyy")</span>
+                </MudTd>
+                <MudTd DataLabel="Course">
+                    <span class="round-card-course">@context.GolfCourse?.Name</span>
+                    <br />
+                    <span class="round-card-club">@context.GolfCourse?.GolfClub?.Name</span>
+                </MudTd>
+                <MudTd DataLabel="Score">
+                    @{ var userScore = GetUserScore(context); }
+                    @if (userScore.total > 0)
+                    {
+                        <div class="round-score-badge">
+                            <span class="round-score-value">@userScore.total</span>
+                            <span class="round-score-vs-par @GetVsParCssClass(userScore.vsPar)">@FormatVsPar(userScore.vsPar)</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Type">
+                    <span class="round-type-chip @(context.RoundType.ToString().ToLower())">@context.RoundType</span>
+                </MudTd>
+                <MudTd DataLabel="Players">
+                    @foreach (var rp in context.RoundPlayers.Take(3))
+                    {
+                        <span class="round-player-pill">@rp.Player?.FirstName</span>
+                    }
+                    @if (context.RoundPlayers.Count > 3)
+                    {
+                        <span class="round-player-pill">+@(context.RoundPlayers.Count - 3)</span>
+                    }
+                </MudTd>
+                <MudTd Style="text-align: right;">
                     <MudTooltip Text="View Details">
                         <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" OnClick="@(() => ViewRoundDetails(context.RoundId))" />
                     </MudTooltip>
@@ -72,12 +138,28 @@ else
 
 @code {
     private List<Round>? rounds;
+    private List<Round>? filteredRounds;
+    private List<Player> allPlayers = new();
     private bool isLoading = true;
     private string searchString = "";
+    private int? selectedPlayerFilterId;
+    private string? selectedRoundType;
+    private string _currentUserId = string.Empty;
+    private bool _isCurrentUserAdmin = false;
+    private int? _currentPlayerId;
 
     protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        _isCurrentUserAdmin = user.IsInRole("Admin");
+
         await LoadRounds();
+        allPlayers = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin);
+        
+        // Find the current user's player ID for score display
+        _currentPlayerId = allPlayers.FirstOrDefault(p => p.ApplicationUserId == _currentUserId)?.PlayerId;
     }
 
     private async Task LoadRounds()
@@ -85,12 +167,8 @@ else
         isLoading = true;
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            var currentUserId = user.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
-            var isCurrentUserAdmin = user.IsInRole("Admin");
-
-            rounds = await RoundService.SearchRoundsAsync(currentUserId, isCurrentUserAdmin, searchString);
+            rounds = await RoundService.SearchRoundsAsync(_currentUserId, _isCurrentUserAdmin, searchString);
+            ApplyFilters();
         }
         catch (Exception ex)
         {
@@ -99,10 +177,71 @@ else
         isLoading = false;
     }
 
+    private void ApplyFilters()
+    {
+        if (rounds == null)
+        {
+            filteredRounds = new();
+            return;
+        }
+
+        IEnumerable<Round> query = rounds;
+
+        // Player filter
+        if (selectedPlayerFilterId.HasValue)
+        {
+            query = query.Where(r =>
+                r.RoundPlayers.Any(rp => rp.PlayerId == selectedPlayerFilterId.Value));
+        }
+        
+        // Round type filter
+        if (!string.IsNullOrEmpty(selectedRoundType))
+        {
+            query = query.Where(r => 
+                r.RoundType.ToString().Equals(selectedRoundType, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        filteredRounds = query.ToList();
+    }
+
     private async Task OnSearchTextChanged(string text)
     {
         searchString = text;
         await LoadRounds();
+    }
+
+    private async Task OnPlayerFilterChanged()
+    {
+        ApplyFilters();
+        await Task.CompletedTask;
+    }
+
+    private (int total, int vsPar) GetUserScore(Round round)
+    {
+        if (_currentPlayerId == null || round.Scores == null || !round.Scores.Any())
+            return (0, 0);
+
+        var playerScores = round.Scores.Where(s => s.PlayerId == _currentPlayerId.Value).ToList();
+        if (!playerScores.Any())
+            return (0, 0);
+
+        var total = playerScores.Sum(s => s.Strokes);
+        var par = playerScores.Where(s => s.Hole != null).Sum(s => s.Hole!.Par);
+        return (total, total - par);
+    }
+
+    private string FormatVsPar(int vsPar)
+    {
+        if (vsPar > 0) return $"+{vsPar}";
+        if (vsPar == 0) return "E";
+        return vsPar.ToString();
+    }
+
+    private string GetVsParCssClass(int vsPar)
+    {
+        if (vsPar < 0) return "under-par";
+        if (vsPar > 0) return "over-par";
+        return "even-par";
     }
 
     private void ViewRoundDetails(int roundId) => NavigationManager.NavigateTo($"/rounds/{roundId}");
@@ -133,7 +272,7 @@ else
         {
             await RoundService.DeleteRoundAsync(roundId);
             Snackbar.Add("Round deleted successfully.", Severity.Success);
-            await LoadRounds(); // Refresh the list
+            await LoadRounds();
         }
         catch (Exception ex)
         {

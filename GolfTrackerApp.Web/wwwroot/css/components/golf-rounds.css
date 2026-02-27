@@ -1,0 +1,331 @@
+/* =============================================================================
+   Golf Rounds - List & Detail Page Styles
+   
+   Consistent styling for rounds list, round cards and round details.
+   Also provides shared list-page patterns for players & clubs pages.
+   ============================================================================= */
+
+/* ──────────────── List Page Header ──────────────── */
+.gp-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.gp-list-header h4 {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: #1a1a2e;
+    margin: 0;
+}
+
+/* ──────────────── Filter Bar ──────────────── */
+.gp-filter-bar {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 1rem;
+}
+
+.gp-filter-bar .mud-input-outlined {
+    border-radius: 8px;
+}
+
+/* ──────────────── Round Card (list item) ──────────────── */
+.round-card-modern {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.round-card-modern:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.12);
+    transform: translateY(-1px);
+}
+
+.round-card-date {
+    font-weight: 600;
+    color: #1a1a2e;
+    font-size: 0.9rem;
+}
+
+.round-card-course {
+    font-weight: 600;
+    color: #374151;
+    font-size: 0.95rem;
+}
+
+.round-card-club {
+    color: #6b7280;
+    font-size: 0.82rem;
+}
+
+/* Score badge */
+.round-score-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: #f0f4ff;
+}
+
+.round-score-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1;
+}
+
+.round-score-vs-par {
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+.round-score-vs-par.under-par { color: #16a34a; }
+.round-score-vs-par.over-par { color: #dc2626; }
+.round-score-vs-par.even-par { color: #6b7280; }
+
+/* Round type chip */
+.round-type-chip {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.round-type-chip.friendly { background: #dbeafe; color: #1d4ed8; }
+.round-type-chip.competitive { background: #fef3c7; color: #d97706; }
+
+/* Player pills in round card */
+.round-player-pill {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #f3f4f6;
+    color: #4b5563;
+    display: inline-block;
+    margin: 1px 2px;
+}
+
+/* ──────────────── Round Detail Header ──────────────── */
+.round-detail-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.round-detail-header .course-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.round-detail-header .club-name {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-bottom: 12px;
+}
+
+.round-detail-header .round-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.round-detail-header .round-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Player summary cards */
+.round-player-summary {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.round-player-summary:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.round-player-summary .player-position {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+}
+
+.round-player-summary .player-name {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #1a1a2e;
+}
+
+.round-player-summary .player-total {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin: 8px 0 4px;
+}
+
+.round-player-summary .player-vs-par {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.round-player-summary .player-vs-par.under-par { color: #16a34a; }
+.round-player-summary .player-vs-par.over-par { color: #dc2626; }
+.round-player-summary .player-vs-par.even-par { color: #6b7280; }
+
+/* ──────────────── Record Round Wizard ──────────────── */
+.wizard-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 24px;
+    background: #ffffff;
+    margin-bottom: 20px;
+}
+
+.wizard-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.wizard-card-header .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.wizard-card-header .icon.green { background: #dcfce7; }
+.wizard-card-header .icon.blue { background: #dbeafe; }
+.wizard-card-header .icon.purple { background: #ede9fe; }
+
+.wizard-card-header h6 {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #1a1a2e;
+    margin: 0;
+}
+
+/* Score entry modernized */
+.score-entry-table {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+}
+
+.score-entry-table thead th {
+    background: #1a1a2e;
+    color: white;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 10px 8px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.score-entry-table tbody td {
+    padding: 6px 4px;
+    text-align: center;
+    vertical-align: middle;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.score-entry-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.score-entry-total {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1a1a2e;
+}
+
+/* Live round banner */
+.live-round-banner {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.live-round-banner:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+.live-round-banner .live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+    animation: livePulse 1.5s ease-in-out infinite;
+    margin-right: 8px;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* ──────────────── Empty State ──────────────── */
+.gp-empty-state {
+    text-align: center;
+    padding: 48px 24px;
+}
+
+.gp-empty-state .empty-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+/* ──────────────── Responsive ──────────────── */
+@media (max-width: 768px) {
+    .round-detail-header {
+        padding: 16px;
+    }
+    
+    .round-detail-header .course-name {
+        font-size: 1.2rem;
+    }
+    
+    .round-score-badge {
+        min-width: 48px;
+        padding: 4px 8px;
+    }
+    
+    .round-score-value {
+        font-size: 1.2rem;
+    }
+}

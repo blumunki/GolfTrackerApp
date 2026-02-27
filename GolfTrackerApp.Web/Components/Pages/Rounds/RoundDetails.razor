@@ -30,30 +30,70 @@ else if (round is null)
 }
 else
 {
-    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4"></MudBreadcrumbs>
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-3"></MudBreadcrumbs>
 
-    <MudPaper Class="pa-4 mb-4" Elevation="0">
-        <MudText Typo="Typo.h5">@round.GolfCourse!.Name</MudText>
-        <MudText Typo="Typo.body1" Color="Color.Dark">@round.GolfCourse!.GolfClub!.Name</MudText>
-        <MudText Typo="Typo.subtitle2" Class="mt-1">@round.DatePlayed.ToString("dddd, MMMM d, yyyy")</MudText>
-    </MudPaper>
+    @* Modern Dark Gradient Header *@
+    <div class="round-detail-header">
+        <div class="course-name">@round.GolfCourse!.Name</div>
+        <div class="club-name">@round.GolfCourse!.GolfClub!.Name</div>
+        <div class="round-meta">
+            <div class="round-meta-item">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" />
+                @round.DatePlayed.ToString("dddd, MMMM d, yyyy")
+            </div>
+            <div class="round-meta-item">
+                <MudIcon Icon="@Icons.Material.Filled.Flag" Size="Size.Small" />
+                @round.RoundType
+            </div>
+            <div class="round-meta-item">
+                <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" />
+                @round.RoundPlayers.Count player@(round.RoundPlayers.Count != 1 ? "s" : "")
+            </div>
+        </div>
+    </div>
 
-    @* Golf Scorecard Style Table - Players as Columns, Holes as Rows *@
-    <MudPaper Class="pa-2 mb-4" Elevation="2">
+    @* Player Summary Cards *@
+    @if (round.RoundPlayers.Count > 0)
+    {
+        <MudGrid Spacing="3" Class="mb-4">
+            @{
+                var playersSorted = round.RoundPlayers
+                    .Select(rp => rp.Player!)
+                    .OrderBy(p => round.Scores.Where(s => s.PlayerId == p.PlayerId).Sum(s => s.Strokes))
+                    .ToList();
+            }
+            @for (int i = 0; i < playersSorted.Count; i++)
+            {
+                var player = playersSorted[i];
+                var totalScore = round.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes);
+                var totalPar = _playedHoles.Sum(h => h.Par);
+                var scoreVsPar = totalScore - totalPar;
+                var vsParText = scoreVsPar > 0 ? $"+{scoreVsPar}" : (scoreVsPar == 0 ? "E" : scoreVsPar.ToString());
+                var posEmoji = i == 0 ? "🏆" : (i == 1 ? "🥈" : (i == 2 ? "🥉" : $"#{i + 1}"));
+
+                <MudItem xs="12" sm="6" md="@(playersSorted.Count <= 2 ? 6 : 4)">
+                    <div class="round-player-summary">
+                        <div class="player-position">@posEmoji</div>
+                        <div class="player-name">@player.FirstName @player.LastName</div>
+                        <div class="player-total">@(totalScore > 0 ? totalScore.ToString() : "—")</div>
+                        <div class="player-vs-par @GetVsParClass(scoreVsPar)">@vsParText</div>
+                    </div>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+
+    @* Golf Scorecard *@
+    <MudText Typo="Typo.h6" Class="mb-2" Style="font-weight: 600;">Scorecard</MudText>
+    <div style="overflow-x: auto; margin-bottom: 24px;">
         <table class="golf-scorecard">
             <thead>
                 <tr>
-                    <th class="golf-scorecard-header golf-scorecard-hole-header">
-                        <MudText Typo="Typo.body2" Class="golf-font-bold">Hole</MudText>
-                    </th>
-                    <th class="golf-scorecard-header golf-scorecard-par-header">
-                        <MudText Typo="Typo.body2" Class="golf-font-bold">Par</MudText>
-                    </th>
+                    <th class="golf-scorecard-header golf-scorecard-hole-header">Hole</th>
+                    <th class="golf-scorecard-header golf-scorecard-par-header">Par</th>
                     @foreach (var player in GetPlayerRows())
                     {
-                        <th class="golf-scorecard-header golf-scorecard-player-header">
-                            <MudText Typo="Typo.body2" Class="golf-font-bold golf-text-center">@player.PlayerName</MudText>
-                        </th>
+                        <th class="golf-scorecard-header golf-scorecard-player-header">@player.PlayerName</th>
                     }
                 </tr>
             </thead>
@@ -64,17 +104,8 @@ else
                     var rowClass = isBackNine ? "golf-back-nine" : "golf-front-nine";
                     
                     <tr class="@rowClass">
-                        <!-- Hole Number -->
-                        <td class="golf-scorecard-cell golf-scorecard-hole-cell">
-                            <MudText Typo="Typo.body2" Class="golf-font-bold">@hole.HoleNumber</MudText>
-                        </td>
-                        
-                        <!-- Par -->
-                        <td class="golf-scorecard-cell golf-scorecard-par-cell">
-                            <MudText Typo="Typo.body2" Class="golf-font-bold">@hole.Par</MudText>
-                        </td>
-                        
-                        <!-- Player Scores -->
+                        <td class="golf-scorecard-cell golf-scorecard-hole-cell">@hole.HoleNumber</td>
+                        <td class="golf-scorecard-cell golf-scorecard-par-cell">@hole.Par</td>
                         @foreach (var player in GetPlayerRows())
                         {
                             var score = round.Scores.FirstOrDefault(s => s.PlayerId == player.PlayerId && s.HoleId == hole.HoleId);
@@ -98,140 +129,80 @@ else
                     </tr>
                 }
                 
-                <!-- Front 9 Total Row -->
+                @* Front 9 Total *@
                 <tr class="golf-total-row golf-front-nine-total">
-                    <td class="golf-scorecard-cell golf-scorecard-total-label">
-                        <MudText Typo="Typo.body2" Class="golf-font-bold">Out</MudText>
-                    </td>
-                    <td class="golf-scorecard-cell golf-scorecard-total-par">
-                        <MudText Typo="Typo.body2" Class="golf-font-bold">
-                            @_playedHoles.Where(h => h.HoleNumber <= 9).Sum(h => h.Par)
-                        </MudText>
-                    </td>
+                    <td class="golf-scorecard-cell golf-scorecard-total-label"><strong>Out</strong></td>
+                    <td class="golf-scorecard-cell golf-scorecard-total-par"><strong>@_playedHoles.Where(h => h.HoleNumber <= 9).Sum(h => h.Par)</strong></td>
                     @foreach (var player in GetPlayerRows())
                     {
                         var frontNineTotal = round.Scores.Where(s => s.PlayerId == player.PlayerId && s.Hole!.HoleNumber <= 9).Sum(s => s.Strokes);
                         var frontNinePar = _playedHoles.Where(h => h.HoleNumber <= 9).Sum(h => h.Par);
-                        var frontNineVsPar = frontNineTotal - frontNinePar;
-                        
                         <td class="golf-scorecard-cell">
-                            <MudText Typo="Typo.body2" Class="golf-font-bold">
+                            <strong>
                                 @if (frontNineTotal > 0)
                                 {
-                                    <span class="@GetVsParClass(frontNineVsPar)">@frontNineTotal</span>
+                                    <span class="@GetVsParClass(frontNineTotal - frontNinePar)">@frontNineTotal</span>
                                 }
-                                else
-                                {
-                                    <span>-</span>
-                                }
-                            </MudText>
+                                else { <span>-</span> }
+                            </strong>
                         </td>
                     }
                 </tr>
                 
-                <!-- Back 9 Total Row (only if back 9 holes exist) -->
+                @* Back 9 Total *@
                 @if (_playedHoles.Any(h => h.HoleNumber > 9))
                 {
                     <tr class="golf-total-row golf-back-nine-total">
-                        <td class="golf-scorecard-cell golf-scorecard-total-label">
-                            <MudText Typo="Typo.body2" Class="golf-font-bold">In</MudText>
-                        </td>
-                        <td class="golf-scorecard-cell golf-scorecard-total-par">
-                            <MudText Typo="Typo.body2" Class="golf-font-bold">
-                                @_playedHoles.Where(h => h.HoleNumber > 9).Sum(h => h.Par)
-                            </MudText>
-                        </td>
+                        <td class="golf-scorecard-cell golf-scorecard-total-label"><strong>In</strong></td>
+                        <td class="golf-scorecard-cell golf-scorecard-total-par"><strong>@_playedHoles.Where(h => h.HoleNumber > 9).Sum(h => h.Par)</strong></td>
                         @foreach (var player in GetPlayerRows())
                         {
                             var backNineTotal = round.Scores.Where(s => s.PlayerId == player.PlayerId && s.Hole!.HoleNumber > 9).Sum(s => s.Strokes);
                             var backNinePar = _playedHoles.Where(h => h.HoleNumber > 9).Sum(h => h.Par);
-                            var backNineVsPar = backNineTotal - backNinePar;
-                            
                             <td class="golf-scorecard-cell">
-                                <MudText Typo="Typo.body2" Class="golf-font-bold">
+                                <strong>
                                     @if (backNineTotal > 0)
                                     {
-                                        <span class="@GetVsParClass(backNineVsPar)">@backNineTotal</span>
+                                        <span class="@GetVsParClass(backNineTotal - backNinePar)">@backNineTotal</span>
                                     }
-                                    else
-                                    {
-                                        <span>-</span>
-                                    }
-                                </MudText>
+                                    else { <span>-</span> }
+                                </strong>
                             </td>
                         }
                     </tr>
                 }
                 
-                <!-- Grand Total Row -->
+                @* Grand Total *@
                 <tr class="golf-total-row golf-grand-total">
-                    <td class="golf-scorecard-cell golf-scorecard-total-label">
-                        <MudText Typo="Typo.body2" Class="golf-font-bold">Total</MudText>
-                    </td>
-                    <td class="golf-scorecard-cell golf-scorecard-total-par">
-                        <MudText Typo="Typo.body2" Class="golf-font-bold">
-                            @_playedHoles.Sum(h => h.Par)
-                        </MudText>
-                    </td>
+                    <td class="golf-scorecard-cell golf-scorecard-total-label"><strong>Total</strong></td>
+                    <td class="golf-scorecard-cell golf-scorecard-total-par"><strong>@_playedHoles.Sum(h => h.Par)</strong></td>
                     @foreach (var player in GetPlayerRows())
                     {
                         var grandTotal = round.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes);
                         var totalPar = _playedHoles.Sum(h => h.Par);
-                        var totalVsPar = grandTotal - totalPar;
-                        
                         <td class="golf-scorecard-cell">
-                            <MudText Typo="Typo.body2" Class="golf-font-bold">
+                            <strong>
                                 @if (grandTotal > 0)
                                 {
-                                    <span class="@GetVsParClass(totalVsPar)">@grandTotal</span>
+                                    <span class="@GetVsParClass(grandTotal - totalPar)">@grandTotal</span>
                                 }
-                                else
-                                {
-                                    <span>-</span>
-                                }
-                            </MudText>
+                                else { <span>-</span> }
+                            </strong>
                         </td>
                     }
                 </tr>
             </tbody>
         </table>
-    </MudPaper>
+    </div>
 
-    @* Summary Stats *@
-    @if (round.RoundPlayers.Count > 1)
-    {
-        <MudPaper Class="pa-3 mb-4" Elevation="1">
-            <MudText Typo="Typo.h6" Class="mb-2">Round Summary</MudText>
-            <MudGrid Spacing="2">
-                @{
-                    var players = round.RoundPlayers.Select(rp => rp.Player).OrderBy(p => 
-                        round.Scores.Where(s => s.PlayerId == p!.PlayerId).Sum(s => s.Strokes)).ToList();
-                }
-                @for (int i = 0; i < players.Count; i++)
-                {
-                    var player = players[i];
-                    var totalScore = round.Scores.Where(s => s.PlayerId == player!.PlayerId).Sum(s => s.Strokes);
-                    var totalPar = _playedHoles.Sum(h => h.Par);
-                    var scoreVsPar = totalScore - totalPar;
-                    var vsParText = scoreVsPar > 0 ? $"+{scoreVsPar}" : (scoreVsPar == 0 ? "E" : scoreVsPar.ToString());
-                    var positionText = i == 0 ? "🏆" : $"{i + 1}.";
-                    
-                    <MudItem xs="12" sm="6" md="4">
-                        <MudCard Elevation="0" Class="pa-2 golf-border">
-                            <MudText Typo="Typo.body1">
-                                <strong>@positionText @player!.FirstName @player.LastName</strong>
-                            </MudText>
-                            <MudText Typo="Typo.body2">
-                                @totalScore (@vsParText)
-                            </MudText>
-                        </MudCard>
-                    </MudItem>
-                }
-            </MudGrid>
-        </MudPaper>
-    }
-
-    <MudButton Variant="Variant.Outlined" OnClick="@(() => NavigationManager.NavigateTo("/rounds"))" Class="mt-4">Back to Rounds List</MudButton>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Outlined" OnClick="@(() => NavigationManager.NavigateTo("/rounds"))" StartIcon="@Icons.Material.Filled.ArrowBack">
+            Back to Rounds
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/record/{RoundId}"))" StartIcon="@Icons.Material.Filled.Edit">
+            Edit Round
+        </MudButton>
+    </div>
 }
 </MudContainer>
 

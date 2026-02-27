@@ -24,6 +24,13 @@ public class RoundsController : BaseApiController
     {
         try
         {
+            // Determine the current user's player ID for per-user score
+            var userId = GetCurrentUserId();
+            var currentPlayer = await _context.Players
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
+            var currentPlayerId = currentPlayer?.PlayerId;
+
             var rounds = await _context.Rounds
                 .Include(r => r.GolfCourse)
                 .ThenInclude(gc => gc!.GolfClub)
@@ -37,7 +44,9 @@ public class RoundsController : BaseApiController
                     CourseName = r.GolfCourse != null ? r.GolfCourse.Name : "Unknown",
                     ClubName = r.GolfCourse != null && r.GolfCourse.GolfClub != null ? r.GolfCourse.GolfClub.Name : "Unknown",
                     DatePlayed = r.DatePlayed,
-                    TotalScore = r.Scores.Sum(s => s.Strokes),
+                    TotalScore = currentPlayerId.HasValue 
+                        ? r.Scores.Where(s => s.PlayerId == currentPlayerId.Value).Sum(s => s.Strokes)
+                        : r.Scores.Sum(s => s.Strokes),
                     TotalPar = r.GolfCourse != null ? r.GolfCourse.DefaultPar : 72,
                     HolesPlayed = r.GolfCourse != null ? r.GolfCourse.NumberOfHoles : 18,
                     PlayerCount = r.RoundPlayers.Count,
