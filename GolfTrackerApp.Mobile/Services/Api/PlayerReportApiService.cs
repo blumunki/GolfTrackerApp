@@ -20,6 +20,7 @@ public class PlayerReportViewModel
 
 public class PlayerReportPerformanceDataPoint
 {
+    public int RoundId { get; set; }
     public DateTime Date { get; set; }
     public int TotalScore { get; set; }
     public int TotalPar { get; set; }
@@ -65,11 +66,73 @@ public class PerformanceByPar
     public bool HasValidData => Par3Count > 0 || Par4Count > 0 || Par5Count > 0;
 }
 
+public class PlayerComparisonResult
+{
+    public List<PlayerComparisonSeries> PlayerSeries { get; set; } = new();
+    public List<PlayerComparisonSummary> Summaries { get; set; } = new();
+}
+
+public class PlayerComparisonSeries
+{
+    public int PlayerId { get; set; }
+    public string PlayerName { get; set; } = string.Empty;
+    public List<PlayerReportPerformanceDataPoint> DataPoints { get; set; } = new();
+}
+
+public class PlayerComparisonSummary
+{
+    public int PlayerId { get; set; }
+    public string PlayerName { get; set; } = string.Empty;
+    public int TotalRounds { get; set; }
+    public double AverageScore { get; set; }
+    public double AverageToPar { get; set; }
+    public int BestScore { get; set; }
+    public int BestToPar { get; set; }
+    public int SharedRounds { get; set; }
+    public int Wins { get; set; }
+    public int Losses { get; set; }
+    public int Ties { get; set; }
+}
+
+public class RoundDetailSummary
+{
+    public int RoundId { get; set; }
+    public DateTime DatePlayed { get; set; }
+    public string CourseName { get; set; } = string.Empty;
+    public string ClubName { get; set; } = string.Empty;
+    public int HolesPlayed { get; set; }
+    public int TotalScore { get; set; }
+    public int TotalPar { get; set; }
+    public int ScoreVsPar => TotalScore - TotalPar;
+    public string RoundType { get; set; } = string.Empty;
+    public List<RoundDetailScore> HoleScores { get; set; } = new();
+    public List<RoundDetailPlayer> OtherPlayers { get; set; } = new();
+}
+
+public class RoundDetailScore
+{
+    public int HoleNumber { get; set; }
+    public int Par { get; set; }
+    public int Strokes { get; set; }
+    public int ScoreVsPar => Strokes - Par;
+}
+
+public class RoundDetailPlayer
+{
+    public int PlayerId { get; set; }
+    public string PlayerName { get; set; } = string.Empty;
+    public int TotalScore { get; set; }
+    public int TotalPar { get; set; }
+    public int ScoreVsPar => TotalScore - TotalPar;
+}
+
 public interface IPlayerReportApiService
 {
-    Task<PlayerReportViewModel?> GetPlayerReportAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null);
-    Task<ScoringDistribution?> GetScoringDistributionAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null);
-    Task<PerformanceByPar?> GetPerformanceByParAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null);
+    Task<PlayerReportViewModel?> GetPlayerReportAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null, List<int>? compareWith = null);
+    Task<ScoringDistribution?> GetScoringDistributionAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null, List<int>? compareWith = null);
+    Task<PerformanceByPar?> GetPerformanceByParAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null, List<int>? compareWith = null);
+    Task<PlayerComparisonResult?> GetPlayerComparisonAsync(int playerId, List<int> comparePlayerIds, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null);
+    Task<RoundDetailSummary?> GetRoundDetailAsync(int playerId, int roundId);
     string LastApiError { get; }
 }
 
@@ -102,7 +165,7 @@ public class PlayerReportApiService : IPlayerReportApiService
         }
     }
 
-    private string BuildQueryString(int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    private string BuildQueryString(int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate, List<int>? compareWith = null)
     {
         var queryParams = new List<string>();
         
@@ -116,18 +179,20 @@ public class PlayerReportApiService : IPlayerReportApiService
             queryParams.Add($"startDate={startDate.Value:yyyy-MM-dd}");
         if (endDate.HasValue)
             queryParams.Add($"endDate={endDate.Value:yyyy-MM-dd}");
+        if (compareWith?.Any() == true)
+            queryParams.Add($"compareWith={string.Join(",", compareWith)}");
             
         return queryParams.Any() ? "?" + string.Join("&", queryParams) : "";
     }
 
-    public async Task<PlayerReportViewModel?> GetPlayerReportAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null)
+    public async Task<PlayerReportViewModel?> GetPlayerReportAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null, List<int>? compareWith = null)
     {
         HttpResponseMessage? response = null;
         try
         {
             EnsureAuthorizationHeader();
             
-            var queryString = BuildQueryString(courseId, holesPlayed, roundType, startDate, endDate);
+            var queryString = BuildQueryString(courseId, holesPlayed, roundType, startDate, endDate, compareWith);
             var url = $"api/players/{playerId}/report{queryString}";
             
             _logger.LogInformation("Fetching player report from API: {Url}", url);
@@ -190,13 +255,13 @@ public class PlayerReportApiService : IPlayerReportApiService
     // Temporary property to expose API error details
     public string LastApiError { get; private set; } = "";
 
-    public async Task<ScoringDistribution?> GetScoringDistributionAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null)
+    public async Task<ScoringDistribution?> GetScoringDistributionAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null, List<int>? compareWith = null)
     {
         try
         {
             EnsureAuthorizationHeader();
             
-            var queryString = BuildQueryString(courseId, holesPlayed, roundType, startDate, endDate);
+            var queryString = BuildQueryString(courseId, holesPlayed, roundType, startDate, endDate, compareWith);
             var url = $"api/players/{playerId}/scoring-distribution{queryString}";
             
             var response = await _httpClient.GetAsync(url);
@@ -220,13 +285,13 @@ public class PlayerReportApiService : IPlayerReportApiService
         }
     }
 
-    public async Task<PerformanceByPar?> GetPerformanceByParAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null)
+    public async Task<PerformanceByPar?> GetPerformanceByParAsync(int playerId, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null, List<int>? compareWith = null)
     {
         try
         {
             EnsureAuthorizationHeader();
             
-            var queryString = BuildQueryString(courseId, holesPlayed, roundType, startDate, endDate);
+            var queryString = BuildQueryString(courseId, holesPlayed, roundType, startDate, endDate, compareWith);
             var url = $"api/players/{playerId}/performance-by-par{queryString}";
             
             var response = await _httpClient.GetAsync(url);
@@ -246,6 +311,58 @@ public class PlayerReportApiService : IPlayerReportApiService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching performance by par for player {PlayerId} from API", playerId);
+            return null;
+        }
+    }
+
+    public async Task<PlayerComparisonResult?> GetPlayerComparisonAsync(int playerId, List<int> comparePlayerIds, int? courseId = null, int? holesPlayed = null, RoundTypeOption? roundType = null, DateTime? startDate = null, DateTime? endDate = null)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            
+            var queryString = BuildQueryString(courseId, holesPlayed, roundType, startDate, endDate);
+            var compareWith = string.Join(",", comparePlayerIds);
+            var separator = string.IsNullOrEmpty(queryString) ? "?" : "&";
+            var url = $"api/players/{playerId}/comparison{queryString}{separator}compareWith={compareWith}";
+            
+            var response = await _httpClient.GetAsync(url);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return null;
+            
+            response.EnsureSuccessStatusCode();
+            
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<PlayerComparisonResult>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching player comparison for player {PlayerId} from API", playerId);
+            return null;
+        }
+    }
+
+    public async Task<RoundDetailSummary?> GetRoundDetailAsync(int playerId, int roundId)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            
+            var url = $"api/players/{playerId}/rounds/{roundId}/detail";
+            var response = await _httpClient.GetAsync(url);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return null;
+            
+            response.EnsureSuccessStatusCode();
+            
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<RoundDetailSummary>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching round detail {RoundId} for player {PlayerId} from API", roundId, playerId);
             return null;
         }
     }

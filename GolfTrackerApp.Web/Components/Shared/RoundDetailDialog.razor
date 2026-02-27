@@ -1,0 +1,94 @@
+@using GolfTrackerApp.Web.Models
+@using System.Globalization
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <MudIcon Icon="@Icons.Material.Filled.GolfCourse" />
+            <span>@RoundDetail.ClubName - @RoundDetail.CourseName</span>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+            <MudChip T="string" Size="Size.Small">@RoundDetail.DatePlayed.ToString("dd MMM yyyy")</MudChip>
+            <MudChip T="string" Size="Size.Small">@RoundDetail.HolesPlayed Holes</MudChip>
+            <MudChip T="string" Size="Size.Small">@RoundDetail.RoundType</MudChip>
+            @{
+                var svp = RoundDetail.ScoreVsPar;
+                var chipColor = svp < 0 ? Color.Success : svp > 0 ? Color.Warning : Color.Info;
+            }
+            <MudChip T="string" Size="Size.Small" Color="@chipColor">@RoundDetail.TotalScore (@(svp >= 0 ? "+" : "")@svp)</MudChip>
+        </div>
+
+        @if (RoundDetail.HoleScores.Any())
+        {
+            <div style="overflow-x: auto;">
+                <table class="report-scorecard-table">
+                    <thead>
+                        <tr>
+                            <th>Hole</th>
+                            @foreach (var hole in RoundDetail.HoleScores)
+                            {
+                                <th>@hole.HoleNumber</th>
+                            }
+                            <th class="report-scorecard-total">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="report-scorecard-par">
+                            <td>Par</td>
+                            @foreach (var hole in RoundDetail.HoleScores)
+                            {
+                                <td>@hole.Par</td>
+                            }
+                            <td class="report-scorecard-total">@RoundDetail.TotalPar</td>
+                        </tr>
+                        <tr class="report-scorecard-score">
+                            <td>Score</td>
+                            @foreach (var hole in RoundDetail.HoleScores)
+                            {
+                                var holeClass = hole.ScoreVsPar switch
+                                {
+                                    <= -2 => "score-eagle",
+                                    -1 => "score-birdie",
+                                    0 => "score-par",
+                                    1 => "score-bogey",
+                                    _ => "score-double"
+                                };
+                                <td class="@holeClass">@hole.Strokes</td>
+                            }
+                            <td class="report-scorecard-total">@RoundDetail.TotalScore</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (RoundDetail.OtherPlayers.Any())
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Playing Partners</MudText>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var other in RoundDetail.OtherPlayers)
+                {
+                    var otherSvp = other.ScoreVsPar;
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                        @other.PlayerName: @other.TotalScore (@(otherSvp >= 0 ? "+" : "")@otherSvp)
+                    </MudChip>
+                }
+            </div>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public RoundDetailSummary RoundDetail { get; set; } = null!;
+
+    private void Close() => MudDialog.Close();
+}

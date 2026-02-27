@@ -1,0 +1,567 @@
+/* =============================================================================
+   Player Report / Analytics Page Styles
+   
+   Premium analytics styling for the player performance report page.
+   ============================================================================= */
+
+/* =========================================================================
+   REPORT LOADING
+   ========================================================================= */
+.report-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+/* =========================================================================
+   HERO HEADER
+   ========================================================================= */
+.report-hero {
+    position: relative;
+    border-radius: var(--gp-radius-xl, 16px);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem 2rem;
+}
+
+.report-hero-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 40%, #388E3C 70%, #43A047 100%);
+    opacity: 0.95;
+}
+
+.report-hero-content {
+    position: relative;
+    z-index: 1;
+}
+
+.report-breadcrumbs {
+    margin-bottom: 0.5rem;
+}
+
+.report-breadcrumbs .mud-breadcrumbs li,
+.report-breadcrumbs .mud-breadcrumbs a,
+.report-breadcrumbs .mud-breadcrumbs span {
+    color: rgba(255, 255, 255, 0.8) !important;
+    font-size: 0.8rem;
+}
+
+.report-hero-player {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.report-hero-avatar {
+    width: 56px !important;
+    height: 56px !important;
+    font-size: 1.25rem !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    color: white !important;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.report-hero-name {
+    color: white !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em;
+}
+
+.report-hero-sub {
+    color: rgba(255, 255, 255, 0.75) !important;
+    font-weight: 400 !important;
+}
+
+/* =========================================================================
+   STAT STRIP
+   ========================================================================= */
+.report-stat-strip {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+}
+
+.report-stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: white;
+    border-radius: var(--gp-radius-lg, 12px);
+    padding: 0.75rem 1.25rem;
+    border: 1px solid var(--gp-neutral-200, #e5e7eb);
+    box-shadow: var(--gp-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+    white-space: nowrap;
+    min-width: fit-content;
+    transition: all 0.2s ease;
+}
+
+.report-stat-chip:hover {
+    box-shadow: var(--gp-shadow-md, 0 4px 6px rgba(0,0,0,0.1));
+    transform: translateY(-1px);
+}
+
+.report-stat-chip-icon {
+    font-size: 1.5rem;
+}
+
+.report-stat-chip-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gp-neutral-800, #1f2937);
+    line-height: 1.2;
+}
+
+.report-stat-chip-label {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--gp-neutral-500, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 500;
+}
+
+.report-stat-date {
+    font-size: 1.1rem !important;
+}
+
+.stat-under-par { color: #2E7D32 !important; }
+.stat-over-par { color: #C62828 !important; }
+.stat-level-par { color: #1565C0 !important; }
+
+/* =========================================================================
+   FILTER CONTROLS
+   ========================================================================= */
+.report-controls {
+    margin-bottom: 1.5rem;
+}
+
+.report-filter-panel {
+    border-radius: var(--gp-radius-lg, 12px) !important;
+    overflow: hidden;
+}
+
+.report-filter-expansion {
+    background: white !important;
+    border: 1px solid var(--gp-neutral-200, #e5e7eb) !important;
+    border-radius: var(--gp-radius-lg, 12px) !important;
+    box-shadow: var(--gp-shadow-sm, 0 1px 2px rgba(0,0,0,0.05)) !important;
+}
+
+.report-filter-expansion .mud-expand-panel-header {
+    min-height: 44px !important;
+}
+
+/* =========================================================================
+   CHART SECTION
+   ========================================================================= */
+.report-chart-section {
+    padding: 0 !important;
+    margin-bottom: 1.5rem;
+}
+
+.report-chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.report-chart-tall {
+    height: 350px !important;
+}
+
+.report-chart-legend {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.report-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--gp-neutral-600, #4b5563);
+}
+
+.report-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* =========================================================================
+   ROUNDS TABLE / DATA GRID
+   ========================================================================= */
+.report-rounds-section {
+    margin-bottom: 1.5rem;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.report-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--gp-neutral-100, #f3f4f6);
+}
+
+.report-data-grid .mud-table-row {
+    cursor: pointer;
+}
+
+.report-data-grid .mud-table-row:hover {
+    background: var(--gp-primary-50, #f0f7f0) !important;
+}
+
+.report-score-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.report-score-badge.stat-under-par {
+    background: #E8F5E9;
+    color: #2E7D32;
+}
+
+.report-score-badge.stat-over-par {
+    background: #FFEBEE;
+    color: #C62828;
+}
+
+.report-score-badge.stat-level-par {
+    background: #E3F2FD;
+    color: #1565C0;
+}
+
+/* =========================================================================
+   DRILL-DOWN PANEL
+   ========================================================================= */
+.report-drilldown {
+    margin-bottom: 1.5rem;
+    padding: 0 !important;
+    border: 2px solid var(--gp-primary-200, #a5d6a7);
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.report-drilldown-meta {
+    padding: 0 1.5rem 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+/* =========================================================================
+   SCORECARD TABLE
+   ========================================================================= */
+.report-scorecard {
+    padding: 0 1rem 1rem;
+    overflow-x: auto;
+}
+
+.report-scorecard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    text-align: center;
+    min-width: 500px;
+}
+
+.report-scorecard-table th,
+.report-scorecard-table td {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--gp-neutral-200, #e5e7eb);
+}
+
+.report-scorecard-table th {
+    background: var(--gp-neutral-50, #f9fafb);
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: var(--gp-neutral-500, #6b7280);
+}
+
+.report-scorecard-table td:first-child,
+.report-scorecard-table th:first-child {
+    font-weight: 600;
+    text-align: left;
+    min-width: 60px;
+}
+
+.report-scorecard-par td {
+    color: var(--gp-neutral-500, #6b7280);
+    font-weight: 500;
+}
+
+.report-scorecard-score td {
+    font-weight: 700;
+}
+
+.report-scorecard-total {
+    font-weight: 700 !important;
+    background: var(--gp-neutral-50, #f9fafb) !important;
+    border-left: 2px solid var(--gp-neutral-300, #d1d5db) !important;
+}
+
+/* Score coloring for scorecard cells */
+.score-eagle { background: #FFF8E1; color: #F57F17; }
+.score-birdie { background: #FFEBEE; color: #C62828; }
+.score-par { background: #E8F5E9; color: #2E7D32; }
+.score-bogey { background: #E3F2FD; color: #1565C0; }
+.score-double { background: #F3E5F5; color: #6A1B9A; }
+
+/* =========================================================================
+   ANALYTICS CARDS (Scoring Distribution & Par Performance)
+   ========================================================================= */
+.report-analytics-card {
+    height: 100%;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+}
+
+.report-analytics-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Scoring Distribution Bars */
+.report-scoring-visual {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.report-scoring-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.report-scoring-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.report-scoring-bar-label {
+    width: 60px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gp-neutral-600, #4b5563);
+    text-align: right;
+}
+
+.report-scoring-bar-track {
+    flex: 1;
+    height: 24px;
+    background: var(--gp-neutral-100, #f3f4f6);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.report-scoring-bar-fill {
+    height: 100%;
+    border-radius: 12px;
+    transition: width 0.6s ease;
+    min-width: 3px;
+}
+
+.report-scoring-bar-value {
+    width: 90px;
+    font-size: 0.75rem;
+    color: var(--gp-neutral-500, #6b7280);
+    white-space: nowrap;
+}
+
+/* Par Performance */
+.report-par-visual {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.report-par-item {
+    background: var(--gp-neutral-50, #f9fafb);
+    border-radius: var(--gp-radius-lg, 12px);
+    padding: 1rem;
+}
+
+.report-par-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.report-par-label {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--gp-neutral-800, #1f2937);
+}
+
+.report-par-count {
+    font-size: 0.75rem;
+    color: var(--gp-neutral-500, #6b7280);
+}
+
+.report-par-stats {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.report-par-avg,
+.report-par-vs {
+    text-align: center;
+}
+
+.report-par-avg-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--gp-neutral-800, #1f2937);
+}
+
+.report-par-avg-label,
+.report-par-vs-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gp-neutral-500, #6b7280);
+}
+
+.report-par-vs-value {
+    display: block;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.report-par-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--gp-neutral-200, #e5e7eb);
+    border-radius: 4px;
+    position: relative;
+    min-width: 80px;
+}
+
+.report-par-bar-center {
+    position: absolute;
+    left: 50%;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: var(--gp-neutral-400, #9ca3af);
+    transform: translateX(-50%);
+}
+
+.report-par-bar-fill {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+.report-par-bar-left {
+    right: 50%;
+}
+
+.report-par-bar-right {
+    left: 50%;
+}
+
+/* =========================================================================
+   COMPARISON TABLE
+   ========================================================================= */
+.report-comparison-section {
+    margin-bottom: 1.5rem;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.report-comparison-table th {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gp-neutral-500, #6b7280);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.report-comparison-primary {
+    background: var(--gp-primary-50, #f0f7f0) !important;
+}
+
+/* =========================================================================
+   EMPTY STATE
+   ========================================================================= */
+.report-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+    text-align: center;
+    padding: 2rem;
+}
+
+/* =========================================================================
+   RESPONSIVE
+   ========================================================================= */
+@media (max-width: 768px) {
+    .report-hero {
+        padding: 1rem;
+    }
+
+    .report-stat-strip {
+        gap: 0.5rem;
+    }
+
+    .report-stat-chip {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .report-stat-chip-value {
+        font-size: 1rem;
+    }
+
+    .report-chart-tall {
+        height: 250px !important;
+    }
+
+    .report-par-stats {
+        gap: 0.75rem;
+    }
+
+    .report-scoring-bar-label {
+        width: 45px;
+        font-size: 0.7rem;
+    }
+
+    .report-scoring-bar-value {
+        width: 70px;
+        font-size: 0.65rem;
+    }
+}

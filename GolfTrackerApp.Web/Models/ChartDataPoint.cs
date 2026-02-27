@@ -2,6 +2,7 @@ namespace GolfTrackerApp.Web.Models;
 
 public class PlayerPerformanceDataPoint
 {
+    public int RoundId { get; set; }
     public DateTime Date { get; set; }
     public int TotalScore { get; set; }
     public int TotalPar { get; set; }

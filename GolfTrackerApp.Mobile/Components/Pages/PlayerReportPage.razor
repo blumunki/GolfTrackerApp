@@ -6,17 +6,19 @@
 @using GolfTrackerApp.Mobile.Models
 @inject INavigationService NavigationService
 @inject IPlayerReportApiService PlayerReportApiService
+@inject IPlayerApiService PlayerApiService
 @inject IRoundApiService RoundApiService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateService AuthService
+@inject IDialogService DialogService
 
 <MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
     @if (loading)
     {
         <div class="text-center pa-4">
             <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
-            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading player report...</MudText>
+            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading performance data...</MudText>
         </div>
     }
     else if (playerId <= 0)
@@ -29,37 +31,157 @@
     }
     else if (reportData?.Player != null)
     {
-        <!-- Player Header -->
-        <div class="d-flex align-center mb-4">
-            <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-3">
+        <!-- Hero Header -->
+        <div class="mobile-report-hero mb-3">
+            <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mobile-report-avatar">
                 @GetPlayerInitials(reportData.Player)
             </MudAvatar>
             <div>
-                <MudText Typo="Typo.h4" Color="Color.Primary">
+                <MudText Typo="Typo.h5" Color="Color.Primary" Style="font-weight: 700;">
                     @reportData.Player.FirstName @reportData.Player.LastName
                 </MudText>
-                <MudText Typo="Typo.subtitle1" Color="Color.Secondary">
-                    Player Report
-                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Performance Analytics</MudText>
             </div>
         </div>
+
+        <!-- Stat Strip -->
+        @if (reportData.PerformanceData?.Any() == true)
+        {
+            <div class="mobile-stat-strip mb-3">
+                <div class="mobile-stat-item">
+                    <span class="mobile-stat-emoji">🏌️</span>
+                    <span class="mobile-stat-val">@reportData.PerformanceData.Count</span>
+                    <span class="mobile-stat-lbl">Rounds</span>
+                </div>
+                <div class="mobile-stat-item">
+                    <span class="mobile-stat-emoji">🏆</span>
+                    <span class="mobile-stat-val">@GetBestScore()</span>
+                    <span class="mobile-stat-lbl">Best</span>
+                </div>
+                <div class="mobile-stat-item">
+                    <span class="mobile-stat-emoji">📊</span>
+                    <span class="mobile-stat-val">@GetAverageScore().ToString("F1")</span>
+                    <span class="mobile-stat-lbl">Avg</span>
+                </div>
+                <div class="mobile-stat-item">
+                    <span class="mobile-stat-emoji">⛳</span>
+                    @{
+                        var mobileAvgToPar = GetAverageToPar();
+                        var mobileToParClass = mobileAvgToPar < 0 ? "mobile-under-par" : mobileAvgToPar > 0 ? "mobile-over-par" : "";
+                    }
+                    <span class="mobile-stat-val @mobileToParClass">@(mobileAvgToPar >= 0 ? "+" : "")@mobileAvgToPar.ToString("F1")</span>
+                    <span class="mobile-stat-lbl">vs Par</span>
+                </div>
+            </div>
+        }
+
+        <!-- Filters (Collapsible) -->
+        <MudExpansionPanels Elevation="0" Class="mb-2">
+            <MudExpansionPanel Text="Filters & Comparison" Expanded="false" Dense="true" Style="background: white; border: 1px solid #e5e7eb; border-radius: 12px; font-size: 0.8rem;">
+                <MudGrid Spacing="0" Class="pa-0">
+                    <MudItem xs="12" Class="py-1">
+                        <MudSelect T="int?" Label="Course" @bind-Value="selectedCourseId" Clearable="true" 
+                                 Variant="Variant.Outlined" Dense="true" Disabled="filterLoading" Margin="Margin.Dense"
+                                 Style="font-size: 0.8rem;">
+                            @if (reportData.FilterCourses != null)
+                            {
+                                @foreach (var course in reportData.FilterCourses.OrderBy(c => c.GolfClubName).ThenBy(c => c.Name))
+                                {
+                                    <MudSelectItem T="int?" Value="@course.GolfCourseId">@(course.GolfClubName != null ? $"{course.GolfClubName} - {course.Name}" : course.Name)</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6" Class="py-1 pr-1">
+                        <MudSelect T="int?" Label="Holes" @bind-Value="selectedHoles" Clearable="true" 
+                                 Variant="Variant.Outlined" Dense="true" Disabled="filterLoading" Margin="Margin.Dense"
+                                 Style="font-size: 0.8rem;">
+                            <MudSelectItem T="int?" Value="9">9</MudSelectItem>
+                            <MudSelectItem T="int?" Value="18">18</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6" Class="py-1 pl-1">
+                        <MudSelect T="string" Label="Type" @bind-Value="selectedRoundType" Clearable="true"
+                                 Variant="Variant.Outlined" Dense="true" Disabled="filterLoading" Margin="Margin.Dense"
+                                 Style="font-size: 0.8rem;">
+                            <MudSelectItem T="string" Value="@("Friendly")">Friendly</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Competitive")">Competitive</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6" Class="py-0 d-flex align-center">
+                        <MudSwitch @bind-Value="showScoreVsPar" Label="vs Par" Color="Color.Primary" Style="font-size: 0.75rem;" />
+                    </MudItem>
+                    <MudItem xs="6" Class="py-1 pl-1 d-flex align-center">
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" 
+                                  OnClick="ApplyFilters" Disabled="filterLoading" Size="Size.Small" Style="font-size: 0.75rem; height: 30px;">
+                            Apply
+                        </MudButton>
+                    </MudItem>
+
+                    <!-- Compare Players -->
+                    <MudItem xs="12">
+                        <MudDivider Class="my-1" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mb-1">Compare with</MudText>
+                        <div class="d-flex flex-wrap gap-1 mb-1">
+                            @foreach (var cp in comparisonPlayers)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" OnClose="() => RemoveComparison(cp.Id)">
+                                    @cp.FirstName
+                                </MudChip>
+                            }
+                        </div>
+                        @if (availablePlayers.Any(p => !comparisonPlayerIds.Contains(p.Id) && p.Id != playerId))
+                        {
+                            <MudSelect T="int?" Label="Add player..." @bind-Value="addPlayerId" Clearable="true"
+                                     Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                                @foreach (var p in availablePlayers.Where(p => !comparisonPlayerIds.Contains(p.Id) && p.Id != playerId))
+                                {
+                                    <MudSelectItem T="int?" Value="@p.Id">@p.FirstName @p.LastName</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+
+        @if (filterLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-3" />
+        }
 
         <!-- Performance Chart -->
         @if (reportData.PerformanceData?.Any() == true)
         {
-            <MudCard Elevation="3" Class="mb-4">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">📈 Performance Trend</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
+            <MudCard Elevation="2" Class="mb-3" Style="border-radius: 12px; overflow: hidden;">
+                <MudCardContent Class="pa-2">
+                    <div class="d-flex justify-space-between align-center mb-1">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">📈 Performance Trend</MudText>
+                        @if (comparisonPlayers.Any())
+                        {
+                            <div class="d-flex gap-2">
+                                @{
+                                    var mLegendColors = new[] { "#1B5E20", "#E65100", "#1565C0", "#6A1B9A" };
+                                    var mLegendNames = new List<string> { reportData.Player.FirstName };
+                                    mLegendNames.AddRange(comparisonPlayers.Select(p => p.FirstName));
+                                }
+                                @for (int li = 0; li < mLegendNames.Count; li++)
+                                {
+                                    var mColor = mLegendColors[li % mLegendColors.Length];
+                                    <span style="font-size: 0.65rem; display: flex; align-items: center; gap: 3px;">
+                                        <span style="width: 8px; height: 8px; border-radius: 50%; background: @mColor; display: inline-block;"></span>
+                                        @mLegendNames[li]
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </div>
                     <div class="golf-chart-container">
                         <MudChart ChartType="ChartType.Line" 
                                  ChartSeries="@performanceSeries" 
                                  XAxisLabels="@performanceXAxisLabels" 
                                  Width="100%" 
-                                 Height="300px"
+                                 Height="250px"
                                  ChartOptions="@chartOptions">
                         </MudChart>
                     </div>
@@ -67,66 +189,137 @@
             </MudCard>
         }
 
-        <!-- Performance Statistics -->
-        @if (reportData.PerformanceData?.Any() == true)
+        <!-- Scoring Distribution -->
+        @if (scoringDistribution != null && scoringDistribution.TotalHoles > 0)
         {
-            <MudGrid Class="mb-4" Spacing="2">
-                <MudItem xs="6" sm="3">
-                    <MudCard Elevation="2" Class="pa-3 text-center" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 50%); color: white;">
-                        <MudText Typo="Typo.h5">@reportData.PerformanceData.Count</MudText>
-                        <MudText Typo="Typo.caption">Total Rounds</MudText>
-                    </MudCard>
-                </MudItem>
-                <MudItem xs="6" sm="3">
-                    <MudCard Elevation="2" Class="pa-3 text-center" Style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%); color: white;">
-                        <MudText Typo="Typo.h5">@GetBestScore()</MudText>
-                        <MudText Typo="Typo.caption">Best Score</MudText>
-                    </MudCard>
-                </MudItem>
-                <MudItem xs="6" sm="3">
-                    <MudCard Elevation="2" Class="pa-3 text-center" Style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%); color: white;">
-                        <MudText Typo="Typo.h5">@GetAverageScore().ToString("F1")</MudText>
-                        <MudText Typo="Typo.caption">Average Score</MudText>
-                    </MudCard>
-                </MudItem>
-                <MudItem xs="6" sm="3">
-                    <MudCard Elevation="2" Class="pa-3 text-center" Style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 50%); color: white;">
-                        <MudText Typo="Typo.h5">@GetAverageToPar().ToString("F1")</MudText>
-                        <MudText Typo="Typo.caption">Avg to Par</MudText>
-                    </MudCard>
-                </MudItem>
-            </MudGrid>
+            <MudCard Elevation="2" Class="mb-3" Style="border-radius: 12px;">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle1" Class="mb-2" Style="font-weight: 600;">🎯 Scoring Distribution</MudText>
+                    @{
+                        var mScoringItems = new (string Label, int Count, double Pct, string Color)[]
+                        {
+                            ("Eagle", scoringDistribution.EagleCount, scoringDistribution.EaglePercentage, "#FFD700"),
+                            ("Birdie", scoringDistribution.BirdieCount, scoringDistribution.BirdiePercentage, "#E53935"),
+                            ("Par", scoringDistribution.ParCount, scoringDistribution.ParPercentage, "#43A047"),
+                            ("Bogey", scoringDistribution.BogeyCount, scoringDistribution.BogeyPercentage, "#1E88E5"),
+                            ("Double", scoringDistribution.DoubleBogeyCount, scoringDistribution.DoubleBogeyPercentage, "#8E24AA"),
+                            ("Triple+", scoringDistribution.TripleBogeyOrWorseCount, scoringDistribution.TripleBogeyOrWorsePercentage, "#546E7A")
+                        };
+                    }
+                    @foreach (var item in mScoringItems.Where(i => i.Count > 0))
+                    {
+                        <div class="d-flex align-center gap-2 mb-1">
+                            <span style="width: 50px; font-size: 0.75rem; font-weight: 600; color: #4b5563; text-align: right;">@item.Label</span>
+                            <div style="flex: 1; height: 18px; background: #f3f4f6; border-radius: 9px; overflow: hidden;">
+                                <div style="height: 100%; width: @item.Pct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%; background: @item.Color; border-radius: 9px; min-width: 3px;"></div>
+                            </div>
+                            <span style="width: 65px; font-size: 0.7rem; color: #6b7280;">@item.Count (@item.Pct.ToString("F0")%)</span>
+                        </div>
+                    }
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">@scoringDistribution.TotalHoles holes</MudText>
+                </MudCardContent>
+            </MudCard>
         }
 
-        <!-- Recent Rounds -->
+        <!-- Performance by Par -->
+        @if (performanceByPar?.HasValidData == true)
+        {
+            <MudCard Elevation="2" Class="mb-3" Style="border-radius: 12px;">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle1" Class="mb-2" Style="font-weight: 600;">⛳ Performance by Par</MudText>
+                    @{
+                        var mParItems = new (string Label, double Avg, double RelPar, int Count)[]
+                        {
+                            ("Par 3", performanceByPar.Par3Average, performanceByPar.Par3RelativeToPar, performanceByPar.Par3Count),
+                            ("Par 4", performanceByPar.Par4Average, performanceByPar.Par4RelativeToPar, performanceByPar.Par4Count),
+                            ("Par 5", performanceByPar.Par5Average, performanceByPar.Par5RelativeToPar, performanceByPar.Par5Count)
+                        };
+                    }
+                    @foreach (var par in mParItems.Where(p => p.Count > 0))
+                    {
+                        var pClass = par.RelPar <= 0 ? "mobile-under-par" : "mobile-over-par";
+                        <div style="background: #f9fafb; border-radius: 10px; padding: 10px; margin-bottom: 8px;">
+                            <div class="d-flex justify-space-between align-center mb-1">
+                                <MudText Typo="Typo.body2" Style="font-weight: 700;">@par.Label</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">@par.Count holes</MudText>
+                            </div>
+                            <div class="d-flex gap-4">
+                                <div>
+                                    <span style="font-size: 1.1rem; font-weight: 700;">@par.Avg.ToString("F2")</span>
+                                    <span style="font-size: 0.6rem; color: #6b7280; display: block;">avg strokes</span>
+                                </div>
+                                <div>
+                                    <span class="@pClass" style="font-size: 1.1rem; font-weight: 700;">@(par.RelPar >= 0 ? "+" : "")@par.RelPar.ToString("F2")</span>
+                                    <span style="font-size: 0.6rem; color: #6b7280; display: block;">vs par</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+
+        <!-- Head-to-Head -->
+        @if (comparisonResult?.Summaries != null && comparisonResult.Summaries.Count > 1)
+        {
+            <MudCard Elevation="2" Class="mb-3" Style="border-radius: 12px;">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle1" Class="mb-2" Style="font-weight: 600;">⚔️ Head-to-Head</MudText>
+                    @foreach (var summary in comparisonResult.Summaries)
+                    {
+                        var isSelf = summary.PlayerId == playerId;
+                        <div style="@(isSelf ? "background: #f0f7f0;" : "background: #f9fafb;") border-radius: 10px; padding: 10px; margin-bottom: 6px;">
+                            <MudText Typo="Typo.body2" Style="font-weight: 700;">@summary.PlayerName @(isSelf ? "(You)" : "")</MudText>
+                            <div class="d-flex flex-wrap gap-3 mt-1">
+                                <div>
+                                    <span style="font-weight: 600;">@summary.TotalRounds</span>
+                                    <span style="font-size: 0.65rem; color: #6b7280;"> rounds</span>
+                                </div>
+                                <div>
+                                    <span style="font-weight: 600;">@summary.AverageScore.ToString("F1")</span>
+                                    <span style="font-size: 0.65rem; color: #6b7280;"> avg</span>
+                                </div>
+                                @if (!isSelf)
+                                {
+                                    <div>
+                                        <span style="font-weight: 600;">@summary.Wins/@summary.Losses/@summary.Ties</span>
+                                        <span style="font-size: 0.65rem; color: #6b7280;"> W/L/T</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+
+        <!-- Round List (at bottom after analytics) -->
         @if (reportData.PerformanceData?.Any() == true)
         {
-            <MudCard Elevation="3" Class="mb-4">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">🏌️ Recent Rounds</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudList T="object" Dense="true">
-                        @foreach (var round in reportData.PerformanceData.OrderByDescending(r => r.Date).Take(10))
+            <MudCard Elevation="2" Class="mb-3" Style="border-radius: 12px; overflow: hidden;">
+                <MudCardContent Class="pa-0">
+                    <div class="d-flex justify-space-between align-center pa-3 pb-1">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">🏌️ Rounds (@reportData.PerformanceData.Count)</MudText>
+                    </div>
+                    <MudList T="object" Dense="true" Class="pa-0">
+                        @foreach (var round in reportData.PerformanceData.OrderByDescending(r => r.Date).Take(20))
                         {
-                            <MudListItem T="object">
+                            <MudListItem T="object" OnClick="() => LoadRoundDetail(round.RoundId)" Style="cursor: pointer;">
                                 <div class="d-flex justify-space-between align-center flex-grow-1">
                                     <div class="d-flex flex-column">
-                                        <MudText Typo="Typo.body2">
-                                            <strong>@round.CourseName</strong>
-                                        </MudText>
+                                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@round.CourseName</MudText>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                            @round.Date.ToString("MMM dd, yyyy")
+                                            @round.Date.ToString("dd MMM yyyy") · @round.HolesPlayed holes
                                         </MudText>
                                     </div>
                                     <div class="text-right">
-                                        <MudText Typo="Typo.h6" Color="Color.Primary">
-                                            @round.TotalScore
-                                        </MudText>
-                                        <MudText Typo="Typo.caption" Color="@(round.ScoreVsPar < 0 ? Color.Success : round.ScoreVsPar > 0 ? Color.Warning : Color.Info)">
-                                            @(round.ScoreVsPar >= 0 ? "+" : "")@round.ScoreVsPar
+                                        <MudText Typo="Typo.h6" Color="Color.Primary">@round.TotalScore</MudText>
+                                        @{
+                                            var rsvp = round.ScoreVsPar;
+                                            var rsvpColor = rsvp < 0 ? Color.Success : rsvp > 0 ? Color.Warning : Color.Info;
+                                        }
+                                        <MudText Typo="Typo.caption" Color="@rsvpColor" Style="font-weight: 600;">
+                                            @(rsvp >= 0 ? "+" : "")@rsvp
                                         </MudText>
                                     </div>
                                 </div>
@@ -140,14 +333,12 @@
     else
     {
         <div class="text-center pa-4">
-            <MudIcon Icon="@Icons.Material.Filled.Error" Size="Size.Large" Color="Color.Error" />
-            <MudText Typo="Typo.h6" Color="Color.Error" Class="mt-2">Unable to Load Report</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Color="Color.Secondary" />
+            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No Data Available</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">There was an error loading the player report data.</MudText>
             @if (!string.IsNullOrEmpty(debugInfo))
             {
-                <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-2">
-                    DEBUG: @debugInfo
-                </MudText>
+                <MudText Typo="Typo.caption" Color="Color.Info" Class="mt-2">DEBUG: @debugInfo</MudText>
             }
         </div>
     }
@@ -159,9 +350,44 @@
     private int playerId = 0;
     private bool useCurrentUser = false;
     private bool loading = true;
+    private bool filterLoading = false;
     private PlayerReportViewModel? reportData;
+    private ScoringDistribution? scoringDistribution;
+    private PerformanceByPar? performanceByPar;
+    private RoundDetailSummary? selectedRoundDetail;
+    private PlayerComparisonResult? comparisonResult;
     private string debugInfo = "";
     
+    // Filters
+    private int? selectedCourseId;
+    private int? selectedHoles;
+    private string? selectedRoundType;
+    private bool showScoreVsPar = true;
+
+    // Comparison
+    private List<Player> availablePlayers = new();
+    private List<Player> comparisonPlayers = new();
+    private HashSet<int> comparisonPlayerIds = new();
+    private int? _addPlayerId;
+    private int? addPlayerId
+    {
+        get => _addPlayerId;
+        set
+        {
+            _addPlayerId = value;
+            if (value.HasValue && value > 0)
+            {
+                var p = availablePlayers.FirstOrDefault(x => x.Id == value.Value);
+                if (p != null && !comparisonPlayerIds.Contains(p.Id))
+                {
+                    comparisonPlayers.Add(p);
+                    comparisonPlayerIds.Add(p.Id);
+                }
+                _addPlayerId = null;
+            }
+        }
+    }
+
     // Chart data
     private List<ChartSeries> performanceSeries = new();
     private string[] performanceXAxisLabels = Array.Empty<string>();
@@ -169,41 +395,29 @@
     
     protected override async Task OnInitializedAsync()
     {
-        // Get player ID from the route parameter
         if (!string.IsNullOrEmpty(PlayerId))
         {
             if (int.TryParse(PlayerId, out var routePlayerId))
-            {
                 playerId = routePlayerId;
-            }
             else if (PlayerId == "me" || PlayerId == "current")
             {
-                // Handle "me" as current user - try player ID 0 which API should handle
                 useCurrentUser = true;
-                playerId = 0; // API should return current user's data
+                playerId = 0;
             }
         }
         else if (NavigationManager.Uri.Contains("/player-report") && !NavigationManager.Uri.Contains("/players/"))
         {
-            // Navigated to /player-report without ID - need to get current user's player
             useCurrentUser = true;
             await LoadCurrentUserPlayer();
-            return; // Exit early, LoadCurrentUserPlayer will handle loading
+            return;
         }
 
         if (playerId > 0)
-        {
             await LoadPlayerReport();
-        }
         else if (useCurrentUser && playerId == 0)
-        {
-            // Handle "me" parameter - need to get current user's player
             await LoadCurrentUserPlayer();
-        }
         else
-        {
             loading = false;
-        }
     }
     
     private async Task LoadCurrentUserPlayer()
@@ -213,67 +427,64 @@
             loading = true;
             StateHasChanged();
             
-            // Get the current user's player ID from AuthenticationStateService
             var currentPlayerId = AuthService.PlayerId;
-            
             if (currentPlayerId.HasValue)
             {
                 PlayerId = currentPlayerId.Value.ToString();
-                playerId = currentPlayerId.Value; // Set the int field too!
+                playerId = currentPlayerId.Value;
                 await LoadPlayerReport();
             }
             else
             {
-                debugInfo = "Could not determine current user's player ID. Please ensure you are logged in.";
+                debugInfo = "Could not determine current user's player ID.";
                 loading = false;
                 StateHasChanged();
             }
         }
         catch (Exception ex)
         {
-            debugInfo = $"Error loading current user player: {ex.Message}";
+            debugInfo = $"Error: {ex.Message}";
             loading = false;
             StateHasChanged();
         }
     }
-    
+
     private async Task LoadPlayerReport()
     {
         try
         {
             loading = true;
-            debugInfo = $"Calling API for player ID: {playerId}";
             StateHasChanged();
-            
-            reportData = await PlayerReportApiService.GetPlayerReportAsync(playerId);
-            
-            if (reportData == null)
+
+            // Load available players for comparison
+            try
             {
-                debugInfo = $"API returned null for player ID: {playerId}. Details: {PlayerReportApiService.LastApiError}";
+                availablePlayers = await PlayerApiService.GetAllPlayersAsync();
             }
-            else if (reportData.Player == null)
+            catch { /* Non-critical */ }
+
+            // When comparison players are selected, filter all data to shared rounds (head-to-head mode)
+            var compareWith = comparisonPlayerIds.Any() ? comparisonPlayerIds.ToList() : null;
+
+            reportData = await PlayerReportApiService.GetPlayerReportAsync(playerId, compareWith: compareWith);
+
+            // Load scoring distribution and par performance
+            scoringDistribution = await PlayerReportApiService.GetScoringDistributionAsync(playerId, compareWith: compareWith);
+            performanceByPar = await PlayerReportApiService.GetPerformanceByParAsync(playerId, compareWith: compareWith);
+
+            // Load comparison data
+            if (comparisonPlayerIds.Any())
             {
-                debugInfo = $"API returned data but Player is null for ID: {playerId}. Response has {reportData.PerformanceData?.Count ?? 0} performance data points. Details: {PlayerReportApiService.LastApiError}";
+                comparisonResult = await PlayerReportApiService.GetPlayerComparisonAsync(
+                    playerId, comparisonPlayerIds.ToList());
             }
-            else
-            {
-                debugInfo = $"Successfully loaded data for player: {reportData.Player.FirstName} {reportData.Player.LastName} (ID: {reportData.Player.Id}). Details: {PlayerReportApiService.LastApiError}";
-            }
-            
+
             if (reportData?.PerformanceData?.Any() == true)
-            {
                 InitializePerformanceChart();
-            }
         }
         catch (Exception ex)
         {
-            // Log error but don't crash the app
-            debugInfo = $"EXCEPTION: {ex.GetType().Name}: {ex.Message}";
-            if (ex.InnerException != null)
-            {
-                debugInfo += $" | Inner: {ex.InnerException.Message}";
-            }
-            debugInfo += $" | API Details: {PlayerReportApiService.LastApiError}";
+            debugInfo = $"EXCEPTION: {ex.Message}";
             reportData = null;
         }
         finally
@@ -281,6 +492,96 @@
             loading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task ApplyFilters()
+    {
+        filterLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            RoundTypeOption? roundType = selectedRoundType switch
+            {
+                "Friendly" => RoundTypeOption.Friendly,
+                "Competitive" => RoundTypeOption.Competitive,
+                _ => null
+            };
+
+            // When comparison players are selected, filter all data to shared rounds (head-to-head mode)
+            var compareWith = comparisonPlayerIds.Any() ? comparisonPlayerIds.ToList() : null;
+
+            reportData = await PlayerReportApiService.GetPlayerReportAsync(
+                playerId, selectedCourseId, selectedHoles, roundType, compareWith: compareWith);
+            scoringDistribution = await PlayerReportApiService.GetScoringDistributionAsync(
+                playerId, selectedCourseId, selectedHoles, roundType, compareWith: compareWith);
+            performanceByPar = await PlayerReportApiService.GetPerformanceByParAsync(
+                playerId, selectedCourseId, selectedHoles, roundType, compareWith: compareWith);
+
+            if (comparisonPlayerIds.Any())
+            {
+                comparisonResult = await PlayerReportApiService.GetPlayerComparisonAsync(
+                    playerId, comparisonPlayerIds.ToList(), selectedCourseId, selectedHoles, roundType);
+            }
+            else
+            {
+                comparisonResult = null;
+            }
+
+            if (reportData?.PerformanceData?.Any() == true)
+                InitializePerformanceChart();
+
+            selectedRoundDetail = null;
+        }
+        catch (Exception ex)
+        {
+            debugInfo = $"Filter error: {ex.Message}";
+        }
+        finally
+        {
+            filterLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveComparison(int id)
+    {
+        comparisonPlayers.RemoveAll(p => p.Id == id);
+        comparisonPlayerIds.Remove(id);
+        comparisonResult = null;
+        InvokeAsync(ApplyFilters);
+    }
+
+    private async Task LoadRoundDetail(int roundId)
+    {
+        if (roundId <= 0) return;
+        selectedRoundDetail = await PlayerReportApiService.GetRoundDetailAsync(playerId, roundId);
+        if (selectedRoundDetail != null)
+            await ShowRoundDetailDialog();
+    }
+
+    private async Task ShowRoundDetailDialog()
+    {
+        if (selectedRoundDetail == null) return;
+
+        var parameters = new DialogParameters
+        {
+            { "RoundDetail", selectedRoundDetail }
+        };
+
+        var options = new DialogOptions
+        {
+            FullScreen = true,
+            CloseButton = true,
+            CloseOnEscapeKey = true
+        };
+
+        await DialogService.ShowAsync<MobileRoundDetailDialog>("Round Detail", parameters, options);
+    }
+
+    private void CloseDetail()
+    {
+        selectedRoundDetail = null;
     }
     
     private void InitializePerformanceChart()
@@ -299,47 +600,49 @@
         var data = reportData.PerformanceData
             .OrderBy(p => p.Date)
             .Take(20)
-            .Select(p => (double)p.ScoreVsPar)
-            .ToArray();
-            
-        var labels = reportData.PerformanceData
-            .OrderBy(p => p.Date)
-            .Take(20)
-            .Select(p => p.Date.ToString("MM/dd"))
-            .ToArray();
-        
-        performanceSeries = new List<ChartSeries>
+            .ToList();
+
+        var primaryData = showScoreVsPar
+            ? data.Select(p => (double)p.ScoreVsPar).ToArray()
+            : data.Select(p => (double)p.TotalScore).ToArray();
+
+        var labels = data.Select(p => p.Date.ToString("MM/dd")).ToArray();
+
+        var seriesList = new List<ChartSeries>
         {
-            new() { Name = "Score vs Par", Data = data }
+            new() { Name = reportData.Player?.FirstName ?? "You", Data = primaryData }
         };
+
+        // Add comparison series
+        if (comparisonResult?.PlayerSeries != null)
+        {
+            foreach (var cs in comparisonResult.PlayerSeries.Where(s => s.PlayerId != playerId))
+            {
+                var compData = cs.DataPoints.OrderBy(d => d.Date).Take(20).ToList();
+                var compSeriesData = showScoreVsPar
+                    ? compData.Select(d => (double)d.ScoreVsPar).ToArray()
+                    : compData.Select(d => (double)d.TotalScore).ToArray();
+                seriesList.Add(new ChartSeries { Name = cs.PlayerName.Split(' ')[0], Data = compSeriesData });
+            }
+        }
+
+        performanceSeries = seriesList;
         performanceXAxisLabels = labels;
     }
     
     private string GetPlayerInitials(Player player)
     {
-        var firstInitial = !string.IsNullOrEmpty(player.FirstName) ? player.FirstName[0].ToString().ToUpper() : "";
-        var lastInitial = !string.IsNullOrEmpty(player.LastName) ? player.LastName[0].ToString().ToUpper() : "";
-        return firstInitial + lastInitial;
+        var first = !string.IsNullOrEmpty(player.FirstName) ? player.FirstName[0].ToString().ToUpper() : "";
+        var last = !string.IsNullOrEmpty(player.LastName) ? player.LastName[0].ToString().ToUpper() : "";
+        return first + last;
     }
     
-    private int GetBestScore()
-    {
-        return reportData?.PerformanceData?.Any() == true 
-            ? reportData.PerformanceData.Min(p => p.TotalScore) 
-            : 0;
-    }
+    private int GetBestScore() => reportData?.PerformanceData?.Any() == true 
+        ? reportData.PerformanceData.Min(p => p.TotalScore) : 0;
     
-    private double GetAverageScore()
-    {
-        return reportData?.PerformanceData?.Any() == true 
-            ? reportData.PerformanceData.Average(p => p.TotalScore) 
-            : 0;
-    }
+    private double GetAverageScore() => reportData?.PerformanceData?.Any() == true 
+        ? reportData.PerformanceData.Average(p => p.TotalScore) : 0;
     
-    private double GetAverageToPar()
-    {
-        return reportData?.PerformanceData?.Any() == true 
-            ? reportData.PerformanceData.Average(p => p.ScoreVsPar) 
-            : 0;
-    }
+    private double GetAverageToPar() => reportData?.PerformanceData?.Any() == true 
+        ? reportData.PerformanceData.Average(p => (double)p.ScoreVsPar) : 0;
 }

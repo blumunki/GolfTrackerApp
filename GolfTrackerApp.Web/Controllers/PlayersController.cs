@@ -178,7 +178,8 @@ public class PlayersController : BaseApiController
         [FromQuery] int? holesPlayed = null,
         [FromQuery] RoundTypeOption? roundType = null,
         [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null)
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] string? compareWith = null)
     {
         try
         {
@@ -192,8 +193,9 @@ public class PlayersController : BaseApiController
             {
                 return NotFound($"Player with ID {id} not found or not accessible");
             }
-            
-            var report = await _reportService.GetPlayerReportViewModelAsync(id, courseId, holesPlayed, roundType, startDate, endDate);
+
+            var sharedWithPlayerIds = ParseCompareWith(compareWith);
+            var report = await _reportService.GetPlayerReportViewModelAsync(id, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds);
             return Ok(report);
         }
         catch (Exception ex)
@@ -210,11 +212,13 @@ public class PlayersController : BaseApiController
         [FromQuery] int? holesPlayed = null,
         [FromQuery] RoundTypeOption? roundType = null,
         [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null)
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] string? compareWith = null)
     {
         try
         {
-            var distribution = await _reportService.GetScoringDistributionAsync(id, courseId, holesPlayed, roundType, startDate, endDate);
+            var sharedWithPlayerIds = ParseCompareWith(compareWith);
+            var distribution = await _reportService.GetScoringDistributionAsync(id, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds);
             return Ok(distribution);
         }
         catch (Exception ex)
@@ -231,17 +235,73 @@ public class PlayersController : BaseApiController
         [FromQuery] int? holesPlayed = null,
         [FromQuery] RoundTypeOption? roundType = null,
         [FromQuery] DateTime? startDate = null,
-        [FromQuery] DateTime? endDate = null)
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] string? compareWith = null)
     {
         try
         {
-            var performance = await _reportService.GetPerformanceByParAsync(id, courseId, holesPlayed, roundType, startDate, endDate);
+            var sharedWithPlayerIds = ParseCompareWith(compareWith);
+            var performance = await _reportService.GetPerformanceByParAsync(id, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds);
             return Ok(performance);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving performance by par for player {PlayerId}", id);
             return StatusCode(500, "An error occurred while retrieving the performance by par");
+        }
+    }
+
+    [HttpGet("{id}/comparison")]
+    public async Task<ActionResult<PlayerComparisonResult>> GetPlayerComparison(
+        int id,
+        [FromQuery] string? compareWith = null,
+        [FromQuery] int? courseId = null,
+        [FromQuery] int? holesPlayed = null,
+        [FromQuery] RoundTypeOption? roundType = null,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null)
+    {
+        try
+        {
+            var comparePlayerIds = ParseCompareWith(compareWith) ?? new List<int>();
+
+            var result = await _reportService.GetPlayerComparisonAsync(id, comparePlayerIds, courseId, holesPlayed, roundType, startDate, endDate);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving player comparison for player {PlayerId}", id);
+            return StatusCode(500, "An error occurred while retrieving the player comparison");
+        }
+    }
+
+    private static List<int>? ParseCompareWith(string? compareWith)
+    {
+        if (string.IsNullOrEmpty(compareWith))
+            return null;
+
+        var ids = compareWith.Split(',')
+            .Select(s => int.TryParse(s.Trim(), out var val) ? val : 0)
+            .Where(v => v > 0)
+            .ToList();
+
+        return ids.Any() ? ids : null;
+    }
+
+    [HttpGet("{id}/rounds/{roundId}/detail")]
+    public async Task<ActionResult<RoundDetailSummary>> GetRoundDetail(int id, int roundId)
+    {
+        try
+        {
+            var detail = await _reportService.GetRoundDetailAsync(roundId, id);
+            if (detail == null)
+                return NotFound($"Round {roundId} not found");
+            return Ok(detail);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving round detail {RoundId} for player {PlayerId}", roundId, id);
+            return StatusCode(500, "An error occurred while retrieving the round detail");
         }
     }
 }

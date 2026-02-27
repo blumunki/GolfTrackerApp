@@ -18,7 +18,19 @@ public class GolfCourse
     [JsonPropertyName("numberOfHoles")]
     public int NumberOfHoles { get; set; }
     
-    // Navigation properties (optional for mobile)
-    [JsonPropertyName("golfClubName")]
-    public string? GolfClubName { get; set; }
+    // Navigation property for nested deserialization from API
+    [JsonPropertyName("golfClub")]
+    public GolfClubRef? GolfClub { get; set; }
+    
+    // Convenience accessor
+    public string? GolfClubName => GolfClub?.Name;
+}
+
+public class GolfClubRef
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+    
+    [JsonPropertyName("golfClubId")]
+    public int GolfClubId { get; set; }
 }

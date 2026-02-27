@@ -284,3 +284,143 @@
         display: none;
     }
 }
+
+/* ============================================
+   Player Report - Premium Analytics Styles
+   ============================================ */
+
+.mobile-report-hero {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+    border-radius: 14px;
+    color: white;
+}
+
+.mobile-report-hero .mud-text-primary,
+.mobile-report-hero .mud-typography {
+    color: white !important;
+}
+
+.mobile-report-avatar {
+    border: 2px solid rgba(255,255,255,0.3);
+}
+
+/* Stat Strip */
+.mobile-stat-strip {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-stat-item {
+    flex: 1;
+    min-width: 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.mobile-stat-emoji {
+    font-size: 1rem;
+    margin-bottom: 2px;
+}
+
+.mobile-stat-val {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    line-height: 1.2;
+}
+
+.mobile-stat-lbl {
+    font-size: 0.6rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.mobile-under-par {
+    color: #1B5E20 !important;
+}
+
+.mobile-over-par {
+    color: #E65100 !important;
+}
+
+/* Scorecard Table */
+.mobile-scorecard-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 0.7rem;
+    margin: 8px 12px;
+}
+
+.mobile-scorecard-table th,
+.mobile-scorecard-table td {
+    padding: 4px 6px;
+    text-align: center;
+    border: 1px solid #e5e7eb;
+    min-width: 28px;
+}
+
+.mobile-scorecard-table th {
+    background: #f3f4f6;
+    font-weight: 600;
+    color: #374151;
+    position: sticky;
+    top: 0;
+}
+
+.mobile-scorecard-table td:first-child,
+.mobile-scorecard-table th:first-child {
+    position: sticky;
+    left: 0;
+    background: #f9fafb;
+    z-index: 1;
+    font-weight: 600;
+}
+
+.mobile-sc-total {
+    font-weight: 700 !important;
+    border-left: 2px solid #9ca3af !important;
+    background: #f9fafb;
+}
+
+/* Score color coding */
+.sc-eagle {
+    background: #FFD700;
+    color: #5D4037;
+    font-weight: 700;
+}
+
+.sc-birdie {
+    background: #FFCDD2;
+    color: #C62828;
+    font-weight: 700;
+}
+
+.sc-par {
+    background: #C8E6C9;
+    color: #1B5E20;
+    font-weight: 600;
+}
+
+.sc-bogey {
+    background: #BBDEFB;
+    color: #0D47A1;
+}
+
+.sc-double {
+    background: #E1BEE7;
+    color: #4A148C;
+}

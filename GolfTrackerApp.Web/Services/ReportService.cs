@@ -13,7 +13,7 @@ public class ReportService : IReportService
         _contextFactory = contextFactory;
     }
 
-    public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate, List<int>? sharedWithPlayerIds = null)
     {
         await using var _context = await _contextFactory.CreateDbContextAsync();
         
@@ -42,6 +42,15 @@ public class ReportService : IReportService
             query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
         }
 
+        // Filter to shared rounds only (where all specified players also participated)
+        if (sharedWithPlayerIds?.Any() == true)
+        {
+            foreach (var cpId in sharedWithPlayerIds)
+            {
+                query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == cpId));
+            }
+        }
+
         var performanceData = await query
             .Include(r => r.Scores)
             .ThenInclude(s => s.Hole)
@@ -50,6 +59,7 @@ public class ReportService : IReportService
             .OrderBy(r => r.DatePlayed)
             .Select(r => new PlayerPerformanceDataPoint
             {
+                RoundId = r.RoundId,
                 Date = r.DatePlayed,
                 CourseName = $"{r.GolfCourse!.GolfClub!.Name} - {r.GolfCourse.Name}",
                 HolesPlayed = r.HolesPlayed,
@@ -166,6 +176,7 @@ public class ReportService : IReportService
             .Take(roundCount)
             .Select(r => new PlayerPerformanceDataPoint
             {
+                RoundId = r.RoundId,
                 Date = r.DatePlayed,
                 TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
                 TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par)
@@ -176,7 +187,7 @@ public class ReportService : IReportService
         return performanceData;
     }
 
-    public async Task<PlayerReportViewModel> GetPlayerReportViewModelAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    public async Task<PlayerReportViewModel> GetPlayerReportViewModelAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate, List<int>? sharedWithPlayerIds = null)
     {
         await using var _context = await _contextFactory.CreateDbContextAsync();
         
@@ -212,7 +223,7 @@ public class ReportService : IReportService
             }
         }).ToList();
 
-        var performanceData = await GetPlayerPerformanceAsync(playerId, courseId, holesPlayed, roundType, startDate, endDate);
+        var performanceData = await GetPlayerPerformanceAsync(playerId, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds);
 
         return new PlayerReportViewModel
         {
@@ -222,7 +233,7 @@ public class ReportService : IReportService
         };
     }
 
-    public async Task<ScoringDistribution> GetScoringDistributionAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    public async Task<ScoringDistribution> GetScoringDistributionAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate, List<int>? sharedWithPlayerIds = null)
     {
         await using var _context = await _contextFactory.CreateDbContextAsync();
         
@@ -249,6 +260,15 @@ public class ReportService : IReportService
         if (endDate.HasValue)
         {
             query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
+        }
+
+        // Filter to shared rounds only (where all specified players also participated)
+        if (sharedWithPlayerIds?.Any() == true)
+        {
+            foreach (var cpId in sharedWithPlayerIds)
+            {
+                query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == cpId));
+            }
         }
 
         // Get all scores for the player in filtered rounds
@@ -358,7 +378,7 @@ public class ReportService : IReportService
         return distribution;
     }
 
-    public async Task<PerformanceByPar> GetPerformanceByParAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate)
+    public async Task<PerformanceByPar> GetPerformanceByParAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate, List<int>? sharedWithPlayerIds = null)
     {
         await using var _context = await _contextFactory.CreateDbContextAsync();
         
@@ -386,6 +406,15 @@ public class ReportService : IReportService
         if (endDate.HasValue)
         {
             roundsQuery = roundsQuery.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
+        }
+
+        // Filter to shared rounds only (where all specified players also participated)
+        if (sharedWithPlayerIds?.Any() == true)
+        {
+            foreach (var cpId in sharedWithPlayerIds)
+            {
+                roundsQuery = roundsQuery.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == cpId));
+            }
         }
 
         // Get the round IDs first
@@ -455,6 +484,7 @@ public class ReportService : IReportService
             .Take(roundCount)
             .Select(r => new PlayerPerformanceDataPoint
             {
+                RoundId = r.RoundId,
                 Date = r.DatePlayed,
                 TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
                 TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par),
@@ -488,6 +518,7 @@ public class ReportService : IReportService
             .Take(roundCount)
             .Select(r => new PlayerPerformanceDataPoint
             {
+                RoundId = r.RoundId,
                 Date = r.DatePlayed,
                 TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
                 TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par),
@@ -654,5 +685,150 @@ public class ReportService : IReportService
             .ToList();
 
         return courseGroups!;
+    }
+
+    public async Task<PlayerComparisonResult> GetPlayerComparisonAsync(
+        int primaryPlayerId, 
+        List<int> comparePlayerIds, 
+        int? courseId, int? holesPlayed, RoundTypeOption? roundType, 
+        DateTime? startDate, DateTime? endDate)
+    {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
+        var allPlayerIds = new List<int> { primaryPlayerId };
+        allPlayerIds.AddRange(comparePlayerIds);
+        allPlayerIds = allPlayerIds.Distinct().ToList();
+
+        // Load all players
+        var players = await _context.Players
+            .AsNoTracking()
+            .Where(p => allPlayerIds.Contains(p.PlayerId))
+            .ToListAsync();
+
+        var result = new PlayerComparisonResult();
+
+        // Get performance data for each player, filtered to rounds where ALL players participated
+        foreach (var playerId in allPlayerIds)
+        {
+            var player = players.FirstOrDefault(p => p.PlayerId == playerId);
+            if (player == null) continue;
+
+            var otherPlayerIds = allPlayerIds.Where(id => id != playerId).ToList();
+            var perfData = await GetPlayerPerformanceAsync(playerId, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds: otherPlayerIds);
+
+            result.PlayerSeries.Add(new PlayerComparisonSeries
+            {
+                PlayerId = playerId,
+                PlayerName = $"{player.FirstName} {player.LastName}",
+                DataPoints = perfData
+            });
+        }
+
+        // Calculate head-to-head stats for shared rounds
+        if (allPlayerIds.Count > 1)
+        {
+            // Find rounds where primary player and each compare player both played
+            var primaryRoundIds = result.PlayerSeries
+                .FirstOrDefault(s => s.PlayerId == primaryPlayerId)?.DataPoints
+                .Select(d => d.RoundId).ToHashSet() ?? new HashSet<int>();
+
+            foreach (var playerId in allPlayerIds)
+            {
+                var player = players.FirstOrDefault(p => p.PlayerId == playerId);
+                if (player == null) continue;
+
+                var series = result.PlayerSeries.FirstOrDefault(s => s.PlayerId == playerId);
+                if (series == null) continue;
+
+                var summary = new PlayerComparisonSummary
+                {
+                    PlayerId = playerId,
+                    PlayerName = $"{player.FirstName} {player.LastName}",
+                    TotalRounds = series.DataPoints.Count
+                };
+
+                if (series.DataPoints.Any())
+                {
+                    summary.AverageScore = series.DataPoints.Average(d => d.TotalScore);
+                    summary.AverageToPar = series.DataPoints.Average(d => (double)d.ScoreVsPar);
+                    summary.BestScore = series.DataPoints.Min(d => d.TotalScore);
+                    summary.BestToPar = series.DataPoints.Min(d => d.ScoreVsPar);
+                }
+
+                // Head-to-head vs primary player
+                if (playerId != primaryPlayerId)
+                {
+                    var compareRoundIds = series.DataPoints.Select(d => d.RoundId).ToHashSet();
+                    var sharedRoundIds = primaryRoundIds.Intersect(compareRoundIds).ToList();
+                    summary.SharedRounds = sharedRoundIds.Count;
+
+                    var primarySeries = result.PlayerSeries.First(s => s.PlayerId == primaryPlayerId);
+                    foreach (var roundId in sharedRoundIds)
+                    {
+                        var primaryScore = primarySeries.DataPoints.First(d => d.RoundId == roundId).TotalScore;
+                        var compareScore = series.DataPoints.First(d => d.RoundId == roundId).TotalScore;
+
+                        if (compareScore < primaryScore) summary.Wins++;
+                        else if (compareScore > primaryScore) summary.Losses++;
+                        else summary.Ties++;
+                    }
+                }
+
+                result.Summaries.Add(summary);
+            }
+        }
+
+        return result;
+    }
+
+    public async Task<RoundDetailSummary?> GetRoundDetailAsync(int roundId, int playerId)
+    {
+        await using var _context = await _contextFactory.CreateDbContextAsync();
+        
+        var round = await _context.Rounds
+            .AsNoTracking()
+            .Include(r => r.GolfCourse)
+            .ThenInclude(gc => gc!.GolfClub)
+            .Include(r => r.Scores)
+            .ThenInclude(s => s.Hole)
+            .Include(r => r.RoundPlayers)
+            .ThenInclude(rp => rp.Player)
+            .FirstOrDefaultAsync(r => r.RoundId == roundId);
+
+        if (round == null) return null;
+
+        var detail = new RoundDetailSummary
+        {
+            RoundId = round.RoundId,
+            DatePlayed = round.DatePlayed,
+            CourseName = round.GolfCourse?.Name ?? "Unknown",
+            ClubName = round.GolfCourse?.GolfClub?.Name ?? "Unknown",
+            HolesPlayed = round.HolesPlayed,
+            TotalScore = round.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Strokes),
+            TotalPar = round.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Hole?.Par ?? 0),
+            RoundType = round.RoundType.ToString(),
+            HoleScores = round.Scores
+                .Where(s => s.PlayerId == playerId && s.Hole != null)
+                .OrderBy(s => s.Hole!.HoleNumber)
+                .Select(s => new RoundDetailScore
+                {
+                    HoleNumber = s.Hole!.HoleNumber,
+                    Par = s.Hole.Par,
+                    Strokes = s.Strokes
+                })
+                .ToList(),
+            OtherPlayers = round.RoundPlayers
+                .Where(rp => rp.PlayerId != playerId && rp.Player != null)
+                .Select(rp => new RoundDetailPlayer
+                {
+                    PlayerId = rp.PlayerId,
+                    PlayerName = $"{rp.Player!.FirstName} {rp.Player.LastName}",
+                    TotalScore = round.Scores.Where(s => s.PlayerId == rp.PlayerId).Sum(s => s.Strokes),
+                    TotalPar = round.Scores.Where(s => s.PlayerId == rp.PlayerId).Sum(s => s.Hole?.Par ?? 0)
+                })
+                .ToList()
+        };
+
+        return detail;
     }
 }
