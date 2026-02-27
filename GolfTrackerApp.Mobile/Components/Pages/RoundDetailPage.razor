@@ -1,0 +1,251 @@
+@page "/rounds/{RoundId:int}"
+@layout MobileLayout
+@using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services.Api
+@inject IRoundApiService RoundApi
+@inject NavigationManager NavigationManager
+@inject ILogger<RoundDetailPage> Logger
+
+<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding:48px;">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading round details...</MudText>
+        </div>
+    }
+    else if (round == null)
+    {
+        <div style="padding:16px;">
+            <MudAlert Severity="Severity.Error">Round not found.</MudAlert>
+            <MudButton Variant="Variant.Text" OnClick="GoBack" Class="mt-3" StartIcon="@Icons.Material.Filled.ArrowBack">Back</MudButton>
+        </div>
+    }
+    else
+    {
+        @* ── Back Button ── *@
+        <div style="padding:8px 12px 0;">
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoBack"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Style="color:#6b7280; font-size:0.8rem; text-transform:none; padding:4px 8px;">
+                Back
+            </MudButton>
+        </div>
+
+        @* ── Dark Header Banner ── *@
+        <div style="background:linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%); color:white; border-radius:16px; padding:20px; margin:8px 12px 16px;">
+            <div style="font-size:1.3rem; font-weight:700; margin-bottom:4px;">📍 @round.CourseName</div>
+            <div style="font-size:0.85rem; color:rgba(255,255,255,0.7); margin-bottom:6px;">@round.ClubName</div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.6);">
+                @round.DatePlayed.ToString("dddd, dd MMMM yyyy")
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; font-size:0.8rem; color:rgba(255,255,255,0.75);">
+                <span style="display:flex; align-items:center; gap:4px;">
+                    <MudIcon Icon="@Icons.Material.Filled.SportsGolf" Size="Size.Small" Style="font-size:14px;" />
+                    @round.HolesPlayed holes
+                </span>
+                @if (!string.IsNullOrEmpty(round.RoundType))
+                {
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" Style="font-size:14px;" />
+                        @round.RoundType
+                    </span>
+                }
+                @if (round.PlayerCount > 0)
+                {
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Style="font-size:14px;" />
+                        @round.PlayerCount player@(round.PlayerCount != 1 ? "s" : "")
+                    </span>
+                }
+            </div>
+        </div>
+
+        @* ── Score Summary ── *@
+        @if (round.TotalScore > 0)
+        {
+            var vsPar = round.TotalScore - round.TotalPar;
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin:0 12px 16px;">
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.8rem; font-weight:800; color:#1a1a2e;">@round.TotalScore</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Score</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.8rem; font-weight:800; color:#6b7280;">@round.TotalPar</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Par</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.8rem; font-weight:800; @GetVsParStyle(vsPar)">@FormatVsPar(vsPar)</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">vs Par</div>
+                </div>
+            </div>
+        }
+
+        @* ── Playing Partners ── *@
+        @if (round.PlayingPartners?.Any() == true)
+        {
+            <div style="padding:0 12px; margin-bottom:16px;">
+                <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:8px;">Players</div>
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px;">
+                    @foreach (var (partner, index) in round.PlayingPartners.Select((p, i) => (p, i)))
+                    {
+                        <div style="display:flex; align-items:center; gap:8px; padding:4px 0; @(index < round.PlayingPartners.Count - 1 ? "border-bottom:1px solid #f3f4f6;" : "")">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Style="color:#667eea; font-size:16px;" />
+                            <span style="font-size:0.9rem; color:#1a1a2e;">@partner</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        @* ── Scorecards ── *@
+        @if (scores?.Any() == true)
+        {
+            <div style="padding:0 12px;">
+                <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">🏌️ Scorecard</div>
+
+                @foreach (var playerGroup in scores.GroupBy(s => s.PlayerId))
+                {
+                    var player = playerGroup.First().Player;
+                    var playerScores = playerGroup.OrderBy(s => s.Hole?.HoleNumber).ToList();
+                    var totalStrokes = playerScores.Sum(s => s.Strokes);
+                    var totalPar = playerScores.Sum(s => s.Hole?.Par ?? 4);
+                    var scoreToPar = totalStrokes - totalPar;
+                    var isExpanded = expandedPlayers.GetValueOrDefault(playerGroup.Key, false);
+
+                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; margin-bottom:8px; overflow:hidden;">
+                        @* Player Header *@
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; cursor:pointer; background:#f8fafc;"
+                             @onclick="@(() => TogglePlayer(playerGroup.Key))">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <MudIcon Icon="@(isExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" Size="Size.Small" />
+                                <span style="font-weight:700; color:#1a1a2e;">@(player?.FullName ?? $"Player {playerGroup.Key}")</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div style="text-align:center;">
+                                    <div style="font-size:0.6rem; color:#6b7280; text-transform:uppercase;">Score</div>
+                                    <div style="font-weight:800; color:#1a1a2e;">@totalStrokes</div>
+                                </div>
+                                <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GetVsParBadgeStyle(scoreToPar)">
+                                    @FormatVsPar(scoreToPar)
+                                </span>
+                            </div>
+                        </div>
+
+                        @* Hole-by-hole detail *@
+                        @if (isExpanded)
+                        {
+                            <div style="border-top:1px solid #e5e7eb;">
+                                @foreach (var score in playerScores)
+                                {
+                                    var holeNumber = score.Hole?.HoleNumber ?? 1;
+                                    var holePar = score.Hole?.Par ?? 4;
+                                    var holeVsPar = score.Strokes - holePar;
+                                    var isEven = holeNumber % 2 == 0;
+                                    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 14px; @(isEven ? "background:#fafbfc;" : "")">
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span style="font-weight:700; color:#1a1a2e; min-width:24px;">@holeNumber</span>
+                                            <span style="font-size:0.75rem; color:#6b7280;">Par @holePar</span>
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span style="font-weight:700; color:#1a1a2e;">@score.Strokes</span>
+                                            <span style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px; min-width:32px; text-align:center; @GetVsParBadgeStyle(holeVsPar)">
+                                                @FormatVsPar(holeVsPar)
+                                            </span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @* ── Notes ── *@
+        @if (!string.IsNullOrEmpty(round.Notes))
+        {
+            <div style="padding:0 12px; margin-top:8px;">
+                <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:8px;">Notes</div>
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px;">
+                    <span style="font-size:0.85rem; color:#4b5563; font-style:italic;">@round.Notes</span>
+                </div>
+            </div>
+        }
+
+        <div style="height:24px;"></div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public int RoundId { get; set; }
+
+    private RoundResponse? round;
+    private List<ScoreResponse>? scores;
+    private Dictionary<int, bool> expandedPlayers = new();
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var roundTask = RoundApi.GetRoundByIdAsync(RoundId);
+            var scoresTask = RoundApi.GetRoundScoresAsync(RoundId);
+
+            await Task.WhenAll(roundTask, scoresTask);
+
+            round = await roundTask;
+            scores = await scoresTask;
+
+            // Initialize player expansion state
+            expandedPlayers.Clear();
+            if (scores?.Any() == true)
+            {
+                foreach (var playerId in scores.Select(s => s.PlayerId).Distinct())
+                {
+                    expandedPlayers[playerId] = scores.Select(s => s.PlayerId).Distinct().Count() == 1;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading round detail for RoundId {RoundId}", RoundId);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void TogglePlayer(int playerId)
+    {
+        expandedPlayers[playerId] = !expandedPlayers.GetValueOrDefault(playerId, false);
+    }
+
+    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
+
+    private string GetVsParStyle(int vsPar)
+    {
+        if (vsPar < 0) return "color:#16a34a;";
+        if (vsPar == 0) return "color:#2563eb;";
+        return "color:#dc2626;";
+    }
+
+    private string GetVsParBadgeStyle(int vsPar)
+    {
+        if (vsPar < 0) return "background:#dcfce7; color:#16a34a;";
+        if (vsPar == 0) return "background:#dbeafe; color:#2563eb;";
+        return "background:#fef2f2; color:#dc2626;";
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/rounds");
+    }
+}

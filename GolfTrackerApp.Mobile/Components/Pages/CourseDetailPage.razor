@@ -256,9 +256,11 @@
     private int? GetBestVsPar()
     {
         if (!courseRounds.Any() || course == null) return null;
-        var scores = courseRounds.Select(r => r.TotalScore).Where(s => s > 0).ToList();
-        if (!scores.Any()) return null;
-        return scores.Min() - course.DefaultPar;
+        var vsParValues = courseRounds
+            .Where(r => r.TotalScore > 0)
+            .Select(r => r.TotalScore - r.TotalPar)
+            .ToList();
+        return vsParValues.Any() ? vsParValues.Min() : null;
     }
 
     private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();

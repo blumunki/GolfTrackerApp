@@ -373,7 +373,9 @@ namespace GolfTrackerApp.Web.Services
                            && r.Status == RoundCompletionStatus.Completed
                            && r.GolfCourse!.GolfClubId == clubId)
                 .Include(r => r.GolfCourse)
-                .ThenInclude(gc => gc!.GolfClub)
+                    .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.GolfCourse)
+                    .ThenInclude(gc => gc!.Holes)
                 .Include(r => r.Scores)
                 .OrderByDescending(r => r.DatePlayed)
                 .Take(count)
@@ -395,7 +397,9 @@ namespace GolfTrackerApp.Web.Services
                            && r.Status == RoundCompletionStatus.Completed
                            && r.GolfCourseId == courseId)
                 .Include(r => r.GolfCourse)
-                .ThenInclude(gc => gc!.GolfClub)
+                    .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.GolfCourse)
+                    .ThenInclude(gc => gc!.Holes)
                 .Include(r => r.Scores)
                 .OrderByDescending(r => r.DatePlayed)
                 .Take(count)

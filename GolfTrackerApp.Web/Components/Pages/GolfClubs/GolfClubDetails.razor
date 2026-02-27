@@ -211,11 +211,11 @@ else
                                         @foreach (var round in recentRounds)
                                         {
                                             var totalScore = GetRoundTotalScore(round);
-                                            var vsPar = totalScore - (round.GolfCourse?.DefaultPar ?? 72);
+                                            var vsPar = totalScore - GetRoundPar(round);
                                             <div class="recent-round-item" @onclick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
                                                 <div>
                                                     <div class="round-date">@round.DatePlayed.ToString("dd MMM yyyy")</div>
-                                                    <div class="round-course">@round.GolfCourse?.Name</div>
+                                                    <div class="round-course">@round.GolfCourse?.Name @(round.HolesPlayed < (round.GolfCourse?.NumberOfHoles ?? 18) ? $"({round.HolesPlayed}h)" : "")</div>
                                                 </div>
                                                 <div class="round-score-mini">
                                                     <span class="score-val">@totalScore</span>
@@ -458,6 +458,24 @@ else
     {
         if (!recentRounds.Any()) return "-";
         return recentRounds.Max(r => r.DatePlayed).ToString("dd MMM");
+    }
+
+    private int GetRoundPar(Round round)
+    {
+        if (round.GolfCourse == null) return 72;
+        if (round.HolesPlayed >= round.GolfCourse.NumberOfHoles)
+            return round.GolfCourse.DefaultPar;
+
+        // Use hole-level data if available
+        if (round.GolfCourse.Holes?.Any() == true)
+        {
+            var actualPar = round.GolfCourse.Holes
+                .Where(h => h.HoleNumber >= round.StartingHole && h.HoleNumber < round.StartingHole + round.HolesPlayed)
+                .Sum(h => h.Par);
+            if (actualPar > 0) return actualPar;
+        }
+
+        return (int)Math.Round((double)round.GolfCourse.DefaultPar * round.HolesPlayed / round.GolfCourse.NumberOfHoles);
     }
 
     private string GetVsParClass(int vsPar) => vsPar < 0 ? "under-par" : vsPar > 0 ? "over-par" : "even-par";

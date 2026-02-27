@@ -19,6 +19,27 @@ public class RoundsController : BaseApiController
         _logger = logger;
     }
 
+    private static int ComputeRoundPar(Round r)
+    {
+        if (r.GolfCourse == null) return 72;
+
+        // If playing full course, use DefaultPar
+        if (r.HolesPlayed >= r.GolfCourse.NumberOfHoles)
+            return r.GolfCourse.DefaultPar;
+
+        // Calculate par for specific holes played using hole data
+        if (r.GolfCourse.Holes?.Any() == true)
+        {
+            var actualPar = r.GolfCourse.Holes
+                .Where(h => h.HoleNumber >= r.StartingHole && h.HoleNumber < r.StartingHole + r.HolesPlayed)
+                .Sum(h => h.Par);
+            if (actualPar > 0) return actualPar;
+        }
+
+        // Fallback: proportional calculation
+        return (int)Math.Round((double)r.GolfCourse.DefaultPar * r.HolesPlayed / r.GolfCourse.NumberOfHoles);
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<object>>> GetAllRounds()
     {
@@ -31,31 +52,35 @@ public class RoundsController : BaseApiController
                 .FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
             var currentPlayerId = currentPlayer?.PlayerId;
 
-            var rounds = await _context.Rounds
+            var roundEntities = await _context.Rounds
                 .Include(r => r.GolfCourse)
-                .ThenInclude(gc => gc!.GolfClub)
+                    .ThenInclude(gc => gc!.GolfClub)
+                .Include(r => r.GolfCourse)
+                    .ThenInclude(gc => gc!.Holes)
                 .Include(r => r.RoundPlayers)
-                .ThenInclude(rp => rp!.Player)
+                    .ThenInclude(rp => rp!.Player)
                 .Include(r => r.Scores)
                 .OrderByDescending(r => r.DatePlayed)
-                .Select(r => new
+                .ToListAsync();
+
+            var rounds = roundEntities.Select(r => new
                 {
                     RoundId = r.RoundId,
-                    CourseName = r.GolfCourse != null ? r.GolfCourse.Name : "Unknown",
-                    ClubName = r.GolfCourse != null && r.GolfCourse.GolfClub != null ? r.GolfCourse.GolfClub.Name : "Unknown",
+                    CourseName = r.GolfCourse?.Name ?? "Unknown",
+                    ClubName = r.GolfCourse?.GolfClub?.Name ?? "Unknown",
                     DatePlayed = r.DatePlayed,
                     TotalScore = currentPlayerId.HasValue 
                         ? r.Scores.Where(s => s.PlayerId == currentPlayerId.Value).Sum(s => s.Strokes)
                         : r.Scores.Sum(s => s.Strokes),
-                    TotalPar = r.GolfCourse != null ? r.GolfCourse.DefaultPar : 72,
-                    HolesPlayed = r.GolfCourse != null ? r.GolfCourse.NumberOfHoles : 18,
+                    TotalPar = ComputeRoundPar(r),
+                    HolesPlayed = r.HolesPlayed,
                     PlayerCount = r.RoundPlayers.Count,
                     RoundType = r.RoundType.ToString(),
                     PlayingPartners = r.RoundPlayers.Select(rp => rp.Player != null ? $"{rp.Player.FirstName} {rp.Player.LastName}" : "Unknown").ToList(),
                     Weather = "",
                     Notes = r.Notes ?? ""
                 })
-                .ToListAsync();
+                .ToList();
             
             return Ok(rounds);
         }

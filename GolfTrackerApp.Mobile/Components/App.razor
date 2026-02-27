@@ -118,6 +118,19 @@
                             }
                         }
                         break;
+                    case var page when page.StartsWith("rounds/") && page.Length > "rounds/".Length:
+                        {
+                            var idStr = currentPage.Substring("rounds/".Length);
+                            if (int.TryParse(idStr, out var roundId))
+                            {
+                                <RoundDetailPage RoundId="@roundId" />
+                            }
+                            else
+                            {
+                                <RoundsPage />
+                            }
+                        }
+                        break;
                     default:
                         <Home />
                         break;
