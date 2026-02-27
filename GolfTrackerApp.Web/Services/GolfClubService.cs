@@ -44,7 +44,10 @@ namespace GolfTrackerApp.Web.Services
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
-            return await _context.GolfClubs.OrderBy(c => c.Name).ToListAsync();
+            return await _context.GolfClubs
+                .Include(c => c.GolfCourses)
+                .OrderBy(c => c.Name)
+                .ToListAsync();
         }
 
         public async Task<GolfClub?> GetGolfClubByIdAsync(int id)

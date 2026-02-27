@@ -77,6 +77,7 @@ namespace GolfTrackerApp.Web.Services
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             return await _context.GolfCourses
+                                .Include(gc => gc.GolfClub)
                                 .Include(gc => gc.Holes) // Include holes for score entry
                                 .FirstOrDefaultAsync(gc => gc.GolfCourseId == id);
         }

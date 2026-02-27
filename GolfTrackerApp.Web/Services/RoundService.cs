@@ -401,5 +401,37 @@ namespace GolfTrackerApp.Web.Services
                 .Take(count)
                 .ToListAsync();
         }
+
+        public async Task<int> GetRoundCountForClubAsync(string requestingUserId, int clubId)
+        {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
+            var player = await _context.Players
+                .FirstOrDefaultAsync(p => p.ApplicationUserId == requestingUserId);
+
+            if (player == null) return 0;
+
+            return await _context.Rounds
+                .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId)
+                           && r.Status == RoundCompletionStatus.Completed
+                           && r.GolfCourse!.GolfClubId == clubId)
+                .CountAsync();
+        }
+
+        public async Task<int> GetRoundCountForCourseAsync(string requestingUserId, int courseId)
+        {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+            
+            var player = await _context.Players
+                .FirstOrDefaultAsync(p => p.ApplicationUserId == requestingUserId);
+
+            if (player == null) return 0;
+
+            return await _context.Rounds
+                .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId)
+                           && r.Status == RoundCompletionStatus.Completed
+                           && r.GolfCourseId == courseId)
+                .CountAsync();
+        }
     }
 }

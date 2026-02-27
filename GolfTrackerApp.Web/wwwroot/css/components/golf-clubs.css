@@ -1,0 +1,602 @@
+/* =============================================================================
+   Golf Clubs & Courses - Page Styles
+   
+   Styling for club list, club dashboard, course detail pages.
+   Reuses shared patterns from golf-rounds.css (.gp-list-header, .gp-filter-bar, etc.)
+   ============================================================================= */
+
+/* ──────────────── Club Detail Header (dark banner) ──────────────── */
+.club-detail-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 28px 28px 20px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.club-detail-header::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.club-detail-header .club-header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.club-detail-header .club-name {
+    font-size: 1.7rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.club-detail-header .club-location {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.7);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.club-detail-header .club-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.club-detail-header .club-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.club-detail-header .club-meta-item .meta-icon {
+    opacity: 0.7;
+}
+
+/* ──────────────── Quick Stats Row ──────────────── */
+.club-stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.club-stat-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.club-stat-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+.club-stat-card .stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.club-stat-card .stat-label {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.club-stat-card .stat-icon {
+    font-size: 1.2rem;
+    margin-bottom: 6px;
+    opacity: 0.6;
+}
+
+/* Color accent variants */
+.club-stat-card.accent-green .stat-value { color: #16a34a; }
+.club-stat-card.accent-blue .stat-value { color: #2563eb; }
+.club-stat-card.accent-amber .stat-value { color: #d97706; }
+.club-stat-card.accent-purple .stat-value { color: #7c3aed; }
+
+/* ──────────────── Course Cards (within club dashboard) ──────────────── */
+.course-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+    margin-top: 12px;
+}
+
+.course-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.course-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.12);
+    transform: translateY(-2px);
+}
+
+.course-card .course-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.course-card .course-card-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0;
+}
+
+.course-card .course-card-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: #f0f4ff;
+    min-width: 52px;
+}
+
+.course-card .badge-par {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1;
+}
+
+.course-card .badge-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.course-card .course-card-info {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.course-card .info-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.82rem;
+    color: #6b7280;
+}
+
+.course-card .info-item .mud-icon-root {
+    font-size: 16px !important;
+}
+
+.course-card .course-card-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #f3f4f6;
+}
+
+/* ──────────────── Course Detail Header ──────────────── */
+.course-detail-header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%);
+    color: white;
+    border-radius: 16px;
+    padding: 24px 28px 20px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+}
+
+.course-detail-header::before {
+    content: '';
+    position: absolute;
+    top: -30px;
+    right: -30px;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.course-detail-header .course-header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.course-detail-header .course-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.course-detail-header .course-club {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.65);
+    margin-top: 4px;
+}
+
+.course-detail-header .course-meta {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+}
+
+.course-detail-header .course-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* ──────────────── Holes Table (modern) ──────────────── */
+.holes-table-wrapper {
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    margin-bottom: 24px;
+}
+
+.holes-table-wrapper .mud-table {
+    border-radius: 0;
+}
+
+.holes-table-wrapper .mud-table-head .mud-table-cell {
+    background: #1a1a2e !important;
+    color: white !important;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 10px 12px;
+    border-bottom: none !important;
+}
+
+.holes-table-wrapper .mud-table-body .mud-table-cell {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.holes-table-wrapper .mud-table-body .mud-table-row:hover {
+    background: #f9fafb;
+}
+
+.hole-number-cell {
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.hole-par-cell {
+    font-weight: 600;
+}
+
+/* ──────────────── Performance Section ──────────────── */
+.performance-section {
+    margin-top: 28px;
+}
+
+.performance-section .section-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.performance-section .section-title .title-icon {
+    font-size: 1.3rem;
+}
+
+.performance-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.performance-card .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid #f3f4f6;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.performance-card .card-body {
+    padding: 16px 18px;
+    flex: 1;
+}
+
+/* Recent rounds list (within performance section) */
+.recent-round-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.recent-round-item:last-child {
+    border-bottom: none;
+}
+
+.recent-round-item:hover {
+    background: #f9fafb;
+    margin: 0 -18px;
+    padding-left: 18px;
+    padding-right: 18px;
+}
+
+.recent-round-item .round-date {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #1a1a2e;
+}
+
+.recent-round-item .round-course {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+.recent-round-item .round-score-mini {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 48px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: #f0f4ff;
+}
+
+.recent-round-item .score-val {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1;
+}
+
+.recent-round-item .score-vs {
+    font-size: 0.65rem;
+    font-weight: 600;
+    margin-top: 1px;
+}
+
+.recent-round-item .score-vs.under-par { color: #16a34a; }
+.recent-round-item .score-vs.over-par { color: #dc2626; }
+.recent-round-item .score-vs.even-par { color: #6b7280; }
+
+/* CTA card for unauthenticated users */
+.club-cta-card {
+    background: linear-gradient(135deg, #f0f4ff 0%, #ede9fe 100%);
+    border: 1px solid #e0e7ff;
+    border-radius: 14px;
+    padding: 28px;
+    text-align: center;
+    margin-top: 24px;
+}
+
+.club-cta-card .cta-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+}
+
+.club-cta-card .cta-text {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-bottom: 16px;
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ──────────────── Club List Cards (alternative to table) ──────────────── */
+.club-list-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.club-list-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.10);
+    transform: translateY(-1px);
+}
+
+.club-list-card .club-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #f0f4ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.club-list-card .club-icon .mud-icon-root {
+    color: #667eea;
+    font-size: 22px !important;
+}
+
+.club-list-card .club-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.club-list-card .club-info-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.club-list-card .club-info-location {
+    font-size: 0.82rem;
+    color: #6b7280;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.club-list-card .club-course-count {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: #f0fdf4;
+    min-width: 52px;
+    flex-shrink: 0;
+}
+
+.club-list-card .course-count-value {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #16a34a;
+    line-height: 1;
+}
+
+.club-list-card .course-count-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.club-list-card .club-actions {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+/* Summary stats row for public visitors */
+.club-network-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, #f0f4ff 0%, #ede9fe 100%);
+    border: 1px solid #e0e7ff;
+    border-radius: 14px;
+}
+
+.club-network-stat {
+    text-align: center;
+}
+
+.club-network-stat .net-value {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1;
+}
+
+.club-network-stat .net-label {
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 500;
+    margin-top: 4px;
+}
+
+/* ──────────────── Responsive ──────────────── */
+@media (max-width: 768px) {
+    .club-detail-header {
+        padding: 18px;
+    }
+
+    .club-detail-header .club-name {
+        font-size: 1.3rem;
+    }
+
+    .course-detail-header {
+        padding: 18px;
+    }
+
+    .course-detail-header .course-name {
+        font-size: 1.2rem;
+    }
+
+    .club-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .course-card-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .club-list-card {
+        padding: 12px 14px;
+        gap: 12px;
+    }
+
+    .club-list-card .club-icon {
+        width: 36px;
+        height: 36px;
+    }
+
+    .club-network-stats {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}

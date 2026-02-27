@@ -15,20 +15,19 @@
 
 <PageTitle>Golf Clubs</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Golf Clubs</MudText>
-
-@* Show different content based on authentication status *@
-<AuthorizeView Roles="Admin">
-    <Authorized>
-        <MudButton Variant="Variant.Filled" 
-                   Color="Color.Primary" 
-                   OnClick="GoToAddGolfClubPage" 
-                   StartIcon="@Icons.Material.Filled.Add" 
-                   Class="mb-3">
-            Add New Golf Club
-        </MudButton>
-    </Authorized>
-</AuthorizeView>
+<div class="gp-list-header">
+    <h4>Golf Clubs</h4>
+    <AuthorizeView Roles="Admin">
+        <Authorized>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       OnClick="GoToAddGolfClubPage" 
+                       StartIcon="@Icons.Material.Filled.Add">
+                Add Club
+            </MudButton>
+        </Authorized>
+    </AuthorizeView>
+</div>
 
 @if (isLoading)
 {
@@ -36,114 +35,95 @@
 }
 else
 {
-    <MudPaper Class="pa-4 mb-4" Elevation="0" Outlined="true">
+    <div class="gp-filter-bar">
         <MudTextField @bind-Value="searchString" 
-                      Label="Filter by Name, City or Country..." 
+                      Placeholder="Search by name, city or country..." 
                       Variant="Variant.Outlined" 
                       Adornment="Adornment.Start" 
                       AdornmentIcon="@Icons.Material.Filled.Search" 
                       DebounceInterval="300" 
-                      OnDebounceIntervalElapsed="OnSearchTextChanged" />
-    </MudPaper>
+                      OnDebounceIntervalElapsed="OnSearchTextChanged"
+                      Margin="Margin.Dense" />
+    </div>
 
     @if (golfClubs is null || !golfClubs.Any())
     {
-        <MudText>No golf clubs found for your search criteria.</MudText>
-        <AuthorizeView>
-            <NotAuthorized>
-                <MudText Class="mt-2">
-                    <MudLink Href="/Account/Register">Register</MudLink> to help us build our database by adding your favorite clubs!
-                </MudText>
-            </NotAuthorized>
-        </AuthorizeView>
+        <div class="gp-empty-state">
+            <div class="empty-icon">⛳</div>
+            <MudText Typo="Typo.h6" Color="Color.Secondary">No golf clubs found</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Try adjusting your search criteria</MudText>
+            <AuthorizeView>
+                <NotAuthorized>
+                    <MudText Class="mt-3">
+                        <MudLink Href="/Account/Register">Register</MudLink> to help us build our database!
+                    </MudText>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
     }
     else
     {
-        <MudTable Items="@golfClubs" Hover="true" Striped="true" Dense="true" Elevation="1">
-            <HeaderContent>
-                <MudTh>Name</MudTh>
-                <MudTh>City</MudTh>
-                <MudTh>Postcode</MudTh>
-                <MudTh>Country</MudTh>
-                <AuthorizeView>
-                    <NotAuthorized>
-                        <MudTh>Courses</MudTh>
-                    </NotAuthorized>
-                </AuthorizeView>
-                <MudTh Class="golf-text-right">Actions</MudTh>
-            </HeaderContent>
-            <RowTemplate>
-                <MudTd DataLabel="Name">
-                    <MudLink Href="@($"/golfclubs/{context.GolfClubId}")">@context.Name</MudLink>
-                </MudTd>
-                <MudTd DataLabel="City">@context.City</MudTd>
-                <MudTd DataLabel="Postcode">@context.Postcode</MudTd>
-                <MudTd DataLabel="Country">@context.Country</MudTd>
-                <AuthorizeView>
-                    <NotAuthorized Context="authContext">
-                        <MudTd DataLabel="Courses">@(context.GolfCourses?.Count ?? 0)</MudTd>
-                    </NotAuthorized>
-                </AuthorizeView>
-                <MudTd Class="golf-text-right">
-                    <MudTooltip Text="View Details">
-                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
-                                       Size="Size.Small" 
-                                       OnClick="@(() => ViewClubDetails(context.GolfClubId))" />
-                    </MudTooltip>
-                    
-                    @* Admin actions only for admin users *@
+        @foreach (var club in golfClubs)
+        {
+            <div class="club-list-card" @onclick="@(() => ViewClubDetails(club.GolfClubId))">
+                <div class="club-icon">
+                    <MudIcon Icon="@Icons.Material.Filled.GolfCourse" />
+                </div>
+                <div class="club-info">
+                    <div class="club-info-name">@club.Name</div>
+                    <div class="club-info-location">@FormatLocation(club)</div>
+                </div>
+                <div class="club-course-count">
+                    <span class="course-count-value">@(club.GolfCourses?.Count ?? 0)</span>
+                    <span class="course-count-label">Courses</span>
+                </div>
+                <div class="club-actions">
                     <AuthorizeView Roles="Admin">
                         <Authorized Context="authContext">
                             <MudTooltip Text="Edit Club">
                                 <MudIconButton Icon="@Icons.Material.Filled.Edit" 
                                                Size="Size.Small" 
                                                Color="Color.Primary" 
-                                               OnClick="@(() => EditClub(context.GolfClubId))" />
+                                               OnClick="@(() => EditClub(club.GolfClubId))" />
                             </MudTooltip>
                             <MudTooltip Text="Delete Club">
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" 
                                                Size="Size.Small" 
                                                Color="Color.Error" 
-                                               OnClick="@(() => PrepareDeleteClub(context))" />
+                                               OnClick="@(() => PrepareDeleteClub(club))" />
                             </MudTooltip>
                         </Authorized>
                     </AuthorizeView>
-                </MudTd>
-            </RowTemplate>
-            <PagerContent>
-                <MudTablePager />
-            </PagerContent>
-        </MudTable>
-        
-        @* Summary stats - especially useful for public users *@
+                    <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Color="Color.Default" Style="opacity:0.4;" />
+                </div>
+            </div>
+        }
+
+        @* Summary stats - for public users *@
         <AuthorizeView>
             <NotAuthorized>
-                <MudPaper Class="pa-4 mt-4" Elevation="1">
-                    <MudText Typo="Typo.h6" Class="mb-3">Network Overview</MudText>
-                    <MudGrid Spacing="3">
-                        <MudItem xs="12" sm="6" md="3">
-                            <MudText Typo="Typo.h6" Color="Color.Primary">@(golfClubs?.Count ?? 0)</MudText>
-                            <MudText Typo="Typo.body2">Golf Clubs</MudText>
-                        </MudItem>
-                        <MudItem xs="12" sm="6" md="3">
-                            <MudText Typo="Typo.h6" Color="Color.Primary">@totalCourses</MudText>
-                            <MudText Typo="Typo.body2">Golf Courses</MudText>
-                        </MudItem>
-                        <MudItem xs="12" sm="6" md="3">
-                            <MudText Typo="Typo.h6" Color="Color.Primary">@uniqueCountries</MudText>
-                            <MudText Typo="Typo.body2">Countries</MudText>
-                        </MudItem>
-                        <MudItem xs="12" sm="6" md="3">
-                            <MudButton Variant="Variant.Filled" 
-                                       Color="Color.Success" 
-                                       Href="/Account/Register"
-                                       StartIcon="@Icons.Material.Filled.PersonAdd"
-                                       FullWidth="true">
-                                Join Our Community
-                            </MudButton>
-                        </MudItem>
-                    </MudGrid>
-                </MudPaper>
+                <div class="club-network-stats">
+                    <div class="club-network-stat">
+                        <div class="net-value">@(golfClubs?.Count ?? 0)</div>
+                        <div class="net-label">Golf Clubs</div>
+                    </div>
+                    <div class="club-network-stat">
+                        <div class="net-value">@totalCourses</div>
+                        <div class="net-label">Golf Courses</div>
+                    </div>
+                    <div class="club-network-stat">
+                        <div class="net-value">@uniqueCountries</div>
+                        <div class="net-label">Countries</div>
+                    </div>
+                </div>
+                <div style="text-align:center; margin-top:16px;">
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               Href="/Account/Register"
+                               StartIcon="@Icons.Material.Filled.PersonAdd">
+                        Join & Start Tracking
+                    </MudButton>
+                </div>
             </NotAuthorized>
         </AuthorizeView>
     }
@@ -202,6 +182,12 @@ else
     private void ViewClubDetails(int clubId) => NavigationManager.NavigateTo($"/golfclubs/{clubId}");
 
     private void EditClub(int clubId) => NavigationManager.NavigateTo($"/golfclubs/edit/{clubId}");
+
+    private string FormatLocation(GolfClub club)
+    {
+        var parts = new List<string?> { club.City, club.CountyOrRegion, club.Country };
+        return string.Join(", ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+    }
 
     private async Task PrepareDeleteClub(GolfClub club)
     {

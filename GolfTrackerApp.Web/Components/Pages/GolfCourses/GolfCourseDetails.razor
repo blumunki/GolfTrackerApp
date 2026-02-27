@@ -34,149 +34,244 @@ else
 {
     <MudBreadcrumbs Items="_breadcrumbs" Class="mb-4"></MudBreadcrumbs>
 
-    <MudPaper Class="pa-4 mb-4" Elevation="0">
-        <MudGrid Spacing="2" Justify="Justify.SpaceBetween" alignItems="AlignItems.Center">
-            <MudItem>
-                <MudText Typo="Typo.h5">@course.Name</MudText>
-                <MudText Typo="Typo.body1">Par: @course.DefaultPar | Holes: @course.NumberOfHoles</MudText>
-            </MudItem>
+    @* ── Dark Header Banner ── *@
+    <div class="course-detail-header">
+        <div class="course-header-top">
+            <div>
+                <h2 class="course-name">@course.Name</h2>
+                <div class="course-club">@(course.GolfClub?.Name ?? "Golf Club")</div>
+            </div>
             <AuthorizeView Roles="Admin">
                 <Authorized>
-                    <MudItem Class="d-flex justify-content-end align-center gap-2">
-                        <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="OpenAddHoleDialog" StartIcon="@Icons.Material.Filled.Add">Add Hole</MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => NavigationManager.NavigateTo($"/golfcourses/edit/{course.GolfCourseId}"))">Edit Course</MudButton>
-                    </MudItem>
+                    <div style="display:flex; gap:6px;">
+                        <MudButton Variant="Variant.Outlined"
+                                   Style="color:white; border-color:rgba(255,255,255,0.3);"
+                                   OnClick="OpenAddHoleDialog"
+                                   StartIcon="@Icons.Material.Filled.Add" Size="Size.Small">Hole</MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Style="color:white; border-color:rgba(255,255,255,0.3);"
+                                   OnClick="@(() => NavigationManager.NavigateTo($"/golfcourses/edit/{course.GolfCourseId}"))"
+                                   StartIcon="@Icons.Material.Filled.Edit" Size="Size.Small">Edit</MudButton>
+                    </div>
                 </Authorized>
             </AuthorizeView>
-        </MudGrid>
-    </MudPaper>
+        </div>
+        <div class="course-meta">
+            <span class="course-meta-item">
+                <MudIcon Icon="@Icons.Material.Filled.Flag" Size="Size.Small" />
+                Par @course.DefaultPar
+            </span>
+            <span class="course-meta-item">
+                <MudIcon Icon="@Icons.Material.Filled.SportsGolf" Size="Size.Small" />
+                @course.NumberOfHoles Holes
+            </span>
+            @if (holes.Any() && holes.Any(h => h.LengthYards.HasValue && h.LengthYards > 0))
+            {
+                <span class="course-meta-item">
+                    <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" />
+                    @(holes.Sum(h => h.LengthYards ?? 0)) Yards
+                </span>
+            }
+            @if (isAuthenticated && _totalRoundCount > 0)
+            {
+                <span class="course-meta-item">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" />
+                    @_totalRoundCount round@(_totalRoundCount != 1 ? "s" : "") played
+                </span>
+            }
+        </div>
+    </div>
 
-    <MudTable Items="@holes.OrderBy(h => h.HoleNumber)" Hover="true" Dense="true" Elevation="1">
-        <HeaderContent>
-            <MudTh>Hole</MudTh>
-            <MudTh>Par</MudTh>
-            <MudTh>Length (Yards)</MudTh>
-            <MudTh>Stroke Index</MudTh>
-            <AuthorizeView Roles="Admin">
-                <Authorized Context="authContext">
-                    <MudTh Class="golf-text-right">Actions</MudTh>
-                </Authorized>
-            </AuthorizeView>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Hole">@context.HoleNumber</MudTd>
-            <MudTd DataLabel="Par">@context.Par</MudTd>
-            <MudTd DataLabel="Length">@context.LengthYards</MudTd>
-            <MudTd DataLabel="SI">@context.StrokeIndex</MudTd>
-            <AuthorizeView Roles="Admin">
-                <Authorized Context="authContext">
-                    <MudTd Class="golf-text-right">
-                        <MudTooltip Text="Edit Hole">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditHoleDialog(context))" />
-                        </MudTooltip>
-                        <MudTooltip Text="Delete Hole">
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteHole(context))" />
-                        </MudTooltip>
+    @* ── Quick Stats (authenticated users with data) ── *@
+    <AuthorizeView>
+        <Authorized>
+            @if (isAuthenticated && _totalRoundCount > 0)
+            {
+                <div class="club-stats-row">
+                    <div class="club-stat-card">
+                        <div class="stat-icon">🏌️</div>
+                        <div class="stat-value">@_totalRoundCount</div>
+                        <div class="stat-label">Rounds</div>
+                    </div>
+                    <div class="club-stat-card accent-green">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-value">@GetBestScore()</div>
+                        <div class="stat-label">Best Score</div>
+                    </div>
+                    <div class="club-stat-card accent-blue">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-value">@GetAverageScore()</div>
+                        <div class="stat-label">Avg Score</div>
+                    </div>
+                    <div class="club-stat-card accent-amber">
+                        <div class="stat-icon">📅</div>
+                        <div class="stat-value">@GetLastPlayedDate()</div>
+                        <div class="stat-label">Last Played</div>
+                    </div>
+                    @if (GetBestVsPar() is not null)
+                    {
+                        <div class="club-stat-card accent-purple">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-value">@FormatVsPar(GetBestVsPar()!.Value)</div>
+                            <div class="stat-label">Best vs Par</div>
+                        </div>
+                    }
+                </div>
+            }
+        </Authorized>
+    </AuthorizeView>
+
+    @* ── Hole Table ── *@
+    <div class="gp-list-header" style="margin-top:8px;">
+        <h4>Hole Details</h4>
+    </div>
+
+    <div class="holes-table-wrapper">
+        <MudTable Items="@holes.OrderBy(h => h.HoleNumber)" Hover="true" Dense="true" Elevation="0">
+            <HeaderContent>
+                <MudTh>Hole</MudTh>
+                <MudTh>Par</MudTh>
+                <MudTh>Length (Yards)</MudTh>
+                <MudTh>Stroke Index</MudTh>
+                @if (isAuthenticated && holeAverages.Any())
+                {
+                    <MudTh>Your Avg</MudTh>
+                }
+                <AuthorizeView Roles="Admin">
+                    <Authorized Context="authContext">
+                        <MudTh Class="golf-text-right">Actions</MudTh>
+                    </Authorized>
+                </AuthorizeView>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Hole"><span class="hole-number-cell">@context.HoleNumber</span></MudTd>
+                <MudTd DataLabel="Par"><span class="hole-par-cell">@context.Par</span></MudTd>
+                <MudTd DataLabel="Length">@(context.LengthYards?.ToString() ?? "-")</MudTd>
+                <MudTd DataLabel="SI">@context.StrokeIndex</MudTd>
+                @if (isAuthenticated && holeAverages.Any())
+                {
+                    var avg = GetHoleAverage(context.HoleId);
+                    var diff = avg - context.Par;
+                    <MudTd DataLabel="Your Avg">
+                        @if (avg > 0)
+                        {
+                            <span style="font-weight:600;">@avg.ToString("F1")</span>
+                            <span class="@GetVsParClass((int)Math.Round(diff))" style="font-size:0.75rem; margin-left:4px;">
+                                (@FormatVsPar((int)Math.Round(diff)))
+                            </span>
+                        }
+                        else
+                        {
+                            <span style="color:#9ca3af;">-</span>
+                        }
                     </MudTd>
-                </Authorized>
-            </AuthorizeView>
-        </RowTemplate>
-    </MudTable>
+                }
+                <AuthorizeView Roles="Admin">
+                    <Authorized Context="authContext">
+                        <MudTd Class="golf-text-right">
+                            <MudTooltip Text="Edit Hole">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="@(() => OpenEditHoleDialog(context))" />
+                            </MudTooltip>
+                            <MudTooltip Text="Delete Hole">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="@(() => PrepareDeleteHole(context))" />
+                            </MudTooltip>
+                        </MudTd>
+                    </Authorized>
+                </AuthorizeView>
+            </RowTemplate>
+        </MudTable>
+    </div>
 
-    @* Personal Performance Section - Only show for logged-in users *@
+    @* ── Personal Performance Section ── *@
     <AuthorizeView>
         <Authorized>
             @if (currentUserId is not null && (_scoringDistribution is not null || recentRounds.Any()))
             {
-                <MudText Typo="Typo.h5" Class="mt-4 mb-3">Your Performance at @course.Name</MudText>
+                <div class="performance-section">
+                    <div class="section-title">
+                        <span class="title-icon">📈</span> Your Performance at @course.Name
+                    </div>
                 
-                <MudGrid Spacing="3" Class="mb-4">
-                    @if (_scoringDistribution is not null && _scoringDistribution.TotalHoles > 0)
-                    {
-                        <MudItem xs="12" md="6">
-                            <MudCard Elevation="2" Class="d-flex flex-column golf-full-height">
-                                <MudCardHeader>
-                                    <CardHeaderContent>
-                                        <MudText Typo="Typo.h6">Scoring Distribution</MudText>
-                                    </CardHeaderContent>
-                                </MudCardHeader>
-                                <MudCardContent Class="flex-grow-1">
-                                    <div class="golf-chart-wrapper">
-                                        <div class="golf-chart-donut">
-                                            <MudChart ChartType="ChartType.Pie" 
-                                                      InputData="@_pieChartData" 
-                                                      InputLabels="@_pieChartLabels" 
-                                                      Width="100%" 
-                                                      Height="100%"></MudChart>
-                                        </div>
+                    <MudGrid Spacing="3" Class="mb-4">
+                        @if (_scoringDistribution is not null && _scoringDistribution.TotalHoles > 0)
+                        {
+                            <MudItem xs="12" md="6">
+                                <div class="performance-card">
+                                    <div class="card-header">
+                                        <MudIcon Icon="@Icons.Material.Filled.PieChart" Size="Size.Small" /> Scoring Distribution
                                     </div>
-                                    <MudText Typo="Typo.caption" Class="mt-2 text-center">Based on @_scoringDistribution.TotalHoles holes</MudText>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
-                    }
-                    
-                    @if (recentRounds.Any())
-                    {
-                        <MudItem xs="12" md="6">
-                            <MudCard Elevation="2" Class="golf-full-height">
-                                <MudCardHeader>
-                                    <CardHeaderContent>
-                                        <MudText Typo="Typo.h6">Recent Rounds</MudText>
-                                    </CardHeaderContent>
-                                </MudCardHeader>
-                                <MudCardContent>
-                                    <MudList clickable="true" T="object">
+                                    <div class="card-body">
+                                        <div class="golf-chart-wrapper">
+                                            <div class="golf-chart-donut">
+                                                <MudChart ChartType="ChartType.Pie" 
+                                                          InputData="@_pieChartData" 
+                                                          InputLabels="@_pieChartLabels" 
+                                                          Width="100%" 
+                                                          Height="100%"></MudChart>
+                                            </div>
+                                        </div>
+                                        <MudText Typo="Typo.caption" Class="mt-2 text-center" Color="Color.Secondary">Based on @_scoringDistribution.TotalHoles holes</MudText>
+                                    </div>
+                                </div>
+                            </MudItem>
+                        }
+                        
+                        @if (recentRounds.Any())
+                        {
+                            <MudItem xs="12" md="6">
+                                <div class="performance-card">
+                                    <div class="card-header">
+                                        <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" /> Recent Rounds
+                                    </div>
+                                    <div class="card-body">
                                         @foreach (var round in recentRounds)
                                         {
-                                            <MudListItem T="object" OnClick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
-                                                <div class="d-flex justify-space-between flex-grow-1">
-                                                    <div class="d-flex flex-column">
-                                                        <MudText Typo="Typo.body1">@round.DatePlayed.ToString("dd MMM yyyy")</MudText>
-                                                        <MudText Typo="Typo.caption">@round.GolfCourse?.Name</MudText>
-                                                    </div>
-                                                    <MudText Typo="Typo.body1">View Round</MudText>
+                                            var totalScore = GetRoundTotalScore(round);
+                                            var vsPar = totalScore - (round.GolfCourse?.DefaultPar ?? 72);
+                                            <div class="recent-round-item" @onclick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
+                                                <div>
+                                                    <div class="round-date">@round.DatePlayed.ToString("dd MMM yyyy")</div>
+                                                    <div class="round-course">@round.GolfCourse?.Name</div>
                                                 </div>
-                                            </MudListItem>
+                                                <div class="round-score-mini">
+                                                    <span class="score-val">@totalScore</span>
+                                                    <span class="score-vs @GetVsParClass(vsPar)">@FormatVsPar(vsPar)</span>
+                                                </div>
+                                            </div>
                                         }
-                                    </MudList>
-                                </MudCardContent>
-                            </MudCard>
-                        </MudItem>
-                    }
-                </MudGrid>
+                                    </div>
+                                </div>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                </div>
             }
         </Authorized>
         <NotAuthorized>
-            @* Show call-to-action for non-authenticated users *@
-            <MudPaper Class="pa-4 mt-4" Elevation="1">
-                <MudText Typo="Typo.h6" Class="mb-3">Track Your Performance</MudText>
-                <MudText Typo="Typo.body1" Class="mb-3">
+            <div class="club-cta-card">
+                <div class="cta-title">Track Your Performance</div>
+                <div class="cta-text">
                     Join our community to track your rounds at @course.Name and see detailed hole-by-hole analytics.
-                </MudText>
-                <MudGrid Spacing="2">
-                    <MudItem xs="12" sm="6">
-                        <MudButton Variant="Variant.Filled" 
-                                   Color="Color.Primary" 
-                                   Href="/Account/Register"
-                                   StartIcon="@Icons.Material.Filled.TrendingUp"
-                                   FullWidth="true">
-                            Start Tracking
-                        </MudButton>
-                    </MudItem>
-                    <MudItem xs="12" sm="6">
-                        <MudButton Variant="Variant.Outlined" 
-                                   Color="Color.Primary" 
-                                   Href="/Account/Login"
-                                   StartIcon="@Icons.Material.Filled.Login"
-                                   FullWidth="true">
-                            Already Have Account?
-                        </MudButton>
-                    </MudItem>
-                </MudGrid>
-            </MudPaper>
+                </div>
+                <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary" 
+                               Href="/Account/Register"
+                               StartIcon="@Icons.Material.Filled.TrendingUp">
+                        Start Tracking
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Primary" 
+                               Href="/Account/Login"
+                               StartIcon="@Icons.Material.Filled.Login">
+                        Sign In
+                    </MudButton>
+                </div>
+            </div>
         </NotAuthorized>
-    </AuthorizeView>    <MudButton Variant="Variant.Text" OnClick="@(() => NavigationManager.NavigateTo($"/golfclubs/{course.GolfClubId}"))" Class="mt-4">Back to Club Details</MudButton>
+    </AuthorizeView>
+
+    <MudButton Variant="Variant.Text" OnClick="@(() => NavigationManager.NavigateTo($"/golfclubs/{course.GolfClubId}"))" Class="mt-4" StartIcon="@Icons.Material.Filled.ArrowBack">Back to Club</MudButton>
 }
 
 @code {
@@ -194,11 +289,15 @@ else
     private List<ChartSeries> _performanceSeries = new();
     private string[] _performanceXAxisLabels = Array.Empty<string>();
     private List<Round> recentRounds = new();
+    private int _totalRoundCount = 0;
     
     // Scoring distribution properties
     private ScoringDistribution? _scoringDistribution;
     private double[] _pieChartData = Array.Empty<double>();
     private string[] _pieChartLabels = Array.Empty<string>();
+    
+    // Hole-by-hole averages
+    private Dictionary<int, double> holeAverages = new();
     
     private bool isAuthenticated = false;
 
@@ -257,17 +356,20 @@ else
 
                     // Load performance data and recent rounds in parallel
                     var performanceTask = ReportService.GetPlayerPerformanceForCourseAsync(currentUserId, CourseId, 10);
-                    var recentRoundsTask = RoundService.GetRecentRoundsForCourseAsync(currentUserId, CourseId, 5);
+                    var recentRoundsTask = RoundService.GetRecentRoundsForCourseAsync(currentUserId, CourseId, 10);
                     var scoringDistributionTask = ReportService.GetScoringDistributionAsync(player.PlayerId, CourseId, null, null, null, null);
+                    var roundCountTask = RoundService.GetRoundCountForCourseAsync(currentUserId, CourseId);
 
-                    await Task.WhenAll(performanceTask, recentRoundsTask, scoringDistributionTask);
+                    await Task.WhenAll(performanceTask, recentRoundsTask, scoringDistributionTask, roundCountTask);
 
                     var performanceData = await performanceTask;
                     recentRounds = await recentRoundsTask;
                     _scoringDistribution = await scoringDistributionTask;
+                    _totalRoundCount = await roundCountTask;
 
                     PreparePerformanceChart(performanceData);
                     PreparePieChartData(_scoringDistribution);
+                    ComputeHoleAverages();
                 }
             }
         }
@@ -342,6 +444,65 @@ else
         _pieChartData = data.ToArray();
         _pieChartLabels = labels.ToArray();
     }
+
+    private void ComputeHoleAverages()
+    {
+        holeAverages.Clear();
+        if (!recentRounds.Any()) return;
+
+        var allScores = recentRounds
+            .Where(r => r.Scores != null)
+            .SelectMany(r => r.Scores!.Where(s => s.PlayerId == _currentPlayerId))
+            .ToList();
+
+        holeAverages = allScores
+            .GroupBy(s => s.HoleId)
+            .ToDictionary(g => g.Key, g => g.Average(s => (double)s.Strokes));
+    }
+
+    private double GetHoleAverage(int holeId)
+    {
+        return holeAverages.TryGetValue(holeId, out var avg) ? avg : 0;
+    }
+
+    private int GetRoundTotalScore(Round round)
+    {
+        if (round.Scores == null || !round.Scores.Any()) return 0;
+        return round.Scores.Where(s => s.PlayerId == _currentPlayerId).Sum(s => s.Strokes);
+    }
+
+    private string GetBestScore()
+    {
+        if (!recentRounds.Any()) return "-";
+        var scores = recentRounds.Select(GetRoundTotalScore).Where(s => s > 0);
+        return scores.Any() ? scores.Min().ToString() : "-";
+    }
+
+    private string GetAverageScore()
+    {
+        if (!recentRounds.Any()) return "-";
+        var scores = recentRounds.Select(GetRoundTotalScore).Where(s => s > 0).ToList();
+        return scores.Any() ? scores.Average().ToString("F1") : "-";
+    }
+
+    private string GetLastPlayedDate()
+    {
+        if (!recentRounds.Any()) return "-";
+        return recentRounds.Max(r => r.DatePlayed).ToString("dd MMM");
+    }
+
+    private int? GetBestVsPar()
+    {
+        if (!recentRounds.Any() || course == null) return null;
+        var scores = recentRounds.Select(GetRoundTotalScore).Where(s => s > 0).ToList();
+        if (!scores.Any()) return null;
+        return scores.Min() - course.DefaultPar;
+    }
+
+    private string GetVsParClass(int vsPar) => vsPar < 0 ? "under-par" : vsPar > 0 ? "over-par" : "even-par";
+
+    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
+
     private async Task OpenAddHoleDialog()
     {
         if (course is null || !isAuthenticated) return;

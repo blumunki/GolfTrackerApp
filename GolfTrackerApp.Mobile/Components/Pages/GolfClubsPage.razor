@@ -8,19 +8,19 @@
 @inject IJSRuntime JSRuntime
 
 <MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
-    <!-- Header and Add Actions -->
-    <div class="d-flex align-center justify-space-between mb-4">
-        <MudText Typo="Typo.h4" Color="Color.Primary">⛳️ Golf Clubs</MudText>
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div style="font-size:1.4rem; font-weight:700; color:#1a1a2e;">⛳ Golf Clubs</div>
         <MudIconButton Icon="@Icons.Material.Filled.Add" 
                       Color="Color.Primary" 
-                      Size="Size.Large"
+                      Size="Size.Medium"
                       OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Add new club coming soon!"))" />
     </div>
     
     <!-- Search Bar -->
-    <MudPaper Class="pa-3 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);">
+    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin-bottom:16px;">
         <MudTextField @bind-Value="searchString" 
-                      Label="Search clubs by name or location..." 
+                      Placeholder="Search clubs by name or location..." 
                       Variant="Variant.Outlined" 
                       Adornment="Adornment.Start" 
                       AdornmentIcon="@Icons.Material.Filled.Search" 
@@ -28,102 +28,43 @@
                       OnDebounceIntervalElapsed="OnSearchTextChanged"
                       Margin="Margin.Dense"
                       FullWidth="true" />
-    </MudPaper>
+    </div>
     
     @if (loading)
     {
-        <div class="text-center pa-4">
+        <div style="text-align:center; padding:32px;">
             <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
-            <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading golf clubs...</MudText>
+            <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading golf clubs...</MudText>
         </div>
     }
     else if (filteredClubs?.Any() == true)
     {
-        <MudList T="object" Class="clubs-list">
-            @foreach (var club in filteredClubs)
-            {
-                <MudListItem T="object" Class="club-list-item">
-                    <MudCard Elevation="2" 
-                             Class="mb-3 club-card" 
-                             Style="border-left: 4px solid #3c8dbc; cursor: pointer; transition: all 0.2s ease;"
-                             @onclick="@(() => ShowClubDetails(club.GolfClubId))">
-                        <MudCardContent Class="pa-3">
-                            <div class="d-flex justify-space-between align-start">
-                                <!-- Main Club Info -->
-                                <div class="flex-grow-1">
-                                    <div class="d-flex align-center mb-2">
-                                        <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Color="Color.Primary" Class="mr-3" />
-                                        <div>
-                                            <MudText Typo="Typo.h6" Style="font-weight: 600;">
-                                                @club.Name
-                                            </MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                @GetClubLocation(club)
-                                            </MudText>
-                                        </div>
-                                    </div>
-                                    
-                                    <div class="d-flex align-center gap-4 mt-2">
-                                        <div class="d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.Flag" 
-                                                    Size="Size.Small" 
-                                                    Class="mr-1" 
-                                                    Color="Color.Info" />
-                                            <MudText Typo="Typo.caption">
-                                                @club.CourseCount Courses
-                                            </MudText>
-                                        </div>
-                                        @if (!string.IsNullOrEmpty(club.Website))
-                                        {
-                                            <div class="d-flex align-center">
-                                                <MudIcon Icon="@Icons.Material.Filled.Language"
-                                                        Size="Size.Small"
-                                                        Class="mr-1"
-                                                        Color="Color.Success" />
-                                                <MudText Typo="Typo.caption">
-                                                    Has Website
-                                                </MudText>
-                                            </div>
-                                        }
-                                    </div>
-                                </div>
-                                
-                                <!-- Quick Actions -->
-                                <div class="d-flex flex-column align-center ml-2">
-                                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
-                                                  Color="Color.Primary" 
-                                                  Size="Size.Small"
-                                                  title="View Courses"
-                                                  OnClick="@(() => ShowClubDetails(club.GolfClubId))" />
-                                    <MudMenu>
-                                        <ActivatorContent>
-                                            <MudIconButton Icon="@Icons.Material.Filled.MoreVert" 
-                                                          Color="Color.Secondary" 
-                                                          Size="Size.Small" />
-                                        </ActivatorContent>
-                                        <ChildContent>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" 
-                                                         OnClick="@(() => ShowClubDetails(club.GolfClubId))">
-                                                View Details
-                                            </MudMenuItem>
-                                            <MudMenuItem Icon="@Icons.Material.Filled.Edit" 
-                                                         OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Edit club coming soon!"))">
-                                                Edit Club
-                                            </MudMenuItem>
-                                        </ChildContent>
-                                    </MudMenu>
-                                </div>
-                            </div>
-                        </MudCardContent>
-                    </MudCard>
-                </MudListItem>
-            }
-        </MudList>
+        @foreach (var club in filteredClubs)
+        {
+            <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin-bottom:8px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all 0.2s ease;"
+                 @onclick="@(() => ShowClubDetails(club.GolfClubId))">
+                <div style="width:40px; height:40px; border-radius:10px; background:#f0f4ff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Style="color:#667eea; font-size:20px;" />
+                </div>
+                <div style="flex:1; min-width:0;">
+                    <div style="font-size:0.95rem; font-weight:700; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        @club.Name
+                    </div>
+                    <div style="font-size:0.8rem; color:#6b7280; margin-top:2px;">
+                        @GetClubLocation(club)
+                    </div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-radius:8px; background:#f0fdf4; min-width:44px; flex-shrink:0;">
+                    <span style="font-size:1.1rem; font-weight:800; color:#16a34a; line-height:1;">@club.CourseCount</span>
+                    <span style="font-size:0.55rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px;">Courses</span>
+                </div>
+                <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Style="color:#d1d5db; font-size:20px;" />
+            </div>
+        }
     }
     else if (!loading && golfClubs?.Any() == true)
     {
-        <!-- No search results -->
-        <div class="text-center pa-4">
+        <div style="text-align:center; padding:32px;">
             <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Secondary" />
             <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No clubs found</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary">Try adjusting your search terms</MudText>
@@ -131,10 +72,9 @@
     }
     else
     {
-        <!-- No clubs at all -->
-        <div class="text-center pa-4">
-            <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Size="Size.Large" Color="Color.Secondary" />
-            <MudText Typo="Typo.h6" Color="Color.Secondary" Class="mt-2">No golf clubs found</MudText>
+        <div style="text-align:center; padding:40px 16px;">
+            <div style="font-size:3rem; margin-bottom:12px; opacity:0.5;">⛳</div>
+            <MudText Typo="Typo.h6" Color="Color.Secondary">No golf clubs found</MudText>
             <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
                 Add a club to get started.
             </MudText>
@@ -153,40 +93,38 @@
     <DialogContent>
         @if (dialogLoading)
         {
-            <div class="text-center pa-8">
+            <div style="text-align:center; padding:32px;">
                 <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
-                <MudText Typo="Typo.body1" Class="mt-3" Color="Color.Secondary">Loading club details...</MudText>
+                <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading club details...</MudText>
             </div>
         }
         else if (selectedClub != null)
         {
-            <div class="mb-2">
-                <MudText Typo="Typo.h5" Color="Color.Primary">@selectedClub.Name</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">@GetClubLocation(selectedClub)</MudText>
+            <div style="background:linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%); color:white; border-radius:12px; padding:18px; margin-bottom:16px;">
+                <div style="font-size:1.2rem; font-weight:700;">@selectedClub.Name</div>
+                <div style="font-size:0.85rem; color:rgba(255,255,255,0.7); margin-top:4px;">@GetClubLocation(selectedClub)</div>
             </div>
 
-            <MudText Typo="Typo.h6" Class="mt-4 mb-2">Courses</MudText>
+            <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">Courses</div>
             @if (selectedClub.Courses?.Any() == true)
             {
-                <MudList T="object" Dense="true">
-                    @foreach (var course in selectedClub.Courses)
-                    {
-                        <MudListItem T="object">
-                            <div class="d-flex justify-space-between align-center flex-grow-1">
-                                <div>
-                                    <MudText>@course.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        @course.NumberOfHoles holes | Par @course.DefaultPar
-                                    </MudText>
-                                </div>
-                            </div>
-                        </MudListItem>
-                    }
-                </MudList>
+                @foreach (var course in selectedClub.Courses)
+                {
+                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
+                        <div>
+                            <div style="font-weight:600; color:#1a1a2e;">@course.Name</div>
+                            <div style="font-size:0.8rem; color:#6b7280;">@course.NumberOfHoles holes · Par @course.DefaultPar</div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-radius:8px; background:#f0f4ff;">
+                            <span style="font-size:1.1rem; font-weight:800; color:#1a1a2e; line-height:1;">@course.DefaultPar</span>
+                            <span style="font-size:0.55rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Par</span>
+                        </div>
+                    </div>
+                }
             }
             else
             {
-                <MudAlert Severity="Severity.Info">No courses have been added for this club yet.</MudAlert>
+                <MudAlert Severity="Severity.Info" Dense="true">No courses added for this club yet.</MudAlert>
             }
         }
     </DialogContent>

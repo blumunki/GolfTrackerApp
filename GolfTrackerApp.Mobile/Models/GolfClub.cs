@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace GolfTrackerApp.Mobile.Models;
 
 public class GolfClub
@@ -12,9 +14,11 @@ public class GolfClub
     public string? Country { get; set; }
     public string? Website { get; set; }
 
-    // This property will be populated from the API when fetching a single club's details.
-    public List<GolfCourse> Courses { get; set; } = new();
+    // Maps from the API's "golfCourses" JSON property
+    [JsonPropertyName("golfCourses")]
+    public List<GolfCourse>? Courses { get; set; }
 
-    // This property is sent by the API in the main list view to efficiently show the count.
-    public int CourseCount { get; set; }
+    // Derive course count from the courses list
+    [JsonIgnore]
+    public int CourseCount => Courses?.Count ?? 0;
 }

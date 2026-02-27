@@ -25,5 +25,9 @@ namespace GolfTrackerApp.Web.Services
         // New methods for club/course specific recent rounds
         Task<List<Round>> GetRecentRoundsForClubAsync(string requestingUserId, int clubId, int count);
         Task<List<Round>> GetRecentRoundsForCourseAsync(string requestingUserId, int courseId, int count);
+
+        // Count methods for total rounds played at a club/course
+        Task<int> GetRoundCountForClubAsync(string requestingUserId, int clubId);
+        Task<int> GetRoundCountForCourseAsync(string requestingUserId, int courseId);
     }
 }
