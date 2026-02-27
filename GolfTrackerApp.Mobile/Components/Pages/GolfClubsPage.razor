@@ -4,6 +4,7 @@
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IGolfClubApiService GolfClubApi
+@inject NavigationManager NavigationManager
 @inject ILogger<GolfClubsPage> Logger
 @inject IJSRuntime JSRuntime
 
@@ -88,66 +89,11 @@
     }
 </MudContainer>
 
-<!-- Club Details Dialog -->
-<MudDialog @bind-Visible="showDetailsDialog" Options="detailsDialogOptions">
-    <DialogContent>
-        @if (dialogLoading)
-        {
-            <div style="text-align:center; padding:32px;">
-                <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
-                <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading club details...</MudText>
-            </div>
-        }
-        else if (selectedClub != null)
-        {
-            <div style="background:linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%); color:white; border-radius:12px; padding:18px; margin-bottom:16px;">
-                <div style="font-size:1.2rem; font-weight:700;">@selectedClub.Name</div>
-                <div style="font-size:0.85rem; color:rgba(255,255,255,0.7); margin-top:4px;">@GetClubLocation(selectedClub)</div>
-            </div>
-
-            <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">Courses</div>
-            @if (selectedClub.Courses?.Any() == true)
-            {
-                @foreach (var course in selectedClub.Courses)
-                {
-                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
-                        <div>
-                            <div style="font-weight:600; color:#1a1a2e;">@course.Name</div>
-                            <div style="font-size:0.8rem; color:#6b7280;">@course.NumberOfHoles holes · Par @course.DefaultPar</div>
-                        </div>
-                        <div style="display:flex; flex-direction:column; align-items:center; padding:4px 10px; border-radius:8px; background:#f0f4ff;">
-                            <span style="font-size:1.1rem; font-weight:800; color:#1a1a2e; line-height:1;">@course.DefaultPar</span>
-                            <span style="font-size:0.55rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Par</span>
-                        </div>
-                    </div>
-                }
-            }
-            else
-            {
-                <MudAlert Severity="Severity.Info" Dense="true">No courses added for this club yet.</MudAlert>
-            }
-        }
-    </DialogContent>
-    <DialogActions>
-        <MudButton Color="Color.Secondary" OnClick="CloseDetailsDialog">Close</MudButton>
-    </DialogActions>
-</MudDialog>
-
 @code {
     private List<GolfClub>? golfClubs;
     private List<GolfClub>? filteredClubs;
     private bool loading = true;
-    private bool dialogLoading = false;
-    private bool showDetailsDialog = false;
-    private GolfClub? selectedClub;
     private string searchString = "";
-
-    private DialogOptions detailsDialogOptions = new() 
-    { 
-        MaxWidth = MaxWidth.Medium, 
-        FullWidth = true,
-        CloseButton = true
-    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -214,31 +160,8 @@
         return string.Join(", ", parts);
     }
 
-    private async Task ShowClubDetails(int clubId)
+    private void ShowClubDetails(int clubId)
     {
-        showDetailsDialog = true;
-        dialogLoading = true;
-        StateHasChanged();
-
-        try
-        {
-            selectedClub = await GolfClubApi.GetGolfClubByIdAsync(clubId);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error fetching details for club {ClubId}", clubId);
-            // Optionally, show an error in the dialog
-        }
-        finally
-        {
-            dialogLoading = false;
-            StateHasChanged();
-        }
-    }
-
-    private void CloseDetailsDialog()
-    {
-        showDetailsDialog = false;
-        selectedClub = null;
+        NavigationManager.NavigateTo($"/club-detail/{clubId}");
     }
 }

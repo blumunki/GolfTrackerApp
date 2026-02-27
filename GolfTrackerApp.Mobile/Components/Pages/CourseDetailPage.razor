@@ -1,0 +1,291 @@
+@page "/course-detail/{CourseId:int}"
+@layout MobileLayout
+@using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services.Api
+@inject IGolfCourseApiService CourseApi
+@inject IRoundApiService RoundApi
+@inject NavigationManager NavigationManager
+@inject ILogger<CourseDetailPage> Logger
+
+<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding:48px;">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading course details...</MudText>
+        </div>
+    }
+    else if (course == null)
+    {
+        <div style="padding:16px;">
+            <MudAlert Severity="Severity.Error">Golf course not found.</MudAlert>
+            <MudButton Variant="Variant.Text" OnClick="GoBack" Class="mt-3" StartIcon="@Icons.Material.Filled.ArrowBack">Back</MudButton>
+        </div>
+    }
+    else
+    {
+        @* ── Back Button ── *@
+        <div style="padding:8px 12px 0;">
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoBack"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Style="color:#6b7280; font-size:0.8rem; text-transform:none; padding:4px 8px;">
+                @(course.GolfClub?.Name ?? "Back")
+            </MudButton>
+        </div>
+
+        @* ── Dark Header Banner ── *@
+        <div style="background:linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%); color:white; border-radius:16px; padding:20px; margin:8px 12px 16px;">
+            <div style="font-size:1.3rem; font-weight:700; margin-bottom:4px;">@course.Name</div>
+            @if (course.GolfClub != null)
+            {
+                <div style="font-size:0.85rem; color:rgba(255,255,255,0.7); margin-bottom:10px;">
+                    @course.GolfClub.Name
+                </div>
+            }
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:0.8rem; color:rgba(255,255,255,0.75);">
+                <span style="display:flex; align-items:center; gap:4px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Flag" Size="Size.Small" Style="font-size:14px;" />
+                    Par @course.DefaultPar
+                </span>
+                <span style="display:flex; align-items:center; gap:4px;">
+                    <MudIcon Icon="@Icons.Material.Filled.SportsGolf" Size="Size.Small" Style="font-size:14px;" />
+                    @course.NumberOfHoles Holes
+                </span>
+                @if (course.Holes.Any() && course.Holes.Any(h => h.LengthYards.HasValue && h.LengthYards > 0))
+                {
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" Style="font-size:14px;" />
+                        @(course.Holes.Sum(h => h.LengthYards ?? 0)) Yards
+                    </span>
+                }
+                @if (courseRounds.Any())
+                {
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.History" Size="Size.Small" Style="font-size:14px;" />
+                        @courseRounds.Count round@(courseRounds.Count != 1 ? "s" : "") played
+                    </span>
+                }
+            </div>
+        </div>
+
+        @* ── Quick Stats ── *@
+        @if (courseRounds.Any())
+        {
+            <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin:0 12px 16px;">
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">🏌️</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#1a1a2e;">@courseRounds.Count</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Rounds</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #dcfce7; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">⭐</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#16a34a;">@GetBestScore()</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Best Score</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #dbeafe; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">📊</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#2563eb;">@GetAverageScore()</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Avg Score</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #fef3c7; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">📅</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#d97706;">@GetLastPlayedDate()</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Last Played</div>
+                </div>
+            </div>
+
+            @* ── Best vs Par ── *@
+            @if (GetBestVsPar() is not null)
+            {
+                <div style="margin:0 12px 16px; background:#ffffff; border:1px solid #f3e8ff; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">🎯</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#7c3aed;">@FormatVsPar(GetBestVsPar()!.Value)</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Best vs Par</div>
+                </div>
+            }
+        }
+
+        @* ── Hole Details Table ── *@
+        @if (course.Holes.Any())
+        {
+            <div style="padding:0 12px;">
+                <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">Hole Details</div>
+
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; margin-bottom:16px;">
+                    @* Table Header *@
+                    <div style="display:grid; grid-template-columns:50px 50px 1fr 60px; background:#f8fafc; padding:10px 14px; border-bottom:2px solid #e5e7eb; font-size:0.7rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px;">
+                        <div>Hole</div>
+                        <div>Par</div>
+                        <div>Yards</div>
+                        <div style="text-align:right;">SI</div>
+                    </div>
+
+                    @* Table Rows *@
+                    @foreach (var hole in course.Holes.OrderBy(h => h.HoleNumber))
+                    {
+                        var isEven = hole.HoleNumber % 2 == 0;
+                        <div style="display:grid; grid-template-columns:50px 50px 1fr 60px; padding:10px 14px; border-bottom:1px solid #f3f4f6; @(isEven ? "background:#fafbfc;" : "")">
+                            <div style="font-weight:700; color:#1a1a2e; font-size:0.9rem;">@hole.HoleNumber</div>
+                            <div>
+                                <span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; font-weight:700; font-size:0.8rem; @GetParBadgeStyle(hole.Par)">
+                                    @hole.Par
+                                </span>
+                            </div>
+                            <div style="color:#4b5563; font-size:0.85rem;">@(hole.LengthYards?.ToString() ?? "-")</div>
+                            <div style="text-align:right; color:#6b7280; font-size:0.85rem;">@hole.StrokeIndex</div>
+                        </div>
+                    }
+
+                    @* Totals Row *@
+                    <div style="display:grid; grid-template-columns:50px 50px 1fr 60px; padding:10px 14px; background:#f0f4ff; font-weight:700; border-top:2px solid #e5e7eb;">
+                        <div style="color:#1a1a2e; font-size:0.85rem;">Total</div>
+                        <div style="color:#1a1a2e; font-size:0.85rem;">@course.DefaultPar</div>
+                        <div style="color:#4b5563; font-size:0.85rem;">
+                            @{
+                                var totalYards = course.Holes.Sum(h => h.LengthYards ?? 0);
+                            }
+                            @(totalYards > 0 ? totalYards.ToString() : "-")
+                        </div>
+                        <div></div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @* ── Recent Rounds Section ── *@
+        @if (courseRounds.Any())
+        {
+            <div style="padding:0 12px;">
+                <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+                    <span>📈</span> Your Recent Rounds
+                </div>
+
+                @foreach (var round in courseRounds.OrderByDescending(r => r.DatePlayed).Take(10))
+                {
+                    var vsPar = round.TotalScore - round.TotalPar;
+                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;"
+                         @onclick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
+                        <div>
+                            <div style="font-size:0.85rem; font-weight:600; color:#1a1a2e;">@round.DatePlayed.ToString("dd MMM yyyy")</div>
+                            <div style="font-size:0.75rem; color:#6b7280;">
+                                @round.HolesPlayed holes
+                                @if (!string.IsNullOrEmpty(round.RoundType))
+                                {
+                                    <span> · @round.RoundType</span>
+                                }
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.1rem; font-weight:800; color:#1a1a2e;">@round.TotalScore</span>
+                            <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GetVsParStyle(vsPar)">
+                                @FormatVsPar(vsPar)
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <div style="height:24px;"></div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public int CourseId { get; set; }
+
+    private GolfCourseDetailResponse? course;
+    private List<RoundResponse> courseRounds = new();
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load course details and all rounds in parallel
+            var courseTask = CourseApi.GetGolfCourseByIdAsync(CourseId);
+            var roundsTask = RoundApi.GetAllRoundsAsync();
+
+            await Task.WhenAll(courseTask, roundsTask);
+
+            course = await courseTask;
+            var allRounds = await roundsTask;
+
+            // Filter rounds for this course
+            if (course != null && allRounds != null)
+            {
+                courseRounds = allRounds
+                    .Where(r => string.Equals(r.CourseName, course.Name, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(r => r.DatePlayed)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading course detail for CourseId {CourseId}", CourseId);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetBestScore()
+    {
+        var scores = courseRounds.Select(r => r.TotalScore).Where(s => s > 0).ToList();
+        return scores.Any() ? scores.Min().ToString() : "-";
+    }
+
+    private string GetAverageScore()
+    {
+        var scores = courseRounds.Select(r => r.TotalScore).Where(s => s > 0).ToList();
+        return scores.Any() ? scores.Average().ToString("F1") : "-";
+    }
+
+    private string GetLastPlayedDate()
+    {
+        if (!courseRounds.Any()) return "-";
+        return courseRounds.Max(r => r.DatePlayed).ToString("dd MMM");
+    }
+
+    private int? GetBestVsPar()
+    {
+        if (!courseRounds.Any() || course == null) return null;
+        var scores = courseRounds.Select(r => r.TotalScore).Where(s => s > 0).ToList();
+        if (!scores.Any()) return null;
+        return scores.Min() - course.DefaultPar;
+    }
+
+    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
+
+    private string GetVsParStyle(int vsPar)
+    {
+        if (vsPar < 0) return "background:#dcfce7; color:#16a34a;";
+        if (vsPar == 0) return "background:#dbeafe; color:#2563eb;";
+        return "background:#fef2f2; color:#dc2626;";
+    }
+
+    private string GetParBadgeStyle(int par)
+    {
+        return par switch
+        {
+            3 => "background:#dcfce7; color:#16a34a;",
+            4 => "background:#dbeafe; color:#2563eb;",
+            5 => "background:#fef3c7; color:#d97706;",
+            _ => "background:#f3f4f6; color:#6b7280;"
+        };
+    }
+
+    private void GoBack()
+    {
+        if (course?.GolfClubId > 0)
+            NavigationManager.NavigateTo($"/club-detail/{course.GolfClubId}");
+        else
+            NavigationManager.NavigateTo("/golfclubs");
+    }
+}

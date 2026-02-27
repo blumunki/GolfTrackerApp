@@ -92,6 +92,32 @@
                     case "player-report":
                         <PlayerReportPage PlayerId="me" />
                         break;
+                    case var page when page.StartsWith("club-detail/"):
+                        {
+                            var idStr = currentPage.Substring("club-detail/".Length);
+                            if (int.TryParse(idStr, out var clubId))
+                            {
+                                <ClubDetailPage ClubId="@clubId" />
+                            }
+                            else
+                            {
+                                <Home />
+                            }
+                        }
+                        break;
+                    case var page when page.StartsWith("course-detail/"):
+                        {
+                            var idStr = currentPage.Substring("course-detail/".Length);
+                            if (int.TryParse(idStr, out var courseId))
+                            {
+                                <CourseDetailPage CourseId="@courseId" />
+                            }
+                            else
+                            {
+                                <Home />
+                            }
+                        }
+                        break;
                     default:
                         <Home />
                         break;

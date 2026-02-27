@@ -1,0 +1,258 @@
+@page "/club-detail/{ClubId:int}"
+@layout MobileLayout
+@using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services.Api
+@inject IGolfClubApiService GolfClubApi
+@inject IRoundApiService RoundApi
+@inject NavigationManager NavigationManager
+@inject ILogger<ClubDetailPage> Logger
+
+<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
+    @if (isLoading)
+    {
+        <div style="text-align:center; padding:48px;">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading club details...</MudText>
+        </div>
+    }
+    else if (club == null)
+    {
+        <div style="padding:16px;">
+            <MudAlert Severity="Severity.Error">Golf club not found.</MudAlert>
+            <MudButton Variant="Variant.Text" OnClick="GoBack" Class="mt-3" StartIcon="@Icons.Material.Filled.ArrowBack">Back to Clubs</MudButton>
+        </div>
+    }
+    else
+    {
+        @* ── Back Button ── *@
+        <div style="padding:8px 12px 0;">
+            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoBack"
+                       StartIcon="@Icons.Material.Filled.ArrowBack"
+                       Style="color:#6b7280; font-size:0.8rem; text-transform:none; padding:4px 8px;">
+                Golf Clubs
+            </MudButton>
+        </div>
+
+        @* ── Dark Header Banner ── *@
+        <div style="background:linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%); color:white; border-radius:16px; padding:20px; margin:8px 12px 16px;">
+            <div style="font-size:1.3rem; font-weight:700; margin-bottom:4px;">@club.Name</div>
+            <div style="font-size:0.85rem; color:rgba(255,255,255,0.7); display:flex; align-items:center; gap:4px; margin-bottom:10px;">
+                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Size="Size.Small" Style="font-size:14px;" />
+                @FormatAddress(club)
+            </div>
+
+            <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:0.8rem; color:rgba(255,255,255,0.75);">
+                <span style="display:flex; align-items:center; gap:4px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Flag" Size="Size.Small" Style="font-size:14px;" />
+                    @(club.CourseCount) Course@(club.CourseCount != 1 ? "s" : "")
+                </span>
+                @if (!string.IsNullOrWhiteSpace(club.Website))
+                {
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.Language" Size="Size.Small" Style="font-size:14px;" />
+                        <a href="@club.Website" target="_blank" style="color:rgba(255,255,255,0.85); text-decoration:underline;">Website</a>
+                    </span>
+                }
+                @if (clubRounds.Any())
+                {
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <MudIcon Icon="@Icons.Material.Filled.SportsGolf" Size="Size.Small" Style="font-size:14px;" />
+                        @clubRounds.Count round@(clubRounds.Count != 1 ? "s" : "") played
+                    </span>
+                }
+            </div>
+        </div>
+
+        @* ── Quick Stats ── *@
+        @if (clubRounds.Any())
+        {
+            <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin:0 12px 16px;">
+                <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">🏌️</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#1a1a2e;">@clubRounds.Count</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Rounds</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #dcfce7; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">⭐</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#16a34a;">@GetBestScore()</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Best Score</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #dbeafe; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">📊</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#2563eb;">@GetAverageScore()</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Avg Score</div>
+                </div>
+                <div style="background:#ffffff; border:1px solid #fef3c7; border-radius:12px; padding:12px; text-align:center;">
+                    <div style="font-size:1.2rem;">📅</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#d97706;">@GetLastPlayedDate()</div>
+                    <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Last Played</div>
+                </div>
+            </div>
+        }
+
+        @* ── Courses Section ── *@
+        <div style="padding:0 12px;">
+            <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">Courses</div>
+
+            @if (club.Courses?.Any() == true)
+            {
+                @foreach (var course in club.Courses.OrderBy(c => c.Name))
+                {
+                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 16px; margin-bottom:8px; display:flex; align-items:center; gap:12px; cursor:pointer;"
+                         @onclick="@(() => NavigateToCourse(course.GolfCourseId))">
+                        <div style="flex:1; min-width:0;">
+                            <div style="font-size:0.95rem; font-weight:700; color:#1a1a2e;">@course.Name</div>
+                            <div style="font-size:0.8rem; color:#6b7280; margin-top:2px;">
+                                @course.NumberOfHoles holes · Par @course.DefaultPar
+                            </div>
+                            @{
+                                var courseRoundCount = GetCourseRoundCount(course.Name);
+                            }
+                            @if (courseRoundCount > 0)
+                            {
+                                <div style="font-size:0.75rem; color:#9ca3af; margin-top:2px;">
+                                    @courseRoundCount round@(courseRoundCount != 1 ? "s" : "") played
+                                </div>
+                            }
+                        </div>
+                        <div style="display:flex; flex-direction:column; align-items:center; padding:6px 12px; border-radius:10px; background:#f0f4ff; min-width:48px; flex-shrink:0;">
+                            <span style="font-size:1.2rem; font-weight:800; color:#1a1a2e; line-height:1;">@course.DefaultPar</span>
+                            <span style="font-size:0.55rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px;">Par</span>
+                        </div>
+                        <MudIcon Icon="@Icons.Material.Filled.ChevronRight" Style="color:#d1d5db; font-size:20px;" />
+                    </div>
+                }
+            }
+            else
+            {
+                <div style="text-align:center; padding:24px;">
+                    <div style="font-size:2rem; margin-bottom:8px; opacity:0.5;">⛳</div>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">No courses listed for this club yet.</MudText>
+                </div>
+            }
+        </div>
+
+        @* ── Recent Rounds Section ── *@
+        @if (clubRounds.Any())
+        {
+            <div style="padding:16px 12px 0;">
+                <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+                    <span>📈</span> Your Recent Rounds
+                </div>
+
+                @foreach (var round in clubRounds.OrderByDescending(r => r.DatePlayed).Take(10))
+                {
+                    var vsPar = round.TotalScore - round.TotalPar;
+                    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:10px; padding:12px 14px; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;"
+                         @onclick="@(() => NavigationManager.NavigateTo($"/rounds/{round.RoundId}"))">
+                        <div>
+                            <div style="font-size:0.85rem; font-weight:600; color:#1a1a2e;">@round.DatePlayed.ToString("dd MMM yyyy")</div>
+                            <div style="font-size:0.75rem; color:#6b7280;">@round.CourseName</div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.1rem; font-weight:800; color:#1a1a2e;">@round.TotalScore</span>
+                            <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GetVsParStyle(vsPar)">
+                                @FormatVsPar(vsPar)
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <div style="height:24px;"></div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public int ClubId { get; set; }
+
+    private GolfClub? club;
+    private List<RoundResponse> clubRounds = new();
+    private bool isLoading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load club details and all rounds in parallel
+            var clubTask = GolfClubApi.GetGolfClubByIdAsync(ClubId);
+            var roundsTask = RoundApi.GetAllRoundsAsync();
+
+            await Task.WhenAll(clubTask, roundsTask);
+
+            club = await clubTask;
+            var allRounds = await roundsTask;
+
+            // Filter rounds for this club
+            if (club != null && allRounds != null)
+            {
+                clubRounds = allRounds
+                    .Where(r => string.Equals(r.ClubName, club.Name, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(r => r.DatePlayed)
+                    .ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading club detail for ClubId {ClubId}", ClubId);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string FormatAddress(GolfClub c)
+    {
+        var parts = new List<string?> { c.AddressLine1, c.City, c.CountyOrRegion, c.Country };
+        return string.Join(", ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+    }
+
+    private string GetBestScore()
+    {
+        var scores = clubRounds.Select(r => r.TotalScore).Where(s => s > 0).ToList();
+        return scores.Any() ? scores.Min().ToString() : "-";
+    }
+
+    private string GetAverageScore()
+    {
+        var scores = clubRounds.Select(r => r.TotalScore).Where(s => s > 0).ToList();
+        return scores.Any() ? scores.Average().ToString("F1") : "-";
+    }
+
+    private string GetLastPlayedDate()
+    {
+        if (!clubRounds.Any()) return "-";
+        return clubRounds.Max(r => r.DatePlayed).ToString("dd MMM");
+    }
+
+    private int GetCourseRoundCount(string courseName)
+    {
+        return clubRounds.Count(r => string.Equals(r.CourseName, courseName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void NavigateToCourse(int courseId)
+    {
+        NavigationManager.NavigateTo($"/course-detail/{courseId}");
+    }
+
+    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
+
+    private string GetVsParStyle(int vsPar)
+    {
+        if (vsPar < 0) return "background:#dcfce7; color:#16a34a;";
+        if (vsPar == 0) return "background:#dbeafe; color:#2563eb;";
+        return "background:#fef2f2; color:#dc2626;";
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo("/golfclubs");
+    }
+}
