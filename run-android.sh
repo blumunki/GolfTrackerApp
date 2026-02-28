@@ -84,7 +84,7 @@ build_and_deploy() {
     
     # Build and deploy to Android
     echo -e "${YELLOW}📦 Building and deploying to Android...${NC}"
-    dotnet build -t:Run -f net9.0-android -p:AndroidSdkDirectory="$ANDROID_HOME"
+    dotnet build -t:Run -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME"
     
     if [ $? -ne 0 ]; then
         echo -e "${RED}❌ Build or deployment failed!${NC}"

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Green circle background -->
+  <circle cx="32" cy="32" r="32" fill="#2c5530"/>
+  <!-- Golf flag pole -->
+  <line x1="28" y1="12" x2="28" y2="48" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Flag -->
+  <path d="M 29.5 12 L 46 19 L 29.5 26 Z" fill="#e74c3c"/>
+  <!-- Golf hole -->
+  <ellipse cx="28" cy="49" rx="9" ry="3" fill="#1a3a1f"/>
+  <!-- Golf ball -->
+  <circle cx="40" cy="46" r="6" fill="#fff"/>
+  <!-- Ball dimples -->
+  <circle cx="38" cy="44" r="0.8" fill="#ddd" opacity="0.6"/>
+  <circle cx="42" cy="44" r="0.8" fill="#ddd" opacity="0.6"/>
+  <circle cx="40" cy="42" r="0.8" fill="#ddd" opacity="0.6"/>
+  <circle cx="36" cy="47" r="0.8" fill="#ddd" opacity="0.6"/>
+  <circle cx="40" cy="48" r="0.8" fill="#ddd" opacity="0.6"/>
+  <circle cx="44" cy="47" r="0.8" fill="#ddd" opacity="0.6"/>
+</svg>
