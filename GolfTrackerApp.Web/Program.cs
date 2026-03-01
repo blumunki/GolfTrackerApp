@@ -281,6 +281,20 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
             logger.LogInformation("PlayerConnections table created.");
         }
 
+        // Check if LinkedPlayerId column exists on AspNetUsers
+        var linkedPlayerIdExists = await ColumnExistsAsync(connection, "AspNetUsers", "LinkedPlayerId");
+        if (!linkedPlayerIdExists)
+        {
+            logger.LogInformation("Adding LinkedPlayerId column to AspNetUsers...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE [AspNetUsers] ADD [LinkedPlayerId] INT NULL;
+                CREATE INDEX [IX_AspNetUsers_LinkedPlayerId] ON [AspNetUsers] ([LinkedPlayerId]);
+                ALTER TABLE [AspNetUsers] ADD CONSTRAINT [FK_AspNetUsers_Players_LinkedPlayerId] 
+                    FOREIGN KEY ([LinkedPlayerId]) REFERENCES [Players]([PlayerId]) ON DELETE SET NULL;
+            ");
+            logger.LogInformation("LinkedPlayerId column added to AspNetUsers.");
+        }
+
         // Check if PlayerMergeRequests table exists
         var mergeRequestsExists = await TableExistsAsync(connection, "PlayerMergeRequests");
         if (!mergeRequestsExists)
@@ -323,6 +337,14 @@ static async Task<bool> TableExistsAsync(System.Data.Common.DbConnection connect
 {
     using var command = connection.CreateCommand();
     command.CommandText = $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{tableName}'";
+    var result = await command.ExecuteScalarAsync();
+    return Convert.ToInt32(result) > 0;
+}
+
+static async Task<bool> ColumnExistsAsync(System.Data.Common.DbConnection connection, string tableName, string columnName)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
     var result = await command.ExecuteScalarAsync();
     return Convert.ToInt32(result) > 0;
 }
