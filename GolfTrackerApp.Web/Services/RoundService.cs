@@ -75,27 +75,32 @@ namespace GolfTrackerApp.Web.Services
                 throw new ArgumentException($"Player(s) with ID(s) {string.Join(", ", missingIds)} not found.");
             }
 
-            // Use a transaction to ensure round + players are saved atomically
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                _context.Rounds.Add(round);
-                await _context.SaveChangesAsync();
+            // Use execution strategy to support SQL Server retrying execution strategy with transactions
+            var strategy = _context.Database.CreateExecutionStrategy();
 
-                foreach (var playerId in playerIds)
-                {
-                    round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
-                }
-                await _context.SaveChangesAsync();
-                
-                await transaction.CommitAsync();
-                _logger.LogInformation("Created Round {RoundId} and linked {PlayerCount} players.", round.RoundId, playerIds.Count());
-            }
-            catch
+            await strategy.ExecuteAsync(async () =>
             {
-                await transaction.RollbackAsync();
-                throw;
-            }
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    _context.Rounds.Add(round);
+                    await _context.SaveChangesAsync();
+
+                    foreach (var playerId in playerIds)
+                    {
+                        round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
+                    }
+                    await _context.SaveChangesAsync();
+                
+                    await transaction.CommitAsync();
+                    _logger.LogInformation("Created Round {RoundId} and linked {PlayerCount} players.", round.RoundId, playerIds.Count());
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
 
             return round;
         }
