@@ -290,7 +290,7 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
                 ALTER TABLE [AspNetUsers] ADD [LinkedPlayerId] INT NULL;
                 CREATE INDEX [IX_AspNetUsers_LinkedPlayerId] ON [AspNetUsers] ([LinkedPlayerId]);
                 ALTER TABLE [AspNetUsers] ADD CONSTRAINT [FK_AspNetUsers_Players_LinkedPlayerId] 
-                    FOREIGN KEY ([LinkedPlayerId]) REFERENCES [Players]([PlayerId]) ON DELETE SET NULL;
+                    FOREIGN KEY ([LinkedPlayerId]) REFERENCES [Players]([PlayerId]) ON DELETE NO ACTION;
             ");
             logger.LogInformation("LinkedPlayerId column added to AspNetUsers.");
         }

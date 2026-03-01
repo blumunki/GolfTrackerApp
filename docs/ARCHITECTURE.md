@@ -241,6 +241,38 @@ Round
 
 `IDbContextFactory<ApplicationDbContext>` is used throughout services for Blazor Server compatibility (avoids DbContext threading issues).
 
+### 5.1 Database Provider Differences (IMPORTANT for AI Agents)
+
+Development and production use **different database providers** with different capabilities and schema management strategies. Any database schema change must account for both.
+
+| Aspect | Development (SQLite) | Production (SQL Server) |
+|--------|---------------------|------------------------|
+| **Provider** | `Microsoft.EntityFrameworkCore.Sqlite` | `Microsoft.EntityFrameworkCore.SqlServer` |
+| **Schema management** | EF Core Migrations (`context.Database.Migrate()`) | `EnsureCreated()` + manual SQL in `EnsureNewTablesExistAsync()` |
+| **Column types** | `INTEGER`, `TEXT`, `REAL` | `INT`, `NVARCHAR(n)`, `DATETIME2`, `BIT`, etc. |
+| **Cascade deletes** | Generally permissive | Strict — rejects `ON DELETE SET NULL` / `CASCADE` if it creates multiple cascade paths |
+| **Config key** | `"DatabaseProvider": "Sqlite"` (in `appsettings.Development.json`) | `"DatabaseProvider": "SqlServer"` (in `appsettings.Production.json`) |
+
+**When making any database schema change, you MUST:**
+
+1. **Create an EF Core migration** for SQLite/development:
+   ```bash
+   cd GolfTrackerApp.Web
+   dotnet ef migrations add <MigrationName>
+   ```
+
+2. **Update `EnsureNewTablesExistAsync()` in `Program.cs`** for SQL Server/production:
+   - New tables: Add a `TableExistsAsync` check and `CREATE TABLE` with SQL Server types
+   - New columns on existing tables: Add a `ColumnExistsAsync` check and `ALTER TABLE ... ADD`
+   - Use `NVARCHAR(n)` not `TEXT`, `INT` not `INTEGER`, `DATETIME2` not `TEXT`, `BIT` not `INTEGER`
+
+3. **Avoid cascade conflicts on SQL Server:**
+   - Use `ON DELETE NO ACTION` for foreign keys where multiple cascade paths exist (e.g., `AspNetUsers` ↔ `Players`)
+   - `ON DELETE CASCADE` is only safe when there's a single path from parent to dependent
+   - `ON DELETE SET NULL` also triggers the cascade-path check on SQL Server
+
+4. **Test both providers** before deploying schema changes.
+
 ## 6. Service Layer Design
 
 All services follow the same pattern:
