@@ -1,5 +1,3 @@
-@page "/players"
-@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Services
@@ -10,7 +8,7 @@
 @inject IJSRuntime JSRuntime
 @inject ILogger<PlayersPage> Logger
 
-<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
+<MudContainer Class="pa-0 page-scroll-container">
     @if (loading)
     {
         <div style="text-align:center; padding:48px;">
@@ -26,7 +24,7 @@
                 <div style="width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg, #667eea, #764ba2); display:flex; align-items:center; justify-content:center; font-size:1.2rem; font-weight:700; flex-shrink:0;">
                     @if (myProfile != null)
                     {
-                        @($"{myProfile.FirstName?[..1]}{myProfile.LastName?[..1]}")
+                        @($"{(myProfile.FirstName?.Length > 0 ? myProfile.FirstName[..1] : "")}{(myProfile.LastName?.Length > 0 ? myProfile.LastName[..1] : "")}")
                     }
                     else
                     {
@@ -540,16 +538,22 @@
 
     private async Task LoadPlayerStats()
     {
-        if (players == null) return;
+        if (players == null || players.Count == 0) return;
         playerStatsCache.Clear();
 
-        var tasks = players.Take(20).Select(async p =>
+        try
         {
-            var stats = await ConnectionApi.GetPlayerQuickStatsAsync(p.Id);
-            if (stats != null)
-                playerStatsCache[p.Id] = stats;
-        });
-        await Task.WhenAll(tasks);
+            var ids = players.Select(p => p.Id);
+            var batchStats = await ConnectionApi.GetBatchPlayerQuickStatsAsync(ids);
+            foreach (var kvp in batchStats)
+            {
+                playerStatsCache[kvp.Key] = kvp.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading batch player stats");
+        }
     }
 
     private void ApplySearchFilter()

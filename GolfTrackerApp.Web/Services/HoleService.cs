@@ -1,7 +1,7 @@
-// In GolfTrackerApp.Web/Services/HoleService.cs
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,10 +11,12 @@ namespace GolfTrackerApp.Web.Services
     public class HoleService : IHoleService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly ILogger<HoleService> _logger;
 
-        public HoleService(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public HoleService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<HoleService> logger)
         {
             _contextFactory = contextFactory;
+            _logger = logger;
         }
 
         public async Task<Hole> AddHoleAsync(Hole hole)
@@ -47,6 +49,14 @@ namespace GolfTrackerApp.Web.Services
             
             var hole = await _context.Holes.FindAsync(id);
             if (hole == null) return false;
+
+            var hasScores = await _context.Scores.AnyAsync(s => s.HoleId == id);
+            if (hasScores)
+            {
+                _logger.LogWarning("Cannot delete Hole {HoleId}: has linked scores", id);
+                throw new InvalidOperationException("Cannot delete this hole because it has recorded scores.");
+            }
+
             _context.Holes.Remove(hole);
             await _context.SaveChangesAsync();
             return true;

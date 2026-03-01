@@ -2,13 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using GolfTrackerApp.Web.Models;
 using GolfTrackerApp.Web.Services;
-using System.Security.Claims;
 
 namespace GolfTrackerApp.Web.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class GolfClubsController : ControllerBase
+public class GolfClubsController : BaseApiController
 {
     private readonly IGolfClubService _golfClubService;
     private readonly ILogger<GolfClubsController> _logger;
@@ -20,6 +18,7 @@ public class GolfClubsController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<GolfClub>>> GetAllGolfClubs()
     {
         try
@@ -35,6 +34,7 @@ public class GolfClubsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<ActionResult<GolfClub>> GetGolfClub(int id)
     {
         try
@@ -54,6 +54,7 @@ public class GolfClubsController : ControllerBase
     }
 
     [HttpGet("search")]
+    [AllowAnonymous]
     public async Task<ActionResult<List<GolfClub>>> SearchGolfClubs([FromQuery] string searchTerm)
     {
         try
@@ -74,7 +75,6 @@ public class GolfClubsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize] // Require authentication for creating clubs
     public async Task<ActionResult<GolfClub>> CreateGolfClub([FromBody] GolfClub golfClub)
     {
         try
@@ -95,7 +95,6 @@ public class GolfClubsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize] // Require authentication for updating clubs
     public async Task<ActionResult<GolfClub>> UpdateGolfClub(int id, [FromBody] GolfClub golfClub)
     {
         try
@@ -126,7 +125,6 @@ public class GolfClubsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize] // Require authentication for deleting clubs
     public async Task<ActionResult> DeleteGolfClub(int id)
     {
         try

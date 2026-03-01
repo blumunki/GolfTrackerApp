@@ -1,9 +1,18 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using GolfTrackerApp.Web.Models;
 using Microsoft.AspNetCore.Identity;
 
 namespace GolfTrackerApp.Web.Data;
 
-// Add profile data for application users by adding properties to the ApplicationUser class
 public class ApplicationUser : IdentityUser
 {
+    /// <summary>
+    /// Cached FK to the user's linked Player record.
+    /// Avoids the N+1 query pattern of GetPlayerByApplicationUserIdAsync on every page load.
+    /// </summary>
+    public int? LinkedPlayerId { get; set; }
+
+    [ForeignKey("LinkedPlayerId")]
+    public virtual Player? LinkedPlayer { get; set; }
 }
 

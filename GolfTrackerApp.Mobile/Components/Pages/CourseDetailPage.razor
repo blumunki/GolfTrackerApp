@@ -1,5 +1,3 @@
-@page "/course-detail/{CourseId:int}"
-@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IGolfCourseApiService CourseApi
@@ -7,7 +5,7 @@
 @inject NavigationManager NavigationManager
 @inject ILogger<CourseDetailPage> Logger
 
-<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
+<MudContainer Class="pa-0 page-scroll-container">
     @if (isLoading)
     {
         <div style="text-align:center; padding:48px;">
@@ -100,7 +98,7 @@
             {
                 <div style="margin:0 12px 16px; background:#ffffff; border:1px solid #f3e8ff; border-radius:12px; padding:12px; text-align:center;">
                     <div style="font-size:1.2rem;">🎯</div>
-                    <div style="font-size:1.3rem; font-weight:800; color:#7c3aed;">@FormatVsPar(GetBestVsPar()!.Value)</div>
+                    <div style="font-size:1.3rem; font-weight:800; color:#7c3aed;">@GolfHelpers.FormatVsPar(GetBestVsPar()!.Value)</div>
                     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Best vs Par</div>
                 </div>
             }
@@ -178,8 +176,8 @@
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-size:1.1rem; font-weight:800; color:#1a1a2e;">@round.TotalScore</span>
-                            <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GetVsParStyle(vsPar)">
-                                @FormatVsPar(vsPar)
+                            <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GolfHelpers.GetVsParBadgeStyle(vsPar)">
+                                @GolfHelpers.FormatVsPar(vsPar)
                             </span>
                         </div>
                     </div>
@@ -261,15 +259,6 @@
             .Select(r => r.TotalScore - r.TotalPar)
             .ToList();
         return vsParValues.Any() ? vsParValues.Min() : null;
-    }
-
-    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
-
-    private string GetVsParStyle(int vsPar)
-    {
-        if (vsPar < 0) return "background:#dcfce7; color:#16a34a;";
-        if (vsPar == 0) return "background:#dbeafe; color:#2563eb;";
-        return "background:#fef2f2; color:#dc2626;";
     }
 
     private string GetParBadgeStyle(int par)

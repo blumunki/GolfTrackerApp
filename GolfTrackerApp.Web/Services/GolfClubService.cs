@@ -1,6 +1,7 @@
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -9,10 +10,12 @@ namespace GolfTrackerApp.Web.Services
     public class GolfClubService : IGolfClubService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly ILogger<GolfClubService> _logger;
 
-        public GolfClubService(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public GolfClubService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<GolfClubService> logger)
         {
             _contextFactory = contextFactory;
+            _logger = logger;
         }
 
         public async Task<GolfClub> AddGolfClubAsync(GolfClub golfClub)
@@ -33,8 +36,14 @@ namespace GolfTrackerApp.Web.Services
             {
                 return false;
             }
-            // Consider implications: what if courses are linked?
-            // For now, simple delete. Later, you might check for linked courses.
+
+            var hasCourses = await _context.GolfCourses.AnyAsync(c => c.GolfClubId == id);
+            if (hasCourses)
+            {
+                _logger.LogWarning("Cannot delete GolfClub {ClubId}: has linked courses", id);
+                throw new InvalidOperationException($"Cannot delete golf club '{golfClub.Name}' because it has linked courses. Remove the courses first.");
+            }
+
             _context.GolfClubs.Remove(golfClub);
             await _context.SaveChangesAsync();
             return true;
@@ -45,6 +54,7 @@ namespace GolfTrackerApp.Web.Services
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             return await _context.GolfClubs
+                .AsNoTracking()
                 .Include(c => c.GolfCourses)
                 .OrderBy(c => c.Name)
                 .ToListAsync();
@@ -56,6 +66,7 @@ namespace GolfTrackerApp.Web.Services
             
             // Include courses if needed when viewing a single club's details
             return await _context.GolfClubs
+                                 .AsNoTracking()
                                  .Include(c => c.GolfCourses)
                                  .FirstOrDefaultAsync(c => c.GolfClubId == id);
         }
@@ -78,6 +89,7 @@ namespace GolfTrackerApp.Web.Services
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             var query = _context.GolfClubs
+                .AsNoTracking()
                 .Include(c => c.GolfCourses)
                 .AsQueryable();
 

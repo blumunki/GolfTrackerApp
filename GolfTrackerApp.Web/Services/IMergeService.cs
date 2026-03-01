@@ -27,8 +27,8 @@ public interface IMergeService
     Task<List<PlayerMergeRequest>> GetPendingMergeRequestsSentAsync(string userId);
     
     // Get managed players that can be merged to a specific connected user
-    Task<List<Player>> GetMergeablePlayers(string currentUserId, string targetUserId);
+    Task<List<Player>> GetMergeablePlayersAsync(string currentUserId, string targetUserId);
     
     // Check if a player already has a pending merge request
-    Task<bool> HasPendingMergeRequest(int sourcePlayerId);
+    Task<bool> HasPendingMergeRequestAsync(int sourcePlayerId);
 }

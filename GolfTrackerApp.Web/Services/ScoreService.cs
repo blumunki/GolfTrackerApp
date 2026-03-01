@@ -1,7 +1,7 @@
-// In GolfTrackerApp.Web/Services/ScoreService.cs
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,10 +11,12 @@ namespace GolfTrackerApp.Web.Services
     public class ScoreService : IScoreService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly ILogger<ScoreService> _logger;
 
-        public ScoreService(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public ScoreService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<ScoreService> logger)
         {
             _contextFactory = contextFactory;
+            _logger = logger;
         }
 
         public async Task<Score> AddScoreAsync(Score score)

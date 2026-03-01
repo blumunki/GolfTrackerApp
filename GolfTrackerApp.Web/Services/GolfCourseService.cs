@@ -1,7 +1,7 @@
-// In GolfTrackerApp.Web/Services/GolfCourseService.cs
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -10,10 +10,12 @@ namespace GolfTrackerApp.Web.Services
     public class GolfCourseService : IGolfCourseService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly ILogger<GolfCourseService> _logger;
 
-        public GolfCourseService(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public GolfCourseService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<GolfCourseService> logger)
         {
             _contextFactory = contextFactory;
+            _logger = logger;
         }
 
         public async Task<GolfCourse> AddGolfCourseAsync(GolfCourse golfCourse)
@@ -35,8 +37,14 @@ namespace GolfTrackerApp.Web.Services
         public async Task<bool> DeleteGolfCourseAsync(int id)
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
-            
-            // Include the related Holes when fetching the course
+
+            var hasRounds = await _context.Rounds.AnyAsync(r => r.GolfCourseId == id);
+            if (hasRounds)
+            {
+                _logger.LogWarning("Cannot delete GolfCourse {CourseId}: has linked rounds", id);
+                throw new InvalidOperationException($"Cannot delete this course because it has linked rounds. Remove the rounds first.");
+            }
+
             var golfCourse = await _context.GolfCourses
                                         .Include(c => c.Holes)
                                         .FirstOrDefaultAsync(c => c.GolfCourseId == id);
@@ -46,10 +54,8 @@ namespace GolfTrackerApp.Web.Services
                 return false;
             }
 
-            // By removing the course, EF Core will automatically handle deleting the
-            // associated holes due to the cascade delete relationship in the database.
+            // EF Core cascade-deletes the associated holes.
             _context.GolfCourses.Remove(golfCourse);
-
             await _context.SaveChangesAsync();
             return true;
         }
@@ -59,7 +65,8 @@ namespace GolfTrackerApp.Web.Services
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             return await _context.GolfCourses
-                                .Include(gc => gc.GolfClub) // Optionally include club details
+                                .AsNoTracking()
+                                .Include(gc => gc.GolfClub)
                                 .ToListAsync();
         }
 
@@ -68,6 +75,7 @@ namespace GolfTrackerApp.Web.Services
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             return await _context.GolfCourses
+                .AsNoTracking()
                 .Where(c => c.GolfClubId == clubId)
                 .ToListAsync();
         }
@@ -77,8 +85,9 @@ namespace GolfTrackerApp.Web.Services
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             return await _context.GolfCourses
+                                .AsNoTracking()
                                 .Include(gc => gc.GolfClub)
-                                .Include(gc => gc.Holes) // Include holes for score entry
+                                .Include(gc => gc.Holes)
                                 .FirstOrDefaultAsync(gc => gc.GolfCourseId == id);
         }
 
@@ -111,6 +120,7 @@ namespace GolfTrackerApp.Web.Services
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             var query = _context.GolfCourses
+                .AsNoTracking()
                 .Include(gc => gc.GolfClub)
                 .AsQueryable();
 

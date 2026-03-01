@@ -1,12 +1,10 @@
-@page "/rounds/{RoundId:int}"
-@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IRoundApiService RoundApi
 @inject NavigationManager NavigationManager
 @inject ILogger<RoundDetailPage> Logger
 
-<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
+<MudContainer Class="pa-0 page-scroll-container">
     @if (isLoading)
     {
         <div style="text-align:center; padding:48px;">
@@ -76,7 +74,7 @@
                     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">Par</div>
                 </div>
                 <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; text-align:center;">
-                    <div style="font-size:1.8rem; font-weight:800; @GetVsParStyle(vsPar)">@FormatVsPar(vsPar)</div>
+                    <div style="font-size:1.8rem; font-weight:800; @GolfHelpers.GetVsParStyle(vsPar)">@GolfHelpers.FormatVsPar(vsPar)</div>
                     <div style="font-size:0.7rem; font-weight:600; color:#6b7280; text-transform:uppercase;">vs Par</div>
                 </div>
             </div>
@@ -127,8 +125,8 @@
                                     <div style="font-size:0.6rem; color:#6b7280; text-transform:uppercase;">Score</div>
                                     <div style="font-weight:800; color:#1a1a2e;">@totalStrokes</div>
                                 </div>
-                                <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GetVsParBadgeStyle(scoreToPar)">
-                                    @FormatVsPar(scoreToPar)
+                                <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GolfHelpers.GetVsParBadgeStyle(scoreToPar)">
+                                    @GolfHelpers.FormatVsPar(scoreToPar)
                                 </span>
                             </div>
                         </div>
@@ -150,8 +148,8 @@
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px;">
                                             <span style="font-weight:700; color:#1a1a2e;">@score.Strokes</span>
-                                            <span style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px; min-width:32px; text-align:center; @GetVsParBadgeStyle(holeVsPar)">
-                                                @FormatVsPar(holeVsPar)
+                                            <span style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px; min-width:32px; text-align:center; @GolfHelpers.GetVsParBadgeStyle(holeVsPar)">
+                                                @GolfHelpers.FormatVsPar(holeVsPar)
                                             </span>
                                         </div>
                                     </div>
@@ -226,22 +224,6 @@
     private void TogglePlayer(int playerId)
     {
         expandedPlayers[playerId] = !expandedPlayers.GetValueOrDefault(playerId, false);
-    }
-
-    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
-
-    private string GetVsParStyle(int vsPar)
-    {
-        if (vsPar < 0) return "color:#16a34a;";
-        if (vsPar == 0) return "color:#2563eb;";
-        return "color:#dc2626;";
-    }
-
-    private string GetVsParBadgeStyle(int vsPar)
-    {
-        if (vsPar < 0) return "background:#dcfce7; color:#16a34a;";
-        if (vsPar == 0) return "background:#dbeafe; color:#2563eb;";
-        return "background:#fef2f2; color:#dc2626;";
     }
 
     private void GoBack()

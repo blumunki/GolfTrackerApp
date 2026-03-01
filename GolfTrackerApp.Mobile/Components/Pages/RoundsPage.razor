@@ -1,20 +1,15 @@
-@page "/rounds"
-@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Services
 @using System.Text.Json
-@inject HttpClient Http
 @inject IRoundApiService RoundApiService
 
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 
-@* Use aliases to resolve namespace conflicts *@
-@using ApiRound = GolfTrackerApp.Mobile.Services.Api.Round
-@using LocalRound = GolfTrackerApp.Mobile.Models.Round
 
-<MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
+
+<MudContainer Class="pa-2 page-scroll-container">
     <!-- Search and Add Actions -->
     <div class="d-flex align-center justify-space-between mb-3">
         <MudText Typo="Typo.h4" Color="Color.Primary">🏌️ Rounds</MudText>
@@ -80,7 +75,7 @@
                                                 Size="Size.Small" 
                                                 Class="mr-2" 
                                                 Color="Color.Primary" />
-                                        <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                                        <MudText Typo="Typo.body1" Class="fw-semibold">
                                             @round.DatePlayed.ToString("MMM dd, yyyy")
                                         </MudText>
                                     </div>
@@ -130,7 +125,7 @@
                                 <div class="d-flex flex-column align-center ml-2" style="min-width: 60px;">
                                     @if (round.TotalScore > 0)
                                     {
-                                        var vsPar = round.TotalScore - round.Par;
+                                        var vsPar = round.TotalScore - round.TotalPar;
                                         var vsParText = vsPar > 0 ? $"+{vsPar}" : (vsPar == 0 ? "E" : vsPar.ToString());
                                         var scoreColor = vsPar < 0 ? Color.Success : (vsPar == 0 ? Color.Info : Color.Error);
                                         
@@ -269,14 +264,14 @@
                                         <div class="d-flex align-center">
                                             <MudIcon Icon="@(isExpanded ? Icons.Material.Filled.ExpandLess : Icons.Material.Filled.ExpandMore)" 
                                                     Class="mr-2" />
-                                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">
+                                            <MudText Typo="Typo.subtitle1" Class="fw-semibold">
                                                 @(player?.FullName ?? $"Player {playerId}")
                                             </MudText>
                                         </div>
                                         <div class="d-flex align-center gap-3">
                                             <div class="text-center">
                                                 <MudText Typo="Typo.caption" Color="Color.Secondary">Score</MudText>
-                                                <MudText Typo="Typo.body1" Style="font-weight: 600;">@totalStrokes</MudText>
+                                                <MudText Typo="Typo.body1" Class="fw-semibold">@totalStrokes</MudText>
                                             </div>
                                             <div class="text-center">
                                                 <MudText Typo="Typo.caption" Color="Color.Secondary">To Par</MudText>
@@ -344,14 +339,13 @@
     </DialogActions>
 </MudDialog>
 @code {
-    private List<LocalRound>? rounds;
-    private List<LocalRound>? filteredRounds;
-    private List<Score>? scores;
-    private List<GolfTrackerApp.Mobile.Services.Api.ScoreResponse>? apiScores;
+    private List<RoundResponse>? rounds;
+    private List<RoundResponse>? filteredRounds;
+    private List<ScoreResponse>? apiScores;
     private Dictionary<int, bool> expandedPlayers = new();
     private bool loading = true;
     private bool showDetailsDialog = false;
-    private LocalRound? selectedRound;
+    private RoundResponse? selectedRound;
     private string searchString = "";
     private int totalRounds = 0;
     private bool showPlayerFilter = false;
@@ -377,24 +371,9 @@
             loading = true;
             
             // Get rounds from API service
-            var roundResponses = await RoundApiService.GetRoundsAsync(1, 50); // Load more for search
-            
-            // Convert API responses to Round model for UI
-            rounds = roundResponses.Select(r => new LocalRound
-            {
-                Id = r.RoundId,
-                CourseName = r.CourseName,
-                ClubName = r.ClubName,
-                DatePlayed = r.DatePlayed,
-                TotalScore = r.TotalScore,
-                Par = r.TotalPar,
-                Holes = r.HolesPlayed,
-                Notes = r.Notes ?? string.Empty,
-                PlayingPartners = r.PlayingPartners ?? new List<string>(),
-                Weather = "N/A", // Would need to add weather field to API
-                PlayerCount = r.PlayerCount,
-                RoundType = r.RoundType
-            }).OrderByDescending(r => r.DatePlayed).ToList();
+            rounds = (await RoundApiService.GetRoundsAsync(1, 50))
+                .OrderByDescending(r => r.DatePlayed)
+                .ToList();
             
             totalRounds = rounds?.Count ?? 0;
             
@@ -410,8 +389,8 @@
         catch (Exception ex)
         {
             await JSRuntime.InvokeVoidAsync("console.error", $"Error loading rounds: {ex.Message}");
-            rounds = new List<LocalRound>();
-            filteredRounds = new List<LocalRound>();
+            rounds = new List<RoundResponse>();
+            filteredRounds = new List<RoundResponse>();
             totalRounds = 0;
         }
         finally
@@ -432,11 +411,11 @@
     {
         if (rounds == null)
         {
-            filteredRounds = new List<LocalRound>();
+            filteredRounds = new List<RoundResponse>();
             return;
         }
 
-        IEnumerable<LocalRound> results = rounds;
+        IEnumerable<RoundResponse> results = rounds;
 
         if (!string.IsNullOrWhiteSpace(searchString))
         {
@@ -459,21 +438,16 @@
         StateHasChanged();
     }
 
-    private async Task ShowRoundDetails(LocalRound round)
+    private async Task ShowRoundDetails(RoundResponse round)
     {
         selectedRound = round;
-        await LoadRoundScores(round.Id);
+        await LoadRoundScores(round.RoundId);
         showDetailsDialog = true;
     }
 
-    private async Task EditRoundFromMenu(LocalRound round)
+    private async Task EditRoundFromMenu(RoundResponse round)
     {
         await JSRuntime.InvokeVoidAsync("alert", $"Edit functionality coming soon for round at {round.CourseName}!");
-    }
-
-    private async Task DeleteRoundFromMenu(LocalRound round)
-    {
-        await JSRuntime.InvokeVoidAsync("alert", $"Delete functionality coming soon for round at {round.CourseName}!");
     }
 
     private async Task LoadRoundScores(int roundId)
@@ -490,25 +464,11 @@
             {
                 expandedPlayers[playerId] = false;
             }
-            
-            // Keep the old scores format for backward compatibility, but use real par values
-            scores = apiScores.Select(s => new Score
-            {
-                Id = s.ScoreId,
-                RoundId = s.RoundId,
-                HoleNumber = s.Hole?.HoleNumber ?? 1,
-                Strokes = s.Strokes,
-                Par = s.Hole?.Par ?? 4,
-                Putts = s.Putts,
-                FairwayHit = s.FairwayHit ?? false,
-                GreenInRegulation = false
-            }).ToList();
         }
         catch (Exception ex)
         {
             await JSRuntime.InvokeVoidAsync("console.error", $"Error loading scores: {ex.Message}");
-            apiScores = new List<GolfTrackerApp.Mobile.Services.Api.ScoreResponse>();
-            scores = new List<Score>();
+            apiScores = new List<ScoreResponse>();
         }
     }
 
@@ -516,7 +476,6 @@
     {
         showDetailsDialog = false;
         selectedRound = null;
-        scores = null;
         apiScores = null;
         expandedPlayers.Clear();
     }
@@ -526,21 +485,14 @@
         expandedPlayers[playerId] = !expandedPlayers.GetValueOrDefault(playerId, false);
     }
 
-    private string GetRoundTypeDisplay(LocalRound round)
+    private string GetRoundTypeDisplay(RoundResponse round)
     {
         return string.IsNullOrEmpty(round.RoundType) ? "Friendly" : round.RoundType;
     }
 
-    private string GetPlayerCountDisplay(LocalRound round)
+    private string GetPlayerCountDisplay(RoundResponse round)
     {
         return round.PlayerCount > 0 ? round.PlayerCount.ToString() : "1";
-    }
-
-    private string FormatScoreToPar(int score, int par)
-    {
-        var diff = score - par;
-        if (diff == 0) return "E";
-        return diff > 0 ? $"+{diff}" : diff.ToString();
     }
 
     private string FormatHoleScore(int diff)
@@ -563,17 +515,7 @@
     
     private void NavigateToNewRound()
     {
-        @* Console.WriteLine("[ROUNDS] Navigate to new round button clicked");
-        System.Diagnostics.Debug.WriteLine("[ROUNDS] Navigate to new round button clicked");
-        Console.WriteLine($"[ROUNDS] Navigating to: /record-round");
-        System.Diagnostics.Debug.WriteLine("[ROUNDS] Navigating to: /record-round");
-        Navigation.NavigateTo("/record-round"); *@
-
         var targetUrl = $"/record-round";
-        Console.WriteLine($"[ROUNDS] Calling NavigationManager.NavigateTo('{targetUrl}')");
-        System.Diagnostics.Debug.WriteLine($"[ROUNDS] Calling NavigationManager.NavigateTo('{targetUrl}')");
         NavigationManager.NavigateTo(targetUrl, forceLoad: false);
-        Console.WriteLine($"[ROUNDS] Navigation call completed");
-        System.Diagnostics.Debug.WriteLine($"[ROUNDS] Navigation call completed");
     }
 }

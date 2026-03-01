@@ -13,21 +13,15 @@ public class PlayersController : BaseApiController
     private readonly ApplicationDbContext _context;
     private readonly ILogger<PlayersController> _logger;
     private readonly IReportService _reportService;
-    private readonly IConnectionService _connectionService;
-    private readonly IMergeService _mergeService;
 
     public PlayersController(
         ApplicationDbContext context, 
         ILogger<PlayersController> logger, 
-        IReportService reportService,
-        IConnectionService connectionService,
-        IMergeService mergeService)
+        IReportService reportService)
     {
         _context = context;
         _logger = logger;
         _reportService = reportService;
-        _connectionService = connectionService;
-        _mergeService = mergeService;
     }
 
     [HttpGet]
@@ -352,356 +346,25 @@ public class PlayersController : BaseApiController
         }
     }
 
-    // ── Connections ──
-
-    [HttpGet("connections")]
+    [HttpPost("batch-quick-stats")]
     [Authorize]
-    public async Task<ActionResult> GetConnections()
+    public async Task<ActionResult<Dictionary<int, PlayerQuickStats>>> GetBatchQuickStats([FromBody] List<int> playerIds)
     {
         try
         {
-            var userId = GetCurrentUserId();
-            var connections = await _connectionService.GetConnectionsAsync(userId);
-            
-            var result = connections.Select(c => new ConnectionDto
-            {
-                Id = c.Id,
-                ConnectedUserId = c.RequestingUserId == userId ? c.TargetUserId : c.RequestingUserId,
-                ConnectedUserName = c.RequestingUserId == userId 
-                    ? c.TargetUser?.UserName ?? "Unknown"
-                    : c.RequestingUser?.UserName ?? "Unknown",
-                Status = c.Status.ToString(),
-                ConnectedSince = c.RespondedAt
-            }).ToList();
-            
-            return Ok(result);
+            if (playerIds == null || playerIds.Count == 0)
+                return Ok(new Dictionary<int, PlayerQuickStats>());
+
+            // Cap at 50 to prevent abuse
+            var ids = playerIds.Take(50).ToList();
+            var stats = await _reportService.GetBatchPlayerQuickStatsAsync(ids);
+            return Ok(stats);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving connections");
+            _logger.LogError(ex, "Error retrieving batch quick stats for {Count} players", playerIds?.Count ?? 0);
             return StatusCode(500, "An error occurred");
         }
     }
 
-    [HttpGet("connections/pending-received")]
-    [Authorize]
-    public async Task<ActionResult> GetPendingRequestsReceived()
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var requests = await _connectionService.GetPendingRequestsReceivedAsync(userId);
-            
-            var result = requests.Select(c => new ConnectionDto
-            {
-                Id = c.Id,
-                ConnectedUserId = c.RequestingUserId,
-                ConnectedUserName = c.RequestingUser?.UserName ?? "Unknown",
-                Status = c.Status.ToString(),
-                RequestedAt = c.RequestedAt
-            }).ToList();
-            
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving pending requests received");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpGet("connections/pending-sent")]
-    [Authorize]
-    public async Task<ActionResult> GetPendingRequestsSent()
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var requests = await _connectionService.GetPendingRequestsSentAsync(userId);
-            
-            var result = requests.Select(c => new ConnectionDto
-            {
-                Id = c.Id,
-                ConnectedUserId = c.TargetUserId,
-                ConnectedUserName = c.TargetUser?.UserName ?? "Unknown",
-                Status = c.Status.ToString(),
-                RequestedAt = c.RequestedAt
-            }).ToList();
-            
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving pending requests sent");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpGet("connections/search")]
-    [Authorize]
-    public async Task<ActionResult<List<UserSearchResult>>> SearchUsers([FromQuery] string searchTerm)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var results = await _connectionService.SearchUsersAsync(searchTerm, userId);
-            return Ok(results);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error searching users");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpPost("connections/request")]
-    [Authorize]
-    public async Task<ActionResult> SendConnectionRequest([FromBody] ConnectionRequestDto request)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var connection = await _connectionService.SendConnectionRequestAsync(userId, request.TargetUserId);
-            return Ok(new { connection.Id, Status = connection.Status.ToString() });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending connection request");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpPost("connections/{connectionId}/accept")]
-    [Authorize]
-    public async Task<ActionResult> AcceptConnection(int connectionId)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var result = await _connectionService.AcceptConnectionRequestAsync(connectionId, userId);
-            if (result == null)
-                return NotFound("Connection request not found");
-            return Ok(new { result.Id, Status = result.Status.ToString() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error accepting connection {Id}", connectionId);
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpPost("connections/{connectionId}/decline")]
-    [Authorize]
-    public async Task<ActionResult> DeclineConnection(int connectionId)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var result = await _connectionService.DeclineConnectionRequestAsync(connectionId, userId);
-            if (result == null)
-                return NotFound("Connection request not found");
-            return Ok(new { result.Id, Status = result.Status.ToString() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error declining connection {Id}", connectionId);
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpDelete("connections/{connectionId}")]
-    [Authorize]
-    public async Task<ActionResult> RemoveConnection(int connectionId)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var removed = await _connectionService.RemoveConnectionAsync(connectionId, userId);
-            if (!removed)
-                return NotFound("Connection not found");
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error removing connection {Id}", connectionId);
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    // ── Merge ──
-
-    [HttpPost("merge/request")]
-    [Authorize]
-    public async Task<ActionResult> RequestMerge([FromBody] MergeRequestDto request)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var merge = await _mergeService.RequestMergeAsync(
-                userId, request.SourcePlayerId, request.TargetUserId, request.Message);
-            return Ok(new { merge.Id, Status = merge.Status.ToString() });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error requesting merge");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpGet("merge/pending-received")]
-    [Authorize]
-    public async Task<ActionResult> GetPendingMergeRequestsReceived()
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var requests = await _mergeService.GetPendingMergeRequestsReceivedAsync(userId);
-            
-            var result = requests.Select(m => new MergeResponseDto
-            {
-                Id = m.Id,
-                RequestingUserName = m.RequestingUser?.UserName ?? "Unknown",
-                SourcePlayerName = m.SourcePlayer != null ? $"{m.SourcePlayer.FirstName} {m.SourcePlayer.LastName}" : "Unknown",
-                TargetPlayerName = m.TargetPlayer != null ? $"{m.TargetPlayer.FirstName} {m.TargetPlayer.LastName}" : "Unknown",
-                Message = m.Message,
-                RequestedAt = m.RequestedAt,
-                Status = m.Status.ToString()
-            }).ToList();
-            
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting pending merge requests");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpGet("merge/pending-sent")]
-    [Authorize]
-    public async Task<ActionResult> GetPendingMergeRequestsSent()
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var requests = await _mergeService.GetPendingMergeRequestsSentAsync(userId);
-            
-            var result = requests.Select(m => new MergeResponseDto
-            {
-                Id = m.Id,
-                TargetUserName = m.TargetUser?.UserName ?? "Unknown",
-                SourcePlayerName = m.SourcePlayer != null ? $"{m.SourcePlayer.FirstName} {m.SourcePlayer.LastName}" : "Unknown",
-                TargetPlayerName = m.TargetPlayer != null ? $"{m.TargetPlayer.FirstName} {m.TargetPlayer.LastName}" : "Unknown",
-                Message = m.Message,
-                RequestedAt = m.RequestedAt,
-                Status = m.Status.ToString()
-            }).ToList();
-            
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting sent merge requests");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpPost("merge/{mergeId}/accept")]
-    [Authorize]
-    public async Task<ActionResult> AcceptMerge(int mergeId)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var result = await _mergeService.AcceptMergeRequestAsync(mergeId, userId);
-            if (result == null)
-                return NotFound("Merge request not found");
-            return Ok(new { result.Id, Status = result.Status.ToString(), result.RoundsMerged, result.RoundsSkipped });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error accepting merge {Id}", mergeId);
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpPost("merge/{mergeId}/decline")]
-    [Authorize]
-    public async Task<ActionResult> DeclineMerge(int mergeId)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var result = await _mergeService.DeclineMergeRequestAsync(mergeId, userId);
-            if (result == null)
-                return NotFound("Merge request not found");
-            return Ok(new { result.Id, Status = result.Status.ToString() });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error declining merge {Id}", mergeId);
-            return StatusCode(500, "An error occurred");
-        }
-    }
-
-    [HttpGet("merge/mergeable/{targetUserId}")]
-    [Authorize]
-    public async Task<ActionResult<List<Player>>> GetMergeablePlayers(string targetUserId)
-    {
-        try
-        {
-            var userId = GetCurrentUserId();
-            var players = await _mergeService.GetMergeablePlayers(userId, targetUserId);
-            return Ok(players);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting mergeable players");
-            return StatusCode(500, "An error occurred");
-        }
-    }
-}
-
-// ── DTOs for API ──
-
-public class ConnectionDto
-{
-    public int Id { get; set; }
-    public string ConnectedUserId { get; set; } = string.Empty;
-    public string ConnectedUserName { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public DateTime? ConnectedSince { get; set; }
-    public DateTime? RequestedAt { get; set; }
-}
-
-public class ConnectionRequestDto
-{
-    public string TargetUserId { get; set; } = string.Empty;
-}
-
-public class MergeRequestDto
-{
-    public int SourcePlayerId { get; set; }
-    public string TargetUserId { get; set; } = string.Empty;
-    public string? Message { get; set; }
-}
-
-public class MergeResponseDto
-{
-    public int Id { get; set; }
-    public string? RequestingUserName { get; set; }
-    public string? TargetUserName { get; set; }
-    public string SourcePlayerName { get; set; } = string.Empty;
-    public string TargetPlayerName { get; set; } = string.Empty;
-    public string? Message { get; set; }
-    public DateTime RequestedAt { get; set; }
-    public string Status { get; set; } = string.Empty;
 }

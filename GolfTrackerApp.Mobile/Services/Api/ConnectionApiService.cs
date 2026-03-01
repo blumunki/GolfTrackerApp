@@ -104,6 +104,7 @@ public interface IConnectionApiService
     // My profile
     Task<Player?> GetMyProfileAsync();
     Task<PlayerQuickStatsDto?> GetPlayerQuickStatsAsync(int playerId);
+    Task<Dictionary<int, PlayerQuickStatsDto>> GetBatchPlayerQuickStatsAsync(IEnumerable<int> playerIds);
 
     // Connections
     Task<List<ConnectionDto>> GetConnectionsAsync();
@@ -185,6 +186,28 @@ public class ConnectionApiService : IConnectionApiService
         {
             _logger.LogError(ex, "Error getting quick stats for player {PlayerId}", playerId);
             return null;
+        }
+    }
+
+    public async Task<Dictionary<int, PlayerQuickStatsDto>> GetBatchPlayerQuickStatsAsync(IEnumerable<int> playerIds)
+    {
+        try
+        {
+            EnsureAuth();
+            var ids = playerIds.ToList();
+            var content = new StringContent(
+                JsonSerializer.Serialize(ids, _jsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            var response = await _httpClient.PostAsync("api/players/batch-quick-stats", content);
+            if (!response.IsSuccessStatusCode) return new();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<Dictionary<int, PlayerQuickStatsDto>>(json, _jsonOptions) ?? new();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting batch quick stats for {Count} players", playerIds.Count());
+            return new();
         }
     }
 

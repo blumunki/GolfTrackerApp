@@ -1,0 +1,56 @@
+@* Dashboard Scoring Breakdown - stacked bar + legend grid *@
+
+@if (Distribution?.TotalHoles > 0)
+{
+    <MudCard Elevation="2" Class="mb-3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">🎨 Scoring Breakdown</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            <div style="display: flex; height: 22px; border-radius: 20px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
+                @if (Distribution.EagleCount > 0)
+                { <div style="width: @(Distribution.EaglePercentage.ToString("F1"))%; background: #1565c0; min-width: 2px;"></div> }
+                @if (Distribution.BirdieCount > 0)
+                { <div style="width: @(Distribution.BirdiePercentage.ToString("F1"))%; background: #2e7d32; min-width: 2px;"></div> }
+                @if (Distribution.ParCount > 0)
+                { <div style="width: @(Distribution.ParPercentage.ToString("F1"))%; background: #43a047; min-width: 2px;"></div> }
+                @if (Distribution.BogeyCount > 0)
+                { <div style="width: @(Distribution.BogeyPercentage.ToString("F1"))%; background: #ef6c00; min-width: 2px;"></div> }
+                @if (Distribution.DoubleBogeyCount > 0)
+                { <div style="width: @(Distribution.DoubleBogeyPercentage.ToString("F1"))%; background: #c62828; min-width: 2px;"></div> }
+                @if (Distribution.TripleBogeyOrWorseCount > 0)
+                { <div style="width: @(Distribution.TripleBogeyOrWorsePercentage.ToString("F1"))%; background: #880e4f; min-width: 2px;"></div> }
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                @{
+                    var items = new[] {
+                        (Label: "Eagle", Cnt: Distribution.EagleCount, Pct: Distribution.EaglePercentage, Col: "#1565c0"),
+                        (Label: "Birdie", Cnt: Distribution.BirdieCount, Pct: Distribution.BirdiePercentage, Col: "#2e7d32"),
+                        (Label: "Par", Cnt: Distribution.ParCount, Pct: Distribution.ParPercentage, Col: "#43a047"),
+                        (Label: "Bogey", Cnt: Distribution.BogeyCount, Pct: Distribution.BogeyPercentage, Col: "#ef6c00"),
+                        (Label: "Double", Cnt: Distribution.DoubleBogeyCount, Pct: Distribution.DoubleBogeyPercentage, Col: "#c62828"),
+                        (Label: "Triple+", Cnt: Distribution.TripleBogeyOrWorseCount, Pct: Distribution.TripleBogeyOrWorsePercentage, Col: "#880e4f"),
+                    };
+                }
+                @foreach (var s in items.Where(i => i.Cnt > 0))
+                {
+                    <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
+                        <span style="width: 8px; height: 8px; border-radius: 50%; background: @s.Col; flex-shrink: 0;"></span>
+                        <span style="font-weight: 500; color: #616161;">@s.Label</span>
+                        <span style="font-weight: 700; color: #212121; margin-left: auto;">@s.Pct.ToString("F1")%</span>
+                    </div>
+                }
+            </div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="mt-2" Style="font-size: 0.6rem;">
+                @Distribution.TotalHoles.ToString("N0") holes analysed
+            </MudText>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    [Parameter]
+    public ScoringDistributionData? Distribution { get; set; }
+}

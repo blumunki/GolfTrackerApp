@@ -133,6 +133,13 @@ namespace GolfTrackerApp.Web.Data
                 .WithMany()
                 .HasForeignKey(n => n.UserId)
                 .OnDelete(DeleteBehavior.Cascade); // Delete notifications when user is deleted
+
+            // ApplicationUser → Player (cached FK to avoid N+1 queries)
+            builder.Entity<ApplicationUser>()
+                .HasOne(u => u.LinkedPlayer)
+                .WithMany()
+                .HasForeignKey(u => u.LinkedPlayerId)
+                .OnDelete(DeleteBehavior.SetNull);
         }
     }
 }

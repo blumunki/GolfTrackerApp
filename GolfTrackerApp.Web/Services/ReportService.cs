@@ -1,16 +1,49 @@
 using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace GolfTrackerApp.Web.Services;
 
 public class ReportService : IReportService
 {
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+    private readonly ILogger<ReportService> _logger;
 
-    public ReportService(IDbContextFactory<ApplicationDbContext> contextFactory)
+    public ReportService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<ReportService> logger)
     {
         _contextFactory = contextFactory;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Applies standard round filters to a query. Eliminates duplicated filter logic across methods.
+    /// </summary>
+    private static IQueryable<Round> ApplyRoundFilters(
+        IQueryable<Round> query,
+        int? courseId = null,
+        int? holesPlayed = null,
+        RoundTypeOption? roundType = null,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        List<int>? sharedWithPlayerIds = null)
+    {
+        if (courseId.HasValue && courseId > 0)
+            query = query.Where(r => r.GolfCourseId == courseId.Value);
+        if (holesPlayed.HasValue && holesPlayed > 0)
+            query = query.Where(r => r.HolesPlayed == holesPlayed.Value);
+        if (roundType.HasValue)
+            query = query.Where(r => r.RoundType == roundType.Value);
+        if (startDate.HasValue)
+            query = query.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
+        if (endDate.HasValue)
+            query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
+        if (sharedWithPlayerIds?.Any() == true)
+        {
+            foreach (var cpId in sharedWithPlayerIds)
+                query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == cpId));
+        }
+        return query;
     }
 
     public async Task<List<PlayerPerformanceDataPoint>> GetPlayerPerformanceAsync(int playerId, int? courseId, int? holesPlayed, RoundTypeOption? roundType, DateTime? startDate, DateTime? endDate, List<int>? sharedWithPlayerIds = null)
@@ -20,36 +53,7 @@ public class ReportService : IReportService
         var query = _context.Rounds
             .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
 
-        // Apply filters
-        if (courseId.HasValue && courseId > 0)
-        {
-            query = query.Where(r => r.GolfCourseId == courseId.Value);
-        }
-        if (holesPlayed.HasValue && holesPlayed > 0)
-        {
-            query = query.Where(r => r.HolesPlayed == holesPlayed.Value);
-        }
-        if (roundType.HasValue)
-        {
-            query = query.Where(r => r.RoundType == roundType.Value);
-        }
-        if (startDate.HasValue)
-        {
-            query = query.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
-        }
-        if (endDate.HasValue)
-        {
-            query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
-        }
-
-        // Filter to shared rounds only (where all specified players also participated)
-        if (sharedWithPlayerIds?.Any() == true)
-        {
-            foreach (var cpId in sharedWithPlayerIds)
-            {
-                query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == cpId));
-            }
-        }
+        query = ApplyRoundFilters(query, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds);
 
         var performanceData = await query
             .Include(r => r.Scores)
@@ -99,32 +103,33 @@ public class ReportService : IReportService
         }
 
         // Find all players who played in those same rounds (the partners)
-        var partners = await _context.RoundPlayers
+        // Load all rounds with scores in a single query to avoid N+1
+        var roundsWithPartners = await _context.Rounds
             .AsNoTracking()
-            .Where(rp => userRoundIds.Contains(rp.RoundId) && rp.PlayerId != currentPlayerId)
-            .Select(rp => rp.Player)
-            .Distinct()
+            .Where(r => userRoundIds.Contains(r.RoundId))
+            .Include(r => r.RoundPlayers)
+                .ThenInclude(rp => rp.Player)
+            .Include(r => r.Scores)
+            .AsSplitQuery()
             .ToListAsync();
+
+        // Extract unique partners
+        var partners = roundsWithPartners
+            .SelectMany(r => r.RoundPlayers)
+            .Where(rp => rp.PlayerId != currentPlayerId && rp.Player != null)
+            .Select(rp => rp.Player!)
+            .DistinctBy(p => p.PlayerId)
+            .ToList();
 
         var summaryList = new List<PlayingPartnerSummary>();
 
         foreach (var partner in partners)
         {
-            // VVV --- THIS IS THE DEFINITIVE FIX --- VVV
-            // This explicit check guarantees to the compiler that 'partner' is not null for the rest of the loop.
-            if (partner is null)
-            {
-                continue;
-            }
-            // ^^^ ----------------------------------- ^^^
-
-            // Find all rounds played together
-            var roundsTogether = await _context.Rounds
-                .AsNoTracking()
+            // Filter from already-loaded data instead of querying per partner
+            var roundsTogether = roundsWithPartners
                 .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == currentPlayerId) &&
-                            r.RoundPlayers.Any(rp => rp.PlayerId == partner.PlayerId)) // Now safe
-                .Include(r => r.Scores)
-                .ToListAsync();
+                            r.RoundPlayers.Any(rp => rp.PlayerId == partner.PlayerId))
+                .ToList();
 
             if (!roundsTogether.Any()) continue;
 
@@ -240,36 +245,7 @@ public class ReportService : IReportService
         var query = _context.Rounds
             .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
 
-        // Apply filters (same as GetPlayerPerformanceAsync)
-        if (courseId.HasValue && courseId > 0)
-        {
-            query = query.Where(r => r.GolfCourseId == courseId.Value);
-        }
-        if (holesPlayed.HasValue && holesPlayed > 0)
-        {
-            query = query.Where(r => r.HolesPlayed == holesPlayed.Value);
-        }
-        if (roundType.HasValue)
-        {
-            query = query.Where(r => r.RoundType == roundType.Value);
-        }
-        if (startDate.HasValue)
-        {
-            query = query.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
-        }
-        if (endDate.HasValue)
-        {
-            query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
-        }
-
-        // Filter to shared rounds only (where all specified players also participated)
-        if (sharedWithPlayerIds?.Any() == true)
-        {
-            foreach (var cpId in sharedWithPlayerIds)
-            {
-                query = query.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == cpId));
-            }
-        }
+        query = ApplyRoundFilters(query, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds);
 
         // Get all scores for the player in filtered rounds
         var scores = await query
@@ -320,23 +296,7 @@ public class ReportService : IReportService
                        && r.Status == RoundCompletionStatus.Completed
                        && r.GolfCourse!.GolfClubId == clubId);
 
-        // Apply filters
-        if (holesPlayed.HasValue && holesPlayed > 0)
-        {
-            query = query.Where(r => r.HolesPlayed == holesPlayed.Value);
-        }
-        if (roundType.HasValue)
-        {
-            query = query.Where(r => r.RoundType == roundType.Value);
-        }
-        if (startDate.HasValue)
-        {
-            query = query.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
-        }
-        if (endDate.HasValue)
-        {
-            query = query.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
-        }
+        query = ApplyRoundFilters(query, holesPlayed: holesPlayed, roundType: roundType, startDate: startDate, endDate: endDate);
 
         // Get all scores for the player in filtered rounds
         var scores = await query
@@ -382,40 +342,10 @@ public class ReportService : IReportService
     {
         await using var _context = await _contextFactory.CreateDbContextAsync();
         
-        // Start with base query for rounds this player participated in
         var roundsQuery = _context.Rounds
             .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) && r.Status == RoundCompletionStatus.Completed);
 
-        // Apply filters
-        if (courseId.HasValue && courseId > 0)
-        {
-            roundsQuery = roundsQuery.Where(r => r.GolfCourseId == courseId.Value);
-        }
-        if (holesPlayed.HasValue && holesPlayed > 0)
-        {
-            roundsQuery = roundsQuery.Where(r => r.HolesPlayed == holesPlayed.Value);
-        }
-        if (roundType.HasValue)
-        {
-            roundsQuery = roundsQuery.Where(r => r.RoundType == roundType.Value);
-        }
-        if (startDate.HasValue)
-        {
-            roundsQuery = roundsQuery.Where(r => r.DatePlayed.Date >= startDate.Value.Date);
-        }
-        if (endDate.HasValue)
-        {
-            roundsQuery = roundsQuery.Where(r => r.DatePlayed.Date <= endDate.Value.Date);
-        }
-
-        // Filter to shared rounds only (where all specified players also participated)
-        if (sharedWithPlayerIds?.Any() == true)
-        {
-            foreach (var cpId in sharedWithPlayerIds)
-            {
-                roundsQuery = roundsQuery.Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == cpId));
-            }
-        }
+        roundsQuery = ApplyRoundFilters(roundsQuery, courseId, holesPlayed, roundType, startDate, endDate, sharedWithPlayerIds);
 
         // Get the round IDs first
         var filteredRoundIds = await roundsQuery.Select(r => r.RoundId).ToListAsync();
@@ -535,6 +465,7 @@ public class ReportService : IReportService
         await using var _context = await _contextFactory.CreateDbContextAsync();
         
         var player = await _context.Players
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.ApplicationUserId == currentUserId);
 
         if (player == null)
@@ -542,70 +473,76 @@ public class ReportService : IReportService
             return new DashboardStats();
         }
 
-        var rounds = await _context.Rounds
-            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId) 
+        var playerId = player.PlayerId;
+
+        // Project per-round score summaries in SQL (avoids loading full Score/Hole entities)
+        var roundScores = await _context.Rounds
+            .AsNoTracking()
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId) 
                        && r.Status == RoundCompletionStatus.Completed)
-            .Include(r => r.Scores)
-            .ThenInclude(s => s.Hole)
-            .Include(r => r.GolfCourse)
-            .ThenInclude(gc => gc!.GolfClub)
             .OrderBy(r => r.DatePlayed)
+            .Select(r => new
+            {
+                r.RoundId,
+                r.GolfCourseId,
+                r.DatePlayed,
+                r.HolesPlayed,
+                ClubId = r.GolfCourse!.GolfClubId,
+                CourseName = r.GolfCourse!.Name,
+                ClubName = r.GolfCourse!.GolfClub!.Name,
+                TotalScore = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Strokes),
+                TotalPar = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Hole!.Par)
+            })
             .ToListAsync();
 
-        if (!rounds.Any())
+        if (!roundScores.Any())
         {
             return new DashboardStats();
         }
 
         var stats = new DashboardStats
         {
-            TotalRounds = rounds.Count,
-            LastRoundDate = rounds.Max(r => r.DatePlayed),
-            UniqueCoursesPlayed = rounds.Select(r => r.GolfCourseId).Distinct().Count(),
-            UniqueClubsVisited = rounds.Where(r => r.GolfCourse?.GolfClub != null).Select(r => r.GolfCourse!.GolfClub!.GolfClubId).Distinct().Count(),
-            NineHoleRounds = rounds.Count(r => r.HolesPlayed == 9),
-            EighteenHoleRounds = rounds.Count(r => r.HolesPlayed == 18)
+            TotalRounds = roundScores.Count,
+            LastRoundDate = roundScores.Max(r => r.DatePlayed),
+            UniqueCoursesPlayed = roundScores.Select(r => r.GolfCourseId).Distinct().Count(),
+            UniqueClubsVisited = roundScores.Select(r => r.ClubId).Distinct().Count(),
+            NineHoleRounds = roundScores.Count(r => r.HolesPlayed == 9),
+            EighteenHoleRounds = roundScores.Count(r => r.HolesPlayed == 18)
         };
 
-        // Calculate scores and find best round
-        var roundScores = rounds.Select(r => new
-        {
-            Round = r,
-            TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
-            TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par)
-        }).Where(rs => rs.TotalScore > 0).ToList();
+        var validScores = roundScores.Where(rs => rs.TotalScore > 0).ToList();
 
-        if (roundScores.Any())
+        if (validScores.Any())
         {
-            var bestRound = roundScores.OrderBy(rs => rs.TotalScore).First();
+            var bestRound = validScores.OrderBy(rs => rs.TotalScore).First();
             stats.BestScore = bestRound.TotalScore;
-            stats.BestScoreCourseName = $"{bestRound.Round.GolfCourse!.GolfClub!.Name} - {bestRound.Round.GolfCourse.Name}";
-            stats.BestScoreDate = bestRound.Round.DatePlayed;
+            stats.BestScoreCourseName = $"{bestRound.ClubName} - {bestRound.CourseName}";
+            stats.BestScoreDate = bestRound.DatePlayed;
 
-            stats.AverageScore = roundScores.Average(rs => rs.TotalScore);
+            stats.AverageScore = validScores.Average(rs => rs.TotalScore);
             
-            var toPars = roundScores.Select(rs => rs.TotalScore - rs.TotalPar).ToList();
+            var toPars = validScores.Select(rs => rs.TotalScore - rs.TotalPar).ToList();
             stats.AverageToPar = toPars.Average();
             stats.LowestToPar = toPars.Min();
 
             // Find most played course
-            var courseGroups = roundScores
-                .GroupBy(rs => rs.Round.GolfCourseId)
+            var favoriteGroup = validScores
+                .GroupBy(rs => rs.GolfCourseId)
                 .OrderByDescending(g => g.Count())
                 .FirstOrDefault();
 
-            if (courseGroups != null)
+            if (favoriteGroup != null)
             {
-                var favoriteCourse = courseGroups.First().Round.GolfCourse;
-                stats.FavoriteCourseName = $"{favoriteCourse!.GolfClub!.Name} - {favoriteCourse.Name}";
-                stats.FavoriteCourseRounds = courseGroups.Count();
+                var favRound = favoriteGroup.First();
+                stats.FavoriteCourseName = $"{favRound.ClubName} - {favRound.CourseName}";
+                stats.FavoriteCourseRounds = favoriteGroup.Count();
             }
 
             // Calculate improvement streak (last 5 rounds vs previous average)
-            if (roundScores.Count >= 5)
+            if (validScores.Count >= 5)
             {
-                var recentRounds = roundScores.TakeLast(5).ToList();
-                var previousRounds = roundScores.Take(roundScores.Count - 5).ToList();
+                var recentRounds = validScores.TakeLast(5).ToList();
+                var previousRounds = validScores.Take(validScores.Count - 5).ToList();
                 
                 if (previousRounds.Any())
                 {
@@ -632,59 +569,54 @@ public class ReportService : IReportService
         if (player == null)
             return new List<CourseHistoryItem>();
 
-        var rounds = await _context.Rounds
+        var playerId = player.PlayerId;
+
+        // Project per-round score summaries in SQL (avoids loading full entity graphs)
+        var roundSummaries = await _context.Rounds
             .AsNoTracking()
-            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == player.PlayerId)
+            .Where(r => r.RoundPlayers.Any(rp => rp.PlayerId == playerId)
                        && r.Status == RoundCompletionStatus.Completed)
-            .Include(r => r.Scores)
-            .ThenInclude(s => s.Hole)
-            .Include(r => r.GolfCourse)
-            .ThenInclude(gc => gc!.GolfClub)
+            .Select(r => new
+            {
+                r.GolfCourseId,
+                r.DatePlayed,
+                CourseName = r.GolfCourse!.Name ?? "Unknown",
+                ClubName = r.GolfCourse!.GolfClub!.Name ?? "Unknown",
+                TotalScore = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Strokes),
+                TotalPar = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Hole!.Par)
+            })
             .ToListAsync();
 
-        if (!rounds.Any())
+        if (!roundSummaries.Any())
             return new List<CourseHistoryItem>();
 
-        var courseGroups = rounds
-            .GroupBy(r => r.GolfCourseId)
+        var courseGroups = roundSummaries
+            .Where(rs => rs.TotalScore > 0)
+            .GroupBy(rs => rs.GolfCourseId)
             .Select(g =>
             {
-                var courseRounds = g.OrderByDescending(r => r.DatePlayed).ToList();
-                var mostRecent = courseRounds.First();
-
-                // Calculate scores for each round at this course
-                var roundScores = courseRounds.Select(r => new
-                {
-                    Round = r,
-                    TotalScore = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Strokes),
-                    TotalPar = r.Scores.Where(s => s.PlayerId == player.PlayerId).Sum(s => s.Hole!.Par)
-                }).Where(rs => rs.TotalScore > 0).ToList();
-
-                if (!roundScores.Any())
-                    return null;
-
-                var mostRecentScore = roundScores.First();
-                var bestRound = roundScores.OrderBy(rs => rs.TotalScore).First();
+                var ordered = g.OrderByDescending(rs => rs.DatePlayed).ToList();
+                var mostRecent = ordered.First();
+                var best = ordered.OrderBy(rs => rs.TotalScore).First();
 
                 return new CourseHistoryItem
                 {
                     GolfCourseId = g.Key,
-                    CourseName = mostRecent.GolfCourse?.Name ?? "Unknown",
-                    ClubName = mostRecent.GolfCourse?.GolfClub?.Name ?? "Unknown",
+                    CourseName = mostRecent.CourseName,
+                    ClubName = mostRecent.ClubName,
                     LastPlayedDate = mostRecent.DatePlayed,
-                    MostRecentScore = mostRecentScore.TotalScore,
-                    MostRecentToPar = mostRecentScore.TotalScore - mostRecentScore.TotalPar,
-                    BestScore = bestRound.TotalScore,
-                    BestToPar = bestRound.TotalScore - bestRound.TotalPar,
-                    TimesPlayed = roundScores.Count
+                    MostRecentScore = mostRecent.TotalScore,
+                    MostRecentToPar = mostRecent.TotalScore - mostRecent.TotalPar,
+                    BestScore = best.TotalScore,
+                    BestToPar = best.TotalScore - best.TotalPar,
+                    TimesPlayed = ordered.Count
                 };
             })
-            .Where(item => item != null)
-            .OrderByDescending(item => item!.LastPlayedDate)
+            .OrderByDescending(item => item.LastPlayedDate)
             .Take(count)
             .ToList();
 
-        return courseGroups!;
+        return courseGroups;
     }
 
     public async Task<PlayerComparisonResult> GetPlayerComparisonAsync(
@@ -922,5 +854,81 @@ public class ReportService : IReportService
         }
 
         return result;
+    }
+
+    public async Task<List<string>> GetRecentActivityAsync(string currentUserId, int limit = 5)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+
+        var recentRounds = await context.Rounds
+            .AsNoTracking()
+            .Include(r => r.GolfCourse)
+            .ThenInclude(gc => gc!.GolfClub!)
+            .Where(r => r.CreatedByApplicationUserId == currentUserId)
+            .OrderByDescending(r => r.DatePlayed)
+            .Take(limit)
+            .Select(r => $"Played {(r.GolfCourse != null ? r.GolfCourse.Name : "Unknown Course")} on {r.DatePlayed:MMM dd}")
+            .ToListAsync();
+
+        if (!recentRounds.Any())
+        {
+            recentRounds = new List<string>
+            {
+                "Welcome to Golf Tracker!",
+                "Start by recording your first round",
+                "Explore golf clubs in your area"
+            };
+        }
+
+        return recentRounds;
+    }
+
+    public async Task<List<ScoreDistributionBucket>> GetScoreDistributionBucketedAsync(string currentUserId)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+
+        var roundScores = await context.Scores
+            .AsNoTracking()
+            .Where(s => s.Round != null && s.Round.CreatedByApplicationUserId == currentUserId)
+            .GroupBy(s => s.RoundId)
+            .Select(g => g.Sum(s => s.Strokes))
+            .ToListAsync();
+
+        if (!roundScores.Any())
+            return new List<ScoreDistributionBucket>();
+
+        var totalRounds = roundScores.Count;
+
+        return new List<ScoreDistributionBucket>
+        {
+            new() { Range = "Under 80", Count = roundScores.Count(s => s < 80), Percentage = Math.Round((double)roundScores.Count(s => s < 80) / totalRounds * 100, 1) },
+            new() { Range = "80-89", Count = roundScores.Count(s => s >= 80 && s <= 89), Percentage = Math.Round((double)roundScores.Count(s => s >= 80 && s <= 89) / totalRounds * 100, 1) },
+            new() { Range = "90-99", Count = roundScores.Count(s => s >= 90 && s <= 99), Percentage = Math.Round((double)roundScores.Count(s => s >= 90 && s <= 99) / totalRounds * 100, 1) },
+            new() { Range = "100+", Count = roundScores.Count(s => s >= 100), Percentage = Math.Round((double)roundScores.Count(s => s >= 100) / totalRounds * 100, 1) }
+        };
+    }
+
+    public async Task<List<FavoriteCourseItem>> GetFavoriteCoursesAsync(string currentUserId, int limit = 10)
+    {
+        using var context = await _contextFactory.CreateDbContextAsync();
+
+        var favoriteCourses = await context.Rounds
+            .AsNoTracking()
+            .Include(r => r.GolfCourse)
+            .ThenInclude(gc => gc!.GolfClub!)
+            .Where(r => r.CreatedByApplicationUserId == currentUserId)
+            .GroupBy(r => new { r.GolfCourseId, CourseName = r.GolfCourse!.Name, ClubName = r.GolfCourse.GolfClub!.Name })
+            .Select(g => new FavoriteCourseItem
+            {
+                Name = g.Key.CourseName,
+                Location = g.Key.ClubName,
+                RoundsPlayed = g.Count(),
+                AverageScore = Math.Round(g.SelectMany(r => r.Scores).GroupBy(s => s.RoundId).Average(sg => sg.Sum(s => s.Strokes)), 1)
+            })
+            .OrderByDescending(fc => fc.RoundsPlayed)
+            .Take(limit)
+            .ToListAsync();
+
+        return favoriteCourses;
     }
 }

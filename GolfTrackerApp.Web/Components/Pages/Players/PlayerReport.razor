@@ -34,7 +34,7 @@ else
     </div>
     <div class="d-flex align-center gap-3 mb-3">
         <MudAvatar Color="Color.Primary" Size="Size.Medium">
-            @(_viewModel.Player != null ? $"{_viewModel.Player.FirstName?[..1]}{_viewModel.Player.LastName?[..1]}" : "?")
+            @(_viewModel.Player != null ? $"{(_viewModel.Player.FirstName?.Length > 0 ? _viewModel.Player.FirstName[..1] : "")}{(_viewModel.Player.LastName?.Length > 0 ? _viewModel.Player.LastName[..1] : "")}" : "?")
         </MudAvatar>
         <div>
             <MudText Typo="Typo.h5" Style="font-weight: 700; line-height: 1.2;">@_viewModel.Player?.FirstName @_viewModel.Player?.LastName</MudText>

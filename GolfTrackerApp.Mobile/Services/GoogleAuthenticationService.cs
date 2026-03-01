@@ -143,18 +143,23 @@ namespace GolfTrackerApp.Mobile.Services
                             tokenResult.Email = profileResult.Email;
                             tokenResult.Name = profileResult.Name;
 
-                            // Send to our API to get JWT token
-                            var apiResult = await SendToApi(profileResult.Email!, profileResult.Name!, profileResult.IdToken!, tokenResult.AccessToken);
-                            Console.WriteLine($"[GOOGLE_AUTH] SendToApi result: IsSuccess={apiResult.IsSuccess}");
+                            // Send Google ID token to our API to get JWT token
+                            if (string.IsNullOrEmpty(tokenResult.IdToken))
+                            {
+                                _logger.LogError("No ID token received from Google token exchange");
+                                tokenResult.IsSuccess = false;
+                                tokenResult.ErrorMessage = "Authentication failed: no ID token received from Google";
+                                return tokenResult;
+                            }
+
+                            var apiResult = await SendToApi(tokenResult.IdToken);
                             if (apiResult.IsSuccess)
                             {
-                                Console.WriteLine($"[GOOGLE_AUTH] API authentication successful");
                                 tokenResult.JwtToken = apiResult.JwtToken;
                                 tokenResult.UserId = apiResult.UserId;
 
                                 // Fetch player ID BEFORE setting auth state (so we can do it all at once)
                                 int? playerId = null;
-                                Console.WriteLine($"[GOOGLE_AUTH] Fetching player ID for user: {apiResult.UserId}");
                                 try
                                 {
                                     // Make API call with explicit token (don't trigger AuthenticationStateChanged yet!)
@@ -162,7 +167,6 @@ namespace GolfTrackerApp.Mobile.Services
                                     request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiResult.JwtToken);
                                     
                                     var response = await _httpClient.SendAsync(request);
-                                    Console.WriteLine($"[GOOGLE_AUTH] Player API response status: {response.StatusCode}");
                                     
                                     if (response.IsSuccessStatusCode)
                                     {
@@ -172,8 +176,6 @@ namespace GolfTrackerApp.Mobile.Services
                                             PropertyNameCaseInsensitive = true 
                                         });
                                         
-                                        Console.WriteLine($"[GOOGLE_AUTH] Retrieved {players?.Count ?? 0} players from API");
-                                        
                                         var currentUserPlayer = players?.FirstOrDefault(p => 
                                             !string.IsNullOrEmpty(p.ApplicationUserId) && 
                                             p.ApplicationUserId.Equals(apiResult.UserId, StringComparison.OrdinalIgnoreCase));
@@ -181,27 +183,20 @@ namespace GolfTrackerApp.Mobile.Services
                                         if (currentUserPlayer != null)
                                         {
                                             playerId = currentUserPlayer.Id;
-                                            Console.WriteLine($"[GOOGLE_AUTH] Found player ID: {playerId} for user {apiResult.UserId}");
-                                        }
-                                        else
-                                        {
-                                            Console.WriteLine($"[GOOGLE_AUTH] WARNING: No player found for user {apiResult.UserId}");
                                         }
                                     }
                                     else
                                     {
                                         var errorBody = await response.Content.ReadAsStringAsync();
-                                        Console.WriteLine($"[GOOGLE_AUTH] Player API error: {errorBody}");
+                                        _logger.LogWarning("Failed to fetch player ID: {StatusCode} - {Body}", response.StatusCode, errorBody);
                                     }
                                 }
                                 catch (Exception ex)
                                 {
-                                    Console.WriteLine($"[GOOGLE_AUTH] Error fetching player ID: {ex.Message}");
                                     _logger.LogError(ex, "Error fetching player ID during authentication");
                                 }
 
                                 // Now set auth state WITH player ID - ONLY ONCE (this triggers AuthenticationStateChanged)
-                                Console.WriteLine($"[GOOGLE_AUTH] Setting auth state with player ID: {playerId?.ToString() ?? "NULL"}");
                                 _authStateService.SetAuthenticationState(
                                     apiResult.JwtToken!, 
                                     apiResult.UserId!, 
@@ -210,10 +205,20 @@ namespace GolfTrackerApp.Mobile.Services
                                     playerId);
 
                                 // Save to secure storage
-                                Console.WriteLine($"[GOOGLE_AUTH] Saving authentication state to storage...");
                                 await _authStateService.SaveTokenSecurelyAsync();
-                                Console.WriteLine($"[GOOGLE_AUTH] Authentication state saved");
                             }
+                            else
+                            {
+                                _logger.LogError("API authentication failed: {Error}", apiResult.ErrorMessage);
+                                tokenResult.IsSuccess = false;
+                                tokenResult.ErrorMessage = apiResult.ErrorMessage ?? "API authentication failed";
+                            }
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to get user profile from Google: {Error}", profileResult.ErrorMessage);
+                            tokenResult.IsSuccess = false;
+                            tokenResult.ErrorMessage = profileResult.ErrorMessage ?? "Failed to get user profile";
                         }
                     }
 
@@ -269,11 +274,13 @@ namespace GolfTrackerApp.Mobile.Services
                     var tokenResponse = JsonSerializer.Deserialize<JsonElement>(responseContent);
 
                     var accessToken = tokenResponse.GetProperty("access_token").GetString();
+                    var idToken = tokenResponse.TryGetProperty("id_token", out var idTokenProp) ? idTokenProp.GetString() : null;
 
                     return new AuthenticationResult
                     {
                         IsSuccess = true,
-                        AccessToken = accessToken
+                        AccessToken = accessToken,
+                        IdToken = idToken
                     };
                 }
                 else
@@ -330,8 +337,7 @@ namespace GolfTrackerApp.Mobile.Services
                 {
                     IsSuccess = true,
                     Email = email,
-                    Name = name,
-                    IdToken = googleId // Store Google ID in IdToken field for API call
+                    Name = name
                 };
             }
             catch (Exception ex)
@@ -345,28 +351,27 @@ namespace GolfTrackerApp.Mobile.Services
             }
         }
 
-        private async Task<AuthenticationResult> SendToApi(string email, string name, string googleId, string accessToken)
+        private async Task<AuthenticationResult> SendToApi(string idToken)
         {
             try
             {
                 var googleSignInData = new
                 {
-                    Email = email,
-                    Name = name,
-                    GoogleId = googleId,
-                    AccessToken = accessToken
+                    IdToken = idToken
                 };
 
                 var json = JsonSerializer.Serialize(googleSignInData);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 
-                _logger.LogInformation("Sending Google auth data to API");
+                _logger.LogInformation("Sending Google auth data to API (IdToken length: {Length})", idToken?.Length ?? 0);
                 var apiResponse = await _httpClient.PostAsync("api/auth/google-signin", content);
+                
+                var responseBody = await apiResponse.Content.ReadAsStringAsync();
+                _logger.LogInformation("API google-signin response: {StatusCode} - {Body}", (int)apiResponse.StatusCode, responseBody);
                 
                 if (apiResponse.IsSuccessStatusCode)
                 {
-                    var responseJson = await apiResponse.Content.ReadAsStringAsync();
-                    var authResponse = JsonSerializer.Deserialize<JsonElement>(responseJson);
+                    var authResponse = JsonSerializer.Deserialize<JsonElement>(responseBody);
                     
                     if (authResponse.TryGetProperty("token", out var tokenProp) &&
                         authResponse.TryGetProperty("userId", out var userIdProp))
@@ -374,7 +379,7 @@ namespace GolfTrackerApp.Mobile.Services
                         var jwtToken = tokenProp.GetString();
                         var userId = userIdProp.GetString();
 
-                        _logger.LogInformation("API authentication successful");
+                        _logger.LogInformation("API authentication successful for user {UserId}", userId);
                         
                         return new AuthenticationResult
                         {
@@ -383,18 +388,25 @@ namespace GolfTrackerApp.Mobile.Services
                             UserId = userId
                         };
                     }
+                    else
+                    {
+                        _logger.LogError("API response missing token/userId fields: {Body}", responseBody);
+                        return new AuthenticationResult
+                        {
+                            IsSuccess = false,
+                            ErrorMessage = "API response missing expected fields"
+                        };
+                    }
                 }
                 else
                 {
-                    var errorContent = await apiResponse.Content.ReadAsStringAsync();
-                    _logger.LogError($"API authentication failed: {errorContent}");
+                    _logger.LogError("API authentication failed: {StatusCode} - {Body}", (int)apiResponse.StatusCode, responseBody);
+                    return new AuthenticationResult
+                    {
+                        IsSuccess = false,
+                        ErrorMessage = $"Server returned {(int)apiResponse.StatusCode}: {responseBody}"
+                    };
                 }
-
-                return new AuthenticationResult
-                {
-                    IsSuccess = false,
-                    ErrorMessage = "API authentication failed"
-                };
             }
             catch (Exception ex)
             {

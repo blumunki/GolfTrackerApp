@@ -1,0 +1,65 @@
+@* Dashboard Hero Stats - 4 stat cards *@
+
+<MudGrid Spacing="2" Class="mb-3">
+    <MudItem xs="6">
+        <MudCard Elevation="2" Style="height: 100%;">
+            <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
+                <div style="width: 40px; height: 40px; border-radius: 10px; background: #e8f5e9; color: #2e7d32; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">🏌️</div>
+                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #2e7d32;">@Stats.TotalRounds</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">ROUNDS PLAYED</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 0.65rem; margin-top: 2px;">
+                    @Stats.UniqueCoursesPlayed courses · @Stats.UniqueClubsVisited clubs
+                </MudText>
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="6">
+        <MudCard Elevation="2" Style="height: 100%;">
+            <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
+                <div style="width: 40px; height: 40px; border-radius: 10px; background: #e3f2fd; color: #1565c0; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">🏆</div>
+                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #1565c0;">@(Stats.BestScore?.ToString() ?? "—")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">BEST SCORE</MudText>
+                @if (Stats.LowestToPar.HasValue)
+                {
+                    var lowestToParColor = Stats.LowestToPar.Value <= 0 ? "#2e7d32" : "#ef6c00";
+                    <MudText Typo="Typo.caption" Style="@($"font-size: 0.65rem; margin-top: 2px; color: {lowestToParColor}")">
+                        @(Stats.LowestToPar.Value >= 0 ? "+" : "")@Stats.LowestToPar.Value to par
+                    </MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="6">
+        <MudCard Elevation="2" Style="height: 100%;">
+            <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
+                <div style="width: 40px; height: 40px; border-radius: 10px; background: #fff3e0; color: #e65100; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">📊</div>
+                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #e65100;">@(Stats.AverageToPar?.ToString("+0.0;-0.0;E") ?? "—")</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">AVG TO PAR</MudText>
+                @if (Stats.IsImprovingStreak)
+                {
+                    <MudText Typo="Typo.caption" Style="font-size: 0.65rem; margin-top: 2px; color: #2e7d32;">↗ Improving</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+    <MudItem xs="6">
+        <MudCard Elevation="2" Style="height: 100%;">
+            <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
+                <div style="width: 40px; height: 40px; border-radius: 10px; background: #f3e5f5; color: #7b1fa2; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">⭐</div>
+                <MudText Typo="Typo.h5" Style="font-weight: 800; color: #7b1fa2;">@Stats.FavoriteCourseRounds</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">MOST PLAYED</MudText>
+                @if (!string.IsNullOrEmpty(Stats.FavoriteCourseName))
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 0.6rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">
+                        @Stats.FavoriteCourseName
+                    </MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [Parameter, EditorRequired]
+    public DashboardStats Stats { get; set; } = default!;
+}

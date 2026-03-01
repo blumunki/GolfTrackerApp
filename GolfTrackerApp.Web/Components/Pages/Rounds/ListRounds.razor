@@ -96,7 +96,7 @@ else
                     {
                         <div class="round-score-badge">
                             <span class="round-score-value">@userScore.total</span>
-                            <span class="round-score-vs-par @GetVsParCssClass(userScore.vsPar)">@FormatVsPar(userScore.vsPar)</span>
+                            <span class="round-score-vs-par @GolfHelpers.GetVsParClass(userScore.vsPar)">@GolfHelpers.FormatVsPar(userScore.vsPar)</span>
                         </div>
                     }
                     else
@@ -228,20 +228,6 @@ else
         var total = playerScores.Sum(s => s.Strokes);
         var par = playerScores.Where(s => s.Hole != null).Sum(s => s.Hole!.Par);
         return (total, total - par);
-    }
-
-    private string FormatVsPar(int vsPar)
-    {
-        if (vsPar > 0) return $"+{vsPar}";
-        if (vsPar == 0) return "E";
-        return vsPar.ToString();
-    }
-
-    private string GetVsParCssClass(int vsPar)
-    {
-        if (vsPar < 0) return "under-par";
-        if (vsPar > 0) return "over-par";
-        return "even-par";
     }
 
     private void ViewRoundDetails(int roundId) => NavigationManager.NavigateTo($"/rounds/{roundId}");

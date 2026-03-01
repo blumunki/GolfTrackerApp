@@ -112,7 +112,7 @@ else
                     {
                         <div class="club-stat-card accent-purple">
                             <div class="stat-icon">🎯</div>
-                            <div class="stat-value">@FormatVsPar(GetBestVsPar()!.Value)</div>
+                            <div class="stat-value">@GolfHelpers.FormatVsPar(GetBestVsPar()!.Value)</div>
                             <div class="stat-label">Best vs Par</div>
                         </div>
                     }
@@ -156,8 +156,8 @@ else
                         @if (avg > 0)
                         {
                             <span style="font-weight:600;">@avg.ToString("F1")</span>
-                            <span class="@GetVsParClass((int)Math.Round(diff))" style="font-size:0.75rem; margin-left:4px;">
-                                (@FormatVsPar((int)Math.Round(diff)))
+                            <span class="@GolfHelpers.GetVsParClass((int)Math.Round(diff))" style="font-size:0.75rem; margin-left:4px;">
+                                (@GolfHelpers.FormatVsPar((int)Math.Round(diff)))
                             </span>
                         }
                         else
@@ -235,7 +235,7 @@ else
                                                 </div>
                                                 <div class="round-score-mini">
                                                     <span class="score-val">@totalScore</span>
-                                                    <span class="score-vs @GetVsParClass(vsPar)">@FormatVsPar(vsPar)</span>
+                                                    <span class="score-vs @GolfHelpers.GetVsParClass(vsPar)">@GolfHelpers.FormatVsPar(vsPar)</span>
                                                 </div>
                                             </div>
                                         }
@@ -518,10 +518,6 @@ else
             .ToList();
         return vsParValues.Any() ? vsParValues.Min() : null;
     }
-
-    private string GetVsParClass(int vsPar) => vsPar < 0 ? "under-par" : vsPar > 0 ? "over-par" : "even-par";
-
-    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
 
     private async Task OpenAddHoleDialog()
     {

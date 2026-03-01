@@ -3,56 +3,39 @@ using Microsoft.AspNetCore.Authorization;
 using GolfTrackerApp.Web.Models;
 using Microsoft.EntityFrameworkCore;
 using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Web.Services;
 
 namespace GolfTrackerApp.Web.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
 public class RoundsController : BaseApiController
 {
+    private readonly IRoundService _roundService;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<RoundsController> _logger;
 
-    public RoundsController(ApplicationDbContext context, ILogger<RoundsController> logger)
+    public RoundsController(IRoundService roundService, ApplicationDbContext context, ILogger<RoundsController> logger)
     {
+        _roundService = roundService;
         _context = context;
         _logger = logger;
     }
 
-    private static int ComputeRoundPar(Round r)
-    {
-        if (r.GolfCourse == null) return 72;
-
-        // If playing full course, use DefaultPar
-        if (r.HolesPlayed >= r.GolfCourse.NumberOfHoles)
-            return r.GolfCourse.DefaultPar;
-
-        // Calculate par for specific holes played using hole data
-        if (r.GolfCourse.Holes?.Any() == true)
-        {
-            var actualPar = r.GolfCourse.Holes
-                .Where(h => h.HoleNumber >= r.StartingHole && h.HoleNumber < r.StartingHole + r.HolesPlayed)
-                .Sum(h => h.Par);
-            if (actualPar > 0) return actualPar;
-        }
-
-        // Fallback: proportional calculation
-        return (int)Math.Round((double)r.GolfCourse.DefaultPar * r.HolesPlayed / r.GolfCourse.NumberOfHoles);
-    }
+    private static int ComputeRoundPar(Round r) => RoundService.ComputeRoundPar(r);
 
     [HttpGet]
     public async Task<ActionResult<List<object>>> GetAllRounds()
     {
         try
         {
-            // Determine the current user's player ID for per-user score
             var userId = GetCurrentUserId();
             var currentPlayer = await _context.Players
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
             var currentPlayerId = currentPlayer?.PlayerId;
 
-            var roundEntities = await _context.Rounds
+            // Only return rounds the user created or participated in
+            var query = _context.Rounds
                 .Include(r => r.GolfCourse)
                     .ThenInclude(gc => gc!.GolfClub)
                 .Include(r => r.GolfCourse)
@@ -61,8 +44,11 @@ public class RoundsController : BaseApiController
                     .ThenInclude(rp => rp!.Player)
                 .Include(r => r.Scores)
                 .AsSplitQuery()
-                .OrderByDescending(r => r.DatePlayed)
-                .ToListAsync();
+                .Where(r => r.CreatedByApplicationUserId == userId 
+                    || (currentPlayerId.HasValue && r.RoundPlayers.Any(rp => rp.PlayerId == currentPlayerId.Value)))
+                .OrderByDescending(r => r.DatePlayed);
+
+            var roundEntities = await query.ToListAsync();
 
             var rounds = roundEntities.Select(r => new
                 {
@@ -194,7 +180,6 @@ public class RoundsController : BaseApiController
     }
 
     [HttpPost]
-    [Authorize]
     public async Task<ActionResult<RoundResponse>> CreateRound([FromBody] Round round)
     {
         try
@@ -203,6 +188,9 @@ public class RoundsController : BaseApiController
             {
                 return BadRequest(ModelState);
             }
+
+            // Always set the creator from the authenticated user
+            round.CreatedByApplicationUserId = GetCurrentUserId();
 
             _context.Rounds.Add(round);
             await _context.SaveChangesAsync();
@@ -256,7 +244,6 @@ public class RoundsController : BaseApiController
     }
 
     [HttpPut("{id}")]
-    [Authorize]
     public async Task<ActionResult<Round>> UpdateRound(int id, [FromBody] Round round)
     {
         try
@@ -269,6 +256,17 @@ public class RoundsController : BaseApiController
             if (!ModelState.IsValid)
             {
                 return BadRequest(ModelState);
+            }
+
+            // Verify ownership
+            var existingRound = await _context.Rounds.AsNoTracking().FirstOrDefaultAsync(r => r.RoundId == id);
+            if (existingRound == null)
+            {
+                return NotFound($"Round with ID {id} not found");
+            }
+            if (existingRound.CreatedByApplicationUserId != GetCurrentUserId())
+            {
+                return Forbid();
             }
 
             _context.Entry(round).State = EntityState.Modified;
@@ -292,7 +290,6 @@ public class RoundsController : BaseApiController
     }
 
     [HttpDelete("{id}")]
-    [Authorize]
     public async Task<ActionResult> DeleteRound(int id)
     {
         try
@@ -301,6 +298,12 @@ public class RoundsController : BaseApiController
             if (round == null)
             {
                 return NotFound($"Round with ID {id} not found");
+            }
+
+            // Verify ownership
+            if (round.CreatedByApplicationUserId != GetCurrentUserId())
+            {
+                return Forbid();
             }
 
             _context.Rounds.Remove(round);

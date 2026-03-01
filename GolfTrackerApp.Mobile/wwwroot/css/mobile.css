@@ -1,5 +1,75 @@
 /* Mobile-specific styles for Golf Tracker */
 
+/* ============================================
+   Utility Classes
+   ============================================ */
+
+/* Page scroll container — used on most pages */
+.page-scroll-container {
+    height: calc(100vh - 144px);
+    overflow-y: auto;
+}
+
+/* Font weight utilities */
+.fw-medium { font-weight: 500; }
+.fw-semibold { font-weight: 600; }
+.fw-bold { font-weight: 700; }
+.fw-extrabold { font-weight: 800; }
+
+/* Font size utilities */
+.text-14 { font-size: 14px; }
+.text-xs { font-size: 0.7rem; }
+.text-sm { font-size: 0.8rem; }
+.text-base { font-size: 0.875rem; }
+
+/* Border radius utilities */
+.rounded-md { border-radius: 8px; }
+.rounded-lg { border-radius: 12px; }
+.rounded-xl { border-radius: 16px; }
+
+/* Common component patterns */
+.page-heading {
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.section-heading {
+    font-weight: 600;
+    color: #1a1a2e;
+}
+
+.tab-button {
+    color: #6b7280;
+    font-size: 0.8rem;
+    text-transform: none;
+    padding: 4px 8px;
+}
+
+.empty-state-icon {
+    color: #d1d5db;
+    font-size: 20px;
+}
+
+/* Branded gradient backgrounds */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.bg-gradient-green {
+    background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+}
+
+.bg-gradient-light {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.card-branded-left {
+    border-left: 4px solid #667eea;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 12px;
+}
+
 /* Loading Screen */
 .loading-container {
     display: flex;

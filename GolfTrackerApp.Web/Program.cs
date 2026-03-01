@@ -54,7 +54,8 @@ if (!string.IsNullOrEmpty(googleClientId) && !string.IsNullOrEmpty(googleClientS
 }
 
 // Add JWT Authentication for mobile app API
-var jwtKey = builder.Configuration["Jwt:Key"] ?? "your-super-secret-jwt-key-that-is-at-least-32-characters-long";
+var jwtKey = builder.Configuration["Jwt:Key"] 
+    ?? throw new InvalidOperationException("JWT signing key must be configured via 'Jwt:Key'. See appsettings.json.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GolfTrackerApp";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "GolfTrackerApp";
 

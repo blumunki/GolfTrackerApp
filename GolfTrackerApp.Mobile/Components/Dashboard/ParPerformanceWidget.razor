@@ -1,0 +1,49 @@
+@* Dashboard Par Performance - horizontal bar chart by par type *@
+
+@if (PerformanceData?.HasValidData == true)
+{
+    <MudCard Elevation="2" Class="mb-3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">🎯 Par Performance</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent>
+            @{
+                var parData = new[] {
+                    (Label: "Par 3", Avg: PerformanceData.Par3Average, Rel: PerformanceData.Par3RelativeToPar, Count: PerformanceData.Par3Count, Color: "#2e7d32", Base: 3),
+                    (Label: "Par 4", Avg: PerformanceData.Par4Average, Rel: PerformanceData.Par4RelativeToPar, Count: PerformanceData.Par4Count, Color: "#1565c0", Base: 4),
+                    (Label: "Par 5", Avg: PerformanceData.Par5Average, Rel: PerformanceData.Par5RelativeToPar, Count: PerformanceData.Par5Count, Color: "#7b1fa2", Base: 5),
+                };
+            }
+            @foreach (var p in parData.Where(p => p.Count > 0))
+            {
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+                    <div style="min-width: 48px; font-size: 0.8rem; font-weight: 600; color: #616161;">
+                        <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: @p.Color; margin-right: 4px;"></span>
+                        @p.Label
+                    </div>
+                    <div style="flex: 1; height: 16px; background: #f5f5f5; border-radius: 20px; position: relative; overflow: visible;">
+                        @{
+                            var barWidth = Math.Min(100, (p.Avg / (p.Base + 2)) * 100);
+                            var parLine = (double)p.Base / (p.Base + 2) * 100;
+                        }
+                        <div style="height: 100%; width: @(barWidth.ToString("F0"))%; background: @p.Color; border-radius: 20px; opacity: 0.75;"></div>
+                        <div style="position: absolute; top: -3px; bottom: -3px; left: @(parLine.ToString("F0"))%; width: 2px; background: #212121; opacity: 0.25;"></div>
+                    </div>
+                    <div style="min-width: 50px; text-align: right;">
+                        <div style="font-size: 0.9rem; font-weight: 700; color: #212121;">@p.Avg.ToString("F1")</div>
+                        <div style="font-size: 0.65rem; font-weight: 600; padding: 0 4px; border-radius: 8px; display: inline-block; background: @(p.Rel <= 0 ? "#e8f5e9" : "#fff3e0"); color: @(p.Rel <= 0 ? "#2e7d32" : "#ef6c00");">
+                            @(p.Rel >= 0 ? "+" : "")@p.Rel.ToString("F1")
+                        </div>
+                    </div>
+                </div>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    [Parameter]
+    public PerformanceByParData? PerformanceData { get; set; }
+}

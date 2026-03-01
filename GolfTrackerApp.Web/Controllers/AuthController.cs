@@ -5,11 +5,15 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Web.Models.Api;
+using Google.Apis.Auth;
+using Microsoft.AspNetCore.Authorization;
 
 namespace GolfTrackerApp.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[AllowAnonymous]
 public class AuthController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -109,54 +113,78 @@ public class AuthController : ControllerBase
     {
         try
         {
-            _logger.LogInformation($"Google sign-in request received for email: {request.Email}");
+            _logger.LogInformation("Google sign-in request received (IdToken length: {Length})", request.IdToken?.Length ?? 0);
             
-            // Validate the request
-            if (string.IsNullOrEmpty(request.Email))
+            if (string.IsNullOrEmpty(request.IdToken))
             {
-                _logger.LogWarning("Google sign-in request missing email");
-                return BadRequest(new { message = "Email is required" });
+                _logger.LogWarning("Google sign-in request missing IdToken");
+                return BadRequest(new { message = "Google ID token is required" });
             }
             
-            if (string.IsNullOrEmpty(request.GoogleId))
+            // Verify the Google ID token
+            GoogleJsonWebSignature.Payload payload;
+            try
             {
-                _logger.LogWarning("Google sign-in request missing GoogleId");
-                return BadRequest(new { message = "Google ID is required" });
+                var googleClientId = _configuration["Authentication:Google:ClientId"];
+                var mobileClientId = _configuration["Authentication:Google:MobileClientId"];
+                var audiences = new List<string>();
+                if (!string.IsNullOrEmpty(googleClientId)) audiences.Add(googleClientId);
+                if (!string.IsNullOrEmpty(mobileClientId)) audiences.Add(mobileClientId);
+                _logger.LogInformation("Validating Google ID token (audiences: {Audiences})", string.Join(", ", audiences));
+                var settings = new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = audiences.Count > 0 ? audiences : null
+                };
+                payload = await GoogleJsonWebSignature.ValidateAsync(request.IdToken, settings);
+                _logger.LogInformation("Google ID token validated successfully for {Email}", payload.Email);
+            }
+            catch (InvalidJwtException ex)
+            {
+                _logger.LogWarning(ex, "Invalid Google ID token");
+                return Unauthorized(new { message = $"Invalid Google ID token: {ex.Message}" });
+            }
+            catch (Exception ex) when (ex is not InvalidJwtException)
+            {
+                _logger.LogError(ex, "Error validating Google ID token");
+                return StatusCode(500, new { message = $"Token validation error: {ex.Message}" });
             }
             
-            // For mobile app, we'll trust the Google ID token and create/login the user
-            // In production, you should verify the ID token with Google
+            var email = payload.Email;
+            var googleId = payload.Subject;
             
-            var user = await _userManager.FindByEmailAsync(request.Email);
+            if (string.IsNullOrEmpty(email))
+            {
+                return BadRequest(new { message = "Email not available in Google token" });
+            }
+            
+            var user = await _userManager.FindByEmailAsync(email);
             if (user == null)
             {
-                _logger.LogInformation($"Creating new user for Google sign-in: {request.Email}");
+                _logger.LogInformation("Creating new user for Google sign-in: {Email}", email);
                 
-                // Create new user
                 user = new ApplicationUser
                 {
-                    UserName = request.Email,
-                    Email = request.Email,
+                    UserName = email,
+                    Email = email,
                     EmailConfirmed = true
                 };
 
                 var result = await _userManager.CreateAsync(user);
                 if (!result.Succeeded)
                 {
-                    _logger.LogError($"Failed to create user for Google sign-in: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                    _logger.LogError("Failed to create user for Google sign-in: {Errors}", 
+                        string.Join(", ", result.Errors.Select(e => e.Description)));
                     return BadRequest(new { message = "Failed to create user account", errors = result.Errors });
                 }
                 
-                _logger.LogInformation($"Successfully created new user: {user.Id}");
+                _logger.LogInformation("Successfully created new user: {UserId}", user.Id);
             }
             else
             {
-                _logger.LogInformation($"Existing user found for Google sign-in: {user.Id}");
+                _logger.LogInformation("Existing user found for Google sign-in: {UserId}", user.Id);
             }
 
             var token = await GenerateJwtToken(user);
-            
-            _logger.LogInformation($"Successfully generated JWT token for user: {user.Id}");
             
             return Ok(new LoginResponse
             {
@@ -175,7 +203,8 @@ public class AuthController : ControllerBase
 
     private Task<string> GenerateJwtToken(ApplicationUser user)
     {
-        var jwtKey = _configuration["Jwt:Key"] ?? "your-super-secret-jwt-key-that-is-at-least-32-characters-long";
+        var jwtKey = _configuration["Jwt:Key"] 
+            ?? throw new InvalidOperationException("JWT signing key must be configured via 'Jwt:Key'.");
         var jwtIssuer = _configuration["Jwt:Issuer"] ?? "GolfTrackerApp";
         var jwtAudience = _configuration["Jwt:Audience"] ?? "GolfTrackerApp";
 
@@ -203,35 +232,3 @@ public class AuthController : ControllerBase
     }
 }
 
-public class LoginRequest
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-}
-
-public class RegisterRequest
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-}
-
-public class GoogleSignInRequest
-{
-    public string Email { get; set; } = string.Empty;
-    public string Name { get; set; } = string.Empty;
-    public string GoogleId { get; set; } = string.Empty;
-    public string AccessToken { get; set; } = string.Empty;
-}
-
-public class LoginResponse
-{
-    public string Token { get; set; } = string.Empty;
-    public string UserId { get; set; } = string.Empty;
-    public string Email { get; set; } = string.Empty;
-    public string UserName { get; set; } = string.Empty;
-}
-
-public class ErrorResponse
-{
-    public string Message { get; set; } = string.Empty;
-}

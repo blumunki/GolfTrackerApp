@@ -15,7 +15,7 @@ namespace GolfTrackerApp.Web.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.2");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
 
             modelBuilder.Entity("GolfTrackerApp.Web.Data.ApplicationUser", b =>
                 {
@@ -34,6 +34,9 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("LinkedPlayerId")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("LockoutEnabled")
@@ -70,6 +73,8 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("LinkedPlayerId");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -559,6 +564,16 @@ namespace GolfTrackerApp.Web.Migrations
                     b.HasKey("UserId", "LoginProvider", "Name");
 
                     b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Data.ApplicationUser", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.Player", "LinkedPlayer")
+                        .WithMany()
+                        .HasForeignKey("LinkedPlayerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("LinkedPlayer");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfCourse", b =>

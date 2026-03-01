@@ -377,7 +377,7 @@ public class MergeService : IMergeService
             .ToListAsync();
     }
 
-    public async Task<List<Player>> GetMergeablePlayers(string currentUserId, string targetUserId)
+    public async Task<List<Player>> GetMergeablePlayersAsync(string currentUserId, string targetUserId)
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
 
@@ -397,7 +397,7 @@ public class MergeService : IMergeService
             .ToListAsync();
     }
 
-    public async Task<bool> HasPendingMergeRequest(int sourcePlayerId)
+    public async Task<bool> HasPendingMergeRequestAsync(int sourcePlayerId)
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
 

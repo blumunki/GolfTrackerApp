@@ -1,8 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using GolfTrackerApp.Web.Services;
 using GolfTrackerApp.Web.Models;
-using GolfTrackerApp.Web.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace GolfTrackerApp.Web.Controllers;
 
@@ -11,19 +9,19 @@ public class ReportsController : BaseApiController
 {
     private readonly IReportService _reportService;
     private readonly IRoundService _roundService;
+    private readonly IPlayerService _playerService;
     private readonly ILogger<ReportsController> _logger;
-    private readonly ApplicationDbContext _context;
 
     public ReportsController(
         IReportService reportService, 
         IRoundService roundService,
-        ILogger<ReportsController> logger,
-        ApplicationDbContext context)
+        IPlayerService playerService,
+        ILogger<ReportsController> logger)
     {
         _reportService = reportService;
         _roundService = roundService;
+        _playerService = playerService;
         _logger = logger;
-        _context = context;
     }
 
     [HttpGet("dashboard-stats")]
@@ -80,23 +78,18 @@ public class ReportsController : BaseApiController
         try
         {
             var userId = GetCurrentUserId();
-            _logger.LogInformation($"Recent rounds requested for userId: {userId}, limit: {limit}");
             
-            // Get the player's integer ID from the userId GUID
-            var currentPlayer = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
+            var currentPlayer = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
             if (currentPlayer == null)
             {
-                _logger.LogWarning($"Player not found for userId: {userId}");
+                _logger.LogWarning("Player not found for userId: {UserId}", userId);
                 return Ok(new List<object>());
             }
             
             var playerId = currentPlayer.PlayerId;
-            _logger.LogInformation($"Found playerId: {playerId} for userId: {userId}");
             
             var domainRounds = await _roundService.GetRecentRoundsAsync(userId, false, limit);
-            _logger.LogInformation($"Domain rounds found: {domainRounds?.Count ?? 0}");
             
-            // Map domain rounds to API DTOs
             var apiRounds = (domainRounds ?? new List<Round>()).Select(r => new
             {
                 RoundId = r.RoundId,
@@ -106,8 +99,6 @@ public class ReportsController : BaseApiController
                 TotalScore = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Strokes),
                 TotalPar = r.Scores.Where(s => s.PlayerId == playerId).Sum(s => s.Hole?.Par ?? 0)
             }).ToList();
-            
-            _logger.LogInformation($"API rounds mapped: {apiRounds?.Count ?? 0}");
             
             return Ok(apiRounds);
         }
@@ -140,7 +131,7 @@ public class ReportsController : BaseApiController
         try
         {
             var userId = GetCurrentUserId();
-            var currentPlayer = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
+            var currentPlayer = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
             if (currentPlayer == null)
                 return Ok(new ScoringDistribution());
 
@@ -160,7 +151,7 @@ public class ReportsController : BaseApiController
         try
         {
             var userId = GetCurrentUserId();
-            var currentPlayer = await _context.Players.AsNoTracking().FirstOrDefaultAsync(p => p.ApplicationUserId == userId);
+            var currentPlayer = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
             if (currentPlayer == null)
                 return Ok(new PerformanceByPar());
 

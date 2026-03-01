@@ -1,6 +1,3 @@
-@page "/record-round"
-@using GolfTrackerApp.Mobile.Components.Layout
-@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services
 @using GolfTrackerApp.Mobile.Services.Api
@@ -385,8 +382,6 @@
     {
         try
         {
-            Console.WriteLine("[RECORD_ROUND] Loading initial data...");
-            System.Diagnostics.Debug.WriteLine("[RECORD_ROUND] Loading initial data...");
             
             // Load clubs and players in parallel
             var clubsTask = GolfClubApiService.GetAllGolfClubsAsync();
@@ -397,13 +392,9 @@
             _golfClubs = await clubsTask;
             _availablePlayers = await playersTask;
             
-            Console.WriteLine($"[RECORD_ROUND] Loaded {_golfClubs.Count} clubs and {_availablePlayers.Count} players");
-            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Loaded {_golfClubs.Count} clubs and {_availablePlayers.Count} players");
             
             // Auto-select current player
             var currentPlayerId = AuthStateService.PlayerId;
-            Console.WriteLine($"[RECORD_ROUND] Current player ID: {currentPlayerId}");
-            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Current player ID: {currentPlayerId}");
             
             if (currentPlayerId.HasValue)
             {
@@ -411,15 +402,11 @@
                 if (currentPlayer != null)
                 {
                     _selectedPlayers.Add(currentPlayer);
-                    Console.WriteLine($"[RECORD_ROUND] Auto-selected current player: {currentPlayer.FullName}");
-                    System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Auto-selected current player: {currentPlayer.FullName}");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RECORD_ROUND] Error loading data: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Error loading data: {ex.Message}");
             Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
         }
         finally
@@ -430,8 +417,6 @@
     
     private async Task OnClubSelected(int clubId)
     {
-        Console.WriteLine($"[RECORD_ROUND] Club selected: {clubId}");
-        System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Club selected: {clubId}");
         _selectedClubId = clubId;
         _selectedCourseId = 0;
         _coursesForSelectedClub.Clear();
@@ -448,18 +433,12 @@
     {
         try
         {
-            Console.WriteLine($"[RECORD_ROUND] Loading courses for club {_selectedClubId}");
-            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Loading courses for club {_selectedClubId}");
             _coursesForSelectedClub = await GolfCourseApiService.GetCoursesForClubAsync(_selectedClubId);
-            Console.WriteLine($"[RECORD_ROUND] Loaded {_coursesForSelectedClub.Count} courses");
-            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Loaded {_coursesForSelectedClub.Count} courses");
             _selectedCourseId = 0; // Reset course selection
             StateHasChanged();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[RECORD_ROUND] Error loading courses: {ex.Message}");
-            System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] Error loading courses: {ex.Message}");
             Snackbar.Add($"Error loading courses: {ex.Message}", Severity.Error);
         }
     }
@@ -488,8 +467,6 @@
                       _selectedCourseId > 0 &&
                       _selectedPlayers.Any();
         
-        Console.WriteLine($"[RECORD_ROUND] CanStartScoreEntry: date={_datePlayed.HasValue}, course={_selectedCourseId}, players={_selectedPlayers.Count}, result={canStart}");
-        System.Diagnostics.Debug.WriteLine($"[RECORD_ROUND] CanStartScoreEntry: date={_datePlayed.HasValue}, course={_selectedCourseId}, players={_selectedPlayers.Count}, result={canStart}");
         
         return canStart;
     }
@@ -603,7 +580,7 @@
                 DatePlayed = _datePlayed!.Value,
                 StartingHole = 1,
                 HolesPlayed = _holesPlayed,
-                RoundType = RoundTypeOption.Friendly,
+                RoundType = Enum.TryParse<RoundTypeOption>(_roundType, out var parsedType) ? parsedType : RoundTypeOption.Friendly,
                 Notes = _notes,
                 Status = RoundCompletionStatus.Completed,
                 CreatedByApplicationUserId = AuthStateService.UserId ?? string.Empty,

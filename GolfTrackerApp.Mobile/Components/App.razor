@@ -1,9 +1,9 @@
+@implements IDisposable
 @using MudBlazor
 @using GolfTrackerApp.Mobile.Services
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Components.Pages
 @using GolfTrackerApp.Mobile.Components.Shared
-@using GolfTrackerApp.Mobile.Components.Navigation
 @inject AuthenticationStateService AuthState
 @inject NavigationManager Navigation
 
@@ -42,8 +42,6 @@
                         break;
                     case "record-round":
                         {
-                            Console.WriteLine("[APP] *** Rendering RecordRoundPage component ***");
-                            System.Diagnostics.Debug.WriteLine("[APP] *** Rendering RecordRoundPage component ***");
                             <RecordRoundPage />
                             break;
                         }
@@ -184,12 +182,10 @@
     
     protected override async Task OnInitializedAsync()
     {
-        Console.WriteLine("[APP] *** SIMPLE PAGE SWITCHER - NO ROUTER ***");
         
         // Check authentication state
         await AuthState.LoadTokenFromSecureStorageAsync();
         
-        Console.WriteLine($"[APP] Is authenticated: {AuthState.IsAuthenticated}");
         
         // Listen for authentication changes
         AuthState.AuthenticationStateChanged += OnAuthenticationStateChanged;
@@ -215,13 +211,10 @@
         }
         
         currentPage = string.IsNullOrEmpty(uri) ? "home" : uri;
-        Console.WriteLine($"[APP] Current page from URL: {currentPage}");
-        System.Diagnostics.Debug.WriteLine($"[APP] Current page from URL: {currentPage}");
     }
     
     private void NavigateToPage(string page)
     {
-        Console.WriteLine($"[APP] *** Button clicked - Navigating to: {page} ***");
         currentPage = page;
         Navigation.NavigateTo($"/{page}", false);
         StateHasChanged();
@@ -229,20 +222,17 @@
     
     private async Task HandleLogout()
     {
-        Console.WriteLine("[APP] Logout clicked");
         await AuthState.LogoutAsync();
         Navigation.NavigateTo("/", forceLoad: true);
     }
     
     private void OnAuthenticationStateChanged()
     {
-        Console.WriteLine("[APP] Authentication state changed");
         StateHasChanged();
     }
     
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
-        Console.WriteLine($"[APP] Location changed: {e.Location}");
         UpdateCurrentPageFromUrl();
         StateHasChanged();
     }

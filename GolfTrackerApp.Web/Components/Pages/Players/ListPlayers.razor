@@ -1,6 +1,7 @@
 @page "/players"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@implements IDisposable
 @inject IPlayerService PlayerService
 @inject IConnectionService ConnectionService
 @inject IMergeService MergeService
@@ -33,7 +34,7 @@ else
                 <div class="player-avatar-large">
                     @if (_myProfile != null)
                     {
-                        @($"{_myProfile.FirstName?[..1]}{_myProfile.LastName?[..1]}")
+                        @($"{(_myProfile.FirstName?.Length > 0 ? _myProfile.FirstName[..1] : "")}{(_myProfile.LastName?.Length > 0 ? _myProfile.LastName[..1] : "")}")
                     }
                     else
                     {
@@ -115,7 +116,7 @@ else
             </div>
             <div class="club-stat-card accent-amber">
                 <div class="stat-icon">⛳</div>
-                <div class="stat-value">@FormatVsPar(_myStats.AverageVsPar)</div>
+                <div class="stat-value">@GolfHelpers.FormatVsPar(_myStats.AverageVsPar)</div>
                 <div class="stat-label">Avg vs Par</div>
             </div>
         </div>
@@ -382,7 +383,7 @@ else
                 <div class="player-card" @onclick="@(() => NavigationManager.NavigateTo($"/players/{player.PlayerId}/report"))">
                     <div class="player-card-top">
                         <div class="player-card-avatar">
-                            @($"{player.FirstName?[..1]}{player.LastName?[..1]}")
+                            @($"{(player.FirstName?.Length > 0 ? player.FirstName[..1] : "")}{(player.LastName?.Length > 0 ? player.LastName[..1] : "")}")
                         </div>
                         <div style="flex:1;">
                             <div class="player-card-name">@player.FirstName @player.LastName</div>
@@ -573,17 +574,6 @@ else
         return parts.Length >= 2 ? $"{parts[0][..1]}{parts[^1][..1]}" : parts[0][..1].ToString();
     }
 
-    private string FormatVsPar(double? vsPar)
-    {
-        if (!vsPar.HasValue) return "-";
-        return vsPar.Value switch
-        {
-            0 => "E",
-            > 0 => $"+{vsPar.Value:F1}",
-            _ => vsPar.Value.ToString("F1")
-        };
-    }
-
     // ── User Search ──
     private void OnUserSearchKeyUp(KeyboardEventArgs e)
     {
@@ -731,7 +721,7 @@ else
         if (string.IsNullOrEmpty(_currentUserId) || string.IsNullOrEmpty(targetUserId)) return;
         try
         {
-            var mergeablePlayers = await MergeService.GetMergeablePlayers(_currentUserId, targetUserId);
+            var mergeablePlayers = await MergeService.GetMergeablePlayersAsync(_currentUserId, targetUserId);
             if (!mergeablePlayers.Any()) { Snackbar.Add("No managed players available to transfer.", Severity.Info); return; }
 
             var parameters = new DialogParameters<MergePlayerDialog>
@@ -788,5 +778,11 @@ else
             await LoadMergeRequests();
         }
         catch (Exception ex) { Snackbar.Add($"Error: {ex.Message}", Severity.Error); }
+    }
+
+    public void Dispose()
+    {
+        _searchDebounceTimer?.Stop();
+        _searchDebounceTimer?.Dispose();
     }
 }

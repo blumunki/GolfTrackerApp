@@ -299,6 +299,11 @@
             };
             
             await PlayerService.AddPlayerAsync(player);
+
+            // Cache the linked player ID on the user for fast lookups
+            user.LinkedPlayerId = player.PlayerId;
+            await UserManager.UpdateAsync(user);
+
             Logger.LogInformation("Created player profile for new user {Email}: {FirstName} {LastName}", 
                 user.Email, player.FirstName, player.LastName);
         }
@@ -325,7 +330,12 @@
             var existingPlayer = await PlayerService.GetPlayerByApplicationUserIdAsync(user.Id);
             if (existingPlayer != null)
             {
-                // Player profile already exists
+                // Player profile exists — ensure LinkedPlayerId is cached
+                if (user.LinkedPlayerId != existingPlayer.PlayerId)
+                {
+                    user.LinkedPlayerId = existingPlayer.PlayerId;
+                    await UserManager.UpdateAsync(user);
+                }
                 return;
             }
 
@@ -342,6 +352,11 @@
             };
             
             await PlayerService.AddPlayerAsync(player);
+
+            // Cache the linked player ID on the user for fast lookups
+            user.LinkedPlayerId = player.PlayerId;
+            await UserManager.UpdateAsync(user);
+
             Logger.LogInformation("Created player profile for existing user {Email} who was missing one", user.Email);
         }
         catch (Exception ex)

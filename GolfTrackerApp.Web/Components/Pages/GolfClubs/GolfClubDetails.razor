@@ -219,7 +219,7 @@ else
                                                 </div>
                                                 <div class="round-score-mini">
                                                     <span class="score-val">@totalScore</span>
-                                                    <span class="score-vs @GetVsParClass(vsPar)">@FormatVsPar(vsPar)</span>
+                                                    <span class="score-vs @GolfHelpers.GetVsParClass(vsPar)">@GolfHelpers.FormatVsPar(vsPar)</span>
                                                 </div>
                                             </div>
                                         }
@@ -477,10 +477,6 @@ else
 
         return (int)Math.Round((double)round.GolfCourse.DefaultPar * round.HolesPlayed / round.GolfCourse.NumberOfHoles);
     }
-
-    private string GetVsParClass(int vsPar) => vsPar < 0 ? "under-par" : vsPar > 0 ? "over-par" : "even-par";
-
-    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
 
     private void ViewCourseDetails(int courseId)
     {

@@ -35,10 +35,8 @@ public static class MauiProgram
 				}
 			}
 		}
-		catch (Exception ex)
+		catch (Exception)
 		{
-			System.Diagnostics.Debug.WriteLine($"[CONFIG] Error loading development configuration: {ex.Message}");
-			System.Diagnostics.Debug.WriteLine($"[CONFIG] Run './generate-dev-config.sh' to create DevConfiguration.generated.cs");
 		}
 #endif
 

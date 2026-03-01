@@ -2,13 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using GolfTrackerApp.Web.Models;
 using GolfTrackerApp.Web.Services;
-using System.Security.Claims;
 
 namespace GolfTrackerApp.Web.Controllers;
 
-[ApiController]
 [Route("api/[controller]")]
-public class GolfCoursesController : ControllerBase
+public class GolfCoursesController : BaseApiController
 {
     private readonly IGolfCourseService _golfCourseService;
     private readonly ILogger<GolfCoursesController> _logger;
@@ -20,6 +18,7 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<List<GolfCourse>>> GetAllGolfCourses()
     {
         try
@@ -35,6 +34,7 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<ActionResult> GetGolfCourse(int id)
     {
         try
@@ -73,6 +73,7 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpGet("search")]
+    [AllowAnonymous]
     public async Task<ActionResult<List<GolfCourse>>> SearchGolfCourses([FromQuery] string searchTerm)
     {
         try
@@ -93,6 +94,7 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpGet("byclub/{clubId}")]
+    [AllowAnonymous]
     public async Task<ActionResult<List<object>>> GetCoursesByClub(int clubId)
     {
         try
@@ -119,7 +121,6 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize] // Require authentication for creating courses
     public async Task<ActionResult<GolfCourse>> CreateGolfCourse([FromBody] GolfCourse golfCourse)
     {
         try
@@ -140,7 +141,6 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize] // Require authentication for updating courses
     public async Task<ActionResult<GolfCourse>> UpdateGolfCourse(int id, [FromBody] GolfCourse golfCourse)
     {
         try
@@ -171,7 +171,6 @@ public class GolfCoursesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize] // Require authentication for deleting courses
     public async Task<ActionResult> DeleteGolfCourse(int id)
     {
         try

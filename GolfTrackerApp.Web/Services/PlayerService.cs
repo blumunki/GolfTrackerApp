@@ -91,7 +91,22 @@ namespace GolfTrackerApp.Web.Services
                 return false;
             }
 
-            // Delete related merge requests that reference this player as the source
+            // Check for round participation (scores & round-players)
+            var hasScores = await _context.Scores.AnyAsync(s => s.PlayerId == id);
+            if (hasScores)
+            {
+                _logger.LogWarning("Cannot delete Player {PlayerId}: has linked scores", id);
+                throw new InvalidOperationException($"Cannot delete player '{player.FirstName} {player.LastName}' because they have recorded scores. Remove the rounds first.");
+            }
+
+            var hasRoundParticipation = await _context.RoundPlayers.AnyAsync(rp => rp.PlayerId == id);
+            if (hasRoundParticipation)
+            {
+                _logger.LogWarning("Cannot delete Player {PlayerId}: has linked round participation", id);
+                throw new InvalidOperationException($"Cannot delete player '{player.FirstName} {player.LastName}' because they are linked to rounds.");
+            }
+
+            // Clean up merge requests
             var relatedMergeRequests = await _context.PlayerMergeRequests
                 .Where(m => m.SourcePlayerId == id)
                 .ToListAsync();
@@ -112,20 +127,17 @@ namespace GolfTrackerApp.Web.Services
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
-            IQueryable<Player> query = _context.Players.Include(p => p.ApplicationUser);
+            IQueryable<Player> query = _context.Players.AsNoTracking().Include(p => p.ApplicationUser);
 
             if (!isUserAdmin)
             {
                 // Regular users see:
                 // 1. Their own player profile (if they are a registered player)
                 // 2. Managed players they created
-                // 3. (Optional - add this if desired) All other registered system players (public profiles)
-                query = query.Where(p => (p.ApplicationUserId != null && p.ApplicationUserId == requestingUserId) || // Their own profile
-                                        (p.ApplicationUserId == null && p.CreatedByApplicationUserId == requestingUserId) // Managed players they created
-                                                                                                                          // || (p.ApplicationUserId != null) // Uncomment to show all registered players to everyone
+                query = query.Where(p => (p.ApplicationUserId != null && p.ApplicationUserId == requestingUserId) ||
+                                        (p.ApplicationUserId == null && p.CreatedByApplicationUserId == requestingUserId)
                                         );
             }
-            // Admins see all players (no additional filtering needed beyond the base query)
             return await query.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).ToListAsync();
         }
 
@@ -133,14 +145,14 @@ namespace GolfTrackerApp.Web.Services
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
-            return await _context.Players.Include(p => p.ApplicationUser).FirstOrDefaultAsync(p => p.PlayerId == id);
+            return await _context.Players.AsNoTracking().Include(p => p.ApplicationUser).FirstOrDefaultAsync(p => p.PlayerId == id);
         }
 
         public async Task<Player?> GetPlayerByApplicationUserIdAsync(string applicationUserId)
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
-            return await _context.Players.Include(p => p.ApplicationUser)
+            return await _context.Players.AsNoTracking().Include(p => p.ApplicationUser)
                                    .FirstOrDefaultAsync(p => p.ApplicationUserId == applicationUserId);
         }
 
@@ -201,8 +213,7 @@ namespace GolfTrackerApp.Web.Services
         {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
-            // Start with the same authorization query from GetAllPlayersAsync
-            IQueryable<Player> query = _context.Players.Include(p => p.ApplicationUser);
+            IQueryable<Player> query = _context.Players.AsNoTracking().Include(p => p.ApplicationUser);
 
             if (!isUserAdmin)
             {

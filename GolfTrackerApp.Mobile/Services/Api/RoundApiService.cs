@@ -84,17 +84,13 @@ public class RoundApiService : IRoundApiService
 
     private void EnsureAuthorizationHeader()
     {
-        Debug.WriteLine($"[ROUND_API] EnsureAuthorizationHeader called - IsAuth: {_authService.IsAuthenticated}, HasToken: {!string.IsNullOrEmpty(_authService.Token)}");
         
         if (_authService.IsAuthenticated && !string.IsNullOrEmpty(_authService.Token))
         {
-            Debug.WriteLine($"[ROUND_API] Setting Authorization header with token (length: {_authService.Token.Length})");
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _authService.Token);
-            Debug.WriteLine($"[ROUND_API] Header set. Current auth header: {_httpClient.DefaultRequestHeaders.Authorization?.ToString() ?? "NULL"}");
         }
         else
         {
-            Debug.WriteLine("[ROUND_API] WARNING: Not setting auth header - not authenticated or no token");
         }
     }
 
@@ -189,26 +185,20 @@ public class RoundApiService : IRoundApiService
         {
             EnsureAuthorizationHeader();
             
-            Debug.WriteLine($"[ROUND_API] Creating round - Auth: {_authService.IsAuthenticated}, Token exists: {!string.IsNullOrEmpty(_authService.Token)}");
             _logger.LogInformation("[ROUND_API] Creating round - Auth: {IsAuth}, Token: {HasToken}", 
                 _authService.IsAuthenticated, !string.IsNullOrEmpty(_authService.Token));
             
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             
-            Debug.WriteLine($"[ROUND_API] Request JSON length: {json.Length}");
-            Debug.WriteLine($"[ROUND_API] Request JSON: {json}");
-            Debug.WriteLine($"[ROUND_API] Sending POST to api/rounds");
             _logger.LogInformation("[ROUND_API] Sending POST to api/rounds");
             var response = await _httpClient.PostAsync("api/rounds", content);
             
-            Debug.WriteLine($"[ROUND_API] Response status: {response.StatusCode}");
             _logger.LogInformation("[ROUND_API] Response status: {Status}", response.StatusCode);
             
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                Debug.WriteLine($"[ROUND_API] Error response: {errorContent}");
             }
             
             response.EnsureSuccessStatusCode();
@@ -220,11 +210,8 @@ public class RoundApiService : IRoundApiService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[ROUND_API] ERROR: {ex.Message}");
-            Debug.WriteLine($"[ROUND_API] ERROR Type: {ex.GetType().Name}");
             if (ex.InnerException != null)
             {
-                Debug.WriteLine($"[ROUND_API] INNER ERROR: {ex.InnerException.Message}");
             }
             _logger.LogError(ex, "Error creating round via API");
             throw;

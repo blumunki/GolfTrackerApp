@@ -1,5 +1,3 @@
-@page "/club-detail/{ClubId:int}"
-@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IGolfClubApiService GolfClubApi
@@ -7,7 +5,7 @@
 @inject NavigationManager NavigationManager
 @inject ILogger<ClubDetailPage> Logger
 
-<MudContainer Class="pa-0" Style="height: calc(100vh - 144px); overflow-y: auto;">
+<MudContainer Class="pa-0 page-scroll-container">
     @if (isLoading)
     {
         <div style="text-align:center; padding:48px;">
@@ -151,8 +149,8 @@
                         </div>
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-size:1.1rem; font-weight:800; color:#1a1a2e;">@round.TotalScore</span>
-                            <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GetVsParStyle(vsPar)">
-                                @FormatVsPar(vsPar)
+                            <span style="font-size:0.8rem; font-weight:700; padding:2px 8px; border-radius:12px; @GolfHelpers.GetVsParBadgeStyle(vsPar)">
+                                @GolfHelpers.FormatVsPar(vsPar)
                             </span>
                         </div>
                     </div>
@@ -240,15 +238,6 @@
     private void NavigateToCourse(int courseId)
     {
         NavigationManager.NavigateTo($"/course-detail/{courseId}");
-    }
-
-    private string FormatVsPar(int vsPar) => vsPar == 0 ? "E" : vsPar > 0 ? $"+{vsPar}" : vsPar.ToString();
-
-    private string GetVsParStyle(int vsPar)
-    {
-        if (vsPar < 0) return "background:#dcfce7; color:#16a34a;";
-        if (vsPar == 0) return "background:#dbeafe; color:#2563eb;";
-        return "background:#fef2f2; color:#dc2626;";
     }
 
     private void GoBack()

@@ -1,6 +1,3 @@
-@page "/golf-clubs"
-@page "/golfclubs"
-@layout MobileLayout
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IGolfClubApiService GolfClubApi
@@ -8,7 +5,7 @@
 @inject ILogger<GolfClubsPage> Logger
 @inject IJSRuntime JSRuntime
 
-<MudContainer Class="pa-2" Style="height: calc(100vh - 144px); overflow-y: auto;">
+<MudContainer Class="pa-2 page-scroll-container">
     <!-- Header -->
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
         <div style="font-size:1.4rem; font-weight:700; color:#1a1a2e;">⛳ Golf Clubs</div>

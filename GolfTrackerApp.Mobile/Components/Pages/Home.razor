@@ -1,4 +1,3 @@
-@page "/home"
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services
@@ -41,64 +40,7 @@
     else if (dashboardStats != null)
     {
         <!-- Hero Stats -->
-        <MudGrid Spacing="2" Class="mb-3">
-            <MudItem xs="6">
-                <MudCard Elevation="2" Style="height: 100%;">
-                    <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
-                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #e8f5e9; color: #2e7d32; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">🏌️</div>
-                        <MudText Typo="Typo.h5" Style="font-weight: 800; color: #2e7d32;">@dashboardStats.TotalRounds</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">ROUNDS PLAYED</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 0.65rem; margin-top: 2px;">
-                            @dashboardStats.UniqueCoursesPlayed courses · @dashboardStats.UniqueClubsVisited clubs
-                        </MudText>
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-            <MudItem xs="6">
-                <MudCard Elevation="2" Style="height: 100%;">
-                    <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
-                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #e3f2fd; color: #1565c0; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">🏆</div>
-                        <MudText Typo="Typo.h5" Style="font-weight: 800; color: #1565c0;">@(dashboardStats.BestScore?.ToString() ?? "—")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">BEST SCORE</MudText>
-                        @if (dashboardStats.LowestToPar.HasValue)
-                        {
-                            var lowestToParColor = dashboardStats.LowestToPar.Value <= 0 ? "#2e7d32" : "#ef6c00";
-                            <MudText Typo="Typo.caption" Style="@($"font-size: 0.65rem; margin-top: 2px; color: {lowestToParColor}")">
-                                @(dashboardStats.LowestToPar.Value >= 0 ? "+" : "")@dashboardStats.LowestToPar.Value to par
-                            </MudText>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-            <MudItem xs="6">
-                <MudCard Elevation="2" Style="height: 100%;">
-                    <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
-                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #fff3e0; color: #e65100; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">📊</div>
-                        <MudText Typo="Typo.h5" Style="font-weight: 800; color: #e65100;">@(dashboardStats.AverageToPar?.ToString("+0.0;-0.0;E") ?? "—")</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">AVG TO PAR</MudText>
-                        @if (dashboardStats.IsImprovingStreak)
-                        {
-                            <MudText Typo="Typo.caption" Style="font-size: 0.65rem; margin-top: 2px; color: #2e7d32;">↗ Improving</MudText>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-            <MudItem xs="6">
-                <MudCard Elevation="2" Style="height: 100%;">
-                    <MudCardContent Class="pa-3 d-flex flex-column align-center" Style="text-align: center;">
-                        <div style="width: 40px; height: 40px; border-radius: 10px; background: #f3e5f5; color: #7b1fa2; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; margin-bottom: 6px;">⭐</div>
-                        <MudText Typo="Typo.h5" Style="font-weight: 800; color: #7b1fa2;">@dashboardStats.FavoriteCourseRounds</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Default" Style="font-size: 0.7rem; font-weight: 600;">MOST PLAYED</MudText>
-                        @if (!string.IsNullOrEmpty(dashboardStats.FavoriteCourseName))
-                        {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="font-size: 0.6rem; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">
-                                @dashboardStats.FavoriteCourseName
-                            </MudText>
-                        }
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
-        </MudGrid>
+        <HeroStatsWidget Stats="dashboardStats" />
 
         <!-- Performance Chart -->
         <MudCard Elevation="2" Class="mb-3">
@@ -129,147 +71,13 @@
         </MudCard>
 
         <!-- Course Diary -->
-        @if (courseHistory?.Any() == true)
-        {
-            <MudCard Elevation="2" Class="mb-3">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">🗺️ Course Diary</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent Class="pa-2">
-                    <div style="overflow-x: auto; display: flex; gap: 10px; padding: 4px 2px 8px; -webkit-overflow-scrolling: touch;">
-                        @foreach (var course in courseHistory)
-                        {
-                            <div style="flex: 0 0 170px; background: white; border-radius: 12px; border: 1px solid #eee; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden;">
-                                <div style="padding: 8px 10px 6px; background: linear-gradient(135deg, #e8f5e9 0%, #f0f7f0 100%); border-bottom: 1px solid #eee;">
-                                    <div style="font-size: 0.6rem; font-weight: 600; color: #2e7d32; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@course.ClubName</div>
-                                    <div style="font-size: 0.8rem; font-weight: 700; color: #212121; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@course.CourseName</div>
-                                </div>
-                                <div style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 0.6rem; color: #9e9e9e; text-transform: uppercase; font-weight: 500;">Latest</div>
-                                        <div style="font-size: 1.2rem; font-weight: 700; color: #424242;">@course.MostRecentScore</div>
-                                        <div style="font-size: 0.6rem; font-weight: 600; padding: 1px 5px; border-radius: 10px; background: @(course.MostRecentToPar <= 0 ? "#e8f5e9" : "#fff3e0"); color: @(course.MostRecentToPar <= 0 ? "#2e7d32" : "#ef6c00");">
-                                            @(course.MostRecentToPar >= 0 ? "+" : "")@course.MostRecentToPar
-                                        </div>
-                                    </div>
-                                    <div style="width: 1px; height: 32px; background: #eee;"></div>
-                                    <div style="text-align: center;">
-                                        <div style="font-size: 0.6rem; color: #9e9e9e; text-transform: uppercase; font-weight: 500;">Best</div>
-                                        <div style="font-size: 1.2rem; font-weight: 700; color: #2e7d32;">@course.BestScore</div>
-                                        <div style="font-size: 0.6rem; font-weight: 600; padding: 1px 5px; border-radius: 10px; background: @(course.BestToPar <= 0 ? "#e8f5e9" : "#fff3e0"); color: @(course.BestToPar <= 0 ? "#2e7d32" : "#ef6c00");">
-                                            @(course.BestToPar >= 0 ? "+" : "")@course.BestToPar
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style="padding: 4px 10px 6px; display: flex; justify-content: space-between; font-size: 0.6rem; color: #9e9e9e; border-top: 1px solid #f5f5f5; background: #fafafa;">
-                                    <span>×@course.TimesPlayed</span>
-                                    <span>@course.LastPlayedDate.ToString("dd MMM")</span>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                </MudCardContent>
-            </MudCard>
-        }
+        <CourseDiaryWidget Courses="courseHistory" />
 
         <!-- Par Performance -->
-        @if (performanceByPar?.HasValidData == true)
-        {
-            <MudCard Elevation="2" Class="mb-3">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">🎯 Par Performance</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    @{
-                        var mobileParData = new[] {
-                            (Label: "Par 3", Avg: performanceByPar.Par3Average, Rel: performanceByPar.Par3RelativeToPar, Count: performanceByPar.Par3Count, Color: "#2e7d32", Base: 3),
-                            (Label: "Par 4", Avg: performanceByPar.Par4Average, Rel: performanceByPar.Par4RelativeToPar, Count: performanceByPar.Par4Count, Color: "#1565c0", Base: 4),
-                            (Label: "Par 5", Avg: performanceByPar.Par5Average, Rel: performanceByPar.Par5RelativeToPar, Count: performanceByPar.Par5Count, Color: "#7b1fa2", Base: 5),
-                        };
-                    }
-                    @foreach (var p in mobileParData.Where(p => p.Count > 0))
-                    {
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
-                            <div style="min-width: 48px; font-size: 0.8rem; font-weight: 600; color: #616161;">
-                                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: @p.Color; margin-right: 4px;"></span>
-                                @p.Label
-                            </div>
-                            <div style="flex: 1; height: 16px; background: #f5f5f5; border-radius: 20px; position: relative; overflow: visible;">
-                                @{
-                                    var mBarW = Math.Min(100, (p.Avg / (p.Base + 2)) * 100);
-                                    var mParLine = (double)p.Base / (p.Base + 2) * 100;
-                                }
-                                <div style="height: 100%; width: @(mBarW.ToString("F0"))%; background: @p.Color; border-radius: 20px; opacity: 0.75;"></div>
-                                <div style="position: absolute; top: -3px; bottom: -3px; left: @(mParLine.ToString("F0"))%; width: 2px; background: #212121; opacity: 0.25;"></div>
-                            </div>
-                            <div style="min-width: 50px; text-align: right;">
-                                <div style="font-size: 0.9rem; font-weight: 700; color: #212121;">@p.Avg.ToString("F1")</div>
-                                <div style="font-size: 0.65rem; font-weight: 600; padding: 0 4px; border-radius: 8px; display: inline-block; background: @(p.Rel <= 0 ? "#e8f5e9" : "#fff3e0"); color: @(p.Rel <= 0 ? "#2e7d32" : "#ef6c00");">
-                                    @(p.Rel >= 0 ? "+" : "")@p.Rel.ToString("F1")
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </MudCardContent>
-            </MudCard>
-        }
+        <ParPerformanceWidget PerformanceData="performanceByPar" />
 
         <!-- Scoring Breakdown -->
-        @if (scoringDistribution?.TotalHoles > 0)
-        {
-            <MudCard Elevation="2" Class="mb-3">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h6">🎨 Scoring Breakdown</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <!-- Stacked Bar -->
-                    <div style="display: flex; height: 22px; border-radius: 20px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
-                        @if (scoringDistribution.EagleCount > 0)
-                        { <div style="width: @(scoringDistribution.EaglePercentage.ToString("F1"))%; background: #1565c0; min-width: 2px;"></div> }
-                        @if (scoringDistribution.BirdieCount > 0)
-                        { <div style="width: @(scoringDistribution.BirdiePercentage.ToString("F1"))%; background: #2e7d32; min-width: 2px;"></div> }
-                        @if (scoringDistribution.ParCount > 0)
-                        { <div style="width: @(scoringDistribution.ParPercentage.ToString("F1"))%; background: #43a047; min-width: 2px;"></div> }
-                        @if (scoringDistribution.BogeyCount > 0)
-                        { <div style="width: @(scoringDistribution.BogeyPercentage.ToString("F1"))%; background: #ef6c00; min-width: 2px;"></div> }
-                        @if (scoringDistribution.DoubleBogeyCount > 0)
-                        { <div style="width: @(scoringDistribution.DoubleBogeyPercentage.ToString("F1"))%; background: #c62828; min-width: 2px;"></div> }
-                        @if (scoringDistribution.TripleBogeyOrWorseCount > 0)
-                        { <div style="width: @(scoringDistribution.TripleBogeyOrWorsePercentage.ToString("F1"))%; background: #880e4f; min-width: 2px;"></div> }
-                    </div>
-                    <!-- Legend Grid -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                        @{
-                            var mScoringItems = new[] {
-                                (Label: "Eagle", Cnt: scoringDistribution.EagleCount, Pct: scoringDistribution.EaglePercentage, Col: "#1565c0"),
-                                (Label: "Birdie", Cnt: scoringDistribution.BirdieCount, Pct: scoringDistribution.BirdiePercentage, Col: "#2e7d32"),
-                                (Label: "Par", Cnt: scoringDistribution.ParCount, Pct: scoringDistribution.ParPercentage, Col: "#43a047"),
-                                (Label: "Bogey", Cnt: scoringDistribution.BogeyCount, Pct: scoringDistribution.BogeyPercentage, Col: "#ef6c00"),
-                                (Label: "Double", Cnt: scoringDistribution.DoubleBogeyCount, Pct: scoringDistribution.DoubleBogeyPercentage, Col: "#c62828"),
-                                (Label: "Triple+", Cnt: scoringDistribution.TripleBogeyOrWorseCount, Pct: scoringDistribution.TripleBogeyOrWorsePercentage, Col: "#880e4f"),
-                            };
-                        }
-                        @foreach (var s in mScoringItems.Where(i => i.Cnt > 0))
-                        {
-                            <div style="display: flex; align-items: center; gap: 4px; font-size: 0.7rem;">
-                                <span style="width: 8px; height: 8px; border-radius: 50%; background: @s.Col; flex-shrink: 0;"></span>
-                                <span style="font-weight: 500; color: #616161;">@s.Label</span>
-                                <span style="font-weight: 700; color: #212121; margin-left: auto;">@s.Pct.ToString("F1")%</span>
-                            </div>
-                        }
-                    </div>
-                    <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center" Class="mt-2" Style="font-size: 0.6rem;">
-                        @scoringDistribution.TotalHoles.ToString("N0") holes analysed
-                    </MudText>
-                </MudCardContent>
-            </MudCard>
-        }
+        <ScoringBreakdownWidget Distribution="scoringDistribution" />
 
         <!-- Recent Rounds -->
         <MudCard Elevation="2" Class="mb-3">
@@ -351,7 +159,7 @@
                             <MudListItem T="object" OnClick="@(() => NavigateToPlayerReport(partner.PartnerId))">
                                 <div class="d-flex justify-space-between align-center flex-grow-1">
                                     <div class="d-flex flex-column">
-                                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@partner.PartnerName</MudText>
+                                        <MudText Typo="Typo.body2" Class="fw-semibold">@partner.PartnerName</MudText>
                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
                                             Last played: @($"{partner.LastPlayedDate:dd MMM yyyy}")
                                         </MudText>
@@ -421,7 +229,6 @@
         catch (Exception ex)
         {
             errorMessage = $"Failed to load dashboard: {ex.Message}";
-            Console.WriteLine($"[HOME] Error loading dashboard: {errorMessage}");
         }
         finally
         {
@@ -501,9 +308,8 @@
             
             StateHasChanged();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine($"[HOME] Error loading additional data: {ex.Message}");
         }
     }
     

@@ -1,4 +1,3 @@
-@page "/login"
 @using GolfTrackerApp.Mobile.Services.Api
 @using GolfTrackerApp.Mobile.Services
 @using MudBlazor
@@ -12,7 +11,7 @@
     <MudPaper Elevation="8" Class="pa-6" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
         <div class="text-center mb-4">
             <MudIcon Icon="Icons.Material.Filled.GolfCourse" Color="Color.Surface" Size="Size.Medium" Style="font-size: 2.5rem;" />
-            <MudText Typo="Typo.h5" Color="Color.Surface" Class="mt-2 mb-1" Style="font-weight: 600;">
+            <MudText Typo="Typo.h5" Color="Color.Surface" Class="mt-2 mb-1 fw-semibold">
                 Golf Tracker
             </MudText>
             <MudText Typo="Typo.body2" Color="Color.Surface" Style="opacity: 0.9; font-size: 0.875rem;">
@@ -38,8 +37,6 @@
                           Size="Size.Medium"
                           FullWidth="true"
                           @onclick="@(async () => await GoogleSignIn())"
-                          @onmousedown="@(() => Console.WriteLine("[LOGIN] Google button mousedown detected"))"
-                          @ontouchstart="@(() => Console.WriteLine("[LOGIN] Google button touchstart detected"))"
                           Disabled="@isGoogleSigningIn"
                           Class="mb-4"
                           Style="height: 48px; border: 2px solid; border-radius: 12px; font-weight: 500;"
@@ -117,8 +114,6 @@
                               Color="Color.Primary" 
                               Size="Size.Medium"
                               @onclick="ShowRegisterForm"
-                              @onmousedown="@(() => Console.WriteLine("[LOGIN] Create account button mousedown detected"))"
-                              @ontouchstart="@(() => Console.WriteLine("[LOGIN] Create account button touchstart detected"))"
                               Disabled="@(isLoading || isGoogleSigningIn)"
                               Style="font-weight: 500; font-size: 0.875rem;">
                         Create your account
@@ -218,7 +213,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        Console.WriteLine("[LOGIN] *** LOGIN PAGE V2.1 *** Initialized");
         Logger.LogInformation("LoginPage V2.1 initialized");
         
         // Test JavaScript interop to see if WebView is working
@@ -226,11 +220,9 @@
         {
             // This should work in MAUI BlazorWebView
             await Task.Delay(1000); // Give time for JS to load
-            Console.WriteLine("[LOGIN] LoginPage initialization complete");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Console.WriteLine($"[LOGIN] Error in OnInitializedAsync: {ex.Message}");
         }
     }
 
@@ -264,38 +256,31 @@
     {
         try
         {
-            Console.WriteLine("[LOGIN] *** Google Sign-In button clicked ***");
             Logger.LogInformation("Google Sign-In button clicked");
             
             isGoogleSigningIn = true;
             errorMessage = string.Empty;
             await InvokeAsync(StateHasChanged);
             
-            Console.WriteLine("[LOGIN] Calling GoogleAuthService.GoogleSignInAsync()");
             var result = await GoogleAuthService.GoogleSignInAsync();
             
-            Console.WriteLine($"[LOGIN] Google auth result: IsSuccess={result.IsSuccess}");
             
             if (result.IsSuccess)
             {
-                Console.WriteLine("[LOGIN] Google authentication successful - navigating to home");
                 Navigation.NavigateTo("/");
             }
             else
             {
-                Console.WriteLine($"[LOGIN] Google authentication failed: {result.ErrorMessage}");
                 errorMessage = result.ErrorMessage ?? "Authentication failed";
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[LOGIN] Exception during Google authentication: {ex.Message}");
             Logger.LogError(ex, "Error during Google authentication");
             errorMessage = "Authentication failed. Please try again.";
         }
         finally
         {
-            Console.WriteLine("[LOGIN] Finalizing Google Sign-In process");
             isGoogleSigningIn = false;
             await InvokeAsync(StateHasChanged);
         }
@@ -329,7 +314,6 @@
 
     private void ShowRegisterForm()
     {
-        Console.WriteLine("[LOGIN] *** Create your account button clicked ***");
         Logger.LogInformation("Create your account button clicked");
         
         showRegisterDialog = true;
@@ -338,7 +322,6 @@
         registerPassword = string.Empty;
         confirmPassword = string.Empty;
         
-        Console.WriteLine("[LOGIN] Register dialog should now be visible");
         StateHasChanged();
     }
 
@@ -351,12 +334,6 @@
     private void ClearError()
     {
         errorMessage = string.Empty;
-    }
-
-    private void TestButtonClicked()
-    {
-        Console.WriteLine("[LOGIN] *** BLAZOR TEST BUTTON CLICKED ***");
-        Logger.LogInformation("Blazor test button clicked");
     }
 
     private string ValidatePasswordMatch(string confirmPwd)

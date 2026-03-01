@@ -13,10 +13,4 @@ public abstract class BaseApiController : ControllerBase
         return User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
                throw new UnauthorizedAccessException("User ID not found in token");
     }
-    
-    protected string GetCurrentUserEmail()
-    {
-        return User.FindFirst(ClaimTypes.Email)?.Value ?? 
-               throw new UnauthorizedAccessException("User email not found in token");
-    }
 }

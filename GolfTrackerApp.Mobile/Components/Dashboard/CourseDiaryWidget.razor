@@ -1,0 +1,51 @@
+@* Dashboard Course Diary - horizontally scrolling course cards *@
+
+@if (Courses?.Any() == true)
+{
+    <MudCard Elevation="2" Class="mb-3">
+        <MudCardHeader>
+            <CardHeaderContent>
+                <MudText Typo="Typo.h6">🗺️ Course Diary</MudText>
+            </CardHeaderContent>
+        </MudCardHeader>
+        <MudCardContent Class="pa-2">
+            <div style="overflow-x: auto; display: flex; gap: 10px; padding: 4px 2px 8px; -webkit-overflow-scrolling: touch;">
+                @foreach (var course in Courses)
+                {
+                    <div style="flex: 0 0 170px; background: white; border-radius: 12px; border: 1px solid #eee; box-shadow: 0 1px 3px rgba(0,0,0,0.08); overflow: hidden;">
+                        <div style="padding: 8px 10px 6px; background: linear-gradient(135deg, #e8f5e9 0%, #f0f7f0 100%); border-bottom: 1px solid #eee;">
+                            <div style="font-size: 0.6rem; font-weight: 600; color: #2e7d32; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@course.ClubName</div>
+                            <div style="font-size: 0.8rem; font-weight: 700; color: #212121; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@course.CourseName</div>
+                        </div>
+                        <div style="padding: 8px 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: #9e9e9e; text-transform: uppercase; font-weight: 500;">Latest</div>
+                                <div style="font-size: 1.2rem; font-weight: 700; color: #424242;">@course.MostRecentScore</div>
+                                <div style="font-size: 0.6rem; font-weight: 600; padding: 1px 5px; border-radius: 10px; background: @(course.MostRecentToPar <= 0 ? "#e8f5e9" : "#fff3e0"); color: @(course.MostRecentToPar <= 0 ? "#2e7d32" : "#ef6c00");">
+                                    @(course.MostRecentToPar >= 0 ? "+" : "")@course.MostRecentToPar
+                                </div>
+                            </div>
+                            <div style="width: 1px; height: 32px; background: #eee;"></div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.6rem; color: #9e9e9e; text-transform: uppercase; font-weight: 500;">Best</div>
+                                <div style="font-size: 1.2rem; font-weight: 700; color: #2e7d32;">@course.BestScore</div>
+                                <div style="font-size: 0.6rem; font-weight: 600; padding: 1px 5px; border-radius: 10px; background: @(course.BestToPar <= 0 ? "#e8f5e9" : "#fff3e0"); color: @(course.BestToPar <= 0 ? "#2e7d32" : "#ef6c00");">
+                                    @(course.BestToPar >= 0 ? "+" : "")@course.BestToPar
+                                </div>
+                            </div>
+                        </div>
+                        <div style="padding: 4px 10px 6px; display: flex; justify-content: space-between; font-size: 0.6rem; color: #9e9e9e; border-top: 1px solid #f5f5f5; background: #fafafa;">
+                            <span>×@course.TimesPlayed</span>
+                            <span>@course.LastPlayedDate.ToString("dd MMM")</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    [Parameter]
+    public List<CourseHistoryItem>? Courses { get; set; }
+}

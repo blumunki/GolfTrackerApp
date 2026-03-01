@@ -21,116 +21,86 @@
 
 <PageTitle>Data Migration</PageTitle>
 
-<h1>Data Migration Utility</h1>
+<MudText Typo="Typo.h4" Class="mb-2">Data Migration Utility</MudText>
+<MudText Typo="Typo.body2" Class="mb-4"><strong>Important:</strong> Upload files in the specified order. Ensure CSV files are UTF-8 encoded.</MudText>
 
-<p><strong>Important:</strong> Upload files in the specified order. Ensure CSV files are UTF-8 encoded.</p>
-
-<div class="migration-section mb-4">
-    <h4>1. Import Golf Clubs</h4>
-    <p>CSV Format: Name, AddressLine1, AddressLine2, City, CountyOrRegion, Postcode, Country, Website</p>
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.h6">1. Import Golf Clubs</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: Name, AddressLine1, AddressLine2, City, CountyOrRegion, Postcode, Country, Website</MudText>
     <InputFile OnChange="HandleGolfClubsUpload" accept=".csv" />
-    <button class="btn btn-primary mt-2" @onclick="ProcessGolfClubs" disabled="@(golfClubsFile == null || isProcessingGolfClubs)">
-        @if (isProcessingGolfClubs) { <span>Processing...</span> } else { <span>Import Golf Clubs</span> }
-    </button>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessGolfClubs" Disabled="@(golfClubsFile == null || isProcessingGolfClubs)">
+        @(isProcessingGolfClubs ? "Processing..." : "Import Golf Clubs")
+    </MudButton>
     @if (!string.IsNullOrEmpty(golfClubsImportLog))
     {
         <pre class="log-output">@golfClubsImportLog</pre>
     }
-</div>
+</MudPaper>
 
-@* --- Import Golf Courses --- *@
-<div class="migration-section mb-4">
-    <h4>2. Import Golf Courses</h4>
-    <p>CSV Format: ClubName (must match an already imported club's name), CourseName, DefaultPar, NumberOfHoles</p>
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.h6">2. Import Golf Courses</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: ClubName (must match an already imported club's name), CourseName, DefaultPar, NumberOfHoles</MudText>
     <InputFile OnChange="HandleGolfCoursesUpload" accept=".csv" />
-    <button class="btn btn-primary mt-2" @onclick="ProcessGolfCourses" disabled="@(golfCoursesFile == null || isProcessingGolfCourses || isProcessingGolfClubs)">
-        @if (isProcessingGolfCourses) { <span>Processing...</span> } else { <span>Import Golf Courses</span> }
-    </button>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessGolfCourses" Disabled="@(golfCoursesFile == null || isProcessingGolfCourses || isProcessingGolfClubs)">
+        @(isProcessingGolfCourses ? "Processing..." : "Import Golf Courses")
+    </MudButton>
     @if (!string.IsNullOrEmpty(golfCoursesImportLog))
     {
         <pre class="log-output">@golfCoursesImportLog</pre>
     }
-</div>
+</MudPaper>
 
-
-@* --- Import Players --- *@
-<div class="migration-section mb-4">
-    <h4>3. Import Players</h4>
-    <p>CSV Format: FirstName, LastName, Email (optional; if provided, attempts to link/create system user), Handicap (optional)</p>
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.h6">3. Import Players</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: FirstName, LastName, Email (optional; if provided, attempts to link/create system user), Handicap (optional)</MudText>
     <InputFile OnChange="HandlePlayersUpload" accept=".csv" />
-    <button class="btn btn-primary mt-2" @onclick="ProcessPlayers" disabled="@(playersFile == null || isProcessingPlayers || isProcessingGolfClubs || isProcessingGolfCourses)">
-        @if (isProcessingPlayers) { <span>Processing...</span> } else { <span>Import Players</span> }
-    </button>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessPlayers" Disabled="@(playersFile == null || isProcessingPlayers || isProcessingGolfClubs || isProcessingGolfCourses)">
+        @(isProcessingPlayers ? "Processing..." : "Import Players")
+    </MudButton>
     @if (!string.IsNullOrEmpty(playersImportLog))
     {
         <pre class="log-output">@playersImportLog</pre>
     }
-</div>
+</MudPaper>
 
-@* --- Import Holes --- *@
-<div class="migration-section mb-4">
-    <h4>4. Import Holes</h4>
-    <p>CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex (optional), LengthYards (optional)</p>
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.h6">4. Import Holes</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex (optional), LengthYards (optional)</MudText>
     <InputFile OnChange="HandleHolesUpload" accept=".csv" />
-    <button class="btn btn-primary mt-2" @onclick="ProcessHoles" disabled="@(holesFile == null || isProcessingHoles || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers)">
-        @if (isProcessingHoles) { <span>Processing...</span> } else { <span>Import Holes</span> }
-    </button>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessHoles" Disabled="@(holesFile == null || isProcessingHoles || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers)">
+        @(isProcessingHoles ? "Processing..." : "Import Holes")
+    </MudButton>
     @if (!string.IsNullOrEmpty(holesImportLog))
     {
         <pre class="log-output">@holesImportLog</pre>
     }
-</div>
+</MudPaper>
 
-@* --- Import Rounds --- *@
-<div class="migration-section mb-4">
-    <h4>5. Import Rounds</h4>
-    @* VVV UPDATE THIS LINE VVV *@
-    <p>CSV Format: Date (dd/mm/yyyy), PlayerName, ClubName, ActualCourseName, HolesPlayed, StartingHole, RoundType, RoundText (Spreadsheet Key), Notes (optional)</p>
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.h6">5. Import Rounds</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: Date (dd/mm/yyyy), PlayerName, ClubName, ActualCourseName, HolesPlayed, StartingHole, RoundType, RoundText (Spreadsheet Key), Notes (optional)</MudText>
     <InputFile OnChange="HandleRoundsUpload" accept=".csv" />
-    <button class="btn btn-primary mt-2" @onclick="ProcessRounds" disabled="@(roundsFile == null || isProcessingRounds || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers || isProcessingHoles)">
-        @if (isProcessingRounds) { <span>Processing...</span> } else { <span>Import Rounds</span> }
-    </button>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessRounds" Disabled="@(roundsFile == null || isProcessingRounds || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers || isProcessingHoles)">
+        @(isProcessingRounds ? "Processing..." : "Import Rounds")
+    </MudButton>
     @if (!string.IsNullOrEmpty(roundsImportLog))
     {
         <pre class="log-output">@roundsImportLog</pre>
     }
-</div>
+</MudPaper>
 
-@* --- Import Scores --- *@
-<div class="migration-section mb-4">
-    <h4>6. Import Scores (Final Step)</h4>
-    <p>CSV Format: RoundText (from original spreadsheet), HoleNumber, Strokes</p>
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudText Typo="Typo.h6">6. Import Scores (Final Step)</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: RoundText (from original spreadsheet), HoleNumber, Strokes</MudText>
     <InputFile OnChange="HandleScoresUpload" accept=".csv" />
-    <button class="btn btn-primary mt-2" @onclick="ProcessScores" disabled="@(scoresFile == null || isProcessingScores || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers || isProcessingHoles || isProcessingRounds)">
-        @if (isProcessingScores) { <span>Processing...</span> } else { <span>Import Scores</span> }
-    </button>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessScores" Disabled="@(scoresFile == null || isProcessingScores || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers || isProcessingHoles || isProcessingRounds)">
+        @(isProcessingScores ? "Processing..." : "Import Scores")
+    </MudButton>
     @if (!string.IsNullOrEmpty(scoresImportLog))
     {
         <pre class="log-output">@scoresImportLog</pre>
     }
-</div>
-
-@* --- Further placeholders for Holes, Rounds, Scores --- *@
-
-
-<style>
-    .migration-section {
-        border: 1px solid #ccc;
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 5px;
-    }
-    .log-output {
-        background-color: #f5f5f5;
-        border: 1px solid #eee;
-        padding: 10px;
-        max-height: 200px;
-        overflow-y: auto;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        margin-top:10px;
-    }
-</style>
+</MudPaper>
 
 @code {
     private IBrowserFile? golfClubsFile;
