@@ -27,7 +27,7 @@ This script:
 
 ### 3. Build and Run the Mobile App
 ```bash
-dotnet build GolfTrackerApp.Mobile -f net9.0-ios -t:Run
+dotnet build GolfTrackerApp.Mobile -f net10.0-ios -t:Run
 ```
 
 ## How It Works

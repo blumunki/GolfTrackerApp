@@ -91,12 +91,6 @@ GolfTrackerApp/
 │
 ├── docs/                               # Documentation
 │   ├── ARCHITECTURE.md                 # System architecture document
-│   ├── TODO.md                         # Improvement backlog
-│   ├── architecture/                   # Technical docs
-│   │   └── css-architecture.md
-│   ├── features/                       # Feature docs
-│   │   ├── dashboard.md
-│   │   └── public-access.md
 │   └── mobile-development-setup.md
 │
 ├── GolfTrackerApp.Web/                 # Web application + API host
@@ -135,12 +129,14 @@ Key API endpoints:
 | Controller | Base Route | Purpose |
 |-----------|-----------|---------|
 | AuthController | `/api/auth` | Login, register, Google sign-in |
+| ConnectionsController | `/api/connections` | Player-to-player social connections |
 | DashboardController | `/api/dashboard` | Dashboard statistics |
-| RoundsController | `/api/rounds` | Round CRUD |
-| PlayersController | `/api/players` | Player CRUD, connections, merge, reports |
 | GolfClubsController | `/api/golfclubs` | Golf club CRUD |
 | GolfCoursesController | `/api/golfcourses` | Golf course CRUD |
+| MergeController | `/api/merge` | Managed player merge workflow |
+| PlayersController | `/api/players` | Player CRUD + reports |
 | ReportsController | `/api/reports` | Aggregated reports |
+| RoundsController | `/api/rounds` | Round CRUD |
 
 ## Authentication
 
@@ -151,11 +147,7 @@ Key API endpoints:
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) — system architecture, data flow, design decisions
-- [Improvement Backlog](docs/TODO.md) — prioritised list of code optimisations and technical debt
-- [CSS Architecture](docs/architecture/css-architecture.md) — styling conventions
 - [Mobile Setup](docs/mobile-development-setup.md) — mobile development environment
-- [Dashboard Features](docs/features/dashboard.md) — dashboard capabilities
-- [Public Access](docs/features/public-access.md) — public browsing implementation
 
 ## License
 

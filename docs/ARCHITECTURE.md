@@ -99,12 +99,14 @@ GolfTrackerApp.Web/
 ├── Controllers/                        # REST API surface
 │   ├── BaseApiController.cs            # Shared JWT auth + user ID extraction
 │   ├── AuthController.cs              # Login, register, Google sign-in → JWT
+│   ├── ConnectionsController.cs       # Player-to-player social connections
 │   ├── DashboardController.cs         # Dashboard stats for mobile
-│   ├── RoundsController.cs            # Round CRUD
-│   ├── PlayersController.cs           # Player CRUD, connections, merge, reports
 │   ├── GolfClubsController.cs         # Golf club CRUD
 │   ├── GolfCoursesController.cs       # Golf course CRUD
-│   └── ReportsController.cs           # Aggregated reporting endpoints
+│   ├── MergeController.cs             # Managed player merge workflow
+│   ├── PlayersController.cs           # Player CRUD + reports
+│   ├── ReportsController.cs           # Aggregated reporting endpoints
+│   └── RoundsController.cs            # Round CRUD
 ├── Services/                           # Business logic (interfaces + implementations)
 │   ├── IGolfClubService.cs            # Golf club operations
 │   ├── IGolfCourseService.cs          # Golf course operations
@@ -126,9 +128,9 @@ GolfTrackerApp.Web/
 │   └── [Various DTOs]                # Report view models, chart data, etc.
 ├── Data/
 │   ├── ApplicationDbContext.cs        # EF Core context (Identity + domain entities)
-│   ├── ApplicationUser.cs            # Identity user (extends IdentityUser)
+│   ├── ApplicationUser.cs            # Identity user (extends IdentityUser with LinkedPlayerId)
 │   ├── SeedData.cs                   # Initial data seeding
-│   └── Migrations/                   # EF Core migrations (SQL Server)
+│   └── Migrations/                   # EF Core migrations (SQLite dev)
 ├── Components/
 │   ├── Pages/                        # Blazor Server page components
 │   ├── Layout/                       # MainLayout + NavMenu
@@ -150,6 +152,13 @@ GolfTrackerApp.Mobile/
 ├── MainPage.xaml / .cs                # BlazorWebView host
 ├── Components/
 │   ├── App.razor                      # Root component (custom page routing + bottom nav)
+│   ├── Dashboard/                     # Dashboard widget components
+│   │   ├── CourseDiaryWidget.razor
+│   │   ├── HeroStatsWidget.razor
+│   │   ├── ParPerformanceWidget.razor
+│   │   └── ScoringBreakdownWidget.razor
+│   ├── Shared/
+│   │   └── MobileRoundDetailDialog.razor
 │   └── Pages/                         # Page components
 │       ├── Home.razor                 # Dashboard
 │       ├── LoginPage.razor            # Google sign-in
@@ -214,8 +223,10 @@ The application uses Entity Framework Core with the following primary entities:
 
 ```
 ApplicationUser (ASP.NET Identity)
-    ├── 1:N → Player (CreatedByApplicationUserId)
+    ├── N:1 → Player (LinkedPlayerId — cached FK to user's own player record)
+    ├── 1:N → Player (CreatedByApplicationUserId — players this user created)
     ├── 1:N → PlayerConnection (RequestingUserId / TargetUserId)
+    ├── 1:N → PlayerMergeRequest (RequestingUserId / TargetUserId)
     └── 1:N → Notification
 
 Player
