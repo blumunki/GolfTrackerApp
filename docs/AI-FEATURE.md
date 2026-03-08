@@ -1631,7 +1631,7 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | 1.11 | Add AI config section to `appsettings.json` + `appsettings.Development.json` | Config files | ✅ Done |
 | 1.12 | Register all services in `Program.cs` | `Program.cs` | ✅ Done |
 | 1.13 | Add AI insight widget to web `Home.razor` | `Components/Pages/Home.razor` | ✅ Done |
-| 1.14 | Test end-to-end: dashboard loads → AI widget appears → insight generated + audit row written | Manual testing | ⬜ Pending |
+| 1.14 | Test end-to-end: dashboard loads → AI widget appears → insight generated + audit row written | Manual testing | ✅ Done |
 
 ### Phase 2 — Additional Providers + Failover
 
@@ -1645,66 +1645,66 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | 2.4 | Implement `MistralProviderService` (OpenAI-compatible) | `Services/AiProviders/MistralProviderService.cs` | ✅ Done |
 | 2.5 | Implement `DeepSeekProviderService` (OpenAI-compatible) | `Services/AiProviders/DeepSeekProviderService.cs` | ⬜ Pending |
 | 2.6 | Add placeholder implementations for MetaLlama, Manus | `Services/AiProviders/MetaLlama*.cs`, `Manus*.cs` | ⬜ Pending |
-| 2.7 | Test failover: disable primary → verify secondary picks up | Manual testing | ⬜ Pending |
-| 2.8 | Test circuit breaker: verify failed provider is skipped temporarily | Manual testing | ⬜ Pending |
+| 2.7 | Test failover: disable primary → verify secondary picks up | Manual testing | ✅ Done |
+| 2.8 | Test circuit breaker: verify failed provider is skipped temporarily | Manual testing | ✅ Done |
 
 ### Phase 3 — Insights Controller + Mobile API
 
 **Goal**: Mobile app can request AI insights via API.
 
-| Step | Task | Files |
-|------|------|-------|
-| 3.1 | Create `InsightsController` | `Controllers/InsightsController.cs` |
-| 3.2 | Create `IInsightsApiService` + `InsightsApiService` (mobile) | `Mobile/Services/Api/InsightsApiService.cs` |
-| 3.3 | Create mobile `AiInsightResult` + `AiChatMessage` DTOs | `Mobile/Models/AiInsightResult.cs` |
-| 3.4 | Register mobile service in `MauiProgram.cs` | `MauiProgram.cs` |
-| 3.5 | Create `AiInsightsWidget.razor` (mobile dashboard widget) | `Mobile/Components/Dashboard/AiInsightsWidget.razor` |
-| 3.6 | Integrate widget into mobile `Home.razor` | `Mobile/Components/Pages/Home.razor` |
-| 3.7 | Test mobile dashboard with AI insights | Manual testing |
+| Step | Task | Files | Status |
+|------|------|-------|--------|
+| 3.1 | Create `InsightsController` | `Controllers/InsightsController.cs` | ⬜ Pending |
+| 3.2 | Create `IInsightsApiService` + `InsightsApiService` (mobile) | `Mobile/Services/Api/InsightsApiService.cs` | ⬜ Pending |
+| 3.3 | Create mobile `AiInsightResult` + `AiChatMessage` DTOs | `Mobile/Models/AiInsightResult.cs` | ⬜ Pending |
+| 3.4 | Register mobile service in `MauiProgram.cs` | `MauiProgram.cs` | ⬜ Pending |
+| 3.5 | Create `AiInsightsWidget.razor` (mobile dashboard widget) | `Mobile/Components/Dashboard/AiInsightsWidget.razor` | ⬜ Pending |
+| 3.6 | Integrate widget into mobile `Home.razor` | `Mobile/Components/Pages/Home.razor` | ⬜ Pending |
+| 3.7 | Test mobile dashboard with AI insights | Manual testing | ⬜ Pending |
 
 ### Phase 4 — Player Report + Club/Course Insights
 
 **Goal**: AI analysis on report and detail pages.
 
-| Step | Task | Files |
-|------|------|-------|
-| 4.1 | Implement `GetPlayerReportInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` |
-| 4.2 | Implement `GetClubInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` |
-| 4.3 | Implement `GetCourseInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` |
-| 4.4 | Add AI panel to web `PlayerReport.razor` | `Components/Pages/Players/PlayerReport.razor` |
-| 4.5 | Add AI panel to web `GolfClubDetails.razor` | `Components/Pages/GolfClubs/GolfClubDetails.razor` |
-| 4.6 | Add AI panel to web `GolfCourseDetails.razor` | `Components/Pages/GolfCourses/GolfCourseDetails.razor` |
-| 4.7 | Add corresponding API endpoints to `InsightsController` | `Controllers/InsightsController.cs` |
-| 4.8 | Integrate into mobile report/detail pages | Mobile pages |
+| Step | Task | Files | Status |
+|------|------|-------|--------|
+| 4.1 | Implement `GetPlayerReportInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ⬜ Pending |
+| 4.2 | Implement `GetClubInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ⬜ Pending |
+| 4.3 | Implement `GetCourseInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ⬜ Pending |
+| 4.4 | Add AI panel to web `PlayerReport.razor` | `Components/Pages/Players/PlayerReport.razor` | ⬜ Pending |
+| 4.5 | Add AI panel to web `GolfClubDetails.razor` | `Components/Pages/GolfClubs/GolfClubDetails.razor` | ⬜ Pending |
+| 4.6 | Add AI panel to web `GolfCourseDetails.razor` | `Components/Pages/GolfCourses/GolfCourseDetails.razor` | ⬜ Pending |
+| 4.7 | Add corresponding API endpoints to `InsightsController` | `Controllers/InsightsController.cs` | ⬜ Pending |
+| 4.8 | Integrate into mobile report/detail pages | Mobile pages | ⬜ Pending |
 
 ### Phase 5 — AI Chat (Persistent Sessions)
 
 **Goal**: Free-form conversational AI with persistent session history.
 
-| Step | Task | Files |
-|------|------|-------|
-| 5.1 | Implement `ChatAsync` in `AiInsightService` (with session persistence + audit) | `Services/AiInsightService.cs` |
-| 5.2 | Add chat endpoints to `InsightsController` (`POST chat`, `GET sessions`, `GET sessions/{id}`) | `Controllers/InsightsController.cs` |
-| 5.3 | Create web AI Chat page with session list sidebar | `Components/Pages/AiChat.razor` |
-| 5.4 | Create mobile `AiChatPage.razor` with session resume | `Mobile/Components/Pages/AiChatPage.razor` |
-| 5.5 | Add mobile chat session endpoints to `InsightsApiService` | `Mobile/Services/Api/InsightsApiService.cs` |
-| 5.6 | Register chat page in mobile `App.razor` routing | `Mobile/Components/App.razor` |
-| 5.7 | Add navigation entry for chat | Mobile nav |
+| Step | Task | Files | Status |
+|------|------|-------|--------|
+| 5.1 | Implement `ChatAsync` in `AiInsightService` (with session persistence + audit) | `Services/AiInsightService.cs` | ⬜ Pending |
+| 5.2 | Add chat endpoints to `InsightsController` (`POST chat`, `GET sessions`, `GET sessions/{id}`) | `Controllers/InsightsController.cs` | ⬜ Pending |
+| 5.3 | Create web AI Chat page with session list sidebar | `Components/Pages/AiChat.razor` | ⬜ Pending |
+| 5.4 | Create mobile `AiChatPage.razor` with session resume | `Mobile/Components/Pages/AiChatPage.razor` | ⬜ Pending |
+| 5.5 | Add mobile chat session endpoints to `InsightsApiService` | `Mobile/Services/Api/InsightsApiService.cs` | ⬜ Pending |
+| 5.6 | Register chat page in mobile `App.razor` routing | `Mobile/Components/App.razor` | ⬜ Pending |
+| 5.7 | Add navigation entry for chat | Mobile nav | ⬜ Pending |
 
 ### Phase 6 — Polish + Production Readiness
 
 **Goal**: Production-ready with cost controls and observability.
 
-| Step | Task |
-|------|------|
-| 6.1 | Verify rate limiting works via audit log queries (already wired in Phase 1) |
-| 6.2 | Add CSS styling for AI widgets (web + mobile) |
-| 6.3 | Tune prompts based on real output quality |
-| 6.4 | Add "AI Insights" toggle in user settings (optional) |
-| 6.5 | Test with production data volume |
-| 6.6 | Configure production API keys via environment variables |
-| 6.7 | Review audit logs for prompt quality and token usage patterns |
-| 6.8 | Implement audit log retention cleanup (scheduled task or manual) |
+| Step | Task | Status |
+|------|------|--------|
+| 6.1 | Verify rate limiting works via audit log queries (already wired in Phase 1) | ⬜ Pending |
+| 6.2 | Add CSS styling for AI widgets (web + mobile) | ⬜ Pending |
+| 6.3 | Tune prompts based on real output quality | ⬜ Pending |
+| 6.4 | Add "AI Insights" toggle in user settings (optional) | ⬜ Pending |
+| 6.5 | Test with production data volume | ⬜ Pending |
+| 6.6 | Configure production API keys via environment variables | ⬜ Pending |
+| 6.7 | Review audit logs for prompt quality and token usage patterns | ⬜ Pending |
+| 6.8 | Implement audit log retention cleanup (scheduled task or manual) | ⬜ Pending |
 
 ---
 
