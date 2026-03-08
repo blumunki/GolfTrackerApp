@@ -10,6 +10,8 @@
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
+@inject IAiInsightService AiInsightService
+@inject IConfiguration Configuration
 
 @using System.Security.Claims
 @using GolfTrackerApp.Web.Models
@@ -412,6 +414,53 @@
                         </MudItem>
                     </MudGrid>
 
+                    @* ========== AI Insights Widget ========== *@
+                    @if (aiInsightEnabled && dashboardStats?.TotalRounds > 0)
+                    {
+                        <MudGrid Spacing="4">
+                            <MudItem xs="12">
+                                <MudCard Class="gp-card gp-animate-fade-in-up" Elevation="0">
+                                    <MudCardHeader>
+                                        <CardHeaderContent>
+                                            <MudText Typo="Typo.h6">
+                                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Class="mr-2" />
+                                                AI Insights
+                                            </MudText>
+                                        </CardHeaderContent>
+                                        <CardHeaderActions>
+                                            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                                                           OnClick="RefreshAiInsights"
+                                                           Disabled="@aiLoading"
+                                                           Size="Size.Small" />
+                                        </CardHeaderActions>
+                                    </MudCardHeader>
+                                    <MudCardContent>
+                                        @if (aiLoading)
+                                        {
+                                            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                                            <MudText Typo="Typo.caption" Class="mt-2">Analysing your game...</MudText>
+                                        }
+                                        else if (aiInsight?.Success == true)
+                                        {
+                                            <MudText Typo="Typo.body2" Style="white-space: pre-line;">
+                                                @aiInsight.Content
+                                            </MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2">
+                                                Powered by @aiInsight.ProviderUsed
+                                            </MudText>
+                                        }
+                                        else if (aiInsight != null)
+                                        {
+                                            <MudText Typo="Typo.body2" Color="Color.Warning">
+                                                @(aiInsight.ErrorMessage ?? "Unable to generate insights right now.")
+                                            </MudText>
+                                        }
+                                    </MudCardContent>
+                                </MudCard>
+                            </MudItem>
+                        </MudGrid>
+                    }
+
                     <!-- ========== ROW 5: Recent Rounds + Playing Partners ========== -->
                     <MudGrid Spacing="4">
                         <!-- Recent Rounds -->
@@ -747,6 +796,11 @@
     private ScoringDistribution? _scoringDistribution;
     private PerformanceByPar? _performanceByPar;
 
+    // AI Insights
+    private bool aiInsightEnabled;
+    private bool aiLoading;
+    private AiInsightResult? aiInsight;
+
     // Data for public landing page
     private int totalGolfClubs = 0;
     private int totalGolfCourses = 0;
@@ -802,6 +856,13 @@
                 _courseHistory = courseHistoryTask.Result;
                 _scoringDistribution = scoringDistTask.Result;
                 _performanceByPar = parPerfTask.Result;
+
+                // Fire-and-forget AI insights load (don't block dashboard render)
+                aiInsightEnabled = Configuration.GetValue<bool>("AiInsights:Enabled");
+                if (aiInsightEnabled && dashboardStats?.TotalRounds > 0)
+                {
+                    _ = LoadAiInsights(currentUserId);
+                }
             }
         }
         else
@@ -869,5 +930,38 @@
             new ChartSeries { Name = "Score vs Par", Data = data.Select(d => (double)d.ScoreVsPar).ToArray() }
         };
         _performanceXAxisLabels = data.Select(d => d.Date.ToString("MMM dd")).ToArray();
+    }
+
+    private async Task LoadAiInsights(string userId)
+    {
+        aiLoading = true;
+        StateHasChanged();
+        try
+        {
+            aiInsight = await AiInsightService.GetDashboardInsightsAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            aiInsight = new AiInsightResult
+            {
+                Success = false,
+                ErrorMessage = "Could not load AI insights."
+            };
+        }
+        finally
+        {
+            aiLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task RefreshAiInsights()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId != null)
+        {
+            await LoadAiInsights(userId);
+        }
     }
 }

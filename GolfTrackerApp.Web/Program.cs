@@ -140,6 +140,20 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IConnectionService, ConnectionService>();
 builder.Services.AddScoped<IMergeService, MergeService>();
 
+// AI Insights services
+builder.Services.AddScoped<IAiInsightService, AiInsightService>();
+builder.Services.AddScoped<IAiRoutingService, AiRoutingService>();
+builder.Services.AddScoped<IAiAuditService, AiAuditService>();
+builder.Services.AddScoped<IAiChatService, AiChatService>();
+builder.Services.AddHttpClient("AiProvider_OpenAI");
+builder.Services.AddHttpClient("AiProvider_Anthropic");
+builder.Services.AddHttpClient("AiProvider_Gemini");
+builder.Services.AddHttpClient("AiProvider_Grok");
+builder.Services.AddHttpClient("AiProvider_Mistral");
+builder.Services.AddHttpClient("AiProvider_DeepSeek");
+builder.Services.AddHttpClient("AiProvider_MetaLlama");
+builder.Services.AddHttpClient("AiProvider_Manus");
+
 builder.Services.AddMudServices();
 
 var app = builder.Build();
@@ -325,6 +339,76 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
                 CREATE INDEX [IX_PlayerMergeRequests_TargetUserId] ON [PlayerMergeRequests] ([TargetUserId]);
             ");
             logger.LogInformation("PlayerMergeRequests table created.");
+        }
+
+        // Check if AiChatSessions table exists
+        if (!await TableExistsAsync(connection, "AiChatSessions"))
+        {
+            logger.LogInformation("Creating AiChatSessions table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [AiChatSessions] (
+                    [AiChatSessionId] INT IDENTITY(1,1) NOT NULL,
+                    [ApplicationUserId] NVARCHAR(450) NOT NULL,
+                    [Title] NVARCHAR(100) NULL,
+                    [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    [LastMessageAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    [IsArchived] BIT NOT NULL DEFAULT 0,
+                    CONSTRAINT [PK_AiChatSessions] PRIMARY KEY ([AiChatSessionId]),
+                    CONSTRAINT [FK_AiChatSessions_AspNetUsers] FOREIGN KEY ([ApplicationUserId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_AiChatSessions_UserId_LastMessage] ON [AiChatSessions] ([ApplicationUserId], [LastMessageAt]);
+            ");
+            logger.LogInformation("AiChatSessions table created.");
+        }
+
+        // Check if AiChatSessionMessages table exists
+        if (!await TableExistsAsync(connection, "AiChatSessionMessages"))
+        {
+            logger.LogInformation("Creating AiChatSessionMessages table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [AiChatSessionMessages] (
+                    [AiChatSessionMessageId] INT IDENTITY(1,1) NOT NULL,
+                    [AiChatSessionId] INT NOT NULL,
+                    [Role] NVARCHAR(20) NOT NULL,
+                    [Content] NVARCHAR(MAX) NOT NULL,
+                    [Timestamp] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    CONSTRAINT [PK_AiChatSessionMessages] PRIMARY KEY ([AiChatSessionMessageId]),
+                    CONSTRAINT [FK_AiChatSessionMessages_Session] FOREIGN KEY ([AiChatSessionId]) REFERENCES [AiChatSessions]([AiChatSessionId]) ON DELETE CASCADE
+                );
+                CREATE INDEX [IX_AiChatSessionMessages_SessionId_Timestamp] ON [AiChatSessionMessages] ([AiChatSessionId], [Timestamp]);
+            ");
+            logger.LogInformation("AiChatSessionMessages table created.");
+        }
+
+        // Check if AiAuditLogs table exists
+        if (!await TableExistsAsync(connection, "AiAuditLogs"))
+        {
+            logger.LogInformation("Creating AiAuditLogs table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [AiAuditLogs] (
+                    [AiAuditLogId] INT IDENTITY(1,1) NOT NULL,
+                    [ApplicationUserId] NVARCHAR(450) NOT NULL,
+                    [RequestedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    [ResponseTimeMs] INT NOT NULL DEFAULT 0,
+                    [InsightType] NVARCHAR(50) NOT NULL,
+                    [ProviderName] NVARCHAR(50) NULL,
+                    [ModelUsed] NVARCHAR(50) NULL,
+                    [PromptTokens] INT NOT NULL DEFAULT 0,
+                    [CompletionTokens] INT NOT NULL DEFAULT 0,
+                    [TotalTokens] INT NOT NULL DEFAULT 0,
+                    [Success] BIT NOT NULL DEFAULT 0,
+                    [ErrorMessage] NVARCHAR(500) NULL,
+                    [PromptSent] NVARCHAR(MAX) NULL,
+                    [ResponseReceived] NVARCHAR(MAX) NULL,
+                    [AiChatSessionId] INT NULL,
+                    CONSTRAINT [PK_AiAuditLogs] PRIMARY KEY ([AiAuditLogId]),
+                    CONSTRAINT [FK_AiAuditLogs_AspNetUsers] FOREIGN KEY ([ApplicationUserId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_AiAuditLogs_AiChatSession] FOREIGN KEY ([AiChatSessionId]) REFERENCES [AiChatSessions]([AiChatSessionId]) ON DELETE NO ACTION
+                );
+                CREATE INDEX [IX_AiAuditLogs_UserId_RequestedAt] ON [AiAuditLogs] ([ApplicationUserId], [RequestedAt]);
+                CREATE INDEX [IX_AiAuditLogs_RequestedAt] ON [AiAuditLogs] ([RequestedAt]);
+            ");
+            logger.LogInformation("AiAuditLogs table created.");
         }
     }
     finally

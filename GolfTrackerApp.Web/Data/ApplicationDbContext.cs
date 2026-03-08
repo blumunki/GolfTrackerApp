@@ -29,6 +29,11 @@ namespace GolfTrackerApp.Web.Data
         public DbSet<PlayerMergeRequest> PlayerMergeRequests { get; set; }
         public DbSet<Notification> Notifications { get; set; }
 
+        // AI Insights tables
+        public DbSet<AiAuditLog> AiAuditLogs { get; set; }
+        public DbSet<AiChatSession> AiChatSessions { get; set; }
+        public DbSet<AiChatSessionMessage> AiChatSessionMessages { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder); // Important: Call base method first for Identity models
@@ -140,6 +145,45 @@ namespace GolfTrackerApp.Web.Data
                 .WithMany()
                 .HasForeignKey(u => u.LinkedPlayerId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // AI Audit Log
+            builder.Entity<AiAuditLog>(entity =>
+            {
+                entity.HasOne(a => a.ApplicationUser)
+                    .WithMany()
+                    .HasForeignKey(a => a.ApplicationUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(a => a.AiChatSession)
+                    .WithMany(s => s.AuditLogs)
+                    .HasForeignKey(a => a.AiChatSessionId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasIndex(a => new { a.ApplicationUserId, a.RequestedAt });
+                entity.HasIndex(a => a.RequestedAt);
+            });
+
+            // AI Chat Session
+            builder.Entity<AiChatSession>(entity =>
+            {
+                entity.HasOne(s => s.ApplicationUser)
+                    .WithMany()
+                    .HasForeignKey(s => s.ApplicationUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(s => new { s.ApplicationUserId, s.LastMessageAt });
+            });
+
+            // AI Chat Session Message
+            builder.Entity<AiChatSessionMessage>(entity =>
+            {
+                entity.HasOne(m => m.AiChatSession)
+                    .WithMany(s => s.Messages)
+                    .HasForeignKey(m => m.AiChatSessionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(m => new { m.AiChatSessionId, m.Timestamp });
+            });
         }
     }
 }
