@@ -26,47 +26,47 @@
 }
 else if (providerViewModels.Any())
 {
-    <MudTable Items="@providerViewModels" Hover="true" Elevation="2" Class="mb-4">
-        <HeaderContent>
-            <MudTh>Provider</MudTh>
-            <MudTh>Model</MudTh>
-            <MudTh>Priority</MudTh>
-            <MudTh>API Key</MudTh>
-            <MudTh>Enabled</MudTh>
-            <MudTh>Last Updated</MudTh>
-        </HeaderContent>
-        <RowTemplate>
-            <MudTd DataLabel="Provider">
-                <MudText Typo="Typo.body1"><strong>@context.ProviderName</strong></MudText>
-            </MudTd>
-            <MudTd DataLabel="Model">
-                <MudText Typo="Typo.body2">@context.Model</MudText>
-            </MudTd>
-            <MudTd DataLabel="Priority">
-                <MudNumericField T="int" @bind-Value="context.Priority" Min="1" Max="99"
-                                 Style="width: 80px" Variant="Variant.Outlined"
-                                 OnBlur="() => SaveProvider(context)" />
-            </MudTd>
-            <MudTd DataLabel="API Key">
-                @if (context.HasApiKey)
+    <MudText Typo="Typo.body2" Color="Color.Tertiary" Class="mb-3">
+        Use the arrows to reorder failover priority. The first enabled provider with an API key will be used.
+    </MudText>
+
+    <div class="d-flex flex-column gap-2 mb-4">
+        @for (int i = 0; i < providerViewModels.Count; i++)
+        {
+            var index = i;
+            var vm = providerViewModels[index];
+            <MudPaper Elevation="2" Class="pa-3 d-flex align-center gap-3">
+                <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="min-width: 24px; text-align: center;">@(index + 1)</MudText>
+                <MudButtonGroup OverrideStyles="false" Size="Size.Small" Variant="Variant.Outlined">
+                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp"
+                                   Size="Size.Small"
+                                   Disabled="@(index == 0)"
+                                   OnClick="@(() => MoveProvider(index, -1))" />
+                    <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown"
+                                   Size="Size.Small"
+                                   Disabled="@(index == providerViewModels.Count - 1)"
+                                   OnClick="@(() => MoveProvider(index, 1))" />
+                </MudButtonGroup>
+                <MudText Typo="Typo.body1" Style="min-width: 120px;"><strong>@vm.ProviderName</strong></MudText>
+                <MudText Typo="Typo.body2" Color="Color.Tertiary" Style="min-width: 160px;">@vm.Model</MudText>
+                @if (vm.HasApiKey)
                 {
-                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Configured</MudChip>
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">API Key</MudChip>
                 }
                 else
                 {
-                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Missing</MudChip>
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">No Key</MudChip>
                 }
-            </MudTd>
-            <MudTd DataLabel="Enabled">
-                <MudSwitch T="bool" Value="context.Enabled" Color="Color.Primary"
-                           Disabled="@(!context.HasApiKey)"
-                           ValueChanged="@(async (bool val) => { context.Enabled = val; await SaveProvider(context); })" />
-            </MudTd>
-            <MudTd DataLabel="Last Updated">
-                <MudText Typo="Typo.caption">@context.UpdatedAt.ToString("dd MMM yyyy HH:mm")</MudText>
-            </MudTd>
-        </RowTemplate>
-    </MudTable>
+                <MudSwitch T="bool" Value="vm.Enabled" Color="Color.Primary"
+                           Disabled="@(!vm.HasApiKey)"
+                           ValueChanged="@(async (bool val) => await ToggleEnabled(vm, val))"
+                           Class="ml-auto" />
+                <MudText Typo="Typo.caption" Color="Color.Tertiary" Style="min-width: 130px;">
+                    @vm.UpdatedAt.ToString("dd MMM yyyy HH:mm")
+                </MudText>
+            </MudPaper>
+        }
+    </div>
 
     @if (!string.IsNullOrEmpty(statusMessage))
     {
@@ -75,7 +75,6 @@ else if (providerViewModels.Any())
 
     <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-4">
         API keys are managed via user-secrets or environment variables. Models and endpoints are configured in appsettings.json.
-        Use this page to enable/disable providers and adjust failover priority.
     </MudText>
 }
 else
@@ -116,13 +115,57 @@ else
         }).OrderBy(p => p.Priority).ToList();
     }
 
-    private async Task SaveProvider(ProviderViewModel vm)
+    private async Task MoveProvider(int currentIndex, int direction)
+    {
+        var targetIndex = currentIndex + direction;
+        if (targetIndex < 0 || targetIndex >= providerViewModels.Count) return;
+
+        // Swap the two items
+        (providerViewModels[currentIndex], providerViewModels[targetIndex]) =
+            (providerViewModels[targetIndex], providerViewModels[currentIndex]);
+
+        // Reassign priorities based on new order
+        for (int i = 0; i < providerViewModels.Count; i++)
+        {
+            providerViewModels[i].Priority = i + 1;
+        }
+
+        await SaveAllPriorities();
+    }
+
+    private async Task SaveAllPriorities()
     {
         try
         {
-            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+            var userId = await GetUserIdAsync();
+            var priorities = providerViewModels
+                .Select(p => (p.AiProviderSettingsId, p.Priority))
+                .ToList();
 
+            await ProviderSettingsService.UpdatePrioritiesAsync(priorities, userId);
+
+            foreach (var vm in providerViewModels)
+                vm.UpdatedAt = DateTime.UtcNow;
+
+            statusMessage = "Provider order saved.";
+            statusSeverity = Severity.Success;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save provider priorities");
+            statusMessage = "Failed to save provider order.";
+            statusSeverity = Severity.Error;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ToggleEnabled(ProviderViewModel vm, bool enabled)
+    {
+        vm.Enabled = enabled;
+        try
+        {
+            var userId = await GetUserIdAsync();
             await ProviderSettingsService.UpdateAsync(new AiProviderSettings
             {
                 AiProviderSettingsId = vm.AiProviderSettingsId,
@@ -132,17 +175,24 @@ else
             }, userId);
 
             vm.UpdatedAt = DateTime.UtcNow;
-            statusMessage = $"{vm.ProviderName} updated successfully.";
+            statusMessage = $"{vm.ProviderName} {(enabled ? "enabled" : "disabled")}.";
             statusSeverity = Severity.Success;
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to save provider {Provider}", vm.ProviderName);
+            Logger.LogError(ex, "Failed to toggle provider {Provider}", vm.ProviderName);
+            vm.Enabled = !enabled; // revert
             statusMessage = $"Failed to update {vm.ProviderName}.";
             statusSeverity = Severity.Error;
         }
 
         StateHasChanged();
+    }
+
+    private async Task<string> GetUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
     }
 
     private class ProviderViewModel

@@ -57,6 +57,26 @@ namespace GolfTrackerApp.Web.Services
                 existing.ProviderName, existing.Enabled, existing.Priority, updatedByUserId);
         }
 
+        public async Task UpdatePrioritiesAsync(List<(int Id, int Priority)> priorities, string updatedByUserId)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var allSettings = await context.AiProviderSettings.ToListAsync();
+
+            foreach (var (id, priority) in priorities)
+            {
+                var setting = allSettings.FirstOrDefault(s => s.AiProviderSettingsId == id);
+                if (setting != null)
+                {
+                    setting.Priority = priority;
+                    setting.UpdatedAt = DateTime.UtcNow;
+                    setting.UpdatedByUserId = updatedByUserId;
+                }
+            }
+
+            await context.SaveChangesAsync();
+            _logger.LogInformation("Updated priorities for {Count} providers by {User}", priorities.Count, updatedByUserId);
+        }
+
         public async Task SeedFromConfigAsync()
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
