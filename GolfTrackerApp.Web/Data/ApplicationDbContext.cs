@@ -33,6 +33,7 @@ namespace GolfTrackerApp.Web.Data
         public DbSet<AiAuditLog> AiAuditLogs { get; set; }
         public DbSet<AiChatSession> AiChatSessions { get; set; }
         public DbSet<AiChatSessionMessage> AiChatSessionMessages { get; set; }
+        public DbSet<AiProviderSettings> AiProviderSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -183,6 +184,12 @@ namespace GolfTrackerApp.Web.Data
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(m => new { m.AiChatSessionId, m.Timestamp });
+            });
+
+            // AI Provider Settings
+            builder.Entity<AiProviderSettings>(entity =>
+            {
+                entity.HasIndex(s => s.ProviderName).IsUnique();
             });
         }
     }

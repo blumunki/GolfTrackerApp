@@ -1,0 +1,158 @@
+@page "/admin/ai-providers"
+@attribute [Authorize(Roles = "Admin")]
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
+@inject IAiProviderSettingsService ProviderSettingsService
+@inject IConfiguration Configuration
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<AiProviders> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>AI Provider Management</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-2" />
+    AI Provider Management
+</MudText>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (providerViewModels.Any())
+{
+    <MudTable Items="@providerViewModels" Hover="true" Elevation="2" Class="mb-4">
+        <HeaderContent>
+            <MudTh>Provider</MudTh>
+            <MudTh>Model</MudTh>
+            <MudTh>Priority</MudTh>
+            <MudTh>API Key</MudTh>
+            <MudTh>Enabled</MudTh>
+            <MudTh>Last Updated</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Provider">
+                <MudText Typo="Typo.body1"><strong>@context.ProviderName</strong></MudText>
+            </MudTd>
+            <MudTd DataLabel="Model">
+                <MudText Typo="Typo.body2">@context.Model</MudText>
+            </MudTd>
+            <MudTd DataLabel="Priority">
+                <MudNumericField T="int" @bind-Value="context.Priority" Min="1" Max="99"
+                                 Style="width: 80px" Variant="Variant.Outlined"
+                                 OnBlur="() => SaveProvider(context)" />
+            </MudTd>
+            <MudTd DataLabel="API Key">
+                @if (context.HasApiKey)
+                {
+                    <MudChip T="string" Color="Color.Success" Size="Size.Small">Configured</MudChip>
+                }
+                else
+                {
+                    <MudChip T="string" Color="Color.Error" Size="Size.Small">Missing</MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Enabled">
+                <MudSwitch T="bool" Value="context.Enabled" Color="Color.Primary"
+                           Disabled="@(!context.HasApiKey)"
+                           ValueChanged="@(async (bool val) => { context.Enabled = val; await SaveProvider(context); })" />
+            </MudTd>
+            <MudTd DataLabel="Last Updated">
+                <MudText Typo="Typo.caption">@context.UpdatedAt.ToString("dd MMM yyyy HH:mm")</MudText>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <MudAlert Severity="@statusSeverity" Class="mt-2" Dense="true">@statusMessage</MudAlert>
+    }
+
+    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-4">
+        API keys are managed via user-secrets or environment variables. Models and endpoints are configured in appsettings.json.
+        Use this page to enable/disable providers and adjust failover priority.
+    </MudText>
+}
+else
+{
+    <MudAlert Severity="Severity.Info">No AI providers configured. Check appsettings.json for provider entries.</MudAlert>
+}
+
+@code {
+    private List<ProviderViewModel> providerViewModels = new();
+    private bool loading = true;
+    private string? statusMessage;
+    private Severity statusSeverity = Severity.Success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProviders();
+        loading = false;
+    }
+
+    private async Task LoadProviders()
+    {
+        var dbSettings = await ProviderSettingsService.GetAllAsync();
+        var providersSection = Configuration.GetSection("AiInsights:Providers");
+
+        providerViewModels = dbSettings.Select(db =>
+        {
+            var configSection = providersSection.GetSection(db.ProviderName);
+            return new ProviderViewModel
+            {
+                AiProviderSettingsId = db.AiProviderSettingsId,
+                ProviderName = db.ProviderName,
+                Enabled = db.Enabled,
+                Priority = db.Priority,
+                UpdatedAt = db.UpdatedAt,
+                Model = configSection?.GetValue<string>("Model") ?? "",
+                HasApiKey = !string.IsNullOrEmpty(configSection?.GetValue<string>("ApiKey"))
+            };
+        }).OrderBy(p => p.Priority).ToList();
+    }
+
+    private async Task SaveProvider(ProviderViewModel vm)
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+
+            await ProviderSettingsService.UpdateAsync(new AiProviderSettings
+            {
+                AiProviderSettingsId = vm.AiProviderSettingsId,
+                ProviderName = vm.ProviderName,
+                Enabled = vm.Enabled,
+                Priority = vm.Priority
+            }, userId);
+
+            vm.UpdatedAt = DateTime.UtcNow;
+            statusMessage = $"{vm.ProviderName} updated successfully.";
+            statusSeverity = Severity.Success;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save provider {Provider}", vm.ProviderName);
+            statusMessage = $"Failed to update {vm.ProviderName}.";
+            statusSeverity = Severity.Error;
+        }
+
+        StateHasChanged();
+    }
+
+    private class ProviderViewModel
+    {
+        public int AiProviderSettingsId { get; set; }
+        public string ProviderName { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+        public int Priority { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public string Model { get; set; } = string.Empty;
+        public bool HasApiKey { get; set; }
+    }
+}

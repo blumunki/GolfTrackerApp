@@ -1,0 +1,267 @@
+@page "/admin/ai-usage"
+@attribute [Authorize(Roles = "Admin")]
+
+@using GolfTrackerApp.Web.Data
+@using GolfTrackerApp.Web.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject ILogger<AiUsage> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>AI Usage Dashboard</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Analytics" Class="mr-2" />
+    AI Usage Dashboard
+</MudText>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Summary Cards ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.caption">Calls (24h)</MudText>
+                    <MudText Typo="Typo.h5">@calls24h</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.caption">Calls (7d)</MudText>
+                    <MudText Typo="Typo.h5">@calls7d</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.caption">Tokens (7d)</MudText>
+                    <MudText Typo="Typo.h5">@tokens7d.ToString("N0")</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.caption">Success Rate (30d)</MudText>
+                    <MudText Typo="Typo.h5" Color="@(successRate30d >= 90 ? Color.Success : Color.Warning)">
+                        @successRate30d.ToString("F1")%
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Provider Distribution ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-2">Provider Distribution (30d)</MudText>
+                    @if (providerDistribution.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr>
+                                    <th>Provider</th>
+                                    <th>Calls</th>
+                                    <th>Tokens</th>
+                                    <th>Avg Response</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in providerDistribution)
+                                {
+                                    <tr>
+                                        <td>@p.Provider</td>
+                                        <td>@p.CallCount</td>
+                                        <td>@p.TotalTokens.ToString("N0")</td>
+                                        <td>@p.AvgResponseMs ms</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Tertiary">No data yet.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-2">Top Users by Tokens (30d)</MudText>
+                    @if (topUsers.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Calls</th>
+                                    <th>Tokens</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var u in topUsers)
+                                {
+                                    <tr>
+                                        <td>@u.Email</td>
+                                        <td>@u.CallCount</td>
+                                        <td>@u.TotalTokens.ToString("N0")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Tertiary">No data yet.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Recent Errors ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-2">Recent Errors</MudText>
+            @if (recentErrors.Any())
+            {
+                <MudSimpleTable Dense="true" Hover="true">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Provider</th>
+                            <th>Type</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in recentErrors)
+                        {
+                            <tr>
+                                <td>@e.RequestedAt.ToString("dd MMM HH:mm")</td>
+                                <td>@(e.ProviderName ?? "—")</td>
+                                <td>@e.InsightType</td>
+                                <td style="max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    @(e.ErrorMessage ?? "Unknown error")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Success">No recent errors.</MudText>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    private bool loading = true;
+    private int calls24h;
+    private int calls7d;
+    private int tokens7d;
+    private double successRate30d;
+    private List<ProviderStats> providerDistribution = new();
+    private List<UserStats> topUsers = new();
+    private List<AiAuditLog> recentErrors = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStats();
+        loading = false;
+    }
+
+    private async Task LoadStats()
+    {
+        await using var context = await ContextFactory.CreateDbContextAsync();
+        var now = DateTime.UtcNow;
+        var since24h = now.AddHours(-24);
+        var since7d = now.AddDays(-7);
+        var since30d = now.AddDays(-30);
+
+        var logs = await context.AiAuditLogs
+            .AsNoTracking()
+            .Where(a => a.RequestedAt >= since30d)
+            .ToListAsync();
+
+        calls24h = logs.Count(a => a.RequestedAt >= since24h);
+        calls7d = logs.Count(a => a.RequestedAt >= since7d);
+        tokens7d = logs.Where(a => a.RequestedAt >= since7d && a.Success).Sum(a => a.TotalTokens);
+
+        var total30d = logs.Count;
+        var success30d = logs.Count(a => a.Success);
+        successRate30d = total30d > 0 ? (double)success30d / total30d * 100 : 0;
+
+        providerDistribution = logs
+            .Where(a => a.Success && !string.IsNullOrEmpty(a.ProviderName))
+            .GroupBy(a => a.ProviderName!)
+            .Select(g => new ProviderStats
+            {
+                Provider = g.Key,
+                CallCount = g.Count(),
+                TotalTokens = g.Sum(a => a.TotalTokens),
+                AvgResponseMs = (int)g.Average(a => a.ResponseTimeMs)
+            })
+            .OrderByDescending(p => p.CallCount)
+            .ToList();
+
+        topUsers = await context.AiAuditLogs
+            .AsNoTracking()
+            .Where(a => a.RequestedAt >= since30d && a.Success)
+            .GroupBy(a => a.ApplicationUserId)
+            .Select(g => new
+            {
+                UserId = g.Key,
+                CallCount = g.Count(),
+                TotalTokens = g.Sum(a => a.TotalTokens)
+            })
+            .OrderByDescending(u => u.TotalTokens)
+            .Take(10)
+            .Join(context.Users, u => u.UserId, user => user.Id, (u, user) => new UserStats
+            {
+                Email = user.Email ?? u.UserId,
+                CallCount = u.CallCount,
+                TotalTokens = u.TotalTokens
+            })
+            .ToListAsync();
+
+        recentErrors = logs
+            .Where(a => !a.Success)
+            .OrderByDescending(a => a.RequestedAt)
+            .Take(20)
+            .ToList();
+    }
+
+    private class ProviderStats
+    {
+        public string Provider { get; set; } = string.Empty;
+        public int CallCount { get; set; }
+        public int TotalTokens { get; set; }
+        public int AvgResponseMs { get; set; }
+    }
+
+    private class UserStats
+    {
+        public string Email { get; set; } = string.Empty;
+        public int CallCount { get; set; }
+        public int TotalTokens { get; set; }
+    }
+}

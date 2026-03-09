@@ -145,6 +145,7 @@ builder.Services.AddScoped<IAiInsightService, AiInsightService>();
 builder.Services.AddScoped<IAiRoutingService, AiRoutingService>();
 builder.Services.AddScoped<IAiAuditService, AiAuditService>();
 builder.Services.AddScoped<IAiChatService, AiChatService>();
+builder.Services.AddScoped<IAiProviderSettingsService, AiProviderSettingsService>();
 builder.Services.AddHttpClient("AiProvider_OpenAI");
 builder.Services.AddHttpClient("AiProvider_Anthropic");
 builder.Services.AddHttpClient("AiProvider_Gemini");
@@ -192,6 +193,10 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("Seeding database...");
         await SeedData.InitializeAsync(services);
         logger.LogInformation("Database seeding completed.");
+
+        // Seed AI provider settings from config if table is empty
+        var providerSettingsService = services.GetRequiredService<IAiProviderSettingsService>();
+        await providerSettingsService.SeedFromConfigAsync();
     }
     catch (Exception ex)
     {
@@ -409,6 +414,25 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
                 CREATE INDEX [IX_AiAuditLogs_RequestedAt] ON [AiAuditLogs] ([RequestedAt]);
             ");
             logger.LogInformation("AiAuditLogs table created.");
+        }
+
+        // Check if AiProviderSettings table exists
+        if (!await TableExistsAsync(connection, "AiProviderSettings"))
+        {
+            logger.LogInformation("Creating AiProviderSettings table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [AiProviderSettings] (
+                    [AiProviderSettingsId] INT IDENTITY(1,1) NOT NULL,
+                    [ProviderName] NVARCHAR(50) NOT NULL,
+                    [Enabled] BIT NOT NULL DEFAULT 0,
+                    [Priority] INT NOT NULL DEFAULT 99,
+                    [UpdatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    [UpdatedByUserId] NVARCHAR(450) NULL,
+                    CONSTRAINT [PK_AiProviderSettings] PRIMARY KEY ([AiProviderSettingsId])
+                );
+                CREATE UNIQUE INDEX [IX_AiProviderSettings_ProviderName] ON [AiProviderSettings] ([ProviderName]);
+            ");
+            logger.LogInformation("AiProviderSettings table created.");
         }
     }
     finally

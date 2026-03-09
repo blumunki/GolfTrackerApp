@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using GolfTrackerApp.Web.Data;
 using GolfTrackerApp.Web.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace GolfTrackerApp.Web.Services
 {
@@ -12,11 +14,16 @@ namespace GolfTrackerApp.Web.Services
         private readonly IPlayerService _playerService;
         private readonly IAiAuditService _auditService;
         private readonly IAiChatService _chatService;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AiInsightService> _logger;
 
-        private static readonly ConcurrentDictionary<string, (AiInsightResult Result, DateTime CachedAt)>
-            _cache = new();
+        private record CachedInsight(
+            AiInsightResult Result,
+            DateTime DataWatermark,
+            DateTime GeneratedAt);
+
+        private static readonly ConcurrentDictionary<string, CachedInsight> _cache = new();
 
         public AiInsightService(
             IAiRoutingService aiRouting,
@@ -24,6 +31,7 @@ namespace GolfTrackerApp.Web.Services
             IPlayerService playerService,
             IAiAuditService auditService,
             IAiChatService chatService,
+            IDbContextFactory<ApplicationDbContext> contextFactory,
             IConfiguration configuration,
             ILogger<AiInsightService> logger)
         {
@@ -32,24 +40,29 @@ namespace GolfTrackerApp.Web.Services
             _playerService = playerService;
             _auditService = auditService;
             _chatService = chatService;
+            _contextFactory = contextFactory;
             _configuration = configuration;
             _logger = logger;
         }
 
         public async Task<AiInsightResult> GetDashboardInsightsAsync(
-            string userId, CancellationToken cancellationToken = default)
+            string userId, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
             if (!IsEnabled()) return DisabledResult();
 
             var cacheKey = $"dashboard_{userId}";
-            if (TryGetCached(cacheKey, out var cached)) return cached;
-
-            if (await _auditService.IsRateLimitedAsync(userId))
-                return new AiInsightResult { Success = false, ErrorMessage = "Rate limit reached. Try again later." };
 
             var player = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
             if (player == null)
                 return new AiInsightResult { Success = false, ErrorMessage = "Player not found." };
+
+            var lastDataChange = await GetLastDataChangeAsync(player.PlayerId);
+
+            if (!forceRefresh && TryGetCachedWithWatermark(cacheKey, lastDataChange, out var cached))
+                return cached;
+
+            if (await _auditService.IsRateLimitedAsync(userId))
+                return new AiInsightResult { Success = false, ErrorMessage = "Rate limit reached. Try again later." };
 
             var statsTask = _reportService.GetDashboardStatsAsync(userId);
             var scoringTask = _reportService.GetScoringDistributionAsync(player.PlayerId, null, null, null, null, null);
@@ -98,7 +111,11 @@ namespace GolfTrackerApp.Web.Services
                 ResponseReceived = logResponses ? result.Content : null
             });
 
-            if (result.Success) Cache(cacheKey, result);
+            if (result.Success)
+            {
+                result.GeneratedAt = DateTime.UtcNow;
+                CacheWithWatermark(cacheKey, result, lastDataChange);
+            }
             return result;
         }
 
@@ -296,20 +313,51 @@ namespace GolfTrackerApp.Web.Services
         private static AiInsightResult DisabledResult() =>
             new() { Success = false, ErrorMessage = "AI Insights are not enabled." };
 
-        private bool TryGetCached(string key, out AiInsightResult result)
+        private bool TryGetCachedWithWatermark(string key, DateTime? lastDataChange, out AiInsightResult result)
         {
-            var cacheMinutes = _configuration.GetValue<int>("AiInsights:CacheMinutes");
-            if (_cache.TryGetValue(key, out var entry)
-                && DateTime.UtcNow - entry.CachedAt < TimeSpan.FromMinutes(cacheMinutes))
+            if (_cache.TryGetValue(key, out var cached)
+                && lastDataChange.HasValue
+                && cached.DataWatermark >= lastDataChange.Value)
             {
-                result = entry.Result;
+                result = new AiInsightResult
+                {
+                    Success = cached.Result.Success,
+                    Content = cached.Result.Content,
+                    ProviderUsed = cached.Result.ProviderUsed,
+                    ModelUsed = cached.Result.ModelUsed,
+                    TokensUsed = cached.Result.TokensUsed,
+                    PromptTokens = cached.Result.PromptTokens,
+                    CompletionTokens = cached.Result.CompletionTokens,
+                    GeneratedAt = cached.GeneratedAt
+                };
+
+                var staleMonths = _configuration.GetValue<int>("AiInsights:StaleInsightMonths");
+                var age = DateTime.UtcNow - cached.GeneratedAt;
+                if (staleMonths > 0 && age.TotalDays > staleMonths * 30)
+                {
+                    result.StaleMessage = $"This insight is {(int)(age.TotalDays / 30)} months old — go play some more golf!";
+                }
+
                 return true;
             }
             result = default!;
             return false;
         }
 
-        private static void Cache(string key, AiInsightResult result) =>
-            _cache[key] = (result, DateTime.UtcNow);
+        private static void CacheWithWatermark(string key, AiInsightResult result, DateTime? lastDataChange)
+        {
+            if (lastDataChange.HasValue)
+                _cache[key] = new CachedInsight(result, lastDataChange.Value, DateTime.UtcNow);
+        }
+
+        private async Task<DateTime?> GetLastDataChangeAsync(int playerId)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Rounds
+                .Where(r => r.Scores.Any(s => s.PlayerId == playerId))
+                .OrderByDescending(r => r.DatePlayed)
+                .Select(r => r.DatePlayed)
+                .FirstOrDefaultAsync();
+        }
     }
 }

@@ -3,7 +3,6 @@ namespace GolfTrackerApp.Web.Models
     public class AiProviderConfig
     {
         public string Name { get; set; } = string.Empty;
-        public bool Enabled { get; set; }
         public int Priority { get; set; }
         public string ApiKey { get; set; } = string.Empty;
         public string Model { get; set; } = string.Empty;

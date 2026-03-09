@@ -10,6 +10,7 @@ namespace GolfTrackerApp.Web.Services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly ILogger<AiRoutingService> _logger;
         private readonly ILoggerFactory _loggerFactory;
+        private readonly IAiProviderSettingsService _providerSettingsService;
 
         private static readonly ConcurrentDictionary<string, DateTime> _circuitBreakerState = new();
         private static readonly TimeSpan CircuitBreakerCooldown = TimeSpan.FromMinutes(5);
@@ -18,12 +19,14 @@ namespace GolfTrackerApp.Web.Services
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory,
             ILogger<AiRoutingService> logger,
-            ILoggerFactory loggerFactory)
+            ILoggerFactory loggerFactory,
+            IAiProviderSettingsService providerSettingsService)
         {
             _configuration = configuration;
             _httpClientFactory = httpClientFactory;
             _logger = logger;
             _loggerFactory = loggerFactory;
+            _providerSettingsService = providerSettingsService;
         }
 
         public async Task<AiInsightResult> RouteCompletionAsync(
@@ -32,11 +35,20 @@ namespace GolfTrackerApp.Web.Services
             CancellationToken cancellationToken = default)
         {
             var providersSection = _configuration.GetSection("AiInsights:Providers");
+            var dbSettings = await _providerSettingsService.GetAllAsync();
+
             var providers = new List<AiProviderConfig>();
             foreach (var child in providersSection.GetChildren())
             {
                 var config = child.Get<AiProviderConfig>() ?? new AiProviderConfig();
                 config.Name = child.Key;
+
+                // Merge DB settings (enabled + priority override)
+                var dbEntry = dbSettings.FirstOrDefault(s => s.ProviderName == config.Name);
+                if (dbEntry == null || !dbEntry.Enabled) continue;
+                config.Priority = dbEntry.Priority;
+
+                if (string.IsNullOrEmpty(config.ApiKey)) continue;
                 providers.Add(config);
             }
 
@@ -46,7 +58,6 @@ namespace GolfTrackerApp.Web.Services
                 ?? _configuration.GetValue<double>("AiInsights:Temperature");
 
             var enabledProviders = providers
-                .Where(p => p.Enabled && !string.IsNullOrEmpty(p.ApiKey))
                 .OrderBy(p => p.Priority)
                 .ToList();
 
@@ -121,6 +132,13 @@ namespace GolfTrackerApp.Web.Services
                     _loggerFactory.CreateLogger<GeminiProviderService>()),
                 "Mistral" => new MistralProviderService(httpClient, config,
                     _loggerFactory.CreateLogger<MistralProviderService>()),
+                "Grok" => new GrokProviderService(httpClient, config,
+                    _loggerFactory.CreateLogger<GrokProviderService>()),
+                "DeepSeek" => new DeepSeekProviderService(httpClient, config,
+                    _loggerFactory.CreateLogger<DeepSeekProviderService>()),
+                "MetaLlama" => new MetaLlamaProviderService(),
+                "Manus" => new ManusProviderService(httpClient, config,
+                    _loggerFactory.CreateLogger<ManusProviderService>()),
                 _ => throw new ArgumentException($"Unknown AI provider: {config.Name}")
             };
         }

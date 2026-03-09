@@ -11,5 +11,7 @@ namespace GolfTrackerApp.Web.Models
         public int CompletionTokens { get; set; }
         public string? ErrorMessage { get; set; }
         public int? ChatSessionId { get; set; }
+        public string? StaleMessage { get; set; }
+        public DateTime? GeneratedAt { get; set; }
     }
 }

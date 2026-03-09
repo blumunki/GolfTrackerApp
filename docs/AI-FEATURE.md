@@ -98,7 +98,9 @@ The AI Insights feature adds natural-language golf performance analysis powered 
 |---|---|
 | AI calls only on the server, never from mobile | Keeps API keys server-side; centralised rate-limiting; no client SDK bloat |
 | `IAiInsightService` calls existing `IReportService` / `IRoundService` for data | No new database queries or EF changes — reuses tested data-access methods |
-| Caching insights per user + context hash | Avoids redundant AI calls; insights only change when underlying data changes |
+| Data-watermark caching (not time-based) | Only regenerate insights when underlying data has changed; avoids wasting tokens on identical data |
+| Provider enabled/disabled in database, not config | Administrators toggle providers via admin UI; avoids stuffing operational state into env vars or user-secrets |
+| Only API keys in user-secrets / env vars | Secrets stores are for secrets; operational config (enabled, priority) belongs in the DB; static config (model, endpoint) belongs in appsettings.json |
 | Separate `IAiProviderService` per vendor | Each provider's HTTP contract is different; clean separation of concerns |
 | `IAiRoutingService` wraps provider selection | Central failover logic; easy to add/remove providers without touching consumers |
 
@@ -108,7 +110,7 @@ The AI Insights feature adds natural-language golf performance analysis powered 
 
 ### 3.1 appsettings Structure
 
-Add the following section to `appsettings.json` (base) with empty/default values, and populate real keys in environment-specific configs or secrets:
+The `appsettings.json` (base) contains **non-secret** configuration only — model names, endpoints, priorities, timeouts, and feature-level defaults. **API keys** are stored in user-secrets (dev) or environment variables / Azure Key Vault (production). **Provider enabled/disabled state** is managed in the database via the admin UI (see Section 3.5).
 
 ```json
 {
@@ -117,10 +119,10 @@ Add the following section to `appsettings.json` (base) with empty/default values
     "MaxTokens": 500,
     "Temperature": 0.7,
     "CacheMinutes": 60,
+    "StaleInsightMonths": 3,
     "RateLimitPerUserPerHour": 20,
     "Providers": {
       "OpenAI": {
-        "Enabled": true,
         "Priority": 1,
         "ApiKey": "",
         "Model": "gpt-4o-mini",
@@ -128,7 +130,6 @@ Add the following section to `appsettings.json` (base) with empty/default values
         "TimeoutSeconds": 30
       },
       "Anthropic": {
-        "Enabled": true,
         "Priority": 2,
         "ApiKey": "",
         "Model": "claude-sonnet-4-20250514",
@@ -136,15 +137,13 @@ Add the following section to `appsettings.json` (base) with empty/default values
         "TimeoutSeconds": 30
       },
       "Gemini": {
-        "Enabled": false,
         "Priority": 3,
         "ApiKey": "",
-        "Model": "gemini-2.0-flash",
+        "Model": "gemini-3.1-flash-lite-preview",
         "Endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
         "TimeoutSeconds": 30
       },
       "Grok": {
-        "Enabled": false,
         "Priority": 4,
         "ApiKey": "",
         "Model": "grok-3-mini",
@@ -152,7 +151,6 @@ Add the following section to `appsettings.json` (base) with empty/default values
         "TimeoutSeconds": 30
       },
       "Mistral": {
-        "Enabled": false,
         "Priority": 5,
         "ApiKey": "",
         "Model": "mistral-small-latest",
@@ -160,7 +158,6 @@ Add the following section to `appsettings.json` (base) with empty/default values
         "TimeoutSeconds": 30
       },
       "DeepSeek": {
-        "Enabled": false,
         "Priority": 6,
         "ApiKey": "",
         "Model": "deepseek-chat",
@@ -168,7 +165,6 @@ Add the following section to `appsettings.json` (base) with empty/default values
         "TimeoutSeconds": 30
       },
       "MetaLlama": {
-        "Enabled": false,
         "Priority": 7,
         "ApiKey": "",
         "Model": "llama-3.1-70b",
@@ -176,7 +172,6 @@ Add the following section to `appsettings.json` (base) with empty/default values
         "TimeoutSeconds": 30
       },
       "Manus": {
-        "Enabled": false,
         "Priority": 8,
         "ApiKey": "",
         "Model": "",
@@ -187,6 +182,14 @@ Add the following section to `appsettings.json` (base) with empty/default values
   }
 }
 ```
+
+> **Important — what goes where:**
+> | Setting | Where | Example |
+> |---|---|---|
+> | API keys | User-secrets (dev) / env vars (prod) | `dotnet user-secrets set "AiInsights:Providers:Anthropic:ApiKey" "sk-..."` |
+> | Provider enabled/disabled + priority | Database (`AiProviderSettings` table), managed via admin UI | See Section 3.5 |
+> | Model, endpoint, timeout | `appsettings.json` | Committed to source |
+> | Feature-level on/off (`AiInsights:Enabled`) | `appsettings.json` / `appsettings.Development.json` | `true` in dev, `false` in base |
 
 > **Note**: Providers are a named dictionary (not an array), so user-secrets use clear names:
 > `dotnet user-secrets set "AiInsights:Providers:Anthropic:ApiKey" "sk-..."`.
@@ -211,7 +214,6 @@ Create in `GolfTrackerApp.Web/Models/AiProviderConfig.cs`:
 public class AiProviderConfig
 {
     public string Name { get; set; } = string.Empty;
-    public bool Enabled { get; set; }
     public int Priority { get; set; }
     public string ApiKey { get; set; } = string.Empty;
     public string Model { get; set; } = string.Empty;
@@ -220,11 +222,207 @@ public class AiProviderConfig
 }
 ```
 
+> **Note**: `Enabled` is NOT on this model — it lives in the `AiProviderSettings` database table (Section 3.5), so administrators can toggle providers on/off from the admin UI without redeploying or touching environment variables.
+
 ### 3.4 Security — API Key Storage
 
-- **Development**: Store API keys in `appsettings.Development.json` (git-ignored) or user-secrets
-- **Production**: Use environment variables or Azure Key Vault — never commit keys to source
+- **Development**: `dotnet user-secrets set "AiInsights:Providers:{Name}:ApiKey" "key"` — the ONLY values stored in user-secrets are API keys
+- **Production**: Environment variables (`AiInsights__Providers__{Name}__ApiKey`) or Azure Key Vault — never commit keys to source
+- **Never in user-secrets or env vars**: Enabled/disabled flags, model names, priorities, timeouts — these are either in `appsettings.json` (committed) or managed via the admin UI (database)
 - API keys are ONLY accessed server-side; they never reach the mobile app
+
+### 3.5 Provider Settings — Database-Managed (Admin UI)
+
+Provider on/off state and priority overrides are stored in a new `AiProviderSettings` database table, managed exclusively through the admin UI. This avoids the anti-pattern of stuffing operational config into user-secrets or environment variables.
+
+#### 3.5.1 AiProviderSettings Entity
+
+```csharp
+// GolfTrackerApp.Web/Models/AiProviderSettings.cs
+
+public class AiProviderSettings
+{
+    public int AiProviderSettingsId { get; set; }                    // PK
+    [Required][StringLength(50)] public string ProviderName { get; set; } = string.Empty; // e.g. "Anthropic"
+    public bool Enabled { get; set; }                                // Admin toggle
+    public int Priority { get; set; }                                // Admin-adjustable priority
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    [StringLength(450)] public string? UpdatedByUserId { get; set; } // FK → ApplicationUser (who toggled it)
+}
+```
+
+#### 3.5.2 Bootstrap / Seeding
+
+On app startup, if the `AiProviderSettings` table is empty, seed it from the `appsettings.json` provider entries with `Enabled = false` (all off by default — an admin must explicitly enable providers). Subsequent starts read from the database.
+
+```csharp
+// In startup (after EnsureNewTablesExist or migration):
+await SeedAiProviderSettingsAsync(app.Services);
+
+static async Task SeedAiProviderSettingsAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var contextFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+    await using var context = await contextFactory.CreateDbContextAsync();
+    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+    
+    if (await context.AiProviderSettings.AnyAsync()) return; // Already seeded
+    
+    var providersSection = config.GetSection("AiInsights:Providers");
+    foreach (var child in providersSection.GetChildren())
+    {
+        context.AiProviderSettings.Add(new AiProviderSettings
+        {
+            ProviderName = child.Key,
+            Enabled = false, // Off by default — admin enables
+            Priority = child.GetValue<int>("Priority")
+        });
+    }
+    await context.SaveChangesAsync();
+}
+```
+
+#### 3.5.3 How AiRoutingService Uses Provider Settings
+
+The routing service merges config from `appsettings.json` (model, endpoint, API key) with database settings (enabled, priority):
+
+```csharp
+// In AiRoutingService.RouteCompletionAsync:
+var providersSection = _configuration.GetSection("AiInsights:Providers");
+var dbSettings = await GetProviderSettingsAsync(); // from AiProviderSettings table
+
+var providers = new List<AiProviderConfig>();
+foreach (var child in providersSection.GetChildren())
+{
+    var config = child.Get<AiProviderConfig>() ?? new();
+    config.Name = child.Key;
+    
+    // Merge DB settings (enabled + priority override)
+    var dbEntry = dbSettings.FirstOrDefault(s => s.ProviderName == config.Name);
+    if (dbEntry == null || !dbEntry.Enabled) continue; // Skip if not enabled in DB
+    config.Priority = dbEntry.Priority; // DB priority takes precedence
+    
+    if (string.IsNullOrEmpty(config.ApiKey)) continue; // Skip if no API key configured
+    providers.Add(config);
+}
+
+var ordered = providers.OrderBy(p => p.Priority).ToList();
+```
+
+### 3.6 Data Freshness — Smart Cache Invalidation
+
+AI insights should only be regenerated when the underlying data has changed. Requesting a new AI completion against the same data wastes tokens and money.
+
+#### 3.6.1 Concept
+
+```
+┌──────────────────────────┐     ┌──────────────────────────┐
+│ Last Data Change         │     │ Last Insight Generated    │
+│ (most recent round date  │     │ (cached insight timestamp)│
+│  for this user/context)  │     │                           │
+└────────────┬─────────────┘     └────────────┬──────────────┘
+             │                                │
+             ▼                                ▼
+    ┌─────────────────────────────────────────────────┐
+    │ Data changed since last insight?                 │
+    │                                                  │
+    │ YES → Request new AI insight                     │
+    │ NO  → Return cached insight                      │
+    │       + if insight > StaleInsightMonths old:      │
+    │         show "Insight is X months old — go play   │
+    │         some more golf!" note                    │
+    └─────────────────────────────────────────────────┘
+```
+
+#### 3.6.2 Implementation
+
+**Determine "last data change"**: Query the most recent `Round.DatePlayed` (or `Round.CreatedAt`) for the user. This is the data watermark — if no new rounds exist since the last insight was generated, the data hasn't changed.
+
+```csharp
+// In AiInsightService — replaces the simple time-based cache:
+private async Task<DateTime?> GetLastDataChangeAsync(string userId)
+{
+    // Uses existing IRoundService or direct query
+    var player = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
+    if (player == null) return null;
+    
+    await using var context = await _contextFactory.CreateDbContextAsync();
+    return await context.Rounds
+        .Where(r => r.Scores.Any(s => s.PlayerId == player.PlayerId))
+        .OrderByDescending(r => r.DatePlayed)
+        .Select(r => r.DatePlayed)
+        .FirstOrDefaultAsync();
+}
+```
+
+**Cache key includes data watermark**: The cached insight is stored with the data watermark timestamp. On subsequent requests, if the watermark hasn't changed, the cached insight is returned directly — no AI call.
+
+```csharp
+private static readonly ConcurrentDictionary<string, CachedInsight> _cache = new();
+
+private record CachedInsight(
+    AiInsightResult Result,
+    DateTime DataWatermark,   // When the underlying data was last updated
+    DateTime GeneratedAt);    // When the AI insight was generated
+
+public async Task<AiInsightResult> GetDashboardInsightsAsync(...)
+{
+    var lastDataChange = await GetLastDataChangeAsync(userId);
+    var cacheKey = $"dashboard_{userId}";
+    
+    if (_cache.TryGetValue(cacheKey, out var cached)
+        && lastDataChange.HasValue
+        && cached.DataWatermark >= lastDataChange.Value)
+    {
+        // Data hasn't changed — return cached insight
+        var result = cached.Result;
+        
+        // Check staleness
+        var staleMonths = _configuration.GetValue<int>("AiInsights:StaleInsightMonths");
+        var age = DateTime.UtcNow - cached.GeneratedAt;
+        if (staleMonths > 0 && age.TotalDays > staleMonths * 30)
+        {
+            result = result with { }; // Copy
+            result.StaleMessage = $"This insight is {(int)(age.TotalDays / 30)} months old — go play some more golf!";
+        }
+        return result;
+    }
+    
+    // Data has changed (or no cache) — request new AI insight
+    // ... existing logic ...
+    
+    // Cache with watermark
+    if (result.Success && lastDataChange.HasValue)
+        _cache[cacheKey] = new CachedInsight(result, lastDataChange.Value, DateTime.UtcNow);
+    return result;
+}
+```
+
+#### 3.6.3 AiInsightResult — Staleness Property
+
+Add to `AiInsightResult`:
+
+```csharp
+public string? StaleMessage { get; set; }  // e.g. "This insight is 4 months old — go play some more golf!"
+public DateTime? GeneratedAt { get; set; }  // When the insight was originally generated
+```
+
+The UI renders this as a subtle note below the insight content:
+
+```razor
+@if (!string.IsNullOrEmpty(aiInsight.StaleMessage))
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+        @aiInsight.StaleMessage
+    </MudAlert>
+}
+```
+
+#### 3.6.4 Configuration
+
+| Setting | Default | Description |
+|---|---|---|
+| `AiInsights:StaleInsightMonths` | 3 | After this many months with no new data, show a staleness message encouraging the user to play more golf |
 
 ---
 
@@ -235,8 +433,9 @@ public class AiProviderConfig
 ```
 GolfTrackerApp.Web/
 ├── Models/
-│   ├── AiProviderConfig.cs              # Provider configuration model
-│   ├── AiInsightResult.cs               # AI response DTO
+│   ├── AiProviderConfig.cs              # Provider configuration model (no Enabled field)
+│   ├── AiProviderSettings.cs            # DB entity for admin-managed provider on/off + priority
+│   ├── AiInsightResult.cs               # AI response DTO (includes StaleMessage, GeneratedAt)
 │   ├── AiChatMessage.cs                 # Chat conversation message DTO (for API requests)
 │   ├── AiAuditLog.cs                    # Audit log entity
 │   ├── AiChatSession.cs                 # Chat session entity
@@ -251,6 +450,8 @@ GolfTrackerApp.Web/
 │   ├── AiAuditService.cs                # Audit logging + rate limiting implementation
 │   ├── IAiChatService.cs                # Persistent chat session interface
 │   ├── AiChatService.cs                 # Persistent chat session implementation
+│   ├── IAiProviderSettingsService.cs     # Admin provider settings interface
+│   ├── AiProviderSettingsService.cs      # Admin provider settings implementation
 │   └── AiProviders/                     # Provider implementations (new folder)
 │       ├── OpenAiProviderService.cs
 │       ├── AnthropicProviderService.cs
@@ -262,6 +463,11 @@ GolfTrackerApp.Web/
 │       └── ManusProviderService.cs
 ├── Controllers/
 │   └── InsightsController.cs            # API endpoints for mobile
+├── Components/
+│   └── Pages/
+│       └── Admin/
+│           ├── AiProviders.razor         # Admin: enable/disable providers + set priority
+│           └── AiUsage.razor             # Admin: AI usage statistics dashboard
 ```
 
 ```
@@ -910,7 +1116,11 @@ The chat method takes a free-form user message and conversation history. It gath
     }
 ```
 
-#### 4.9.6 Caching Helpers
+#### 4.9.6 Caching — Data-Watermark Strategy
+
+Instead of simple time-based cache expiry, insights are cached against a **data watermark** — the timestamp of the user's most recent round. If no new rounds have been played since the last insight was generated, the cached insight is returned without calling the AI provider.
+
+See **Section 3.6** for the full data freshness design.
 
 ```csharp
     private bool IsEnabled() =>
@@ -919,21 +1129,36 @@ The chat method takes a free-form user message and conversation history. It gath
     private static AiInsightResult DisabledResult() =>
         new() { Success = false, ErrorMessage = "AI Insights are not enabled." };
 
-    private bool TryGetCached(string key, out AiInsightResult result)
+    private static readonly ConcurrentDictionary<string, CachedInsight> _cache = new();
+
+    private record CachedInsight(
+        AiInsightResult Result,
+        DateTime DataWatermark,
+        DateTime GeneratedAt);
+
+    private bool TryGetCached(string key, DateTime? lastDataChange, out AiInsightResult result)
     {
-        var cacheMinutes = _configuration.GetValue<int>("AiInsights:CacheMinutes");
-        if (_cache.TryGetValue(key, out var entry)
-            && DateTime.UtcNow - entry.CachedAt < TimeSpan.FromMinutes(cacheMinutes))
+        if (_cache.TryGetValue(key, out var cached)
+            && lastDataChange.HasValue
+            && cached.DataWatermark >= lastDataChange.Value)
         {
-            result = entry.Result;
+            result = cached.Result;
+            
+            // Check staleness
+            var staleMonths = _configuration.GetValue<int>("AiInsights:StaleInsightMonths");
+            var age = DateTime.UtcNow - cached.GeneratedAt;
+            if (staleMonths > 0 && age.TotalDays > staleMonths * 30)
+            {
+                result.StaleMessage = $"This insight is {(int)(age.TotalDays / 30)} months old \u2014 go play some more golf!";
+            }
             return true;
         }
         result = default!;
         return false;
     }
 
-    private static void Cache(string key, AiInsightResult result) =>
-        _cache[key] = (result, DateTime.UtcNow);
+    private static void Cache(string key, AiInsightResult result, DateTime dataWatermark) =>
+        _cache[key] = new CachedInsight(result, dataWatermark, DateTime.UtcNow);
 }
 ```
 
@@ -1118,6 +1343,7 @@ builder.Services.AddScoped<IAiInsightService, AiInsightService>();
 builder.Services.AddScoped<IAiRoutingService, AiRoutingService>();
 builder.Services.AddScoped<IAiAuditService, AiAuditService>();
 builder.Services.AddScoped<IAiChatService, AiChatService>();
+builder.Services.AddScoped<IAiProviderSettingsService, AiProviderSettingsService>();
 builder.Services.AddHttpClient("AiProvider_OpenAI");
 builder.Services.AddHttpClient("AiProvider_Anthropic");
 builder.Services.AddHttpClient("AiProvider_Gemini");
@@ -1633,20 +1859,35 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | 1.13 | Add AI insight widget to web `Home.razor` | `Components/Pages/Home.razor` | ✅ Done |
 | 1.14 | Test end-to-end: dashboard loads → AI widget appears → insight generated + audit row written | Manual testing | ✅ Done |
 
-### Phase 2 — Additional Providers + Failover
+### Phase 2 — Provider Settings + Admin + Data Freshness
 
-**Goal**: Multi-provider support with automatic failover.
+**Goal**: Move provider enabled/disabled to database, add admin UI, implement data-watermark caching.
 
 | Step | Task | Files | Status |
 |------|------|-------|--------|
 | 2.1 | Implement `AnthropicProviderService` | `Services/AiProviders/AnthropicProviderService.cs` | ✅ Done |
 | 2.2 | Implement `GeminiProviderService` | `Services/AiProviders/GeminiProviderService.cs` | ✅ Done |
-| 2.3 | Implement `GrokProviderService` (OpenAI-compatible) | `Services/AiProviders/GrokProviderService.cs` | ⬜ Pending |
+| 2.3 | Implement `GrokProviderService` (OpenAI-compatible) | `Services/AiProviders/GrokProviderService.cs` | ✅ Done |
 | 2.4 | Implement `MistralProviderService` (OpenAI-compatible) | `Services/AiProviders/MistralProviderService.cs` | ✅ Done |
-| 2.5 | Implement `DeepSeekProviderService` (OpenAI-compatible) | `Services/AiProviders/DeepSeekProviderService.cs` | ⬜ Pending |
-| 2.6 | Add placeholder implementations for MetaLlama, Manus | `Services/AiProviders/MetaLlama*.cs`, `Manus*.cs` | ⬜ Pending |
+| 2.5 | Implement `DeepSeekProviderService` (OpenAI-compatible) | `Services/AiProviders/DeepSeekProviderService.cs` | ✅ Done |
+| 2.6 | Add placeholder implementations for MetaLlama, Manus | `Services/AiProviders/MetaLlama*.cs`, `Manus*.cs` | ✅ Done |
 | 2.7 | Test failover: disable primary → verify secondary picks up | Manual testing | ✅ Done |
 | 2.8 | Test circuit breaker: verify failed provider is skipped temporarily | Manual testing | ✅ Done |
+| 2.9 | Create `AiProviderSettings` entity model | `Models/AiProviderSettings.cs` | ✅ Done |
+| 2.10 | Add `AiProviderSettings` DbSet + OnModelCreating config | `Data/ApplicationDbContext.cs` | ✅ Done |
+| 2.11 | Create migration + update `EnsureNewTablesExistAsync()` for `AiProviderSettings` | Migration + `Program.cs` | ✅ Done |
+| 2.12 | Create `IAiProviderSettingsService` + `AiProviderSettingsService` | `Services/IAiProviderSettingsService.cs`, `Services/AiProviderSettingsService.cs` | ✅ Done |
+| 2.13 | Add startup seeding of `AiProviderSettings` from `appsettings.json` | `Program.cs` | ✅ Done |
+| 2.14 | Refactor `AiRoutingService` to merge DB settings (enabled/priority) with config (model/endpoint/key) | `Services/AiRoutingService.cs` | ✅ Done |
+| 2.15 | Remove `Enabled` from `appsettings.json` provider entries + `AiProviderConfig` model | `appsettings.json`, `Models/AiProviderConfig.cs` | ✅ Done |
+| 2.16 | Create admin AI Providers page (`/admin/ai-providers`) | `Components/Pages/Admin/AiProviders.razor` | ✅ Done |
+| 2.17 | Create admin AI Usage dashboard (`/admin/ai-usage`) | `Components/Pages/Admin/AiUsage.razor` | ✅ Done |
+| 2.18 | Add admin nav links for AI pages | `Components/Layout/NavMenu.razor` | ✅ Done |
+| 2.19 | Implement data-watermark caching in `AiInsightService` (replace time-based cache) | `Services/AiInsightService.cs` | ✅ Done |
+| 2.20 | Add `StaleMessage` + `GeneratedAt` properties to `AiInsightResult` | `Models/AiInsightResult.cs` | ✅ Done |
+| 2.21 | Add `StaleInsightMonths` config + staleness message rendering in `Home.razor` | `appsettings.json`, `Components/Pages/Home.razor` | ✅ Done |
+| 2.22 | Test admin provider toggle → verify routing respects DB state | Manual testing | ⬜ Pending |
+| 2.23 | Test data freshness: add round → insight refreshes; no round → cached insight reused | Manual testing | ⬜ Pending |
 
 ### Phase 3 — Insights Controller + Mobile API
 
@@ -1705,6 +1946,8 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | 6.6 | Configure production API keys via environment variables | ⬜ Pending |
 | 6.7 | Review audit logs for prompt quality and token usage patterns | ⬜ Pending |
 | 6.8 | Implement audit log retention cleanup (scheduled task or manual) | ⬜ Pending |
+| 6.9 | Verify admin AI Providers page works with production provider set | ⬜ Pending |
+| 6.10 | Verify admin AI Usage dashboard shows accurate stats | ⬜ Pending |
 
 ---
 
@@ -1733,9 +1976,23 @@ The following data is available via existing services — no new database querie
 
 ## 12. Database Schema Changes
 
-Three new tables support audit logging, rate limiting, and persistent chat history.
+Four new tables support audit logging, rate limiting, persistent chat history, and provider settings management.
 
 ### 12.1 New Entity Models
+
+```csharp
+// GolfTrackerApp.Web/Models/AiProviderSettings.cs
+
+public class AiProviderSettings
+{
+    public int AiProviderSettingsId { get; set; }                    // PK
+    [Required][StringLength(50)] public string ProviderName { get; set; } = string.Empty; // e.g. "Anthropic"
+    public bool Enabled { get; set; }                                // Admin toggle
+    public int Priority { get; set; }                                // Admin-adjustable priority
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    [StringLength(450)] public string? UpdatedByUserId { get; set; } // FK → ApplicationUser (who toggled it)
+}
+```
 
 ```csharp
 // GolfTrackerApp.Web/Models/AiAuditLog.cs
@@ -1801,6 +2058,9 @@ ApplicationUser
     └── 1:N → AiChatSession        (ApplicationUserId)
                   ├── 1:N → AiChatSessionMessage
                   └── 1:N → AiAuditLog  (optional link)
+
+AiProviderSettings  (standalone — no FK to ApplicationUser)
+    ProviderName (unique), Enabled, Priority, UpdatedAt, UpdatedByUserId
 ```
 
 ### 12.3 ApplicationDbContext Changes
@@ -1811,6 +2071,7 @@ Add to `ApplicationDbContext`:
 public DbSet<AiAuditLog> AiAuditLogs { get; set; }
 public DbSet<AiChatSession> AiChatSessions { get; set; }
 public DbSet<AiChatSessionMessage> AiChatSessionMessages { get; set; }
+public DbSet<AiProviderSettings> AiProviderSettings { get; set; }
 ```
 
 Add to `OnModelCreating`:
@@ -1853,6 +2114,12 @@ modelBuilder.Entity<AiChatSessionMessage>(entity =>
         .OnDelete(DeleteBehavior.Cascade);
 
     entity.HasIndex(m => new { m.AiChatSessionId, m.Timestamp });
+});
+
+// AI Provider Settings
+modelBuilder.Entity<AiProviderSettings>(entity =>
+{
+    entity.HasIndex(s => s.ProviderName).IsUnique();
 });
 ```
 
@@ -1940,6 +2207,23 @@ if (!await TableExistsAsync(connection, "AiAuditLogs"))
         CREATE INDEX IX_AiAuditLogs_RequestedAt
             ON AiAuditLogs (RequestedAt);
     ", connection).ExecuteNonQueryAsync();
+}
+
+// AiProviderSettings
+if (!await TableExistsAsync(connection, \"AiProviderSettings\"))
+{
+    await new SqlCommand(@\"
+        CREATE TABLE AiProviderSettings (
+            AiProviderSettingsId INT IDENTITY(1,1) PRIMARY KEY,
+            ProviderName NVARCHAR(50) NOT NULL,
+            Enabled BIT NOT NULL DEFAULT 0,
+            Priority INT NOT NULL DEFAULT 99,
+            UpdatedAt DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+            UpdatedByUserId NVARCHAR(450) NULL
+        );
+        CREATE UNIQUE INDEX IX_AiProviderSettings_ProviderName
+            ON AiProviderSettings (ProviderName);
+    \", connection).ExecuteNonQueryAsync();
 }
 ```
 
@@ -2224,7 +2508,110 @@ This means `AiInsightResult` gains additional properties to capture provider det
 
 ---
 
-## 15. Future Enhancements (Out of Scope for Initial Implementation)
+## 15. Admin Area — AI Management
+
+The admin area (existing `[Authorize(Roles = "Admin")]` section) gains a new "AI Providers" page for managing AI provider settings and monitoring usage.
+
+### 15.1 Admin Pages
+
+#### 15.1.1 AI Provider Management (`/admin/ai-providers`)
+
+Allows administrators to enable/disable providers and adjust priorities without code changes or redeployment.
+
+```razor
+@page "/admin/ai-providers"
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>AI Provider Management</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">AI Provider Management</MudText>
+
+<MudTable Items="@providerSettings" Hover="true" Elevation="2">
+    <HeaderContent>
+        <MudTh>Provider</MudTh>
+        <MudTh>Model</MudTh>
+        <MudTh>Priority</MudTh>
+        <MudTh>API Key</MudTh>
+        <MudTh>Enabled</MudTh>
+        <MudTh>Last Updated</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.ProviderName</MudTd>
+        <MudTd>@context.Model</MudTd>
+        <MudTd>
+            <MudNumericField @bind-Value="context.Priority" Min="1" Max="10"
+                             Style="width: 80px" Variant="Variant.Outlined"
+                             OnBlur="() => SaveProvider(context)" />
+        </MudTd>
+        <MudTd>
+            @if (context.HasApiKey)
+            {
+                <MudChip T="string" Color="Color.Success" Size="Size.Small">Configured</MudChip>
+            }
+            else
+            {
+                <MudChip T="string" Color="Color.Error" Size="Size.Small">Missing</MudChip>
+            }
+        </MudTd>
+        <MudTd>
+            <MudSwitch @bind-Value="context.Enabled" Color="Color.Primary"
+                       Disabled="@(!context.HasApiKey)"
+                       OnChange="() => SaveProvider(context)" />
+        </MudTd>
+        <MudTd>@context.UpdatedAt.ToString("dd MMM yyyy HH:mm")</MudTd>
+    </RowTemplate>
+</MudTable>
+```
+
+Key behaviours:
+- Providers without an API key configured show "Missing" chip and the Enabled switch is disabled
+- Priority changes take effect immediately (saved on blur)
+- Enabled toggle saved immediately — no "Save" button needed
+- Shows model name from `appsettings.json` (read-only in admin UI, changed via config)
+
+#### 15.1.2 AI Usage Dashboard (`/admin/ai-usage`)
+
+Read-only dashboard showing AI usage statistics from the `AiAuditLogs` table.
+
+| Widget | Data Source |
+|---|---|
+| Total AI calls (24h / 7d / 30d) | `COUNT(*)` from `AiAuditLogs` grouped by time window |
+| Token usage (24h / 7d / 30d) | `SUM(TotalTokens)` from `AiAuditLogs` |
+| Success rate | `COUNT(Success=true) / COUNT(*)` percentage |
+| Provider distribution | Pie chart of calls per provider |
+| Average response time | `AVG(ResponseTimeMs)` per provider |
+| Top users by token consumption | Top 10 users by total tokens in the last 30 days |
+| Error log | Recent failed AI calls with error messages |
+
+### 15.2 Navigation
+
+Add to `NavMenu.razor` under the existing Admin section:
+
+```razor
+<AuthorizeView Roles="Admin">
+    <MudListSubheader>Admin</MudListSubheader>
+    <MudNavLink Href="admin/datamigration" Icon="@Icons.Material.Filled.Storage">Data Migration</MudNavLink>
+    <MudNavLink Href="admin/ai-providers" Icon="@Icons.Material.Filled.SmartToy">AI Providers</MudNavLink>
+    <MudNavLink Href="admin/ai-usage" Icon="@Icons.Material.Filled.Analytics">AI Usage</MudNavLink>
+</AuthorizeView>
+```
+
+### 15.3 Service Layer
+
+```csharp
+// GolfTrackerApp.Web/Services/IAiProviderSettingsService.cs
+
+public interface IAiProviderSettingsService
+{
+    Task<List<AiProviderSettings>> GetAllAsync();
+    Task<AiProviderSettings?> GetByNameAsync(string providerName);
+    Task UpdateAsync(AiProviderSettings settings, string updatedByUserId);
+    Task SeedFromConfigAsync(); // Called on startup
+}
+```
+
+---
+
+## 16. Future Enhancements (Out of Scope for Initial Implementation)
 
 - **User preference for AI provider**: Let users choose their preferred provider
 - **Streaming responses**: Use Server-Sent Events for real-time chat output

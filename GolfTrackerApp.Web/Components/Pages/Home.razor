@@ -445,6 +445,13 @@
                                             <MudText Typo="Typo.body2" Style="white-space: pre-line;">
                                                 @aiInsight.Content
                                             </MudText>
+                                            @if (!string.IsNullOrEmpty(aiInsight.StaleMessage))
+                                            {
+                                                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2"
+                                                          NoIcon="false">
+                                                    @aiInsight.StaleMessage
+                                                </MudAlert>
+                                            }
                                             <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2">
                                                 Powered by @aiInsight.ProviderUsed
                                             </MudText>
@@ -932,13 +939,13 @@
         _performanceXAxisLabels = data.Select(d => d.Date.ToString("MMM dd")).ToArray();
     }
 
-    private async Task LoadAiInsights(string userId)
+    private async Task LoadAiInsights(string userId, bool forceRefresh = false)
     {
         aiLoading = true;
         StateHasChanged();
         try
         {
-            aiInsight = await AiInsightService.GetDashboardInsightsAsync(userId);
+            aiInsight = await AiInsightService.GetDashboardInsightsAsync(userId, forceRefresh);
         }
         catch (Exception ex)
         {
@@ -961,7 +968,7 @@
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId != null)
         {
-            await LoadAiInsights(userId);
+            await LoadAiInsights(userId, forceRefresh: true);
         }
     }
 }
