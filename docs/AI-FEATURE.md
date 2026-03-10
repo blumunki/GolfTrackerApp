@@ -633,10 +633,19 @@ public class OpenAiProviderService : IAiProviderService
 - Only differ in endpoint URL, model name, and API key
 - Can extend or reuse the OpenAI implementation with a different config
 
-#### MetaLlama / Manus Providers
+#### MetaLlama Provider
 
-- Placeholder implementations — will depend on hosting choice (self-hosted, Replicate, Together AI, etc.)
-- Return `Success = false` with `ErrorMessage = "Provider not yet configured"` until implemented
+- Placeholder implementation — will depend on hosting choice (self-hosted, Replicate, Together AI, etc.)
+- Returns `Success = false` with `ErrorMessage = "Provider not yet configured"` until implemented
+
+#### Manus Provider
+
+- Fully implemented async task-based provider using the Manus Open API (`https://api.manus.im`)
+- Uses OpenAI Responses API compatible format: creates a task via `POST /v1/responses`, then polls every 3s until status is `completed` or `failed`
+- Auth via `X-API-Key` header (not Bearer token)
+- Default model: `manus-1.6-lite`, default timeout: 120s
+- Sets `hide_in_task_list: true` to avoid polluting the user's Manus dashboard
+- Extracts the last assistant text from the `output` array in the completed response
 
 ### 4.6 IAiRoutingService
 
@@ -1870,7 +1879,7 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | 2.3 | Implement `GrokProviderService` (OpenAI-compatible) | `Services/AiProviders/GrokProviderService.cs` | ✅ Done |
 | 2.4 | Implement `MistralProviderService` (OpenAI-compatible) | `Services/AiProviders/MistralProviderService.cs` | ✅ Done |
 | 2.5 | Implement `DeepSeekProviderService` (OpenAI-compatible) | `Services/AiProviders/DeepSeekProviderService.cs` | ✅ Done |
-| 2.6 | Add placeholder implementations for MetaLlama, Manus | `Services/AiProviders/MetaLlama*.cs`, `Manus*.cs` | ✅ Done |
+| 2.6 | Implement MetaLlama (placeholder) + Manus (full async task-based provider) | `Services/AiProviders/MetaLlama*.cs`, `Manus*.cs` | ✅ Done |
 | 2.7 | Test failover: disable primary → verify secondary picks up | Manual testing | ✅ Done |
 | 2.8 | Test circuit breaker: verify failed provider is skipped temporarily | Manual testing | ✅ Done |
 | 2.9 | Create `AiProviderSettings` entity model | `Models/AiProviderSettings.cs` | ✅ Done |
@@ -1886,8 +1895,8 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | 2.19 | Implement data-watermark caching in `AiInsightService` (replace time-based cache) | `Services/AiInsightService.cs` | ✅ Done |
 | 2.20 | Add `StaleMessage` + `GeneratedAt` properties to `AiInsightResult` | `Models/AiInsightResult.cs` | ✅ Done |
 | 2.21 | Add `StaleInsightMonths` config + staleness message rendering in `Home.razor` | `appsettings.json`, `Components/Pages/Home.razor` | ✅ Done |
-| 2.22 | Test admin provider toggle → verify routing respects DB state | Manual testing | ⬜ Pending |
-| 2.23 | Test data freshness: add round → insight refreshes; no round → cached insight reused | Manual testing | ⬜ Pending |
+| 2.22 | Test admin provider toggle → verify routing respects DB state | Manual testing | ✅ Done |
+| 2.23 | Test data freshness: add round → insight refreshes; no round → cached insight reused | Manual testing | ✅ Done |
 
 ### Phase 3 — Insights Controller + Mobile API
 
@@ -1895,12 +1904,12 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 
 | Step | Task | Files | Status |
 |------|------|-------|--------|
-| 3.1 | Create `InsightsController` | `Controllers/InsightsController.cs` | ⬜ Pending |
-| 3.2 | Create `IInsightsApiService` + `InsightsApiService` (mobile) | `Mobile/Services/Api/InsightsApiService.cs` | ⬜ Pending |
-| 3.3 | Create mobile `AiInsightResult` + `AiChatMessage` DTOs | `Mobile/Models/AiInsightResult.cs` | ⬜ Pending |
-| 3.4 | Register mobile service in `MauiProgram.cs` | `MauiProgram.cs` | ⬜ Pending |
-| 3.5 | Create `AiInsightsWidget.razor` (mobile dashboard widget) | `Mobile/Components/Dashboard/AiInsightsWidget.razor` | ⬜ Pending |
-| 3.6 | Integrate widget into mobile `Home.razor` | `Mobile/Components/Pages/Home.razor` | ⬜ Pending |
+| 3.1 | Create `InsightsController` | `Controllers/InsightsController.cs` | ✅ Done |
+| 3.2 | Create `IInsightsApiService` + `InsightsApiService` (mobile) | `Mobile/Services/Api/InsightsApiService.cs` | ✅ Done |
+| 3.3 | Create mobile `AiInsightResult` + `AiChatMessage` DTOs | `Mobile/Models/AiInsightResult.cs` | ✅ Done |
+| 3.4 | Register mobile service in `MauiProgram.cs` | `MauiProgram.cs` | ✅ Done |
+| 3.5 | Create `AiInsightsWidget.razor` (mobile dashboard widget) | `Mobile/Components/Dashboard/AiInsightsWidget.razor` | ✅ Done |
+| 3.6 | Integrate widget into mobile `Home.razor` | `Mobile/Components/Pages/Home.razor` | ✅ Done |
 | 3.7 | Test mobile dashboard with AI insights | Manual testing | ⬜ Pending |
 
 ### Phase 4 — Player Report + Club/Course Insights
@@ -2516,57 +2525,47 @@ The admin area (existing `[Authorize(Roles = "Admin")]` section) gains a new "AI
 
 #### 15.1.1 AI Provider Management (`/admin/ai-providers`)
 
-Allows administrators to enable/disable providers and adjust priorities without code changes or redeployment.
+Allows administrators to enable/disable providers and adjust failover priority without code changes or redeployment.
+
+Each provider is displayed as a card row with:
+- **Position number** (1, 2, 3…) showing current priority
+- **Up/down arrow buttons** to swap with adjacent provider — saves immediately via `UpdatePrioritiesAsync`
+- **Provider name** and **model** (read-only, from `appsettings.json`)
+- **API Key chip** — green "API Key" if configured, red "No Key" if missing
+- **Enabled toggle** — `MudSwitch`, disabled when no API key is configured
+- **Last Updated** timestamp
 
 ```razor
-@page "/admin/ai-providers"
-@attribute [Authorize(Roles = "Admin")]
-
-<PageTitle>AI Provider Management</PageTitle>
-<MudText Typo="Typo.h4" Class="mb-4">AI Provider Management</MudText>
-
-<MudTable Items="@providerSettings" Hover="true" Elevation="2">
-    <HeaderContent>
-        <MudTh>Provider</MudTh>
-        <MudTh>Model</MudTh>
-        <MudTh>Priority</MudTh>
-        <MudTh>API Key</MudTh>
-        <MudTh>Enabled</MudTh>
-        <MudTh>Last Updated</MudTh>
-    </HeaderContent>
-    <RowTemplate>
-        <MudTd>@context.ProviderName</MudTd>
-        <MudTd>@context.Model</MudTd>
-        <MudTd>
-            <MudNumericField @bind-Value="context.Priority" Min="1" Max="10"
-                             Style="width: 80px" Variant="Variant.Outlined"
-                             OnBlur="() => SaveProvider(context)" />
-        </MudTd>
-        <MudTd>
-            @if (context.HasApiKey)
-            {
-                <MudChip T="string" Color="Color.Success" Size="Size.Small">Configured</MudChip>
-            }
-            else
-            {
-                <MudChip T="string" Color="Color.Error" Size="Size.Small">Missing</MudChip>
-            }
-        </MudTd>
-        <MudTd>
-            <MudSwitch @bind-Value="context.Enabled" Color="Color.Primary"
-                       Disabled="@(!context.HasApiKey)"
-                       OnChange="() => SaveProvider(context)" />
-        </MudTd>
-        <MudTd>@context.UpdatedAt.ToString("dd MMM yyyy HH:mm")</MudTd>
-    </RowTemplate>
-</MudTable>
+@* Simplified structure — see AiProviders.razor for full implementation *@
+<div class="d-flex flex-column gap-2 mb-4">
+    @for (int i = 0; i < providerViewModels.Count; i++)
+    {
+        var index = i;
+        var vm = providerViewModels[index];
+        <MudPaper Elevation="2" Class="pa-3 d-flex align-center gap-3">
+            <MudText>@(index + 1)</MudText>
+            <MudButtonGroup>
+                <MudIconButton Icon="KeyboardArrowUp" Disabled="@(index == 0)"
+                               OnClick="@(() => MoveProvider(index, -1))" />
+                <MudIconButton Icon="KeyboardArrowDown" Disabled="@(index == providerViewModels.Count - 1)"
+                               OnClick="@(() => MoveProvider(index, 1))" />
+            </MudButtonGroup>
+            <MudText><strong>@vm.ProviderName</strong></MudText>
+            <MudText>@vm.Model</MudText>
+            <MudChip Color="@(vm.HasApiKey ? Color.Success : Color.Error)">...</MudChip>
+            <MudSwitch Value="vm.Enabled" Disabled="@(!vm.HasApiKey)" ... />
+            <MudText>@vm.UpdatedAt</MudText>
+        </MudPaper>
+    }
+</div>
 ```
 
 Key behaviours:
-- Providers without an API key configured show "Missing" chip and the Enabled switch is disabled
-- Priority changes take effect immediately (saved on blur)
-- Enabled toggle saved immediately — no "Save" button needed
+- Providers without an API key configured show "No Key" chip and the Enabled switch is disabled
+- Up/down arrows swap the provider with its neighbour and auto-save all priorities via `UpdatePrioritiesAsync`
+- Enabled toggle saved immediately via `UpdateAsync` — no "Save" button needed
 - Shows model name from `appsettings.json` (read-only in admin UI, changed via config)
+- Arrow buttons are disabled at list boundaries (up disabled for first, down disabled for last)
 
 #### 15.1.2 AI Usage Dashboard (`/admin/ai-usage`)
 
@@ -2605,6 +2604,7 @@ public interface IAiProviderSettingsService
     Task<List<AiProviderSettings>> GetAllAsync();
     Task<AiProviderSettings?> GetByNameAsync(string providerName);
     Task UpdateAsync(AiProviderSettings settings, string updatedByUserId);
+    Task UpdatePrioritiesAsync(List<(int Id, int Priority)> priorities, string updatedByUserId);
     Task SeedFromConfigAsync(); // Called on startup
 }
 ```

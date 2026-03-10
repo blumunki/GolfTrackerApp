@@ -4,6 +4,7 @@
 @inject IDashboardApiService DashboardService
 @inject IRoundApiService RoundApiService
 @inject IPlayerReportApiService PlayerReportApiService
+@inject IInsightsApiService InsightsService
 @inject NavigationManager Navigation
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4" Style="padding-bottom: 80px;">
@@ -78,6 +79,12 @@
 
         <!-- Scoring Breakdown -->
         <ScoringBreakdownWidget Distribution="scoringDistribution" />
+
+        <!-- AI Insights -->
+        @if (dashboardStats?.TotalRounds > 0)
+        {
+            <AiInsightsWidget Insight="aiInsight" Loading="aiLoading" OnRefresh="RefreshAiInsights" />
+        }
 
         <!-- Recent Rounds -->
         <MudCard Elevation="2" Class="mb-3">
@@ -209,11 +216,14 @@
     private List<CourseHistoryItem>? courseHistory;
     private ScoringDistributionData? scoringDistribution;
     private PerformanceByParData? performanceByPar;
+    private AiInsightResult? aiInsight;
+    private bool aiLoading;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadDashboardData();
         await LoadAdditionalData();
+        _ = LoadAiInsights();
     }
 
     private async Task LoadDashboardData()
@@ -353,5 +363,35 @@
     private void NavigateToPlayerReport(int playerId)
     {
         Navigation.NavigateTo($"/players/{playerId}/report");
+    }
+
+    private async Task LoadAiInsights()
+    {
+        if (dashboardStats == null || dashboardStats.TotalRounds == 0) return;
+
+        aiLoading = true;
+        StateHasChanged();
+        try
+        {
+            aiInsight = await InsightsService.GetDashboardInsightsAsync();
+        }
+        catch
+        {
+            aiInsight = new AiInsightResult
+            {
+                Success = false,
+                ErrorMessage = "Could not load AI insights."
+            };
+        }
+        finally
+        {
+            aiLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshAiInsights()
+    {
+        await LoadAiInsights();
     }
 }

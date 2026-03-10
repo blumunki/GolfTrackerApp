@@ -1,0 +1,50 @@
+@using GolfTrackerApp.Mobile.Models
+
+<MudCard Elevation="2" Class="mb-3">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.h6">✨ AI Insights</MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                           OnClick="OnRefresh"
+                           Disabled="@Loading"
+                           Size="Size.Small" />
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent>
+        @if (Loading)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.caption" Class="mt-2">Analysing your game...</MudText>
+        }
+        else if (Insight?.Success == true)
+        {
+            <MudText Typo="Typo.body2" Style="white-space: pre-line; font-size: 0.85rem;">
+                @Insight.Content
+            </MudText>
+            @if (!string.IsNullOrEmpty(Insight.StaleMessage))
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" NoIcon="false">
+                    @Insight.StaleMessage
+                </MudAlert>
+            }
+            <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2"
+                     Style="font-size: 0.7rem;">
+                Powered by @Insight.ProviderUsed
+            </MudText>
+        }
+        else if (Insight != null)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Warning">
+                @(Insight.ErrorMessage ?? "Could not load insights.")
+            </MudText>
+        }
+    </MudCardContent>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public AiInsightResult? Insight { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+}
