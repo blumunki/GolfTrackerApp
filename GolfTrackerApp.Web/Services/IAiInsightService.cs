@@ -7,7 +7,7 @@ namespace GolfTrackerApp.Web.Services
         Task<AiInsightResult> GetDashboardInsightsAsync(string userId,
             bool forceRefresh = false, CancellationToken cancellationToken = default);
 
-        Task<AiInsightResult> GetPlayerReportInsightsAsync(int playerId,
+        Task<AiInsightResult> GetPlayerReportInsightsAsync(string userId, int playerId,
             int? courseId = null, int? holesPlayed = null,
             CancellationToken cancellationToken = default);
 

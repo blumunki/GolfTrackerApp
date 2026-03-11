@@ -12,6 +12,9 @@ namespace GolfTrackerApp.Web.Services
         private readonly IAiRoutingService _aiRouting;
         private readonly IReportService _reportService;
         private readonly IPlayerService _playerService;
+        private readonly IGolfClubService _clubService;
+        private readonly IGolfCourseService _courseService;
+        private readonly IRoundService _roundService;
         private readonly IAiAuditService _auditService;
         private readonly IAiChatService _chatService;
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
@@ -29,6 +32,9 @@ namespace GolfTrackerApp.Web.Services
             IAiRoutingService aiRouting,
             IReportService reportService,
             IPlayerService playerService,
+            IGolfClubService clubService,
+            IGolfCourseService courseService,
+            IRoundService roundService,
             IAiAuditService auditService,
             IAiChatService chatService,
             IDbContextFactory<ApplicationDbContext> contextFactory,
@@ -38,6 +44,9 @@ namespace GolfTrackerApp.Web.Services
             _aiRouting = aiRouting;
             _reportService = reportService;
             _playerService = playerService;
+            _clubService = clubService;
+            _courseService = courseService;
+            _roundService = roundService;
             _auditService = auditService;
             _chatService = chatService;
             _contextFactory = contextFactory;
@@ -119,38 +128,232 @@ namespace GolfTrackerApp.Web.Services
             return result;
         }
 
-        public Task<AiInsightResult> GetPlayerReportInsightsAsync(
-            int playerId, int? courseId = null, int? holesPlayed = null,
+        public async Task<AiInsightResult> GetPlayerReportInsightsAsync(
+            string userId, int playerId, int? courseId = null, int? holesPlayed = null,
             CancellationToken cancellationToken = default)
         {
-            // Will be implemented in Phase 4
-            return Task.FromResult(new AiInsightResult
+            if (!IsEnabled()) return DisabledResult();
+
+            var cacheKey = $"report_{userId}_{playerId}_{courseId}_{holesPlayed}";
+            var lastDataChange = await GetLastDataChangeAsync(playerId);
+
+            if (TryGetCachedWithWatermark(cacheKey, lastDataChange, out var cached))
+                return cached;
+
+            if (await _auditService.IsRateLimitedAsync(userId))
+                return new AiInsightResult { Success = false, ErrorMessage = "Rate limit reached. Try again later." };
+
+            // Determine if this is the logged-in user's own report or another player's
+            var viewedPlayer = await _playerService.GetPlayerByIdAsync(playerId);
+            var loggedInPlayer = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
+            var isOwnReport = loggedInPlayer != null && loggedInPlayer.PlayerId == playerId;
+
+            var reportTask = _reportService.GetPlayerReportViewModelAsync(
+                playerId, courseId, holesPlayed, null, null, null);
+            var scoringTask = _reportService.GetScoringDistributionAsync(
+                playerId, courseId, holesPlayed, null, null, null);
+            var parTask = _reportService.GetPerformanceByParAsync(
+                playerId, courseId, holesPlayed, null, null, null);
+
+            await Task.WhenAll(reportTask, scoringTask, parTask);
+
+            var report = await reportTask;
+            var scoring = await scoringTask;
+            var par = await parTask;
+
+            if (report?.PerformanceData == null || !report.PerformanceData.Any())
+                return new AiInsightResult { Success = true, Content = "Not enough data for analysis." };
+
+            string systemPrompt;
+            string userPrompt;
+
+            if (!isOwnReport && loggedInPlayer != null)
             {
-                Success = false,
-                ErrorMessage = "Player report insights coming soon."
+                // Viewing another player — provide comparison-focused insights
+                var comparison = await _reportService.GetPlayerComparisonAsync(
+                    loggedInPlayer.PlayerId, new List<int> { playerId }, courseId, holesPlayed, null, null, null);
+
+                systemPrompt = BuildSystemPrompt();
+                userPrompt = BuildComparisonPrompt(loggedInPlayer, viewedPlayer!, report, scoring, par, comparison, courseId, holesPlayed);
+            }
+            else
+            {
+                systemPrompt = BuildSystemPrompt();
+                userPrompt = BuildPlayerReportPrompt(report, scoring, par, courseId, holesPlayed);
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+            var result = await _aiRouting.RouteCompletionAsync(
+                systemPrompt, userPrompt, cancellationToken: cancellationToken);
+            stopwatch.Stop();
+
+            var logPrompts = _configuration.GetValue<bool>("AiInsights:AuditLogging:LogPrompts");
+            var logResponses = _configuration.GetValue<bool>("AiInsights:AuditLogging:LogResponses");
+            await _auditService.LogAsync(new AiAuditLog
+            {
+                ApplicationUserId = userId,
+                InsightType = "PlayerReport",
+                ProviderName = result.ProviderUsed,
+                ModelUsed = result.ModelUsed,
+                PromptTokens = result.PromptTokens,
+                CompletionTokens = result.CompletionTokens,
+                TotalTokens = result.TokensUsed,
+                ResponseTimeMs = (int)stopwatch.ElapsedMilliseconds,
+                Success = result.Success,
+                ErrorMessage = result.ErrorMessage,
+                PromptSent = logPrompts ? userPrompt : null,
+                ResponseReceived = logResponses ? result.Content : null
             });
+
+            if (result.Success)
+            {
+                result.GeneratedAt = DateTime.UtcNow;
+                CacheWithWatermark(cacheKey, result, lastDataChange);
+            }
+            return result;
         }
 
-        public Task<AiInsightResult> GetClubInsightsAsync(string userId, int clubId,
+        public async Task<AiInsightResult> GetClubInsightsAsync(string userId, int clubId,
             CancellationToken cancellationToken = default)
         {
-            // Will be implemented in Phase 4
-            return Task.FromResult(new AiInsightResult
+            if (!IsEnabled()) return DisabledResult();
+
+            var cacheKey = $"club_{userId}_{clubId}";
+            var player = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
+            if (player == null)
+                return new AiInsightResult { Success = false, ErrorMessage = "Player not found." };
+
+            var lastDataChange = await GetLastDataChangeAsync(player.PlayerId);
+
+            if (TryGetCachedWithWatermark(cacheKey, lastDataChange, out var cached))
+                return cached;
+
+            if (await _auditService.IsRateLimitedAsync(userId))
+                return new AiInsightResult { Success = false, ErrorMessage = "Rate limit reached. Try again later." };
+
+            var club = await _clubService.GetGolfClubByIdAsync(clubId);
+            if (club == null)
+                return new AiInsightResult { Success = false, ErrorMessage = "Golf club not found." };
+
+            var scoringTask = _reportService.GetScoringDistributionForClubAsync(
+                player.PlayerId, clubId, null, null, null, null);
+            var performanceTask = _reportService.GetPlayerPerformanceForClubAsync(userId, clubId, 20);
+            var roundCountTask = _roundService.GetRoundCountForClubAsync(userId, clubId);
+
+            await Task.WhenAll(scoringTask, performanceTask, roundCountTask);
+
+            var scoring = await scoringTask;
+            var performance = await performanceTask;
+            var roundCount = await roundCountTask;
+
+            if (roundCount == 0)
+                return new AiInsightResult { Success = true, Content = "Play some rounds at this club to unlock AI insights!" };
+
+            var systemPrompt = BuildSystemPrompt();
+            var userPrompt = BuildClubPrompt(player, club, scoring, performance, roundCount);
+
+            var stopwatch = Stopwatch.StartNew();
+            var result = await _aiRouting.RouteCompletionAsync(
+                systemPrompt, userPrompt, cancellationToken: cancellationToken);
+            stopwatch.Stop();
+
+            var logPrompts = _configuration.GetValue<bool>("AiInsights:AuditLogging:LogPrompts");
+            var logResponses = _configuration.GetValue<bool>("AiInsights:AuditLogging:LogResponses");
+            await _auditService.LogAsync(new AiAuditLog
             {
-                Success = false,
-                ErrorMessage = "Club insights coming soon."
+                ApplicationUserId = userId,
+                InsightType = "Club",
+                ProviderName = result.ProviderUsed,
+                ModelUsed = result.ModelUsed,
+                PromptTokens = result.PromptTokens,
+                CompletionTokens = result.CompletionTokens,
+                TotalTokens = result.TokensUsed,
+                ResponseTimeMs = (int)stopwatch.ElapsedMilliseconds,
+                Success = result.Success,
+                ErrorMessage = result.ErrorMessage,
+                PromptSent = logPrompts ? userPrompt : null,
+                ResponseReceived = logResponses ? result.Content : null
             });
+
+            if (result.Success)
+            {
+                result.GeneratedAt = DateTime.UtcNow;
+                CacheWithWatermark(cacheKey, result, lastDataChange);
+            }
+            return result;
         }
 
-        public Task<AiInsightResult> GetCourseInsightsAsync(string userId, int courseId,
+        public async Task<AiInsightResult> GetCourseInsightsAsync(string userId, int courseId,
             CancellationToken cancellationToken = default)
         {
-            // Will be implemented in Phase 4
-            return Task.FromResult(new AiInsightResult
+            if (!IsEnabled()) return DisabledResult();
+
+            var cacheKey = $"course_{userId}_{courseId}";
+            var player = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
+            if (player == null)
+                return new AiInsightResult { Success = false, ErrorMessage = "Player not found." };
+
+            var lastDataChange = await GetLastDataChangeAsync(player.PlayerId);
+
+            if (TryGetCachedWithWatermark(cacheKey, lastDataChange, out var cached))
+                return cached;
+
+            if (await _auditService.IsRateLimitedAsync(userId))
+                return new AiInsightResult { Success = false, ErrorMessage = "Rate limit reached. Try again later." };
+
+            var course = await _courseService.GetGolfCourseByIdAsync(courseId);
+            if (course == null)
+                return new AiInsightResult { Success = false, ErrorMessage = "Golf course not found." };
+
+            var scoringTask = _reportService.GetScoringDistributionAsync(
+                player.PlayerId, courseId, null, null, null, null);
+            var parTask = _reportService.GetPerformanceByParAsync(
+                player.PlayerId, courseId, null, null, null, null);
+            var performanceTask = _reportService.GetPlayerPerformanceForCourseAsync(userId, courseId, 20);
+            var roundCountTask = _roundService.GetRoundCountForCourseAsync(userId, courseId);
+
+            await Task.WhenAll(scoringTask, parTask, performanceTask, roundCountTask);
+
+            var scoring = await scoringTask;
+            var par = await parTask;
+            var performance = await performanceTask;
+            var roundCount = await roundCountTask;
+
+            if (roundCount == 0)
+                return new AiInsightResult { Success = true, Content = "Play some rounds at this course to unlock AI insights!" };
+
+            var systemPrompt = BuildSystemPrompt();
+            var userPrompt = BuildCoursePrompt(player, course, scoring, par, performance, roundCount);
+
+            var stopwatch = Stopwatch.StartNew();
+            var result = await _aiRouting.RouteCompletionAsync(
+                systemPrompt, userPrompt, cancellationToken: cancellationToken);
+            stopwatch.Stop();
+
+            var logPrompts = _configuration.GetValue<bool>("AiInsights:AuditLogging:LogPrompts");
+            var logResponses = _configuration.GetValue<bool>("AiInsights:AuditLogging:LogResponses");
+            await _auditService.LogAsync(new AiAuditLog
             {
-                Success = false,
-                ErrorMessage = "Course insights coming soon."
+                ApplicationUserId = userId,
+                InsightType = "Course",
+                ProviderName = result.ProviderUsed,
+                ModelUsed = result.ModelUsed,
+                PromptTokens = result.PromptTokens,
+                CompletionTokens = result.CompletionTokens,
+                TotalTokens = result.TokensUsed,
+                ResponseTimeMs = (int)stopwatch.ElapsedMilliseconds,
+                Success = result.Success,
+                ErrorMessage = result.ErrorMessage,
+                PromptSent = logPrompts ? userPrompt : null,
+                ResponseReceived = logResponses ? result.Content : null
             });
+
+            if (result.Success)
+            {
+                result.GeneratedAt = DateTime.UtcNow;
+                CacheWithWatermark(cacheKey, result, lastDataChange);
+            }
+            return result;
         }
 
         public async Task<AiInsightResult> ChatAsync(
@@ -290,6 +493,233 @@ namespace GolfTrackerApp.Web.Services
             }
 
             sb.AppendLine("\nProvide 2-4 key insights about this golfer's overall game.");
+            return sb.ToString();
+        }
+
+        private static string BuildPlayerReportPrompt(
+            PlayerReportViewModel report,
+            ScoringDistribution scoring,
+            PerformanceByPar par,
+            int? courseId,
+            int? holesPlayed)
+        {
+            var sb = new StringBuilder();
+            var player = report.Player!;
+            sb.AppendLine($"Player: {player.FirstName} {player.LastName}");
+            if (player.Handicap.HasValue)
+                sb.AppendLine($"Handicap: {player.Handicap.Value}");
+
+            if (courseId.HasValue || holesPlayed.HasValue)
+            {
+                var filters = new List<string>();
+                if (courseId.HasValue) filters.Add($"filtered to course ID {courseId}");
+                if (holesPlayed.HasValue) filters.Add($"{holesPlayed}-hole rounds only");
+                sb.AppendLine($"Filters: {string.Join(", ", filters)}");
+            }
+
+            sb.AppendLine($"\n--- Performance Data ({report.PerformanceData.Count} rounds) ---");
+            var bestScore = report.PerformanceData.Min(d => d.TotalScore);
+            var avgScore = report.PerformanceData.Average(d => (double)d.TotalScore);
+            var avgToPar = report.PerformanceData.Average(d => (double)d.ScoreVsPar);
+            sb.AppendLine($"Best score: {bestScore}");
+            sb.AppendLine($"Average score: {avgScore:F1}");
+            sb.AppendLine($"Average vs par: {avgToPar:+0.0;-0.0;0}");
+
+            // Recent trend (last 5 rounds)
+            var recent = report.PerformanceData.OrderByDescending(d => d.Date).Take(5).ToList();
+            if (recent.Count >= 2)
+            {
+                sb.AppendLine($"\n--- Recent Trend (last {recent.Count} rounds) ---");
+                foreach (var r in recent)
+                    sb.AppendLine($"  {r.Date:dd MMM} at {r.CourseName}: {r.TotalScore} ({r.ScoreVsPar:+0;-0;E} vs par)");
+            }
+
+            sb.AppendLine($"\n--- Scoring Distribution ---");
+            sb.AppendLine($"Eagles: {scoring.EagleCount} ({scoring.EaglePercentage:F1}%)");
+            sb.AppendLine($"Birdies: {scoring.BirdieCount} ({scoring.BirdiePercentage:F1}%)");
+            sb.AppendLine($"Pars: {scoring.ParCount} ({scoring.ParPercentage:F1}%)");
+            sb.AppendLine($"Bogeys: {scoring.BogeyCount} ({scoring.BogeyPercentage:F1}%)");
+            sb.AppendLine($"Double bogeys: {scoring.DoubleBogeyCount} ({scoring.DoubleBogeyPercentage:F1}%)");
+            sb.AppendLine($"Triple+: {scoring.TripleBogeyOrWorseCount} ({scoring.TripleBogeyOrWorsePercentage:F1}%)");
+
+            if (par.HasValidData)
+            {
+                sb.AppendLine($"\n--- Performance by Par ---");
+                sb.AppendLine($"Par 3 avg: {par.Par3Average:F2} ({par.Par3RelativeToPar:+0.00;-0.00})");
+                sb.AppendLine($"Par 4 avg: {par.Par4Average:F2} ({par.Par4RelativeToPar:+0.00;-0.00})");
+                sb.AppendLine($"Par 5 avg: {par.Par5Average:F2} ({par.Par5RelativeToPar:+0.00;-0.00})");
+            }
+
+            sb.AppendLine("\nProvide 2-4 specific insights about this player's performance, highlighting strengths and areas for improvement.");
+            return sb.ToString();
+        }
+
+        private static string BuildComparisonPrompt(
+            Player loggedInPlayer,
+            Player viewedPlayer,
+            PlayerReportViewModel viewedReport,
+            ScoringDistribution viewedScoring,
+            PerformanceByPar viewedPar,
+            PlayerComparisonResult comparison,
+            int? courseId,
+            int? holesPlayed)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"You (the golfer asking): {loggedInPlayer.FirstName} {loggedInPlayer.LastName}");
+            if (loggedInPlayer.Handicap.HasValue)
+                sb.AppendLine($"Your handicap: {loggedInPlayer.Handicap.Value}");
+
+            sb.AppendLine($"\nYou are viewing the report for: {viewedPlayer.FirstName} {viewedPlayer.LastName}");
+            if (viewedPlayer.Handicap.HasValue)
+                sb.AppendLine($"Their handicap: {viewedPlayer.Handicap.Value}");
+
+            if (courseId.HasValue || holesPlayed.HasValue)
+            {
+                var filters = new List<string>();
+                if (courseId.HasValue) filters.Add($"filtered to course ID {courseId}");
+                if (holesPlayed.HasValue) filters.Add($"{holesPlayed}-hole rounds only");
+                sb.AppendLine($"Filters: {string.Join(", ", filters)}");
+            }
+
+            // Head-to-head comparison data
+            // Note: GetPlayerComparisonAsync only sets SharedRounds/Wins/Losses on the NON-primary player,
+            // so we use theirSummary for shared round count, and their Wins = your Losses (and vice versa)
+            var yourSummary = comparison.Summaries.FirstOrDefault(s => s.PlayerId == loggedInPlayer.PlayerId);
+            var theirSummary = comparison.Summaries.FirstOrDefault(s => s.PlayerId == viewedPlayer.PlayerId);
+
+            if (yourSummary != null && theirSummary != null && theirSummary.SharedRounds > 0)
+            {
+                sb.AppendLine($"\n--- Head-to-Head ({theirSummary.SharedRounds} shared rounds) ---");
+                sb.AppendLine($"Your wins: {theirSummary.Losses}, Their wins: {theirSummary.Wins}, Ties: {theirSummary.Ties}");
+                sb.AppendLine($"Your avg score (all rounds): {yourSummary.AverageScore:F1}, Their avg score (all rounds): {theirSummary.AverageScore:F1}");
+                sb.AppendLine($"Your avg vs par: {yourSummary.AverageToPar:+0.0;-0.0;0}, Their avg vs par: {theirSummary.AverageToPar:+0.0;-0.0;0}");
+                sb.AppendLine($"Your best: {yourSummary.BestScore}, Their best: {theirSummary.BestScore}");
+            }
+            else
+            {
+                sb.AppendLine("\nNo shared rounds found between you and this player.");
+            }
+
+            // Their overall stats for context
+            if (viewedReport.PerformanceData?.Any() == true)
+            {
+                sb.AppendLine($"\n--- {viewedPlayer.FirstName}'s Overall Stats ({viewedReport.PerformanceData.Count} rounds) ---");
+                var avgScore = viewedReport.PerformanceData.Average(d => (double)d.TotalScore);
+                var avgToPar = viewedReport.PerformanceData.Average(d => (double)d.ScoreVsPar);
+                sb.AppendLine($"Avg score: {avgScore:F1}, Avg vs par: {avgToPar:+0.0;-0.0;0}");
+            }
+
+            sb.AppendLine("\nProvide 2-4 insights from the perspective of the logged-in golfer about how they compare to this player. " +
+                "Focus on head-to-head record, relative strengths, and what they could learn from or leverage against this playing partner.");
+            return sb.ToString();
+        }
+
+        private static string BuildClubPrompt(
+            Player player,
+            GolfClub club,
+            ScoringDistribution scoring,
+            List<PlayerPerformanceDataPoint> performance,
+            int roundCount)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"Player: {player.FirstName} {player.LastName}");
+            if (player.Handicap.HasValue)
+                sb.AppendLine($"Handicap: {player.Handicap.Value}");
+
+            sb.AppendLine($"\n--- Club: {club.Name} ---");
+            sb.AppendLine($"Total rounds at this club: {roundCount}");
+            if (club.GolfCourses?.Any() == true)
+                sb.AppendLine($"Courses: {string.Join(", ", club.GolfCourses.Select(c => $"{c.Name} (Par {c.DefaultPar})"))}");
+
+            if (performance.Any())
+            {
+                var bestScore = performance.Min(d => d.TotalScore);
+                var avgScore = performance.Average(d => (double)d.TotalScore);
+                var avgToPar = performance.Average(d => (double)d.ScoreVsPar);
+                sb.AppendLine($"Best score: {bestScore}");
+                sb.AppendLine($"Average score: {avgScore:F1}");
+                sb.AppendLine($"Average vs par: {avgToPar:+0.0;-0.0;0}");
+
+                // Trend
+                var recent = performance.OrderByDescending(d => d.Date).Take(5).ToList();
+                if (recent.Count >= 2)
+                {
+                    sb.AppendLine($"\n--- Recent rounds ---");
+                    foreach (var r in recent)
+                        sb.AppendLine($"  {r.Date:dd MMM} at {r.CourseName}: {r.TotalScore} ({r.ScoreVsPar:+0;-0;E})");
+                }
+            }
+
+            if (scoring.TotalHoles > 0)
+            {
+                sb.AppendLine($"\n--- Scoring Distribution at this club ---");
+                sb.AppendLine($"Eagles: {scoring.EagleCount} ({scoring.EaglePercentage:F1}%)");
+                sb.AppendLine($"Birdies: {scoring.BirdieCount} ({scoring.BirdiePercentage:F1}%)");
+                sb.AppendLine($"Pars: {scoring.ParCount} ({scoring.ParPercentage:F1}%)");
+                sb.AppendLine($"Bogeys: {scoring.BogeyCount} ({scoring.BogeyPercentage:F1}%)");
+                sb.AppendLine($"Double bogeys: {scoring.DoubleBogeyCount} ({scoring.DoubleBogeyPercentage:F1}%)");
+                sb.AppendLine($"Triple+: {scoring.TripleBogeyOrWorseCount} ({scoring.TripleBogeyOrWorsePercentage:F1}%)");
+            }
+
+            sb.AppendLine($"\nProvide 2-4 insights about this player's performance at {club.Name}, including trends and areas to focus on.");
+            return sb.ToString();
+        }
+
+        private static string BuildCoursePrompt(
+            Player player,
+            GolfCourse course,
+            ScoringDistribution scoring,
+            PerformanceByPar par,
+            List<PlayerPerformanceDataPoint> performance,
+            int roundCount)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"Player: {player.FirstName} {player.LastName}");
+            if (player.Handicap.HasValue)
+                sb.AppendLine($"Handicap: {player.Handicap.Value}");
+
+            sb.AppendLine($"\n--- Course: {course.Name} (Par {course.DefaultPar}, {course.NumberOfHoles} holes) ---");
+            sb.AppendLine($"Club: {course.GolfClub?.Name ?? "Unknown"}");
+            sb.AppendLine($"Total rounds at this course: {roundCount}");
+
+            if (performance.Any())
+            {
+                var bestScore = performance.Min(d => d.TotalScore);
+                var avgScore = performance.Average(d => (double)d.TotalScore);
+                var avgToPar = performance.Average(d => (double)d.ScoreVsPar);
+                sb.AppendLine($"Best score: {bestScore}");
+                sb.AppendLine($"Average score: {avgScore:F1}");
+                sb.AppendLine($"Average vs par: {avgToPar:+0.0;-0.0;0}");
+
+                var recent = performance.OrderByDescending(d => d.Date).Take(5).ToList();
+                if (recent.Count >= 2)
+                {
+                    sb.AppendLine($"\n--- Recent rounds ---");
+                    foreach (var r in recent)
+                        sb.AppendLine($"  {r.Date:dd MMM}: {r.TotalScore} ({r.ScoreVsPar:+0;-0;E})");
+                }
+            }
+
+            if (scoring.TotalHoles > 0)
+            {
+                sb.AppendLine($"\n--- Scoring Distribution ---");
+                sb.AppendLine($"Eagles: {scoring.EagleCount} ({scoring.EaglePercentage:F1}%)");
+                sb.AppendLine($"Birdies: {scoring.BirdieCount} ({scoring.BirdiePercentage:F1}%)");
+                sb.AppendLine($"Pars: {scoring.ParCount} ({scoring.ParPercentage:F1}%)");
+                sb.AppendLine($"Bogeys: {scoring.BogeyCount} ({scoring.BogeyPercentage:F1}%)");
+                sb.AppendLine($"Double bogeys: {scoring.DoubleBogeyCount} ({scoring.DoubleBogeyPercentage:F1}%)");
+                sb.AppendLine($"Triple+: {scoring.TripleBogeyOrWorseCount} ({scoring.TripleBogeyOrWorsePercentage:F1}%)");
+            }
+
+            if (par.HasValidData)
+            {
+                sb.AppendLine($"\n--- Performance by Par ---");
+                sb.AppendLine($"Par 3 avg: {par.Par3Average:F2} ({par.Par3RelativeToPar:+0.00;-0.00})");
+                sb.AppendLine($"Par 4 avg: {par.Par4Average:F2} ({par.Par4RelativeToPar:+0.00;-0.00})");
+                sb.AppendLine($"Par 5 avg: {par.Par5Average:F2} ({par.Par5RelativeToPar:+0.00;-0.00})");
+            }
+
+            sb.AppendLine($"\nProvide 2-4 insights about this player's performance at {course.Name}, including course-specific strengths and weaknesses.");
             return sb.ToString();
         }
 

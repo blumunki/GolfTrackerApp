@@ -1918,14 +1918,14 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 
 | Step | Task | Files | Status |
 |------|------|-------|--------|
-| 4.1 | Implement `GetPlayerReportInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ⬜ Pending |
-| 4.2 | Implement `GetClubInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ⬜ Pending |
-| 4.3 | Implement `GetCourseInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ⬜ Pending |
-| 4.4 | Add AI panel to web `PlayerReport.razor` | `Components/Pages/Players/PlayerReport.razor` | ⬜ Pending |
-| 4.5 | Add AI panel to web `GolfClubDetails.razor` | `Components/Pages/GolfClubs/GolfClubDetails.razor` | ⬜ Pending |
-| 4.6 | Add AI panel to web `GolfCourseDetails.razor` | `Components/Pages/GolfCourses/GolfCourseDetails.razor` | ⬜ Pending |
-| 4.7 | Add corresponding API endpoints to `InsightsController` | `Controllers/InsightsController.cs` | ⬜ Pending |
-| 4.8 | Integrate into mobile report/detail pages | Mobile pages | ⬜ Pending |
+| 4.1 | Implement `GetPlayerReportInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ✅ Done |
+| 4.2 | Implement `GetClubInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ✅ Done |
+| 4.3 | Implement `GetCourseInsightsAsync` in `AiInsightService` | `Services/AiInsightService.cs` | ✅ Done |
+| 4.4 | Add AI panel to web `PlayerReport.razor` | `Components/Pages/Players/PlayerReport.razor` | ✅ Done |
+| 4.5 | Add AI panel to web `GolfClubDetails.razor` | `Components/Pages/GolfClubs/GolfClubDetails.razor` | ✅ Done |
+| 4.6 | Add AI panel to web `GolfCourseDetails.razor` | `Components/Pages/GolfCourses/GolfCourseDetails.razor` | ✅ Done |
+| 4.7 | Add corresponding API endpoints to `InsightsController` | `Controllers/InsightsController.cs` | ✅ Done |
+| 4.8 | Integrate into mobile report/detail pages | Mobile pages | ✅ Done |
 
 ### Phase 5 — AI Chat (Persistent Sessions)
 

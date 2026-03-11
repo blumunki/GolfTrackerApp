@@ -9,6 +9,8 @@
 @inject IReportService ReportService
 @inject IRoundService RoundService
 @inject IPlayerService PlayerService
+@inject IAiInsightService AiInsightService
+@inject IConfiguration Configuration
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
 @using Microsoft.AspNetCore.Authorization
@@ -105,6 +107,41 @@ else
             }
         </Authorized>
     </AuthorizeView>
+
+    @* ── AI Analysis Panel (authenticated users with data) ── *@
+    @if (_aiInsightEnabled && isAuthenticated && _totalRoundCount > 0)
+    {
+        <MudExpansionPanels Class="mb-3" Elevation="0">
+            <MudExpansionPanel @bind-Expanded="_aiPanelExpanded" Dense="true" Style="border: 1px solid #e5e7eb; border-radius: 12px;">
+                <TitleContent>
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" Color="Color.Warning" />
+                        <MudText Typo="Typo.subtitle2">AI Analysis</MudText>
+                    </div>
+                </TitleContent>
+                <ChildContent>
+                    @if (_aiLoading)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Analysing your performance at @golfClub.Name...</MudText>
+                    }
+                    else if (_aiInsight?.Success == true)
+                    {
+                        <MudText Typo="Typo.body2" Style="white-space: pre-line;">@_aiInsight.Content</MudText>
+                        @if (!string.IsNullOrEmpty(_aiInsight.StaleMessage))
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@_aiInsight.StaleMessage</MudAlert>
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2" Style="font-size: 0.7rem;">Powered by @_aiInsight.ProviderUsed • <MudLink OnClick="LoadClubInsights" Typo="Typo.caption">Refresh</MudLink></MudText>
+                    }
+                    else if (_aiInsight != null)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">@(_aiInsight.ErrorMessage ?? "Could not load AI insights.")</MudAlert>
+                    }
+                </ChildContent>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
 
     @* ── Courses Section ── *@
     <div class="gp-list-header" style="margin-top:8px;">
@@ -277,6 +314,22 @@ else
     
     private bool isAuthenticated = false;
 
+    // AI Insights
+    private bool _aiInsightEnabled;
+    private bool _aiLoading;
+    private bool _aiPanelExpanded
+    {
+        get => _aiPanelExpandedBacking;
+        set
+        {
+            _aiPanelExpandedBacking = value;
+            if (value && _aiInsight == null && !_aiLoading)
+                _ = LoadClubInsights();
+        }
+    }
+    private bool _aiPanelExpandedBacking;
+    private AiInsightResult? _aiInsight;
+
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
@@ -285,6 +338,7 @@ else
         // Check authentication status
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
+        _aiInsightEnabled = Configuration.GetValue<bool>("AiInsights:Enabled");
         
         try
         {
@@ -316,6 +370,30 @@ else
             Snackbar.Add(errorMessage, Severity.Error);
         }
         isLoading = false;
+    }
+
+    private async Task LoadClubInsights()
+    {
+        if (currentUserId == null) return;
+        _aiLoading = true;
+        StateHasChanged();
+        try
+        {
+            _aiInsight = await AiInsightService.GetClubInsightsAsync(currentUserId, ClubId);
+        }
+        catch
+        {
+            _aiInsight = new AiInsightResult
+            {
+                Success = false,
+                ErrorMessage = "Could not load AI insights."
+            };
+        }
+        finally
+        {
+            _aiLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task LoadPersonalPerformanceData()

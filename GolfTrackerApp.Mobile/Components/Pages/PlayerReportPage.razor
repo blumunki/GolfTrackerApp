@@ -8,6 +8,7 @@
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateService AuthService
+@inject IInsightsApiService InsightsService
 @inject IDialogService DialogService
 
 <MudContainer Class="pa-2 page-scroll-container">
@@ -70,6 +71,41 @@
                     <span class="mobile-stat-lbl">vs Par</span>
                 </div>
             </div>
+        }
+
+        @* ── AI Analysis Panel (on-demand) ── *@
+        @if (reportData.PerformanceData?.Any() == true)
+        {
+            <MudExpansionPanels Elevation="0" Class="mb-2">
+                <MudExpansionPanel @bind-Expanded="_aiPanelExpanded" Dense="true" Style="background: white; border: 1px solid #e5e7eb; border-radius: 12px;">
+                    <TitleContent>
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" Color="Color.Warning" />
+                            <MudText Typo="Typo.subtitle2" Style="font-size: 0.85rem;">AI Analysis</MudText>
+                        </div>
+                    </TitleContent>
+                    <ChildContent>
+                        @if (_aiLoading)
+                        {
+                            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Analysing performance...</MudText>
+                        }
+                        else if (_aiInsight?.Success == true)
+                        {
+                            <MudText Typo="Typo.body2" Style="white-space: pre-line; font-size: 0.85rem;">@_aiInsight.Content</MudText>
+                            @if (!string.IsNullOrEmpty(_aiInsight.StaleMessage))
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" NoIcon="false">@_aiInsight.StaleMessage</MudAlert>
+                            }
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2" Style="font-size: 0.7rem;">Powered by @_aiInsight.ProviderUsed</MudText>
+                        }
+                        else if (_aiInsight != null)
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Warning" Style="font-size: 0.85rem;">@(_aiInsight.ErrorMessage ?? "Could not load AI insights.")</MudText>
+                        }
+                    </ChildContent>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
         }
 
         <!-- Filters (Collapsible) -->
@@ -362,6 +398,22 @@
     private List<Player> comparisonPlayers = new();
     private HashSet<int> comparisonPlayerIds = new();
     private int? _addPlayerId;
+
+    // AI Insights
+    private bool _aiLoading;
+    private bool _aiPanelExpanded
+    {
+        get => _aiPanelExpandedBacking;
+        set
+        {
+            _aiPanelExpandedBacking = value;
+            if (value && _aiInsight == null && !_aiLoading)
+                _ = LoadPlayerReportInsights();
+        }
+    }
+    private bool _aiPanelExpandedBacking;
+    private AiInsightResult? _aiInsight;
+
     private int? addPlayerId
     {
         get => _addPlayerId;
@@ -438,6 +490,31 @@
         {
             debugInfo = $"Error: {ex.Message}";
             loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPlayerReportInsights()
+    {
+        if (playerId <= 0) return;
+        _aiLoading = true;
+        StateHasChanged();
+        try
+        {
+            _aiInsight = await InsightsService.GetPlayerReportInsightsAsync(
+                playerId, selectedCourseId, selectedHoles);
+        }
+        catch
+        {
+            _aiInsight = new AiInsightResult
+            {
+                Success = false,
+                ErrorMessage = "Could not load AI insights."
+            };
+        }
+        finally
+        {
+            _aiLoading = false;
             StateHasChanged();
         }
     }

@@ -9,6 +9,8 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAiInsightService AiInsightService
+@inject IConfiguration Configuration
 
 @using System.Globalization
 @using GolfTrackerApp.Web.Models
@@ -58,6 +60,40 @@ else
         </div>
     }
 
+    @* ── AI Analysis Panel (expandable, on-demand) ── *@
+    @if (_aiInsightEnabled && !string.IsNullOrEmpty(_currentUserId) && _viewModel.PerformanceData?.Any() == true)
+    {
+        <MudExpansionPanels Class="mb-2" Elevation="0">
+            <MudExpansionPanel @bind-Expanded="_aiPanelExpanded" Class="gp-card" Dense="true">
+                <TitleContent>
+                    <div class="d-flex align-center gap-2">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" Color="Color.Warning" />
+                        <MudText Typo="Typo.subtitle2">AI Analysis</MudText>
+                    </div>
+                </TitleContent>
+                <ChildContent>
+                    @if (_aiLoading)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">Analysing performance data...</MudText>
+                    }
+                    else if (_aiInsight?.Success == true)
+                    {
+                        <MudText Typo="Typo.body2" Style="white-space: pre-line;">@_aiInsight.Content</MudText>
+                        @if (!string.IsNullOrEmpty(_aiInsight.StaleMessage))
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@_aiInsight.StaleMessage</MudAlert>
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2" Style="font-size: 0.7rem;">Powered by @_aiInsight.ProviderUsed • <MudLink OnClick="LoadPlayerReportInsights" Typo="Typo.caption">Refresh</MudLink></MudText>
+                    }
+                    else if (_aiInsight != null)
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">@(_aiInsight.ErrorMessage ?? "Could not load AI insights.")</MudAlert>
+                    }
+                </ChildContent>
+            </MudExpansionPanel>
+        </MudExpansionPanels>
+    }
     <!-- Filters & Comparison Controls -->
     <div class="report-controls mb-2">
         <MudExpansionPanels Elevation="0" Class="report-filter-panel">
@@ -429,13 +465,33 @@ else
     private ScoringDistribution? _scoringDistribution;
     private PerformanceByPar? _performanceByPar;
 
+    // AI Insights
+    private string? _currentUserId;
+    private bool _aiInsightEnabled;
+    private bool _aiLoading;
+    private bool _aiPanelExpanded
+    {
+        get => _aiPanelExpandedBacking;
+        set
+        {
+            _aiPanelExpandedBacking = value;
+            if (value && _aiInsight == null && !_aiLoading)
+                _ = LoadPlayerReportInsights();
+        }
+    }
+    private bool _aiPanelExpandedBacking;
+    private AiInsightResult? _aiInsight;
+
     private List<BreadcrumbItem> _breadcrumbs = new();
 
     protected override async Task OnInitializedAsync()
     {
+        _aiInsightEnabled = Configuration.GetValue<bool>("AiInsights:Enabled");
+
         // Load available players for comparison
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        _currentUserId = userId;
         if (!string.IsNullOrEmpty(userId))
         {
             var isAdmin = authState.User.IsInRole("Admin");
@@ -485,6 +541,30 @@ else
     private void UpdateChartDisplayMode()
     {
         PrepareChartData();
+    }
+
+    private async Task LoadPlayerReportInsights()
+    {
+        _aiLoading = true;
+        StateHasChanged();
+        try
+        {
+            _aiInsight = await AiInsightService.GetPlayerReportInsightsAsync(
+                _currentUserId!, PlayerId, _selectedCourseId, _selectedHolesPlayed);
+        }
+        catch (Exception ex)
+        {
+            _aiInsight = new AiInsightResult
+            {
+                Success = false,
+                ErrorMessage = "Could not load AI insights."
+            };
+        }
+        finally
+        {
+            _aiLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task LoadReportData()

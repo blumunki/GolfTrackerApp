@@ -2,6 +2,7 @@
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IGolfCourseApiService CourseApi
 @inject IRoundApiService RoundApi
+@inject IInsightsApiService InsightsService
 @inject NavigationManager NavigationManager
 @inject ILogger<CourseDetailPage> Logger
 
@@ -104,6 +105,43 @@
             }
         }
 
+        @* ── AI Analysis Panel ── *@
+        @if (courseRounds.Any())
+        {
+            <div style="padding:0 12px;">
+                <MudExpansionPanels Elevation="0" Class="mb-3">
+                    <MudExpansionPanel @bind-Expanded="_aiPanelExpanded" Dense="true" Style="background: white; border: 1px solid #e5e7eb; border-radius: 12px;">
+                        <TitleContent>
+                            <div class="d-flex align-center gap-2">
+                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Small" Color="Color.Warning" />
+                                <MudText Typo="Typo.subtitle2" Style="font-size: 0.85rem;">AI Analysis</MudText>
+                            </div>
+                        </TitleContent>
+                        <ChildContent>
+                            @if (_aiLoading)
+                            {
+                                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-2" />
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">Analysing your performance...</MudText>
+                            }
+                            else if (_aiInsight?.Success == true)
+                            {
+                                <MudText Typo="Typo.body2" Style="white-space: pre-line; font-size: 0.85rem;">@_aiInsight.Content</MudText>
+                                @if (!string.IsNullOrEmpty(_aiInsight.StaleMessage))
+                                {
+                                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2" NoIcon="false">@_aiInsight.StaleMessage</MudAlert>
+                                }
+                                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-2" Style="font-size: 0.7rem;">Powered by @_aiInsight.ProviderUsed</MudText>
+                            }
+                            else if (_aiInsight != null)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Warning" Style="font-size: 0.85rem;">@(_aiInsight.ErrorMessage ?? "Could not load AI insights.")</MudText>
+                            }
+                        </ChildContent>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </div>
+        }
+
         @* ── Hole Details Table ── *@
         @if (course.Holes.Any())
         {
@@ -197,6 +235,21 @@
     private List<RoundResponse> courseRounds = new();
     private bool isLoading = true;
 
+    // AI Insights
+    private bool _aiLoading;
+    private bool _aiPanelExpanded
+    {
+        get => _aiPanelExpandedBacking;
+        set
+        {
+            _aiPanelExpandedBacking = value;
+            if (value && _aiInsight == null && !_aiLoading)
+                _ = LoadCourseInsights();
+        }
+    }
+    private bool _aiPanelExpandedBacking;
+    private AiInsightResult? _aiInsight;
+
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
@@ -229,6 +282,29 @@
         finally
         {
             isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadCourseInsights()
+    {
+        _aiLoading = true;
+        StateHasChanged();
+        try
+        {
+            _aiInsight = await InsightsService.GetCourseInsightsAsync(CourseId);
+        }
+        catch
+        {
+            _aiInsight = new AiInsightResult
+            {
+                Success = false,
+                ErrorMessage = "Could not load AI insights."
+            };
+        }
+        finally
+        {
+            _aiLoading = false;
             StateHasChanged();
         }
     }

@@ -47,8 +47,9 @@ public class InsightsController : BaseApiController
     {
         try
         {
+            var userId = GetCurrentUserId();
             var result = await _insightService.GetPlayerReportInsightsAsync(
-                playerId, courseId, holesPlayed, cancellationToken);
+                userId, playerId, courseId, holesPlayed, cancellationToken);
             return Ok(result);
         }
         catch (Exception ex)
