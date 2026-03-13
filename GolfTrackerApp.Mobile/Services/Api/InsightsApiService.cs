@@ -15,6 +15,8 @@ public interface IInsightsApiService
     Task<AiInsightResult?> GetClubInsightsAsync(int clubId);
     Task<AiInsightResult?> GetCourseInsightsAsync(int courseId);
     Task<AiInsightResult?> ChatAsync(string message, int? sessionId = null);
+    Task<List<AiChatSessionSummary>?> GetChatSessionsAsync(int limit = 20);
+    Task<AiChatSessionDetail?> GetChatSessionAsync(int sessionId);
 }
 
 public class InsightsApiService : IInsightsApiService
@@ -141,6 +143,42 @@ public class InsightsApiService : IInsightsApiService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending chat message");
+            return null;
+        }
+    }
+
+    public async Task<List<AiChatSessionSummary>?> GetChatSessionsAsync(int limit = 20)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.GetAsync($"api/insights/sessions?limit={limit}");
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) return null;
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<AiChatSessionSummary>>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching chat sessions");
+            return null;
+        }
+    }
+
+    public async Task<AiChatSessionDetail?> GetChatSessionAsync(int sessionId)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.GetAsync($"api/insights/sessions/{sessionId}");
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) return null;
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<AiChatSessionDetail>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching chat session {SessionId}", sessionId);
             return null;
         }
     }

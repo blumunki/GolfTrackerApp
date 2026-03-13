@@ -1,0 +1,289 @@
+@page "/chat"
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+@attribute [Authorize]
+@inject IAiInsightService AiInsightService
+@inject IAiChatService ChatService
+@inject IConfiguration Configuration
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>AI Coach Chat</PageTitle>
+
+@if (!_aiEnabled)
+{
+    <MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+        <MudAlert Severity="Severity.Info">AI Insights are not currently enabled.</MudAlert>
+    </MudContainer>
+}
+else
+{
+    <div class="chat-page-container">
+        @* Session Sidebar *@
+        <div class="chat-sidebar @(_sidebarOpen ? "open" : "")">
+            <div class="chat-sidebar-header">
+                <MudText Typo="Typo.h6">Chat Sessions</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               OnClick="StartNewSession"
+                               title="New Chat" />
+            </div>
+            <MudDivider />
+            <div class="chat-session-list">
+                @if (_sessionsLoading)
+                {
+                    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mx-2 mt-2" />
+                }
+                else if (_sessions.Count == 0)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="pa-4 text-center">
+                        No chat sessions yet. Start a conversation below!
+                    </MudText>
+                }
+                else
+                {
+                    @foreach (var session in _sessions)
+                    {
+                        <div class="chat-session-item @(session.AiChatSessionId == _currentSessionId ? "active" : "")"
+                             @onclick="() => LoadSession(session.AiChatSessionId)">
+                            <MudText Typo="Typo.body2" Class="session-title">
+                                @(session.Title ?? "Untitled Chat")
+                            </MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                @session.LastMessageAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                            </MudText>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        @* Chat Main Area *@
+        <div class="chat-main">
+            @* Mobile sidebar toggle *@
+            <div class="chat-topbar d-flex d-md-none">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                               OnClick="() => _sidebarOpen = !_sidebarOpen"
+                               Size="Size.Small" />
+                <MudText Typo="Typo.subtitle1" Class="ml-2">AI Coach Chat</MudText>
+            </div>
+
+            @* Messages *@
+            <div class="chat-messages" id="chatMessages">
+                @if (_messages.Count == 0 && !_isTyping)
+                {
+                    <div class="chat-empty-state">
+                        <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Size="Size.Large"
+                                 Color="Color.Primary" Class="mb-3" />
+                        <MudText Typo="Typo.h5" Class="mb-2">AI Golf Coach</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Tertiary" Class="mb-4">
+                            Ask me about your golf game — performance trends, practice tips, 
+                            course strategy, or anything golf-related!
+                        </MudText>
+                        <div class="chat-suggestions">
+                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined"
+                                     OnClick="@(() => SendSuggestion("What are my strengths and weaknesses?"))">
+                                What are my strengths and weaknesses?
+                            </MudChip>
+                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined"
+                                     OnClick="@(() => SendSuggestion("How can I improve my par 3 scoring?"))">
+                                How can I improve my par 3 scoring?
+                            </MudChip>
+                            <MudChip T="string" Color="Color.Primary" Variant="Variant.Outlined"
+                                     OnClick="@(() => SendSuggestion("What should I focus on in practice?"))">
+                                What should I focus on in practice?
+                            </MudChip>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var msg in _messages)
+                    {
+                        <div class="chat-bubble @(msg.Role == "user" ? "chat-bubble-user" : "chat-bubble-assistant")">
+                            @if (msg.Role == "assistant")
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome"
+                                         Size="Size.Small" Class="chat-bubble-icon" />
+                            }
+                            <div class="chat-bubble-content">
+                                <MudText Typo="Typo.body2" Style="white-space: pre-line;">@msg.Content</MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mt-1"
+                                         Style="font-size: 0.7rem;">
+                                    @msg.Timestamp.ToLocalTime().ToString("HH:mm")
+                                </MudText>
+                            </div>
+                        </div>
+                    }
+                    @if (_isTyping)
+                    {
+                        <div class="chat-bubble chat-bubble-assistant">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome"
+                                     Size="Size.Small" Class="chat-bubble-icon" />
+                            <div class="chat-bubble-content">
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                                     Color="Color.Primary" />
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+
+            @* Input Bar *@
+            <div class="chat-input-bar">
+                <MudTextField @bind-Value="_currentMessage"
+                              Placeholder="Ask about your golf game..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Filled.Send"
+                              AdornmentColor="Color.Primary"
+                              OnAdornmentClick="SendMessage"
+                              OnKeyDown="HandleKeyDown"
+                              Disabled="@_isTyping"
+                              FullWidth="true"
+                              Lines="1"
+                              Class="chat-input" />
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _aiEnabled;
+    private string? _userId;
+    private string _currentMessage = string.Empty;
+    private bool _isTyping;
+    private bool _sidebarOpen;
+    private bool _sessionsLoading;
+    private int? _currentSessionId;
+    private List<AiChatSession> _sessions = new();
+    private List<AiChatMessage> _messages = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _aiEnabled = Configuration.GetValue<bool>("AiInsights:Enabled");
+        if (!_aiEnabled) return;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(_userId)) return;
+
+        await LoadSessions();
+    }
+
+    private async Task LoadSessions()
+    {
+        _sessionsLoading = true;
+        try
+        {
+            _sessions = await ChatService.GetSessionsAsync(_userId!, 20);
+        }
+        catch
+        {
+            _sessions = new();
+        }
+        finally
+        {
+            _sessionsLoading = false;
+        }
+    }
+
+    private async Task LoadSession(int sessionId)
+    {
+        _currentSessionId = sessionId;
+        _sidebarOpen = false;
+        _messages.Clear();
+
+        var session = await ChatService.GetSessionAsync(sessionId, _userId!);
+        if (session?.Messages != null)
+        {
+            _messages = session.Messages
+                .Select(m => new AiChatMessage
+                {
+                    Role = m.Role,
+                    Content = m.Content,
+                    Timestamp = m.Timestamp
+                })
+                .ToList();
+        }
+        StateHasChanged();
+        await ScrollToBottom();
+    }
+
+    private void StartNewSession()
+    {
+        _currentSessionId = null;
+        _messages.Clear();
+        _sidebarOpen = false;
+        StateHasChanged();
+    }
+
+    private async Task SendSuggestion(string suggestion)
+    {
+        _currentMessage = suggestion;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_currentMessage) || _isTyping || string.IsNullOrEmpty(_userId))
+            return;
+
+        var messageText = _currentMessage.Trim();
+        _currentMessage = string.Empty;
+
+        _messages.Add(new AiChatMessage
+        {
+            Role = "user",
+            Content = messageText,
+            Timestamp = DateTime.UtcNow
+        });
+        _isTyping = true;
+        StateHasChanged();
+        await ScrollToBottom();
+
+        var result = await AiInsightService.ChatAsync(_userId, messageText, _currentSessionId);
+
+        if (result.Success)
+        {
+            _messages.Add(new AiChatMessage
+            {
+                Role = "assistant",
+                Content = result.Content,
+                Timestamp = DateTime.UtcNow
+            });
+
+            if (result.ChatSessionId.HasValue && _currentSessionId == null)
+            {
+                _currentSessionId = result.ChatSessionId;
+                await LoadSessions();
+            }
+        }
+        else
+        {
+            _messages.Add(new AiChatMessage
+            {
+                Role = "assistant",
+                Content = result.ErrorMessage ?? "Sorry, I couldn't process that. Please try again.",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        _isTyping = false;
+        StateHasChanged();
+        await ScrollToBottom();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await SendMessage();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await Task.Delay(50);
+        // JS interop would be ideal here, but we'll rely on CSS scroll-to-bottom
+        StateHasChanged();
+    }
+}

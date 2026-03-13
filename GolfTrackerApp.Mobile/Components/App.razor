@@ -129,6 +129,9 @@
                             }
                         }
                         break;
+                    case "ai-chat":
+                        <AiChatPage />
+                        break;
                     default:
                         <Home />
                         break;
@@ -164,6 +167,11 @@
                                       Color="@(currentPage == "golfclubs" ? Color.Primary : Color.Secondary)"
                                       Size="Size.Medium"
                                       OnClick="@(() => NavigateToPage("golfclubs"))" />
+                        
+                        <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome" 
+                                      Color="@(currentPage == "ai-chat" ? Color.Primary : Color.Secondary)"
+                                      Size="Size.Medium"
+                                      OnClick="@(() => NavigateToPage("ai-chat"))" />
                         
                         <MudIconButton Icon="@Icons.Material.Filled.Person" 
                                       Color="@(currentPage == "profile" ? Color.Primary : Color.Secondary)"

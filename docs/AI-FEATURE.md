@@ -1927,19 +1927,24 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | 4.7 | Add corresponding API endpoints to `InsightsController` | `Controllers/InsightsController.cs` | ✅ Done |
 | 4.8 | Integrate into mobile report/detail pages | Mobile pages | ✅ Done |
 
+**Post-implementation fixes (Phase 4):**
+- Fixed FK constraint failure when viewing managed (non-registered) player reports — audit log was writing `"unknown"` as `ApplicationUserId`. Changed `GetPlayerReportInsightsAsync` to accept `string userId` (the logged-in user) for audit + rate limiting.
+- Fixed insight perspective — when viewing another player's report, the AI now uses `GetPlayerComparisonAsync` to build a head-to-head comparison prompt from the logged-in user's perspective (wins/losses, relative averages) instead of just describing the viewed player's stats.
+- Fixed head-to-head data not appearing in comparison prompt — `GetPlayerComparisonAsync` only sets `SharedRounds`/`Wins`/`Losses` on the non-primary player's summary. Corrected `BuildComparisonPrompt` to read from `theirSummary` with flipped win/loss perspective.
+
 ### Phase 5 — AI Chat (Persistent Sessions)
 
 **Goal**: Free-form conversational AI with persistent session history.
 
 | Step | Task | Files | Status |
 |------|------|-------|--------|
-| 5.1 | Implement `ChatAsync` in `AiInsightService` (with session persistence + audit) | `Services/AiInsightService.cs` | ⬜ Pending |
-| 5.2 | Add chat endpoints to `InsightsController` (`POST chat`, `GET sessions`, `GET sessions/{id}`) | `Controllers/InsightsController.cs` | ⬜ Pending |
-| 5.3 | Create web AI Chat page with session list sidebar | `Components/Pages/AiChat.razor` | ⬜ Pending |
-| 5.4 | Create mobile `AiChatPage.razor` with session resume | `Mobile/Components/Pages/AiChatPage.razor` | ⬜ Pending |
-| 5.5 | Add mobile chat session endpoints to `InsightsApiService` | `Mobile/Services/Api/InsightsApiService.cs` | ⬜ Pending |
-| 5.6 | Register chat page in mobile `App.razor` routing | `Mobile/Components/App.razor` | ⬜ Pending |
-| 5.7 | Add navigation entry for chat | Mobile nav | ⬜ Pending |
+| 5.1 | Implement `ChatAsync` in `AiInsightService` (with session persistence + audit) | `Services/AiInsightService.cs` | ✅ Done (Phase 1) |
+| 5.2 | Add chat endpoints to `InsightsController` (`POST chat`, `GET sessions`, `GET sessions/{id}`) | `Controllers/InsightsController.cs` | ✅ Done (Phase 3) |
+| 5.3 | Create web AI Chat page with session list sidebar | `Components/Pages/AiChat.razor` | ✅ Done |
+| 5.4 | Create mobile `AiChatPage.razor` with session resume | `Mobile/Components/Pages/AiChatPage.razor` | ✅ Done |
+| 5.5 | Add mobile chat session endpoints to `InsightsApiService` | `Mobile/Services/Api/InsightsApiService.cs` | ✅ Done |
+| 5.6 | Register chat page in mobile `App.razor` routing | `Mobile/Components/App.razor` | ✅ Done |
+| 5.7 | Add navigation entry for chat | Web nav + Mobile bottom nav | ✅ Done |
 
 ### Phase 6 — Polish + Production Readiness
 

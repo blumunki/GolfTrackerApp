@@ -21,6 +21,7 @@
 @import url('./css/components/golf-clubs.css');
 @import url('./css/components/players.css');
 @import url('./css/components/notifications.css');
+@import url('./css/components/golf-chat.css');
 
 /* Import Utility Classes */
 @import url('./css/utilities/golf-utilities.css');

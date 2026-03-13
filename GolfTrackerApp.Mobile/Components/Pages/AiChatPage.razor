@@ -1,0 +1,273 @@
+@using MudBlazor
+@using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services.Api
+@inject IInsightsApiService InsightsService
+
+<div style="display: flex; flex-direction: column; height: calc(100vh - 80px);">
+    @* Header *@
+    <MudPaper Elevation="1" Style="padding: 8px 12px; border-radius: 0;">
+        <div class="d-flex align-center justify-space-between">
+            <div class="d-flex align-center">
+                @if (_showSessions)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack"
+                                   Size="Size.Small"
+                                   OnClick="() => _showSessions = false" />
+                    <MudText Typo="Typo.subtitle1" Class="ml-1">Chat History</MudText>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome"
+                             Size="Size.Small" Color="Color.Primary" Class="mr-2" />
+                    <MudText Typo="Typo.subtitle1">AI Coach</MudText>
+                }
+            </div>
+            <div class="d-flex">
+                @if (!_showSessions)
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.History"
+                                   Size="Size.Small"
+                                   OnClick="ShowSessions"
+                                   title="Chat History" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                   Size="Size.Small"
+                                   OnClick="StartNewSession"
+                                   title="New Chat" />
+                }
+            </div>
+        </div>
+    </MudPaper>
+
+    @if (_showSessions)
+    {
+        @* Session List View *@
+        <div style="flex: 1; overflow-y: auto;">
+            @if (_sessionsLoading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mx-2 mt-2" />
+            }
+            else if (_sessions == null || _sessions.Count == 0)
+            {
+                <div class="pa-4 text-center">
+                    <MudIcon Icon="@Icons.Material.Filled.ChatBubbleOutline"
+                             Size="Size.Large" Color="Color.Tertiary" Class="mb-2" />
+                    <MudText Typo="Typo.body2" Color="Color.Tertiary">
+                        No chat sessions yet.
+                    </MudText>
+                </div>
+            }
+            else
+            {
+                <MudList T="int" Dense="true" Class="pa-0">
+                    @foreach (var session in _sessions)
+                    {
+                        <MudListItem T="int" OnClick="() => LoadSession(session.AiChatSessionId)">
+                            <div>
+                                <MudText Typo="Typo.body2" Style="font-weight: 500;">
+                                    @(session.Title ?? "Untitled Chat")
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                    @session.LastMessageAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                                </MudText>
+                            </div>
+                        </MudListItem>
+                    }
+                </MudList>
+            }
+        </div>
+    }
+    else
+    {
+        @* Chat Messages View *@
+        <div style="flex: 1; overflow-y: auto; padding: 12px;">
+            @if (_messages.Count == 0 && !_isTyping)
+            {
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 20px;">
+                    <MudIcon Icon="@Icons.Material.Filled.AutoAwesome"
+                             Size="Size.Large" Color="Color.Primary" Class="mb-2" />
+                    <MudText Typo="Typo.subtitle1" Class="mb-1">AI Golf Coach</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary" Class="mb-3">
+                        Ask about your game, get tips, or discuss strategy!
+                    </MudText>
+                    <div style="display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 300px;">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="@(() => SendSuggestion("What are my strengths?"))"
+                                   FullWidth="true" Style="text-transform: none; font-size: 0.8rem;">
+                            What are my strengths?
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="@(() => SendSuggestion("How can I improve my scoring?"))"
+                                   FullWidth="true" Style="text-transform: none; font-size: 0.8rem;">
+                            How can I improve my scoring?
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                                   OnClick="@(() => SendSuggestion("What should I practice next?"))"
+                                   FullWidth="true" Style="text-transform: none; font-size: 0.8rem;">
+                            What should I practice next?
+                        </MudButton>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    @foreach (var msg in _messages)
+                    {
+                        <div style="display: flex; gap: 6px; max-width: 88%;
+                                    @(msg.Role == "user" ? "align-self: flex-end; flex-direction: row-reverse;" : "align-self: flex-start;")">
+                            @if (msg.Role == "assistant")
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome"
+                                         Size="Size.Small" Color="Color.Primary"
+                                         Style="margin-top: 4px; flex-shrink: 0;" />
+                            }
+                            <div style="padding: 8px 12px; border-radius: 14px; line-height: 1.4;
+                                        @(msg.Role == "user"
+                                            ? "background: #3d7c3f; color: white; border-bottom-right-radius: 4px;"
+                                            : "background: #f5f5f5; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px;")">
+                                <MudText Typo="Typo.body2" Style="white-space: pre-line; font-size: 0.85rem;">
+                                    @msg.Content
+                                </MudText>
+                                <MudText Typo="Typo.caption" Style="font-size: 0.65rem; opacity: 0.6; margin-top: 2px;">
+                                    @msg.Timestamp.ToLocalTime().ToString("HH:mm")
+                                </MudText>
+                            </div>
+                        </div>
+                    }
+                    @if (_isTyping)
+                    {
+                        <div style="display: flex; gap: 6px; align-self: flex-start;">
+                            <MudIcon Icon="@Icons.Material.Filled.AutoAwesome"
+                                     Size="Size.Small" Color="Color.Primary"
+                                     Style="margin-top: 4px;" />
+                            <div style="padding: 10px 14px; background: #f5f5f5; border-radius: 14px; border-bottom-left-radius: 4px;">
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true"
+                                                     Color="Color.Primary" />
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        @* Input Bar *@
+        <div style="padding: 8px 12px 12px; border-top: 1px solid #e0e0e0; background: white;">
+            <MudTextField @bind-Value="_currentMessage"
+                          Placeholder="Ask about your golf game..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.Send"
+                          AdornmentColor="Color.Primary"
+                          OnAdornmentClick="SendMessage"
+                          OnKeyDown="HandleKeyDown"
+                          Disabled="@_isTyping"
+                          FullWidth="true"
+                          Margin="Margin.Dense"
+                          Style="border-radius: 24px;" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<string> OnNavigate { get; set; }
+
+    private List<AiChatMessage> _messages = new();
+    private List<AiChatSessionSummary> _sessions = new();
+    private string _currentMessage = string.Empty;
+    private bool _isTyping;
+    private bool _showSessions;
+    private bool _sessionsLoading;
+    private int? _currentSessionId;
+
+    private async Task ShowSessions()
+    {
+        _showSessions = true;
+        _sessionsLoading = true;
+        StateHasChanged();
+
+        _sessions = await InsightsService.GetChatSessionsAsync() ?? new();
+        _sessionsLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task LoadSession(int sessionId)
+    {
+        _currentSessionId = sessionId;
+        _showSessions = false;
+        _messages.Clear();
+        StateHasChanged();
+
+        var session = await InsightsService.GetChatSessionAsync(sessionId);
+        if (session?.Messages != null)
+        {
+            _messages = session.Messages;
+        }
+        StateHasChanged();
+    }
+
+    private void StartNewSession()
+    {
+        _currentSessionId = null;
+        _messages.Clear();
+        _showSessions = false;
+        StateHasChanged();
+    }
+
+    private async Task SendSuggestion(string suggestion)
+    {
+        _currentMessage = suggestion;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_currentMessage) || _isTyping) return;
+
+        var messageText = _currentMessage.Trim();
+        _currentMessage = string.Empty;
+
+        _messages.Add(new AiChatMessage
+        {
+            Role = "user",
+            Content = messageText,
+            Timestamp = DateTime.UtcNow
+        });
+        _isTyping = true;
+        StateHasChanged();
+
+        var result = await InsightsService.ChatAsync(messageText, _currentSessionId);
+
+        if (result?.Success == true)
+        {
+            _messages.Add(new AiChatMessage
+            {
+                Role = "assistant",
+                Content = result.Content,
+                Timestamp = DateTime.UtcNow
+            });
+
+            if (result.ChatSessionId.HasValue && _currentSessionId == null)
+            {
+                _currentSessionId = result.ChatSessionId;
+            }
+        }
+        else
+        {
+            _messages.Add(new AiChatMessage
+            {
+                Role = "assistant",
+                Content = result?.ErrorMessage ?? "Sorry, I couldn't process that. Please try again.",
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
+        _isTyping = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+            await SendMessage();
+    }
+}
