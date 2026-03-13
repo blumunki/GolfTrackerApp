@@ -34,7 +34,17 @@ Golf Tracker App is a cross-platform golf performance tracking system consisting
 │  │  IGolfClubService, IGolfCourseService, IRoundService,     │   │
 │  │  IPlayerService, IReportService, IScoreService,           │   │
 │  │  IHoleService, IConnectionService, IMergeService,         │   │
-│  │  INotificationService, IRoundWorkflowService              │   │
+│  │  INotificationService, IRoundWorkflowService,             │   │
+│  │  IAiInsightService, IAiRoutingService, IAiAuditService,   │   │
+│  │  IAiChatService, IAiProviderSettingsService               │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         │                                       │
+│                         ▼                                       │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │              AI Provider Layer (8 providers)              │   │
+│  │  OpenAI, Anthropic, Gemini, Grok, Mistral,                │   │
+│  │  DeepSeek, MetaLlama, Manus                               │   │
+│  │  (priority-based routing + circuit breaker failover)       │   │
 │  └──────────────────────┬───────────────────────────────────┘   │
 │                         │                                       │
 │                         ▼                                       │
@@ -103,6 +113,7 @@ GolfTrackerApp.Web/
 │   ├── DashboardController.cs         # Dashboard stats for mobile
 │   ├── GolfClubsController.cs         # Golf club CRUD
 │   ├── GolfCoursesController.cs       # Golf course CRUD
+│   ├── InsightsController.cs          # AI insights + chat API endpoints
 │   ├── MergeController.cs             # Managed player merge workflow
 │   ├── PlayersController.cs           # Player CRUD + reports
 │   ├── ReportsController.cs           # Aggregated reporting endpoints
@@ -118,21 +129,49 @@ GolfTrackerApp.Web/
 │   ├── IConnectionService.cs         # Player-to-player social connections
 │   ├── IMergeService.cs              # Managed player merge workflow
 │   ├── INotificationService.cs       # User notifications
-│   └── IRoundWorkflowService.cs      # Multi-step round recording orchestrator
+│   ├── IRoundWorkflowService.cs      # Multi-step round recording orchestrator
+│   ├── IAiInsightService.cs          # Golf-specific AI insight orchestration
+│   ├── IAiRoutingService.cs          # Multi-provider routing + failover
+│   ├── IAiAuditService.cs            # AI audit logging + rate limiting
+│   ├── IAiChatService.cs             # Persistent chat session management
+│   ├── IAiProviderSettingsService.cs  # Admin provider on/off + priority
+│   └── AiProviders/                   # AI provider implementations
+│       ├── OpenAiProviderService.cs
+│       ├── AnthropicProviderService.cs
+│       ├── GeminiProviderService.cs
+│       ├── GrokProviderService.cs
+│       ├── MistralProviderService.cs
+│       ├── DeepSeekProviderService.cs
+│       ├── MetaLlamaProviderService.cs
+│       └── ManusProviderService.cs
 ├── Models/                            # Domain models (EF entities + DTOs)
 │   ├── Round.cs, Score.cs, Player.cs  # Core entities
 │   ├── GolfClub.cs, GolfCourse.cs, Hole.cs
 │   ├── PlayerConnection.cs           # Social connections
 │   ├── PlayerMergeRequest.cs         # Merge workflow
 │   ├── Notification.cs               # In-app notifications
+│   ├── AiProviderConfig.cs           # AI provider configuration model
+│   ├── AiProviderSettings.cs         # DB entity for provider on/off + priority
+│   ├── AiInsightResult.cs            # AI response DTO
+│   ├── AiChatMessage.cs              # Chat message DTO + AiChatRequest
+│   ├── AiAuditLog.cs                 # Audit log entity
+│   ├── AiChatSession.cs              # Chat session entity
+│   ├── AiChatSessionMessage.cs       # Chat message entity
 │   └── [Various DTOs]                # Report view models, chart data, etc.
 ├── Data/
 │   ├── ApplicationDbContext.cs        # EF Core context (Identity + domain entities)
-│   ├── ApplicationUser.cs            # Identity user (extends IdentityUser with LinkedPlayerId)
+│   ├── ApplicationUser.cs            # Identity user (extends IdentityUser with LinkedPlayerId, AiInsightsOptOut)
 │   ├── SeedData.cs                   # Initial data seeding
 │   └── Migrations/                   # EF Core migrations (SQLite dev)
 ├── Components/
 │   ├── Pages/                        # Blazor Server page components
+│   │   ├── Home.razor                # Dashboard with AI insights widget
+│   │   ├── AiChat.razor              # AI coach chat with persistent sessions
+│   │   ├── GolfClubs/                # Club list, add, edit, details
+│   │   ├── GolfCourses/              # Course list, add, edit, details
+│   │   ├── Players/                  # Player list, add, edit, report
+│   │   ├── Rounds/                   # Round list, record, details
+│   │   └── Admin/                    # AI Providers, AI Usage, Data Migration
 │   ├── Layout/                       # MainLayout + NavMenu
 │   ├── Shared/                       # Dialogs, reusable components
 │   └── Account/                      # Identity UI pages (scaffolded)
@@ -155,6 +194,7 @@ GolfTrackerApp.Mobile/
 │   ├── Dashboard/                     # Dashboard widget components
 │   │   ├── CourseDiaryWidget.razor
 │   │   ├── HeroStatsWidget.razor
+│   │   ├── AiInsightsWidget.razor
 │   │   ├── ParPerformanceWidget.razor
 │   │   └── ScoringBreakdownWidget.razor
 │   ├── Shared/
@@ -169,7 +209,8 @@ GolfTrackerApp.Mobile/
 │       ├── RecordRoundPage.razor      # Round recording workflow
 │       ├── RoundDetailPage.razor      # Round detail view
 │       ├── PlayersPage.razor          # Player management + connections
-│       └── PlayerReportPage.razor     # Player stats report
+│   │   ├── PlayerReportPage.razor     # Player stats report
+│   │   └── AiChatPage.razor           # AI coach chat with sessions
 ├── Models/                            # Mobile DTOs
 │   ├── Round.cs, Player.cs
 │   ├── GolfClub.cs, GolfCourse.cs
@@ -184,7 +225,8 @@ GolfTrackerApp.Mobile/
 │       ├── GolfClubApiService.cs
 │       ├── GolfCourseApiService.cs
 │       ├── PlayerReportApiService.cs
-│       └── ConnectionApiService.cs
+│       ├── ConnectionApiService.cs
+│       └── InsightsApiService.cs      # AI insights + chat API client
 └── Resources/                         # App icon, splash screen, fonts
 ```
 
@@ -227,7 +269,10 @@ ApplicationUser (ASP.NET Identity)
     ├── 1:N → Player (CreatedByApplicationUserId — players this user created)
     ├── 1:N → PlayerConnection (RequestingUserId / TargetUserId)
     ├── 1:N → PlayerMergeRequest (RequestingUserId / TargetUserId)
-    └── 1:N → Notification
+    ├── 1:N → Notification
+    ├── 1:N → AiChatSession
+    ├── 1:N → AiAuditLog
+    └── AiInsightsOptOut (bool — user opt-out toggle)
 
 Player
     ├── 1:N → RoundPlayer (junction)
@@ -244,6 +289,18 @@ Round
     └── 1:N → Score
                   ├── N:1 → Player
                   └── N:1 → Hole
+
+AiChatSession
+    ├── N:1 → ApplicationUser
+    ├── 1:N → AiChatSessionMessage
+    └── 1:N → AiAuditLog (optional FK)
+
+AiAuditLog
+    ├── N:1 → ApplicationUser
+    └── N:1 → AiChatSession (nullable)
+
+AiProviderSettings
+    └── ProviderName (unique), Enabled, Priority, UpdatedAt
 ```
 
 **Database providers:**
@@ -307,6 +364,11 @@ Key services and their responsibilities:
 | `IMergeService` | Merge managed player data into connected accounts |
 | `INotificationService` | User notification lifecycle |
 | `IRoundWorkflowService` | Orchestrates multi-step round recording |
+| `IAiInsightService` | Golf-specific AI insight generation (dashboard, report, club, course, chat) |
+| `IAiRoutingService` | Multi-provider routing with priority ordering + circuit breaker failover |
+| `IAiAuditService` | Audit logging, rate limiting, usage counts, retention cleanup |
+| `IAiChatService` | Persistent chat session CRUD (create, resume, archive) |
+| `IAiProviderSettingsService` | Admin-managed provider on/off + priority (DB-backed) |
 
 ## 7. API Design
 
@@ -320,6 +382,7 @@ Key services and their responsibilities:
 - Auth endpoints (`/api/auth/*`): Unauthenticated, issue JWT tokens
 - Reference data (`/api/golfclubs`, `/api/golfcourses` GET): Publicly accessible
 - User data (`/api/rounds`, `/api/players`, `/api/dashboard`, `/api/reports`): JWT-protected
+- AI endpoints (`/api/insights/*`): JWT-protected, rate-limited per user
 
 ### 7.3 Serialisation
 - JSON with `System.Text.Json`
@@ -331,14 +394,16 @@ Key services and their responsibilities:
 ```
 wwwroot/css/
 ├── components/          # Per-feature styles
-│   ├── golf-clubs.css          # Club/course list + detail pages
-│   ├── golf-dashboard.css      # Dashboard widgets
-│   ├── golf-rounds.css         # Round list + detail
-│   ├── golf-scorecard.css      # Scorecard entry UI
-│   ├── golf-report.css         # Player report pages
+│   ├── ai-insights.css             # AI widget cards, shimmer loading, provider badges
+│   ├── golf-chat.css               # AI chat page bubbles, input bar, session list
+│   ├── golf-clubs.css              # Club/course list + detail pages
+│   ├── golf-dashboard.css          # Dashboard widgets
+│   ├── golf-rounds.css             # Round list + detail
+│   ├── golf-scorecard.css          # Scorecard entry UI
+│   ├── golf-report.css             # Player report pages
 │   ├── golf-premium-components.css
 │   ├── notifications.css
-│   └── players.css             # Players page
+│   └── players.css                 # Players page
 ├── layout/
 │   ├── main-layout.css
 │   └── navigation.css
@@ -367,7 +432,108 @@ The mobile app uses a **custom page switcher** in `App.razor` rather than Blazor
 
 This pattern was chosen for full control over transitions and bottom navigation state in the MAUI hybrid context.
 
-## 10. Deployment
+## 10. AI Insights Architecture
+
+The AI Insights feature provides AI-generated golf performance analysis across the entire application.
+
+### 10.1 Architecture Overview
+
+```
+┌────────────────────────────────────────────────────────────┐
+│                    AiInsightService                         │
+│  (Golf-specific orchestration: prompts, caching, context)  │
+│                                                            │
+│  Methods: Dashboard, PlayerReport, Club, Course, Chat      │
+│  Data Freshness: watermark-based caching (not time-based)  │
+│  User Control: opt-out check via ApplicationUser flag      │
+└────────────────────┬───────────────────────────────────────┘
+                     │
+                     ▼
+┌────────────────────────────────────────────────────────────┐
+│                   AiRoutingService                          │
+│  (Multi-provider routing with failover)                    │
+│                                                            │
+│  • Ordered by priority from AiProviderSettings (DB)        │
+│  • Circuit breaker: 5-min cooldown on failed providers     │
+│  • Falls through to next provider on failure               │
+└────────────────────┬───────────────────────────────────────┘
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│  OpenAI  │  │Anthropic │  │ Gemini   │  ... + Grok, Mistral,
+│ (GPT-4o  │  │ (Claude  │  │(Gemini   │      DeepSeek, MetaLlama,
+│  mini)   │  │ Sonnet 4)│  │ 3.1)     │      Manus
+└──────────┘  └──────────┘  └──────────┘
+
+Cross-cutting:
+┌────────────────────────────────┐  ┌─────────────────────────┐
+│       AiAuditService           │  │   AiChatService          │
+│  • Per-request logging         │  │  • Persistent sessions   │
+│  • Rate limiting (20/hr/user)  │  │  • Message history       │
+│  • Usage stats for admin       │  │  • Session archival      │
+│  • Retention cleanup (90 days) │  │                          │
+└────────────────────────────────┘  └─────────────────────────┘
+```
+
+### 10.2 Provider Configuration
+
+Provider settings are split across two sources:
+
+| Source | What it stores | Managed by |
+|--------|---------------|-----------|
+| `appsettings.json` | Model name, endpoint URL, timeout | Developer (committed to repo) |
+| `dotnet user-secrets` / env vars | API keys | Ops / deployment pipeline |
+| `AiProviderSettings` DB table | Enabled/disabled, priority order | Admin UI at runtime |
+
+On startup, the `AiProviderSettings` table is seeded from config (all providers disabled by default). Admins enable providers and set priority via `/admin/ai-providers`.
+
+### 10.3 Data Freshness (Smart Caching)
+
+Insights are cached against a **data watermark** — the timestamp of the user's most recent round. If no new rounds have been played since the last insight was generated, the cached result is returned without calling an AI provider. After a configurable period with no new data (`StaleInsightMonths: 3`), a staleness message is shown.
+
+### 10.4 User Controls
+
+- **Opt-out toggle**: Users can disable AI Insights via Account Settings (`AiInsightsOptOut` on `ApplicationUser`). All insight methods check this flag and return a friendly message if opted out.
+- **Rate limiting**: 20 AI requests per user per hour (configurable), enforced via `AiAuditService`.
+
+### 10.5 AI Configuration
+
+```json
+"AiInsights": {
+  "Enabled": false,
+  "MaxTokens": 500,
+  "Temperature": 0.7,
+  "CacheMinutes": 60,
+  "StaleInsightMonths": 3,
+  "RateLimitPerUserPerHour": 20,
+  "AuditLogging": {
+    "Enabled": true,
+    "LogPrompts": true,
+    "LogResponses": true,
+    "RetentionDays": 90
+  }
+}
+```
+
+### 10.6 AI Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/insights/dashboard` | GET | Dashboard performance analysis |
+| `/api/insights/player-report/{playerId}` | GET | Player report with optional course/holes filter |
+| `/api/insights/club/{clubId}` | GET | Club-specific analysis |
+| `/api/insights/course/{courseId}` | GET | Course-specific analysis |
+| `/api/insights/chat` | POST | Send chat message (body: `{ message, sessionId? }`) |
+| `/api/insights/sessions` | GET | List user's chat sessions |
+| `/api/insights/sessions/{id}` | GET | Get session with message history |
+
+### 10.7 Admin Pages
+
+- **AI Providers** (`/admin/ai-providers`): Enable/disable providers, set priority order, view API key status
+- **AI Usage** (`/admin/ai-usage`): Usage statistics, token consumption, provider breakdown, audit log viewer
+
+## 11. Deployment
 
 ### Web
 - Standard ASP.NET Core deployment (IIS, Azure App Service, Docker)
@@ -379,7 +545,7 @@ This pattern was chosen for full control over transitions and bottom navigation 
 - **iOS**: `dotnet build -f net10.0-ios` → IPA (requires Xcode)
 - Mobile connects to the deployed Web API via `DevConfiguration.generated.cs` base URL
 
-## 11. Future Architecture Evolution
+## 12. Future Architecture Evolution
 
 The current MVP architecture is designed for easy evolution:
 
