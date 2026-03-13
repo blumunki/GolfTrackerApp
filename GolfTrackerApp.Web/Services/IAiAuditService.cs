@@ -8,5 +8,6 @@ namespace GolfTrackerApp.Web.Services
         Task<bool> IsRateLimitedAsync(string userId);
         Task<int> GetUsageCountAsync(string userId, TimeSpan window);
         Task<int> GetTotalTokensUsedAsync(string userId, TimeSpan window);
+        Task<int> CleanupOldLogsAsync(int retentionDays);
     }
 }

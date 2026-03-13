@@ -1953,13 +1953,13 @@ Add styles inline or in the component's scoped CSS, following the existing mobil
 | Step | Task | Status |
 |------|------|--------|
 | 6.1 | Verify rate limiting works via audit log queries (already wired in Phase 1) | ⬜ Pending |
-| 6.2 | Add CSS styling for AI widgets (web + mobile) | ⬜ Pending |
+| 6.2 | Add CSS styling for AI widgets (web + mobile) | ✅ Done |
 | 6.3 | Tune prompts based on real output quality | ⬜ Pending |
-| 6.4 | Add "AI Insights" toggle in user settings (optional) | ⬜ Pending |
+| 6.4 | Add "AI Insights" toggle in user settings (optional) | ✅ Done |
 | 6.5 | Test with production data volume | ⬜ Pending |
 | 6.6 | Configure production API keys via environment variables | ⬜ Pending |
 | 6.7 | Review audit logs for prompt quality and token usage patterns | ⬜ Pending |
-| 6.8 | Implement audit log retention cleanup (scheduled task or manual) | ⬜ Pending |
+| 6.8 | Implement audit log retention cleanup (scheduled task or manual) | ✅ Done |
 | 6.9 | Verify admin AI Providers page works with production provider set | ⬜ Pending |
 | 6.10 | Verify admin AI Usage dashboard shows accurate stats | ⬜ Pending |
 

@@ -57,5 +57,17 @@ namespace GolfTrackerApp.Web.Services
                          && a.Success)
                 .SumAsync(a => a.TotalTokens);
         }
+
+        public async Task<int> CleanupOldLogsAsync(int retentionDays)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var cutoff = DateTime.UtcNow.AddDays(-retentionDays);
+            var oldLogs = await context.AiAuditLogs
+                .Where(a => a.RequestedAt < cutoff)
+                .ExecuteDeleteAsync();
+            if (oldLogs > 0)
+                _logger.LogInformation("Cleaned up {Count} AI audit logs older than {Days} days.", oldLogs, retentionDays);
+            return oldLogs;
+        }
     }
 }

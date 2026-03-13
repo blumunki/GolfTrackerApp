@@ -197,6 +197,14 @@ using (var scope = app.Services.CreateScope())
         // Seed AI provider settings from config if table is empty
         var providerSettingsService = services.GetRequiredService<IAiProviderSettingsService>();
         await providerSettingsService.SeedFromConfigAsync();
+
+        // Cleanup old AI audit logs based on retention policy
+        var retentionDays = app.Configuration.GetValue<int>("AiInsights:AuditLogging:RetentionDays");
+        if (retentionDays > 0)
+        {
+            var auditService = services.GetRequiredService<IAiAuditService>();
+            await auditService.CleanupOldLogsAsync(retentionDays);
+        }
     }
     catch (Exception ex)
     {
@@ -433,6 +441,17 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
                 CREATE UNIQUE INDEX [IX_AiProviderSettings_ProviderName] ON [AiProviderSettings] ([ProviderName]);
             ");
             logger.LogInformation("AiProviderSettings table created.");
+        }
+
+        // Check if AiInsightsOptOut column exists on AspNetUsers
+        var aiOptOutExists = await ColumnExistsAsync(connection, "AspNetUsers", "AiInsightsOptOut");
+        if (!aiOptOutExists)
+        {
+            logger.LogInformation("Adding AiInsightsOptOut column to AspNetUsers...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE [AspNetUsers] ADD [AiInsightsOptOut] BIT NOT NULL DEFAULT 0;
+            ");
+            logger.LogInformation("AiInsightsOptOut column added to AspNetUsers.");
         }
     }
     finally

@@ -58,6 +58,7 @@ namespace GolfTrackerApp.Web.Services
             string userId, bool forceRefresh = false, CancellationToken cancellationToken = default)
         {
             if (!IsEnabled()) return DisabledResult();
+            if (await IsUserOptedOutAsync(userId)) return OptedOutResult();
 
             var cacheKey = $"dashboard_{userId}";
 
@@ -133,6 +134,7 @@ namespace GolfTrackerApp.Web.Services
             CancellationToken cancellationToken = default)
         {
             if (!IsEnabled()) return DisabledResult();
+            if (await IsUserOptedOutAsync(userId)) return OptedOutResult();
 
             var cacheKey = $"report_{userId}_{playerId}_{courseId}_{holesPlayed}";
             var lastDataChange = await GetLastDataChangeAsync(playerId);
@@ -217,6 +219,7 @@ namespace GolfTrackerApp.Web.Services
             CancellationToken cancellationToken = default)
         {
             if (!IsEnabled()) return DisabledResult();
+            if (await IsUserOptedOutAsync(userId)) return OptedOutResult();
 
             var cacheKey = $"club_{userId}_{clubId}";
             var player = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
@@ -287,6 +290,7 @@ namespace GolfTrackerApp.Web.Services
             CancellationToken cancellationToken = default)
         {
             if (!IsEnabled()) return DisabledResult();
+            if (await IsUserOptedOutAsync(userId)) return OptedOutResult();
 
             var cacheKey = $"course_{userId}_{courseId}";
             var player = await _playerService.GetPlayerByApplicationUserIdAsync(userId);
@@ -362,6 +366,7 @@ namespace GolfTrackerApp.Web.Services
             CancellationToken cancellationToken = default)
         {
             if (!IsEnabled()) return DisabledResult();
+            if (await IsUserOptedOutAsync(userId)) return OptedOutResult();
             if (await _auditService.IsRateLimitedAsync(userId))
                 return new AiInsightResult { Success = false, ErrorMessage = "Rate limit reached. Try again later." };
 
@@ -742,6 +747,18 @@ namespace GolfTrackerApp.Web.Services
 
         private static AiInsightResult DisabledResult() =>
             new() { Success = false, ErrorMessage = "AI Insights are not enabled." };
+
+        private static AiInsightResult OptedOutResult() =>
+            new() { Success = false, ErrorMessage = "AI Insights are disabled in your account settings." };
+
+        private async Task<bool> IsUserOptedOutAsync(string userId)
+        {
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Users
+                .Where(u => u.Id == userId)
+                .Select(u => u.AiInsightsOptOut)
+                .FirstOrDefaultAsync();
+        }
 
         private bool TryGetCachedWithWatermark(string key, DateTime? lastDataChange, out AiInsightResult result)
         {

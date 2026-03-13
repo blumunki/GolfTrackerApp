@@ -30,6 +30,14 @@
                     <ValidationMessage For="() => Input.PhoneNumber" />
                 </MudItem>
                 <MudItem xs="12">
+                    <MudSwitch @bind-Value="Input.AiInsightsOptOut" Label="Disable AI Insights"
+                               Color="Color.Primary"
+                               UncheckedColor="Color.Default" />
+                    <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                        When enabled, AI-powered analysis will be hidden across all pages.
+                    </MudText>
+                </MudItem>
+                <MudItem xs="12">
                     <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Save</MudButton>
                 </MudItem>
             </MudGrid>
@@ -79,6 +87,7 @@
         phoneNumber = await UserManager.GetPhoneNumberAsync(user);
 
         Input.PhoneNumber ??= phoneNumber;
+        Input.AiInsightsOptOut = user.AiInsightsOptOut;
     }
 
     private async Task OnValidSubmitAsync()
@@ -92,6 +101,12 @@
             }
         }
 
+        if (Input.AiInsightsOptOut != user.AiInsightsOptOut)
+        {
+            user.AiInsightsOptOut = Input.AiInsightsOptOut;
+            await UserManager.UpdateAsync(user);
+        }
+
         await SignInManager.RefreshSignInAsync(user);
         RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
     }
@@ -101,5 +116,8 @@
         [Phone]
         [Display(Name = "Phone number")]
         public string? PhoneNumber { get; set; }
+
+        [Display(Name = "Disable AI Insights")]
+        public bool AiInsightsOptOut { get; set; }
     }
 }

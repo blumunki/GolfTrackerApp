@@ -22,6 +22,7 @@
 @import url('./css/components/players.css');
 @import url('./css/components/notifications.css');
 @import url('./css/components/golf-chat.css');
+@import url('./css/components/ai-insights.css');
 
 /* Import Utility Classes */
 @import url('./css/utilities/golf-utilities.css');

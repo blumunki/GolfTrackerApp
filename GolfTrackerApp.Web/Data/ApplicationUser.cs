@@ -12,6 +12,11 @@ public class ApplicationUser : IdentityUser
     /// </summary>
     public int? LinkedPlayerId { get; set; }
 
+    /// <summary>
+    /// When true, AI insights are hidden for this user across all pages.
+    /// </summary>
+    public bool AiInsightsOptOut { get; set; }
+
     [ForeignKey("LinkedPlayerId")]
     public virtual Player? LinkedPlayer { get; set; }
 }
