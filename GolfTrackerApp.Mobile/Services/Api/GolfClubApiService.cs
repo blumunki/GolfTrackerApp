@@ -2,6 +2,7 @@ using GolfTrackerApp.Mobile.Models;
 using GolfTrackerApp.Mobile.Services;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 
 namespace GolfTrackerApp.Mobile.Services.Api;
@@ -11,6 +12,9 @@ public interface IGolfClubApiService
     Task<List<GolfClub>> GetAllGolfClubsAsync();
     Task<GolfClub?> GetGolfClubByIdAsync(int id);
     Task<List<GolfClub>> SearchGolfClubsAsync(string searchTerm);
+    Task<GolfClub?> CreateGolfClubAsync(GolfClub club);
+    Task<GolfClub?> UpdateGolfClubAsync(GolfClub club);
+    Task<bool> DeleteGolfClubAsync(int id);
 }
 
 public class GolfClubApiService : IGolfClubApiService
@@ -104,6 +108,61 @@ public class GolfClubApiService : IGolfClubApiService
         {
             _logger.LogError(ex, "Error searching golf clubs with term '{SearchTerm}' from API", searchTerm);
             return new List<GolfClub>();
+        }
+    }
+
+    public async Task<GolfClub?> CreateGolfClubAsync(GolfClub club)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var json = JsonSerializer.Serialize(club, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("api/golfclubs", content);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<GolfClub>(responseJson, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating golf club");
+            return null;
+        }
+    }
+
+    public async Task<GolfClub?> UpdateGolfClubAsync(GolfClub club)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var json = JsonSerializer.Serialize(club, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"api/golfclubs/{club.GolfClubId}", content);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<GolfClub>(responseJson, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating golf club {ClubId}", club.GolfClubId);
+            return null;
+        }
+    }
+
+    public async Task<bool> DeleteGolfClubAsync(int id)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.DeleteAsync($"api/golfclubs/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting golf club {ClubId}", id);
+            return false;
         }
     }
 }

@@ -25,3 +25,11 @@ public class RoundResponse
     public int PlayerCount { get; set; }
     public List<string> PlayingPartners { get; set; } = new();
 }
+
+public class ScoreUpdateDto
+{
+    public int ScoreId { get; set; }
+    public int Strokes { get; set; }
+    public int? Putts { get; set; }
+    public bool? FairwayHit { get; set; }
+}

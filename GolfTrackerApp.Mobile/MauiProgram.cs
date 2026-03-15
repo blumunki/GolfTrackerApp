@@ -77,6 +77,14 @@ public static class MauiProgram
 #endif
 
 	// Configure HTTP clients for API services
+	// Register a default HttpClient for components that inject HttpClient directly (e.g., LoginPage)
+	builder.Services.AddHttpClient("Default", httpClientBuilder)
+#if DEBUG
+		.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+		;
+	builder.Services.AddTransient(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("Default"));
+
 	builder.Services.AddHttpClient<IGolfClubApiService, GolfClubApiService>(httpClientBuilder)
 #if DEBUG
 		.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
@@ -120,6 +128,12 @@ public static class MauiProgram
 			;
 
 		builder.Services.AddHttpClient<IInsightsApiService, InsightsApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
+		builder.Services.AddHttpClient<INotificationApiService, NotificationApiService>(httpClientBuilder)
 #if DEBUG
 			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
 #endif

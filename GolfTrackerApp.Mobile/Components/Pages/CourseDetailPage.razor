@@ -23,13 +23,14 @@
     }
     else
     {
-        @* ── Back Button ── *@
-        <div style="padding:8px 12px 0;">
+        @* ── Back Button + Actions ── *@
+        <div style="padding:8px 12px 0; display:flex; justify-content:space-between; align-items:center;">
             <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoBack"
                        StartIcon="@Icons.Material.Filled.ArrowBack"
                        Style="color:#6b7280; font-size:0.8rem; text-transform:none; padding:4px 8px;">
                 @(course.GolfClub?.Name ?? "Back")
             </MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="ShowEditCourseDialog" />
         </div>
 
         @* ── Dark Header Banner ── *@
@@ -227,6 +228,39 @@
     }
 </MudContainer>
 
+@* ── Edit Course Dialog ── *@
+<MudDialog @bind-Visible="showEditCourseDialog" Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Small })">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-3" />
+            <MudText Typo="Typo.h6">Edit Course</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="editCourseForm" @bind-IsValid="editCourseFormValid">
+            <MudTextField @bind-Value="editCourseName" Label="Course Name" Variant="Variant.Outlined"
+                         Required="true" RequiredError="Name is required" Class="mb-3" />
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="editCoursePar" Label="Par" Variant="Variant.Outlined"
+                                     Min="54" Max="80" Class="mb-3" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="editCourseHoles" Label="Holes" Variant="Variant.Outlined"
+                                     Min="9" Max="36" Class="mb-3" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => showEditCourseDialog = false)" Disabled="@savingCourse">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveEditCourse"
+                   Disabled="@(!editCourseFormValid || savingCourse)" Style="border-radius:8px;">
+            @(savingCourse ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter]
     public int CourseId { get; set; }
@@ -234,6 +268,15 @@
     private GolfCourseDetailResponse? course;
     private List<RoundResponse> courseRounds = new();
     private bool isLoading = true;
+
+    // Edit Course dialog
+    private bool showEditCourseDialog;
+    private bool editCourseFormValid;
+    private bool savingCourse;
+    private string editCourseName = string.Empty;
+    private int editCoursePar;
+    private int editCourseHoles;
+    private MudForm editCourseForm = null!;
 
     // AI Insights
     private bool _aiLoading;
@@ -354,5 +397,50 @@
             NavigationManager.NavigateTo($"/club-detail/{course.GolfClubId}");
         else
             NavigationManager.NavigateTo("/golfclubs");
+    }
+
+    private void ShowEditCourseDialog()
+    {
+        if (course == null) return;
+        editCourseName = course.Name;
+        editCoursePar = course.DefaultPar;
+        editCourseHoles = course.NumberOfHoles;
+        showEditCourseDialog = true;
+    }
+
+    private async Task SaveEditCourse()
+    {
+        if (course == null || !editCourseFormValid) return;
+        savingCourse = true;
+        StateHasChanged();
+
+        try
+        {
+            var updatedCourse = new GolfCourse
+            {
+                GolfCourseId = course.GolfCourseId,
+                GolfClubId = course.GolfClubId,
+                Name = editCourseName,
+                DefaultPar = editCoursePar,
+                NumberOfHoles = editCourseHoles
+            };
+
+            var result = await CourseApi.UpdateGolfCourseAsync(updatedCourse);
+            if (result != null)
+            {
+                showEditCourseDialog = false;
+                // Reload course details
+                await OnParametersSetAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating course {CourseId}", course.GolfCourseId);
+        }
+        finally
+        {
+            savingCourse = false;
+            StateHasChanged();
+        }
     }
 }

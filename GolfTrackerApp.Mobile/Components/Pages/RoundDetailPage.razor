@@ -1,6 +1,8 @@
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
+@using GolfTrackerApp.Mobile.Services
 @inject IRoundApiService RoundApi
+@inject AuthenticationStateService AuthState
 @inject NavigationManager NavigationManager
 @inject ILogger<RoundDetailPage> Logger
 
@@ -21,13 +23,37 @@
     }
     else
     {
-        @* ── Back Button ── *@
-        <div style="padding:8px 12px 0;">
+        @* ── Back Button + Actions ── *@
+        <div style="padding:8px 12px 0; display:flex; justify-content:space-between; align-items:center;">
             <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoBack"
                        StartIcon="@Icons.Material.Filled.ArrowBack"
                        Style="color:#6b7280; font-size:0.8rem; text-transform:none; padding:4px 8px;">
                 Back
             </MudButton>
+            @if (isOwner)
+            {
+                <div style="display:flex; gap:4px;">
+                    @if (isEditing)
+                    {
+                        <MudButton Variant="Variant.Filled" Size="Size.Small" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Save" OnClick="SaveScores"
+                                   Disabled="@isSaving" Style="font-size:0.75rem; text-transform:none;">
+                            @(isSaving ? "Saving..." : "Save")
+                        </MudButton>
+                        <MudButton Variant="Variant.Text" Size="Size.Small" Color="Color.Secondary"
+                                   OnClick="CancelEdit" Style="font-size:0.75rem; text-transform:none;">
+                            Cancel
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       Color="Color.Primary" OnClick="StartEdit" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error" OnClick="ConfirmDelete" />
+                    }
+                </div>
+            }
         </div>
 
         @* ── Dark Header Banner ── *@
@@ -139,7 +165,8 @@
                                 {
                                     var holeNumber = score.Hole?.HoleNumber ?? 1;
                                     var holePar = score.Hole?.Par ?? 4;
-                                    var holeVsPar = score.Strokes - holePar;
+                                    var displayStrokes = isEditing ? GetEditedStrokes(score.ScoreId, score.Strokes) : score.Strokes;
+                                    var holeVsPar = displayStrokes - holePar;
                                     var isEven = holeNumber % 2 == 0;
                                     <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 14px; @(isEven ? "background:#fafbfc;" : "")">
                                         <div style="display:flex; align-items:center; gap:8px;">
@@ -147,7 +174,21 @@
                                             <span style="font-size:0.75rem; color:#6b7280;">Par @holePar</span>
                                         </div>
                                         <div style="display:flex; align-items:center; gap:8px;">
-                                            <span style="font-weight:700; color:#1a1a2e;">@score.Strokes</span>
+                                            @if (isEditing)
+                                            {
+                                                var sid = score.ScoreId;
+                                                <MudIconButton Icon="@Icons.Material.Filled.Remove" Size="Size.Small"
+                                                               OnClick="@(() => AdjustScore(sid, -1))"
+                                                               Style="padding:2px; min-width:28px;" />
+                                                <span style="font-weight:700; color:#1a1a2e; min-width:24px; text-align:center;">@displayStrokes</span>
+                                                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small"
+                                                               OnClick="@(() => AdjustScore(sid, 1))"
+                                                               Style="padding:2px; min-width:28px;" />
+                                            }
+                                            else
+                                            {
+                                                <span style="font-weight:700; color:#1a1a2e;">@displayStrokes</span>
+                                            }
                                             <span style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px; min-width:32px; text-align:center; @GolfHelpers.GetVsParBadgeStyle(holeVsPar)">
                                                 @GolfHelpers.FormatVsPar(holeVsPar)
                                             </span>
@@ -176,6 +217,22 @@
     }
 </MudContainer>
 
+@* ── Delete Confirmation Dialog ── *@
+<MudDialog @bind-Visible="showDeleteDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Delete Round?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>This will permanently delete this round and all associated scores. This cannot be undone.</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => showDeleteDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeleteRound" Disabled="@isDeleting">
+            @(isDeleting ? "Deleting..." : "Delete")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter]
     public int RoundId { get; set; }
@@ -184,10 +241,18 @@
     private List<ScoreResponse>? scores;
     private Dictionary<int, bool> expandedPlayers = new();
     private bool isLoading = true;
+    private bool isOwner;
+    private bool isEditing;
+    private bool isSaving;
+    private bool isDeleting;
+    private bool showDeleteDialog;
+    private Dictionary<int, int> editedScores = new();
 
     protected override async Task OnParametersSetAsync()
     {
         isLoading = true;
+        isEditing = false;
+        editedScores.Clear();
         StateHasChanged();
 
         try
@@ -199,6 +264,9 @@
 
             round = await roundTask;
             scores = await scoresTask;
+
+            // Check ownership
+            isOwner = round?.CreatedByApplicationUserId == AuthState.UserId;
 
             // Initialize player expansion state
             expandedPlayers.Clear();
@@ -217,6 +285,114 @@
         finally
         {
             isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void StartEdit()
+    {
+        isEditing = true;
+        editedScores.Clear();
+        // Expand all players when editing
+        if (scores != null)
+        {
+            foreach (var playerId in scores.Select(s => s.PlayerId).Distinct())
+            {
+                expandedPlayers[playerId] = true;
+            }
+        }
+    }
+
+    private void CancelEdit()
+    {
+        isEditing = false;
+        editedScores.Clear();
+    }
+
+    private int GetEditedStrokes(int scoreId, int originalStrokes)
+    {
+        return editedScores.TryGetValue(scoreId, out var edited) ? edited : originalStrokes;
+    }
+
+    private void AdjustScore(int scoreId, int delta)
+    {
+        var current = scores?.FirstOrDefault(s => s.ScoreId == scoreId);
+        if (current == null) return;
+        var currentValue = GetEditedStrokes(scoreId, current.Strokes);
+        var newValue = Math.Max(1, currentValue + delta);
+        editedScores[scoreId] = newValue;
+        StateHasChanged();
+    }
+
+    private async Task SaveScores()
+    {
+        if (scores == null || !editedScores.Any()) return;
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            var updates = scores.Select(s => new ScoreUpdateRequest
+            {
+                ScoreId = s.ScoreId,
+                Strokes = GetEditedStrokes(s.ScoreId, s.Strokes),
+                Putts = s.Putts,
+                FairwayHit = s.FairwayHit
+            }).ToList();
+
+            var success = await RoundApi.UpdateScoresAsync(RoundId, updates);
+            if (success)
+            {
+                // Apply edits to the live scores
+                foreach (var kvp in editedScores)
+                {
+                    var score = scores.FirstOrDefault(s => s.ScoreId == kvp.Key);
+                    if (score != null) score.Strokes = kvp.Value;
+                }
+                isEditing = false;
+                editedScores.Clear();
+                // Reload to get updated totals
+                round = await RoundApi.GetRoundByIdAsync(RoundId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving scores for round {RoundId}", RoundId);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ConfirmDelete()
+    {
+        showDeleteDialog = true;
+    }
+
+    private async Task DeleteRound()
+    {
+        isDeleting = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await RoundApi.DeleteRoundAsync(RoundId);
+            if (success)
+            {
+                showDeleteDialog = false;
+                NavigationManager.NavigateTo("/rounds");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting round {RoundId}", RoundId);
+        }
+        finally
+        {
+            isDeleting = false;
             StateHasChanged();
         }
     }

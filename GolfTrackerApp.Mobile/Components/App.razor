@@ -6,6 +6,7 @@
 @using GolfTrackerApp.Mobile.Components.Shared
 @inject AuthenticationStateService AuthState
 @inject NavigationManager Navigation
+@inject INotificationApiService NotificationApi
 
 <MudThemeProvider />
 <MudPopoverProvider />
@@ -132,6 +133,9 @@
                     case "ai-chat":
                         <AiChatPage />
                         break;
+                    case "notifications":
+                        <NotificationsPage />
+                        break;
                     default:
                         <Home />
                         break;
@@ -173,6 +177,13 @@
                                       Size="Size.Medium"
                                       OnClick="@(() => NavigateToPage("ai-chat"))" />
                         
+                        <MudBadge Content="@unreadNotificationCount" Visible="@(unreadNotificationCount > 0)" Color="Color.Error" Overlap="true">
+                            <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
+                                          Color="@(currentPage == "notifications" ? Color.Primary : Color.Secondary)"
+                                          Size="Size.Medium"
+                                          OnClick="@(() => NavigateToPage("notifications"))" />
+                        </MudBadge>
+                        
                         <MudIconButton Icon="@Icons.Material.Filled.Person" 
                                       Color="@(currentPage == "profile" ? Color.Primary : Color.Secondary)"
                                       Size="Size.Medium"
@@ -187,6 +198,8 @@
 @code {
     private bool isCheckingAuth = true;
     private string currentPage = "home";
+    private int unreadNotificationCount;
+    private System.Timers.Timer? _notificationTimer;
     
     protected override async Task OnInitializedAsync()
     {
@@ -206,6 +219,13 @@
         
         isCheckingAuth = false;
         StateHasChanged();
+
+        // Start polling unread notification count
+        if (AuthState.IsAuthenticated)
+        {
+            await LoadUnreadCount();
+            StartNotificationPolling();
+        }
     }
     
     private void UpdateCurrentPageFromUrl()
@@ -236,17 +256,50 @@
     
     private void OnAuthenticationStateChanged()
     {
+        if (AuthState.IsAuthenticated)
+        {
+            _ = LoadUnreadCount();
+            StartNotificationPolling();
+        }
+        else
+        {
+            _notificationTimer?.Stop();
+            unreadNotificationCount = 0;
+        }
         StateHasChanged();
     }
     
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
     {
         UpdateCurrentPageFromUrl();
+        // Refresh count when navigating away from notifications page
+        if (AuthState.IsAuthenticated)
+            _ = LoadUnreadCount();
         StateHasChanged();
+    }
+
+    private async Task LoadUnreadCount()
+    {
+        try
+        {
+            unreadNotificationCount = await NotificationApi.GetUnreadCountAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    private void StartNotificationPolling()
+    {
+        _notificationTimer?.Stop();
+        _notificationTimer = new System.Timers.Timer(60_000); // Poll every 60s
+        _notificationTimer.Elapsed += async (s, e) => await LoadUnreadCount();
+        _notificationTimer.Start();
     }
     
     public void Dispose()
     {
+        _notificationTimer?.Stop();
+        _notificationTimer?.Dispose();
         AuthState.AuthenticationStateChanged -= OnAuthenticationStateChanged;
         Navigation.LocationChanged -= OnLocationChanged;
     }

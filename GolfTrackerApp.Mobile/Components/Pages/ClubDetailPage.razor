@@ -1,6 +1,7 @@
 @using GolfTrackerApp.Mobile.Models
 @using GolfTrackerApp.Mobile.Services.Api
 @inject IGolfClubApiService GolfClubApi
+@inject IGolfCourseApiService CourseApi
 @inject IRoundApiService RoundApi
 @inject IInsightsApiService InsightsService
 @inject NavigationManager NavigationManager
@@ -23,13 +24,16 @@
     }
     else
     {
-        @* ── Back Button ── *@
-        <div style="padding:8px 12px 0;">
+        @* ── Back Button + Actions ── *@
+        <div style="padding:8px 12px 0; display:flex; justify-content:space-between; align-items:center;">
             <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="GoBack"
                        StartIcon="@Icons.Material.Filled.ArrowBack"
                        Style="color:#6b7280; font-size:0.8rem; text-transform:none; padding:4px 8px;">
                 Golf Clubs
             </MudButton>
+            <div style="display:flex; gap:4px;">
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="ShowEditClubDialog" />
+            </div>
         </div>
 
         @* ── Dark Header Banner ── *@
@@ -128,7 +132,10 @@
 
         @* ── Courses Section ── *@
         <div style="padding:0 12px;">
-            <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">Courses</div>
+            <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span>Courses</span>
+                <MudIconButton Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" OnClick="ShowAddCourseDialog" />
+            </div>
 
             @if (club.Courses?.Any() == true)
             {
@@ -200,6 +207,83 @@
     }
 </MudContainer>
 
+@* ── Edit Club Dialog ── *@
+<MudDialog @bind-Visible="showEditDialog" Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Small })">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Class="mr-3" />
+            <MudText Typo="Typo.h6">Edit Club</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (editClub != null)
+        {
+            <MudForm @ref="editClubForm" @bind-IsValid="editClubFormValid">
+                <MudTextField @bind-Value="editClub.Name" Label="Club Name" Variant="Variant.Outlined"
+                             Required="true" RequiredError="Name is required" Class="mb-3" />
+                <MudTextField @bind-Value="editClub.AddressLine1" Label="Address" Variant="Variant.Outlined" Class="mb-3" />
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="editClub.City" Label="City" Variant="Variant.Outlined" Class="mb-3" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="editClub.CountyOrRegion" Label="County/Region" Variant="Variant.Outlined" Class="mb-3" />
+                    </MudItem>
+                </MudGrid>
+                <MudGrid>
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="editClub.Postcode" Label="Postcode" Variant="Variant.Outlined" Class="mb-3" />
+                    </MudItem>
+                    <MudItem xs="6">
+                        <MudTextField @bind-Value="editClub.Country" Label="Country" Variant="Variant.Outlined" Class="mb-3" />
+                    </MudItem>
+                </MudGrid>
+                <MudTextField @bind-Value="editClub.Website" Label="Website" Variant="Variant.Outlined" Class="mb-3" />
+            </MudForm>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => showEditDialog = false)" Disabled="@savingClub">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveEditClub"
+                   Disabled="@(!editClubFormValid || savingClub)" Style="border-radius:8px;">
+            @(savingClub ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ── Add Course Dialog ── *@
+<MudDialog @bind-Visible="showCourseDialog" Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Small })">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.Add" Class="mr-3" />
+            <MudText Typo="Typo.h6">Add Course</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="courseForm" @bind-IsValid="courseFormValid">
+            <MudTextField @bind-Value="newCourseName" Label="Course Name" Variant="Variant.Outlined"
+                         Required="true" RequiredError="Name is required" Class="mb-3" />
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="newCoursePar" Label="Par" Variant="Variant.Outlined"
+                                     Min="54" Max="80" Class="mb-3" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="newCourseHoles" Label="Holes" Variant="Variant.Outlined"
+                                     Min="9" Max="36" Class="mb-3" />
+                </MudItem>
+            </MudGrid>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => showCourseDialog = false)" Disabled="@savingCourse">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveCourse"
+                   Disabled="@(!courseFormValid || savingCourse)" Style="border-radius:8px;">
+            @(savingCourse ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     [Parameter]
     public int ClubId { get; set; }
@@ -207,6 +291,22 @@
     private GolfClub? club;
     private List<RoundResponse> clubRounds = new();
     private bool isLoading = true;
+
+    // Edit Club dialog
+    private bool showEditDialog;
+    private bool editClubFormValid;
+    private bool savingClub;
+    private GolfClub? editClub;
+    private MudForm editClubForm = null!;
+
+    // Add Course dialog
+    private bool showCourseDialog;
+    private bool courseFormValid;
+    private bool savingCourse;
+    private string newCourseName = string.Empty;
+    private int newCoursePar = 72;
+    private int newCourseHoles = 18;
+    private MudForm courseForm = null!;
 
     // AI Insights
     private bool _aiLoading;
@@ -314,6 +414,94 @@
     private void NavigateToCourse(int courseId)
     {
         NavigationManager.NavigateTo($"/course-detail/{courseId}");
+    }
+
+    private void ShowEditClubDialog()
+    {
+        if (club == null) return;
+        editClub = new GolfClub
+        {
+            GolfClubId = club.GolfClubId,
+            Name = club.Name,
+            AddressLine1 = club.AddressLine1,
+            AddressLine2 = club.AddressLine2,
+            City = club.City,
+            CountyOrRegion = club.CountyOrRegion,
+            Postcode = club.Postcode,
+            Country = club.Country,
+            Website = club.Website
+        };
+        showEditDialog = true;
+    }
+
+    private async Task SaveEditClub()
+    {
+        if (editClub == null || !editClubFormValid) return;
+        savingClub = true;
+        StateHasChanged();
+
+        try
+        {
+            var updated = await GolfClubApi.UpdateGolfClubAsync(editClub);
+            if (updated != null)
+            {
+                showEditDialog = false;
+                // Reload club details
+                await OnParametersSetAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating club {ClubId}", editClub.GolfClubId);
+        }
+        finally
+        {
+            savingClub = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowAddCourseDialog()
+    {
+        newCourseName = string.Empty;
+        newCoursePar = 72;
+        newCourseHoles = 18;
+        showCourseDialog = true;
+    }
+
+    private async Task SaveCourse()
+    {
+        if (!courseFormValid || club == null) return;
+        savingCourse = true;
+        StateHasChanged();
+
+        try
+        {
+            var course = new GolfCourse
+            {
+                GolfClubId = club.GolfClubId,
+                Name = newCourseName,
+                DefaultPar = newCoursePar,
+                NumberOfHoles = newCourseHoles
+            };
+
+            var created = await CourseApi.CreateGolfCourseAsync(course);
+            if (created != null)
+            {
+                showCourseDialog = false;
+                // Reload club details to show new course
+                await OnParametersSetAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error creating course for club {ClubId}", club.GolfClubId);
+        }
+        finally
+        {
+            savingCourse = false;
+            StateHasChanged();
+        }
     }
 
     private void GoBack()

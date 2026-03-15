@@ -1,0 +1,148 @@
+@using GolfTrackerApp.Mobile.Services.Api
+@inject INotificationApiService NotificationApi
+@inject NavigationManager NavigationManager
+@inject ILogger<NotificationsPage> Logger
+
+<MudContainer Class="pa-2 page-scroll-container">
+    <!-- Header -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div style="font-size:1.4rem; font-weight:700; color:#1a1a2e;">🔔 Notifications</div>
+        @if (notifications.Any(n => !n.IsRead))
+        {
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Size="Size.Small"
+                       OnClick="MarkAllRead" Style="font-size:0.8rem; text-transform:none;">
+                Mark all read
+            </MudButton>
+        }
+    </div>
+
+    @if (loading)
+    {
+        <div style="text-align:center; padding:32px;">
+            <MudProgressCircular Size="Size.Large" Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-3" Color="Color.Secondary">Loading notifications...</MudText>
+        </div>
+    }
+    else if (!notifications.Any())
+    {
+        <div style="text-align:center; padding:40px 16px;">
+            <div style="font-size:3rem; margin-bottom:12px; opacity:0.5;">🔔</div>
+            <MudText Typo="Typo.h6" Color="Color.Secondary">No notifications</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                You're all caught up! Notifications for connection requests, merges, and more will appear here.
+            </MudText>
+        </div>
+    }
+    else
+    {
+        @foreach (var notification in notifications)
+        {
+            var bgColor = notification.IsRead ? "#ffffff" : "#f0f4ff";
+            var borderColor = notification.IsRead ? "#e5e7eb" : "#667eea";
+            <div style="background:@bgColor; border:1px solid @borderColor; border-radius:12px; padding:14px 16px; margin-bottom:8px; cursor:pointer; transition:all 0.2s ease;"
+                 @onclick="@(() => HandleNotificationClick(notification))">
+                <div style="display:flex; align-items:flex-start; gap:12px;">
+                    <div style="width:36px; height:36px; border-radius:10px; background:@GetIconBackground(notification.TypeName); display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px;">
+                        <MudIcon Icon="@GetIcon(notification.TypeName)" Style="font-size:18px; color:white;" />
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                            <div style="font-size:0.9rem; font-weight:@(notification.IsRead ? "500" : "700"); color:#1a1a2e;">
+                                @notification.Title
+                            </div>
+                            @if (!notification.IsRead)
+                            {
+                                <div style="width:8px; height:8px; border-radius:50%; background:#667eea; flex-shrink:0; margin-top:6px;"></div>
+                            }
+                        </div>
+                        <div style="font-size:0.8rem; color:#6b7280; margin-top:4px;">@notification.Message</div>
+                        <div style="font-size:0.7rem; color:#9ca3af; margin-top:6px;">@FormatTimeAgo(notification.CreatedAt)</div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</MudContainer>
+
+@code {
+    private List<NotificationDto> notifications = new();
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotifications();
+    }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            loading = true;
+            notifications = await NotificationApi.GetNotificationsAsync(50);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading notifications");
+        }
+        finally
+        {
+            loading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleNotificationClick(NotificationDto notification)
+    {
+        if (!notification.IsRead)
+        {
+            await NotificationApi.MarkAsReadAsync(notification.Id);
+            notification.IsRead = true;
+            StateHasChanged();
+        }
+
+        if (!string.IsNullOrEmpty(notification.ActionUrl))
+        {
+            NavigationManager.NavigateTo(notification.ActionUrl);
+        }
+    }
+
+    private async Task MarkAllRead()
+    {
+        await NotificationApi.MarkAllAsReadAsync();
+        foreach (var n in notifications)
+            n.IsRead = true;
+        StateHasChanged();
+    }
+
+    private string GetIcon(string typeName) => typeName switch
+    {
+        "ConnectionRequest" => Icons.Material.Filled.PersonAdd,
+        "ConnectionAccepted" => Icons.Material.Filled.Check,
+        "ConnectionDeclined" => Icons.Material.Filled.Close,
+        "MergeRequest" => Icons.Material.Filled.MergeType,
+        "MergeCompleted" => Icons.Material.Filled.Done,
+        "MergeDeclined" => Icons.Material.Filled.Block,
+        _ => Icons.Material.Filled.Notifications
+    };
+
+    private string GetIconBackground(string typeName) => typeName switch
+    {
+        "ConnectionRequest" => "#667eea",
+        "ConnectionAccepted" => "#16a34a",
+        "ConnectionDeclined" => "#ef4444",
+        "MergeRequest" => "#d97706",
+        "MergeCompleted" => "#16a34a",
+        "MergeDeclined" => "#ef4444",
+        _ => "#6b7280"
+    };
+
+    private string FormatTimeAgo(DateTime created)
+    {
+        var diff = DateTime.UtcNow - created;
+        if (diff.TotalMinutes < 1) return "Just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours < 24) return $"{(int)diff.TotalHours}h ago";
+        if (diff.TotalDays < 7) return $"{(int)diff.TotalDays}d ago";
+        return created.ToString("dd MMM yyyy");
+    }
+}

@@ -2,6 +2,7 @@ using GolfTrackerApp.Mobile.Models;
 using GolfTrackerApp.Mobile.Services;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 
 namespace GolfTrackerApp.Mobile.Services.Api;
@@ -54,6 +55,9 @@ public interface IGolfCourseApiService
     Task<GolfCourseDetailResponse?> GetGolfCourseByIdAsync(int id);
     Task<List<GolfCourse>> SearchGolfCoursesAsync(string searchTerm);
     Task<List<GolfCourse>> GetCoursesForClubAsync(int clubId);
+    Task<GolfCourse?> CreateGolfCourseAsync(GolfCourse course);
+    Task<GolfCourse?> UpdateGolfCourseAsync(GolfCourse course);
+    Task<bool> DeleteGolfCourseAsync(int id);
 }
 
 public class GolfCourseApiService : IGolfCourseApiService
@@ -168,6 +172,61 @@ public class GolfCourseApiService : IGolfCourseApiService
         {
             _logger.LogError(ex, "Error fetching courses for club {ClubId} from API", clubId);
             return new List<GolfCourse>();
+        }
+    }
+
+    public async Task<GolfCourse?> CreateGolfCourseAsync(GolfCourse course)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var json = JsonSerializer.Serialize(course, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("api/golfcourses", content);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<GolfCourse>(responseJson, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating golf course");
+            return null;
+        }
+    }
+
+    public async Task<GolfCourse?> UpdateGolfCourseAsync(GolfCourse course)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var json = JsonSerializer.Serialize(course, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"api/golfcourses/{course.GolfCourseId}", content);
+            response.EnsureSuccessStatusCode();
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<GolfCourse>(responseJson, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating golf course {CourseId}", course.GolfCourseId);
+            return null;
+        }
+    }
+
+    public async Task<bool> DeleteGolfCourseAsync(int id)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.DeleteAsync($"api/golfcourses/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting golf course {CourseId}", id);
+            return false;
         }
     }
 }

@@ -115,6 +115,7 @@ GolfTrackerApp.Web/
 │   ├── GolfCoursesController.cs       # Golf course CRUD
 │   ├── InsightsController.cs          # AI insights + chat API endpoints
 │   ├── MergeController.cs             # Managed player merge workflow
+│   ├── NotificationsController.cs     # User notification CRUD + mark-read
 │   ├── PlayersController.cs           # Player CRUD + reports
 │   ├── ReportsController.cs           # Aggregated reporting endpoints
 │   └── RoundsController.cs            # Round CRUD
@@ -203,16 +204,17 @@ GolfTrackerApp.Mobile/
 │   │   └── MobileRoundDetailDialog.razor
 │   └── Pages/                         # Page components
 │       ├── Home.razor                 # Dashboard
-│       ├── LoginPage.razor            # Google sign-in
-│       ├── GolfClubsPage.razor        # Club list
-│       ├── ClubDetailPage.razor       # Club detail + stats
-│       ├── CourseDetailPage.razor      # Course detail + hole table
+│       ├── LoginPage.razor            # Email/password + Google sign-in
+│       ├── GolfClubsPage.razor        # Club list + create dialog
+│       ├── ClubDetailPage.razor       # Club detail + edit/add course
+│       ├── CourseDetailPage.razor      # Course detail + edit dialog
 │       ├── RoundsPage.razor           # Round list
 │       ├── RecordRoundPage.razor      # Round recording workflow
-│       ├── RoundDetailPage.razor      # Round detail view
+│       ├── RoundDetailPage.razor      # Round detail + edit scores/delete
 │       ├── PlayersPage.razor          # Player management + connections
-│   │   ├── PlayerReportPage.razor     # Player stats report
-│   │   └── AiChatPage.razor           # AI coach chat with sessions
+│       ├── NotificationsPage.razor    # In-app notifications
+│       ├── PlayerReportPage.razor     # Player stats report
+│       └── AiChatPage.razor           # AI coach chat with sessions
 ├── Models/                            # Mobile DTOs
 │   ├── Round.cs, Player.cs
 │   ├── GolfClub.cs, GolfCourse.cs
@@ -228,6 +230,7 @@ GolfTrackerApp.Mobile/
 │       ├── GolfCourseApiService.cs
 │       ├── PlayerReportApiService.cs
 │       ├── ConnectionApiService.cs
+│       ├── NotificationApiService.cs  # Notification API client
 │       └── InsightsApiService.cs      # AI insights + chat API client
 └── Resources/                         # App icon, splash screen, fonts
 ```
@@ -561,21 +564,21 @@ Planned features organised by priority tier. Each item includes the affected pla
 
 ### 12.1 Mobile Feature Parity — Critical
 
-| Feature | Description | Platform |
-|---------|-------------|----------|
-| Edit Round | Correct scoring mistakes after submission (web has `IsEditMode`, mobile is write-only) | Mobile |
-| Player Connections | Send/accept/decline connection requests, manage social network | Mobile |
-| Notifications | View connection requests, merge alerts, system messages | Mobile |
-| Email/Password Auth | Standard login + registration (currently Google OAuth only; TODOs exist in code) | Mobile |
+| Feature | Status | Description | Platform |
+|---------|--------|-------------|----------|
+| Edit Round | ✅ Done | Inline score editing with +/− controls, delete with confirmation | Mobile |
+| Player Connections | ✅ Done | Already implemented — search, send/accept/decline requests | Mobile |
+| Notifications | ✅ Done | NotificationsController + NotificationApiService + NotificationsPage with badge | Mobile |
+| Email/Password Auth | ✅ Done | Login + registration wired to AuthController (was TODO stubs) | Mobile |
 
 ### 12.2 Mobile Feature Parity — High Value
 
-| Feature | Description | Platform |
-|---------|-------------|----------|
-| Add/Edit Clubs & Courses | Create and update venues from the course | Mobile |
-| Player Merge | Consolidate duplicate player records | Mobile |
-| Advanced Analytics | Filtering by course/date/round type, multi-player comparison, par breakdown | Mobile |
-| Add/Edit Players | Create and manage player profiles | Mobile |
+| Feature | Status | Description | Platform |
+|---------|--------|-------------|----------|
+| Add/Edit Clubs & Courses | ✅ Done | Create club dialog, edit club/course dialogs, add course to club | Mobile |
+| Player Merge | ✅ Done | Already implemented — merge request/accept/decline in PlayersPage | Mobile |
+| Advanced Analytics | ✅ Done | Already implemented — course/holes/type filters, comparison, par breakdown | Mobile |
+| Add/Edit Players | ✅ Done | Already implemented — full CRUD in PlayersPage | Mobile |
 
 ### 12.3 Admin Area Enhancements
 

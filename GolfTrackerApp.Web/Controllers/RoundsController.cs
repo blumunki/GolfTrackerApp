@@ -179,6 +179,39 @@ public class RoundsController : BaseApiController
         }
     }
 
+    [HttpPut("{id}/scores")]
+    public async Task<ActionResult> UpdateRoundScores(int id, [FromBody] List<ScoreUpdateDto> scoreUpdates)
+    {
+        try
+        {
+            var round = await _context.Rounds.AsNoTracking().FirstOrDefaultAsync(r => r.RoundId == id);
+            if (round == null)
+                return NotFound($"Round with ID {id} not found");
+            if (round.CreatedByApplicationUserId != GetCurrentUserId())
+                return Forbid();
+
+            var existingScores = await _context.Scores.Where(s => s.RoundId == id).ToListAsync();
+            foreach (var update in scoreUpdates)
+            {
+                var score = existingScores.FirstOrDefault(s => s.ScoreId == update.ScoreId);
+                if (score != null)
+                {
+                    score.Strokes = update.Strokes;
+                    score.Putts = update.Putts;
+                    score.FairwayHit = update.FairwayHit;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating scores for round {RoundId}", id);
+            return StatusCode(500, "An error occurred while updating round scores");
+        }
+    }
+
     [HttpPost]
     public async Task<ActionResult<RoundResponse>> CreateRound([FromBody] Round round)
     {

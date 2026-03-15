@@ -21,6 +21,7 @@ public class RoundResponse
     public string? Notes { get; set; }
     public int PlayerCount { get; set; }
     public string RoundType { get; set; } = string.Empty;
+    public string? CreatedByApplicationUserId { get; set; }
     public List<string> PlayingPartners { get; set; } = new();
 }
 
@@ -52,6 +53,14 @@ public class HoleResponse
     public int Par { get; set; }
 }
 
+public class ScoreUpdateRequest
+{
+    public int ScoreId { get; set; }
+    public int Strokes { get; set; }
+    public int? Putts { get; set; }
+    public bool? FairwayHit { get; set; }
+}
+
 public interface IRoundApiService
 {
     Task<List<RoundResponse>> GetAllRoundsAsync();
@@ -59,6 +68,8 @@ public interface IRoundApiService
     Task<RoundResponse?> GetRoundByIdAsync(int id);
     Task<List<ScoreResponse>> GetRoundScoresAsync(int roundId);
     Task<RoundResponse?> CreateRoundAsync(CreateRoundRequest request);
+    Task<bool> UpdateScoresAsync(int roundId, List<ScoreUpdateRequest> scores);
+    Task<bool> DeleteRoundAsync(int id);
 }
 
 public class RoundApiService : IRoundApiService
@@ -215,6 +226,38 @@ public class RoundApiService : IRoundApiService
             }
             _logger.LogError(ex, "Error creating round via API");
             throw;
+        }
+    }
+
+    public async Task<bool> UpdateScoresAsync(int roundId, List<ScoreUpdateRequest> scores)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var json = JsonSerializer.Serialize(scores, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"api/rounds/{roundId}/scores", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating scores for round {RoundId}", roundId);
+            return false;
+        }
+    }
+
+    public async Task<bool> DeleteRoundAsync(int id)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var response = await _httpClient.DeleteAsync($"api/rounds/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting round {RoundId}", id);
+            return false;
         }
     }
 }

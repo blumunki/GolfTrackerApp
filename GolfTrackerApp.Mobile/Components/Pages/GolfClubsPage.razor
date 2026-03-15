@@ -3,7 +3,6 @@
 @inject IGolfClubApiService GolfClubApi
 @inject NavigationManager NavigationManager
 @inject ILogger<GolfClubsPage> Logger
-@inject IJSRuntime JSRuntime
 
 <MudContainer Class="pa-2 page-scroll-container">
     <!-- Header -->
@@ -12,7 +11,7 @@
         <MudIconButton Icon="@Icons.Material.Filled.Add" 
                       Color="Color.Primary" 
                       Size="Size.Medium"
-                      OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Add new club coming soon!"))" />
+                      OnClick="ShowAddClubDialog" />
     </div>
     
     <!-- Search Bar -->
@@ -79,18 +78,71 @@
             <MudButton Variant="Variant.Filled" 
                       Color="Color.Primary" 
                       StartIcon="@Icons.Material.Filled.Add"
-                      OnClick="@(() => JSRuntime.InvokeVoidAsync("alert", "Add new club coming soon!"))">
+                      OnClick="ShowAddClubDialog">
                 Add a Club
             </MudButton>
         </div>
     }
 </MudContainer>
 
+@* ── Add/Edit Club Dialog ── *@
+<MudDialog @bind-Visible="showClubDialog" Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Small })">
+    <TitleContent>
+        <div class="d-flex align-center">
+            <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Class="mr-3" />
+            <MudText Typo="Typo.h6">Add Golf Club</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrEmpty(clubDialogError))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" Style="border-radius:8px;">@clubDialogError</MudAlert>
+        }
+        <MudForm @ref="clubForm" @bind-IsValid="clubFormValid">
+            <MudTextField @bind-Value="newClub.Name" Label="Club Name" Variant="Variant.Outlined"
+                         Required="true" RequiredError="Name is required" Class="mb-3" />
+            <MudTextField @bind-Value="newClub.AddressLine1" Label="Address" Variant="Variant.Outlined" Class="mb-3" />
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="newClub.City" Label="City" Variant="Variant.Outlined" Class="mb-3" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="newClub.CountyOrRegion" Label="County/Region" Variant="Variant.Outlined" Class="mb-3" />
+                </MudItem>
+            </MudGrid>
+            <MudGrid>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="newClub.Postcode" Label="Postcode" Variant="Variant.Outlined" Class="mb-3" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudTextField @bind-Value="newClub.Country" Label="Country" Variant="Variant.Outlined" Class="mb-3" />
+                </MudItem>
+            </MudGrid>
+            <MudTextField @bind-Value="newClub.Website" Label="Website" Variant="Variant.Outlined" Class="mb-3" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => showClubDialog = false)" Disabled="@savingClub">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveClub"
+                   Disabled="@(!clubFormValid || savingClub)" Style="border-radius:8px;">
+            @(savingClub ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private List<GolfClub>? golfClubs;
     private List<GolfClub>? filteredClubs;
     private bool loading = true;
     private string searchString = "";
+
+    // Add Club dialog
+    private bool showClubDialog;
+    private bool clubFormValid;
+    private bool savingClub;
+    private string clubDialogError = string.Empty;
+    private GolfClub newClub = new();
+    private MudForm clubForm = null!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -160,5 +212,44 @@
     private void ShowClubDetails(int clubId)
     {
         NavigationManager.NavigateTo($"/club-detail/{clubId}");
+    }
+
+    private void ShowAddClubDialog()
+    {
+        newClub = new GolfClub();
+        clubDialogError = string.Empty;
+        showClubDialog = true;
+    }
+
+    private async Task SaveClub()
+    {
+        if (!clubFormValid) return;
+        savingClub = true;
+        clubDialogError = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            var created = await GolfClubApi.CreateGolfClubAsync(newClub);
+            if (created != null)
+            {
+                showClubDialog = false;
+                await LoadGolfClubs();
+            }
+            else
+            {
+                clubDialogError = "Failed to create club. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving golf club");
+            clubDialogError = "An error occurred while saving the club.";
+        }
+        finally
+        {
+            savingClub = false;
+            StateHasChanged();
+        }
     }
 }

@@ -445,9 +445,9 @@
         showDetailsDialog = true;
     }
 
-    private async Task EditRoundFromMenu(RoundResponse round)
+    private void EditRoundFromMenu(RoundResponse round)
     {
-        await JSRuntime.InvokeVoidAsync("alert", $"Edit functionality coming soon for round at {round.CourseName}!");
+        NavigationManager.NavigateTo($"/rounds/{round.RoundId}", forceLoad: false);
     }
 
     private async Task LoadRoundScores(int roundId)
