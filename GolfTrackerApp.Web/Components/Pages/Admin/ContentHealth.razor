@@ -1,0 +1,481 @@
+@page "/admin/content-health"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject ILogger<ContentHealth> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>Content Health</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.HealthAndSafety" Class="mr-2" />
+    Content Health
+</MudText>
+
+<MudButton Href="admin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-3">
+    Back to Admin Dashboard
+</MudButton>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Health Score ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudGrid Spacing="4">
+                <MudItem xs="12" sm="4" Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h3" Color="@GetHealthColor(overallHealthScore)">
+                        @overallHealthScore%
+                    </MudText>
+                    <MudText Typo="Typo.caption">Overall Health Score</MudText>
+                    <MudProgressLinear Value="@overallHealthScore" Color="@GetHealthColor(overallHealthScore)"
+                                       Class="mt-2" Style="width: 200px;" />
+                </MudItem>
+                <MudItem xs="12" sm="8">
+                    <MudText Typo="Typo.h6" Class="mb-2">Summary</MudText>
+                    <MudText Typo="Typo.body2">@totalClubs golf clubs, @totalCourses courses, @totalHoles holes configured</MudText>
+                    @if (issues.Any())
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Warning" Class="mt-1">
+                            @issues.Count issue(s) detected
+                        </MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success" Class="mt-1">
+                            No issues detected — all content looks healthy!
+                        </MudText>
+                    }
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @* ===== Issues List ===== *@
+    @if (issues.Any())
+    {
+        <MudText Typo="Typo.h6" Class="mb-3">Issues</MudText>
+        @foreach (var issue in issues)
+        {
+            <MudAlert Severity="@issue.Severity" Class="mb-2" Dense="true">
+                <strong>@issue.Category:</strong> @issue.Description
+                @if (issue.AffectedItems.Any())
+                {
+                    <MudText Typo="Typo.caption" Class="mt-1">
+                        Affected: @string.Join(", ", issue.AffectedItems.Take(5))
+                        @if (issue.AffectedItems.Count > 5)
+                        {
+                            <text> and @(issue.AffectedItems.Count - 5) more</text>
+                        }
+                    </MudText>
+                }
+            </MudAlert>
+        }
+    }
+
+    @* ===== Detailed Tables ===== *@
+    <MudGrid Spacing="4" Class="mt-4 mb-4">
+        @* Clubs without courses *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.LocationCity" Class="mr-1" Size="Size.Small" />
+                        Clubs Without Courses (@clubsWithoutCourses.Count)
+                    </MudText>
+                    @if (clubsWithoutCourses.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr><th>ID</th><th>Name</th><th>City</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var club in clubsWithoutCourses)
+                                {
+                                    <tr>
+                                        <td>@club.GolfClubId</td>
+                                        <td>@club.Name</td>
+                                        <td>@(club.City ?? "—")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">All clubs have courses.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* Courses without holes *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Map" Class="mr-1" Size="Size.Small" />
+                        Courses Without Holes (@coursesWithoutHoles.Count)
+                    </MudText>
+                    @if (coursesWithoutHoles.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr><th>ID</th><th>Course</th><th>Club</th><th>Par</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var course in coursesWithoutHoles)
+                                {
+                                    <tr>
+                                        <td>@course.GolfCourseId</td>
+                                        <td>@course.Name</td>
+                                        <td>@(course.GolfClub?.Name ?? "—")</td>
+                                        <td>@course.DefaultPar</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">All courses have holes.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* Courses with wrong hole count *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.Warning" Class="mr-1" Size="Size.Small" />
+                        Hole Count Mismatches (@holeCountMismatches.Count)
+                    </MudText>
+                    @if (holeCountMismatches.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr><th>Course</th><th>Expected</th><th>Actual</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var m in holeCountMismatches)
+                                {
+                                    <tr>
+                                        <td>@m.CourseName</td>
+                                        <td>@m.ExpectedHoles</td>
+                                        <td>
+                                            <MudText Color="Color.Error">@m.ActualHoles</MudText>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">All courses have correct hole counts.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* Par mismatches *@
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Class="mr-1" Size="Size.Small" />
+                        Par Mismatches (@parMismatches.Count)
+                    </MudText>
+                    @if (parMismatches.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr><th>Course</th><th>Default Par</th><th>Sum of Holes Par</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var m in parMismatches)
+                                {
+                                    <tr>
+                                        <td>@m.CourseName</td>
+                                        <td>@m.DefaultPar</td>
+                                        <td>
+                                            <MudText Color="Color.Error">@m.SumOfHolePars</MudText>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">All course pars match hole totals.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        @* Duplicate stroke indices *@
+        <MudItem xs="12">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.ContentCopy" Class="mr-1" Size="Size.Small" />
+                        Duplicate Stroke Indices (@duplicateStrokeIndices.Count courses)
+                    </MudText>
+                    @if (duplicateStrokeIndices.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr><th>Course</th><th>Duplicated SI Values</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var d in duplicateStrokeIndices)
+                                {
+                                    <tr>
+                                        <td>@d.CourseName</td>
+                                        <td>@string.Join(", ", d.DuplicateValues)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Success">No duplicate stroke indices found.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="RunHealthCheck" Class="mb-4"
+               StartIcon="@Icons.Material.Filled.Refresh">
+        Re-run Health Check
+    </MudButton>
+}
+
+@code {
+    private bool loading = true;
+    private int totalClubs;
+    private int totalCourses;
+    private int totalHoles;
+    private int overallHealthScore;
+
+    private List<GolfClub> clubsWithoutCourses = new();
+    private List<GolfCourse> coursesWithoutHoles = new();
+    private List<HoleCountMismatch> holeCountMismatches = new();
+    private List<ParMismatch> parMismatches = new();
+    private List<DuplicateStrokeIndex> duplicateStrokeIndices = new();
+    private List<HealthIssue> issues = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RunHealthCheck();
+        loading = false;
+    }
+
+    private async Task RunHealthCheck()
+    {
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+            issues.Clear();
+
+            totalClubs = await context.GolfClubs.CountAsync();
+            totalCourses = await context.GolfCourses.CountAsync();
+            totalHoles = await context.Holes.CountAsync();
+
+            // Clubs without courses
+            clubsWithoutCourses = await context.GolfClubs
+                .Where(c => !c.GolfCourses.Any())
+                .AsNoTracking()
+                .OrderBy(c => c.Name)
+                .Take(50)
+                .ToListAsync();
+
+            if (clubsWithoutCourses.Any())
+            {
+                issues.Add(new HealthIssue
+                {
+                    Category = "Golf Clubs",
+                    Description = $"{clubsWithoutCourses.Count} club(s) have no courses defined.",
+                    Severity = Severity.Warning,
+                    AffectedItems = clubsWithoutCourses.Select(c => c.Name).ToList()
+                });
+            }
+
+            // Courses without holes
+            coursesWithoutHoles = await context.GolfCourses
+                .Include(c => c.GolfClub)
+                .Where(c => !c.Holes.Any())
+                .AsNoTracking()
+                .OrderBy(c => c.Name)
+                .Take(50)
+                .ToListAsync();
+
+            if (coursesWithoutHoles.Any())
+            {
+                issues.Add(new HealthIssue
+                {
+                    Category = "Golf Courses",
+                    Description = $"{coursesWithoutHoles.Count} course(s) have no holes defined.",
+                    Severity = Severity.Error,
+                    AffectedItems = coursesWithoutHoles.Select(c => c.Name).ToList()
+                });
+            }
+
+            // Hole count mismatches
+            var coursesWithHoles = await context.GolfCourses
+                .Select(c => new
+                {
+                    c.GolfCourseId,
+                    c.Name,
+                    c.NumberOfHoles,
+                    ActualHoles = c.Holes.Count
+                })
+                .Where(c => c.ActualHoles > 0 && c.ActualHoles != c.NumberOfHoles)
+                .AsNoTracking()
+                .ToListAsync();
+
+            holeCountMismatches = coursesWithHoles.Select(c => new HoleCountMismatch
+            {
+                CourseName = c.Name,
+                ExpectedHoles = c.NumberOfHoles,
+                ActualHoles = c.ActualHoles
+            }).ToList();
+
+            if (holeCountMismatches.Any())
+            {
+                issues.Add(new HealthIssue
+                {
+                    Category = "Hole Definitions",
+                    Description = $"{holeCountMismatches.Count} course(s) have mismatched hole counts.",
+                    Severity = Severity.Warning,
+                    AffectedItems = holeCountMismatches.Select(m => m.CourseName).ToList()
+                });
+            }
+
+            // Par mismatches (sum of hole pars != course default par)
+            var parData = await context.GolfCourses
+                .Where(c => c.Holes.Any())
+                .Select(c => new
+                {
+                    c.GolfCourseId,
+                    c.Name,
+                    c.DefaultPar,
+                    SumOfHolePars = c.Holes.Sum(h => h.Par)
+                })
+                .Where(c => c.DefaultPar != c.SumOfHolePars)
+                .AsNoTracking()
+                .ToListAsync();
+
+            parMismatches = parData.Select(c => new ParMismatch
+            {
+                CourseName = c.Name,
+                DefaultPar = c.DefaultPar,
+                SumOfHolePars = c.SumOfHolePars
+            }).ToList();
+
+            if (parMismatches.Any())
+            {
+                issues.Add(new HealthIssue
+                {
+                    Category = "Par Values",
+                    Description = $"{parMismatches.Count} course(s) have default par not matching sum of hole pars.",
+                    Severity = Severity.Warning,
+                    AffectedItems = parMismatches.Select(m => m.CourseName).ToList()
+                });
+            }
+
+            // Duplicate stroke indices per course
+            var allHoles = await context.Holes
+                .Where(h => h.StrokeIndex != null)
+                .Select(h => new { h.GolfCourseId, h.GolfCourse!.Name, h.StrokeIndex })
+                .AsNoTracking()
+                .ToListAsync();
+
+            duplicateStrokeIndices = allHoles
+                .GroupBy(h => new { h.GolfCourseId, h.Name })
+                .Where(g => g.GroupBy(h => h.StrokeIndex).Any(si => si.Count() > 1))
+                .Select(g => new DuplicateStrokeIndex
+                {
+                    CourseName = g.Key.Name,
+                    DuplicateValues = g.GroupBy(h => h.StrokeIndex)
+                        .Where(si => si.Count() > 1)
+                        .Select(si => si.Key!.Value)
+                        .OrderBy(v => v)
+                        .ToList()
+                })
+                .ToList();
+
+            if (duplicateStrokeIndices.Any())
+            {
+                issues.Add(new HealthIssue
+                {
+                    Category = "Stroke Indices",
+                    Description = $"{duplicateStrokeIndices.Count} course(s) have duplicate stroke index values.",
+                    Severity = Severity.Info,
+                    AffectedItems = duplicateStrokeIndices.Select(d => d.CourseName).ToList()
+                });
+            }
+
+            // Calculate health score
+            int totalChecks = 5;
+            int passedChecks = 0;
+            if (!clubsWithoutCourses.Any()) passedChecks++;
+            if (!coursesWithoutHoles.Any()) passedChecks++;
+            if (!holeCountMismatches.Any()) passedChecks++;
+            if (!parMismatches.Any()) passedChecks++;
+            if (!duplicateStrokeIndices.Any()) passedChecks++;
+            overallHealthScore = totalChecks > 0 ? (int)((double)passedChecks / totalChecks * 100) : 100;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error running health check");
+        }
+    }
+
+    private Color GetHealthColor(int score) => score switch
+    {
+        >= 80 => Color.Success,
+        >= 50 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private class HealthIssue
+    {
+        public string Category { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public Severity Severity { get; set; }
+        public List<string> AffectedItems { get; set; } = new();
+    }
+
+    private class HoleCountMismatch
+    {
+        public string CourseName { get; set; } = string.Empty;
+        public int ExpectedHoles { get; set; }
+        public int ActualHoles { get; set; }
+    }
+
+    private class ParMismatch
+    {
+        public string CourseName { get; set; } = string.Empty;
+        public int DefaultPar { get; set; }
+        public int SumOfHolePars { get; set; }
+    }
+
+    private class DuplicateStrokeIndex
+    {
+        public string CourseName { get; set; } = string.Empty;
+        public List<int> DuplicateValues { get; set; } = new();
+    }
+}

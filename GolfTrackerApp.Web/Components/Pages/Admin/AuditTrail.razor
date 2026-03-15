@@ -1,0 +1,291 @@
+@page "/admin/audit"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject ILogger<AuditTrail> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>Audit Trail</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+    Audit Trail
+</MudText>
+
+<MudButton Href="admin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-3">
+    Back to Admin Dashboard
+</MudButton>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Filters ===== *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect @bind-Value="insightTypeFilter" Label="Insight Type" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("All")">All</MudSelectItem>
+                @foreach (var type in insightTypes)
+                {
+                    <MudSelectItem Value="@type">@type</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect @bind-Value="providerFilter" Label="Provider" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("All")">All</MudSelectItem>
+                @foreach (var provider in providers)
+                {
+                    <MudSelectItem Value="@provider">@provider</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="2">
+            <MudSelect @bind-Value="successFilter" Label="Status" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("All")">All</MudSelectItem>
+                <MudSelectItem Value="@("Success")">Success</MudSelectItem>
+                <MudSelectItem Value="@("Failed")">Failed</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="2">
+            <MudSelect @bind-Value="timeRangeFilter" Label="Time Range" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("24h")">Last 24 hours</MudSelectItem>
+                <MudSelectItem Value="@("7d")">Last 7 days</MudSelectItem>
+                <MudSelectItem Value="@("30d")">Last 30 days</MudSelectItem>
+                <MudSelectItem Value="@("90d")">Last 90 days</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadAuditLogs" Class="mt-1"
+                       StartIcon="@Icons.Material.Filled.FilterAlt">
+                Apply
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Summary Cards ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4">@filteredLogs.Count</MudText>
+                    <MudText Typo="Typo.caption">Total Calls</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Success">@filteredLogs.Count(l => l.Success)</MudText>
+                    <MudText Typo="Typo.caption">Successful</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Error">@filteredLogs.Count(l => !l.Success)</MudText>
+                    <MudText Typo="Typo.caption">Failed</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Info">@filteredLogs.Where(l => l.Success).Sum(l => l.TotalTokens).ToString("N0")</MudText>
+                    <MudText Typo="Typo.caption">Total Tokens</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Audit Log Table ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudSimpleTable Dense="true" Hover="true" Bordered="true" Style="overflow-x: auto;">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Provider</th>
+                        <th>Model</th>
+                        <th>Tokens</th>
+                        <th>Response (ms)</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!filteredLogs.Any())
+                    {
+                        <tr>
+                            <td colspan="9" style="text-align: center;">
+                                <MudText Typo="Typo.body2" Color="Color.Tertiary">No audit logs found for the selected filters.</MudText>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var log in filteredLogs.Take(200))
+                    {
+                        <tr>
+                            <td style="white-space: nowrap;">@log.RequestedAt.ToString("dd MMM HH:mm:ss")</td>
+                            <td>@(userEmails.GetValueOrDefault(log.ApplicationUserId, log.ApplicationUserId))</td>
+                            <td>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Default">@log.InsightType</MudChip>
+                            </td>
+                            <td>@(log.ProviderName ?? "—")</td>
+                            <td>@(log.ModelUsed ?? "—")</td>
+                            <td>@log.TotalTokens.ToString("N0")</td>
+                            <td>@log.ResponseTimeMs</td>
+                            <td>
+                                @if (log.Success)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="@(log.ErrorMessage ?? "Unknown error")">
+                                        <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                                    </MudTooltip>
+                                }
+                            </td>
+                            <td>
+                                @if (expandedLogId == log.AiAuditLogId)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.ExpandLess" Size="Size.Small"
+                                                   OnClick="@(() => expandedLogId = null)" />
+                                }
+                                else
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small"
+                                                   OnClick="@(() => expandedLogId = log.AiAuditLogId)" />
+                                }
+                            </td>
+                        </tr>
+                        @if (expandedLogId == log.AiAuditLogId)
+                        {
+                            <tr>
+                                <td colspan="9">
+                                    <MudGrid Spacing="2" Class="pa-2">
+                                        <MudItem xs="12" md="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Prompt Sent</MudText>
+                                            <MudPaper Class="pa-2" Style="max-height: 200px; overflow-y: auto; background: var(--mud-palette-background-grey);">
+                                                <pre style="white-space: pre-wrap; word-break: break-word; margin: 0; font-size: 0.8rem;">@(log.PromptSent ?? "Not recorded")</pre>
+                                            </MudPaper>
+                                        </MudItem>
+                                        <MudItem xs="12" md="6">
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary">Response Received</MudText>
+                                            <MudPaper Class="pa-2" Style="max-height: 200px; overflow-y: auto; background: var(--mud-palette-background-grey);">
+                                                <pre style="white-space: pre-wrap; word-break: break-word; margin: 0; font-size: 0.8rem;">@(log.ResponseReceived ?? "Not recorded")</pre>
+                                            </MudPaper>
+                                        </MudItem>
+                                        @if (!string.IsNullOrEmpty(log.ErrorMessage))
+                                        {
+                                            <MudItem xs="12">
+                                                <MudAlert Severity="Severity.Error" Dense="true">@log.ErrorMessage</MudAlert>
+                                            </MudItem>
+                                        }
+                                        <MudItem xs="12">
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                                                Prompt tokens: @log.PromptTokens | Completion tokens: @log.CompletionTokens
+                                                @if (log.AiChatSessionId.HasValue)
+                                                {
+                                                    <text> | Chat Session: #@log.AiChatSessionId</text>
+                                                }
+                                            </MudText>
+                                        </MudItem>
+                                    </MudGrid>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    private bool loading = true;
+    private string insightTypeFilter = "All";
+    private string providerFilter = "All";
+    private string successFilter = "All";
+    private string timeRangeFilter = "7d";
+    private int? expandedLogId;
+
+    private List<AiAuditLog> filteredLogs = new();
+    private List<string> insightTypes = new();
+    private List<string> providers = new();
+    private Dictionary<string, string> userEmails = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuditLogs();
+        loading = false;
+    }
+
+    private async Task LoadAuditLogs()
+    {
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+            var now = DateTime.UtcNow;
+
+            var since = timeRangeFilter switch
+            {
+                "24h" => now.AddHours(-24),
+                "7d" => now.AddDays(-7),
+                "30d" => now.AddDays(-30),
+                "90d" => now.AddDays(-90),
+                _ => now.AddDays(-7)
+            };
+
+            var query = context.AiAuditLogs
+                .AsNoTracking()
+                .Where(a => a.RequestedAt >= since);
+
+            if (insightTypeFilter != "All")
+                query = query.Where(a => a.InsightType == insightTypeFilter);
+
+            if (providerFilter != "All")
+                query = query.Where(a => a.ProviderName == providerFilter);
+
+            if (successFilter == "Success")
+                query = query.Where(a => a.Success);
+            else if (successFilter == "Failed")
+                query = query.Where(a => !a.Success);
+
+            filteredLogs = await query
+                .OrderByDescending(a => a.RequestedAt)
+                .Take(500)
+                .ToListAsync();
+
+            // Get distinct filter options from all logs in range
+            var allLogsInRange = await context.AiAuditLogs
+                .AsNoTracking()
+                .Where(a => a.RequestedAt >= since)
+                .Select(a => new { a.InsightType, a.ProviderName })
+                .Distinct()
+                .ToListAsync();
+
+            insightTypes = allLogsInRange.Select(a => a.InsightType).Distinct().OrderBy(t => t).ToList();
+            providers = allLogsInRange.Where(a => a.ProviderName != null).Select(a => a.ProviderName!).Distinct().OrderBy(p => p).ToList();
+
+            // Resolve user emails
+            var userIds = filteredLogs.Select(l => l.ApplicationUserId).Distinct().ToList();
+            userEmails = await context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Email ?? u.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading audit logs");
+        }
+    }
+}

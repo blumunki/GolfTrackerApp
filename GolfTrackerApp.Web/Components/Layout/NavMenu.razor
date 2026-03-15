@@ -45,6 +45,13 @@
 
     <AuthorizeView Roles="Admin">
         <MudListSubheader>Admin</MudListSubheader>
+        <MudNavLink Href="admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.AdminPanelSettings">Dashboard</MudNavLink>
+        <MudNavLink Href="admin/users" Icon="@Icons.Material.Filled.ManageAccounts">Users</MudNavLink>
+        <MudNavLink Href="admin/players" Icon="@Icons.Material.Filled.People">Players</MudNavLink>
+        <MudNavLink Href="admin/content-health" Icon="@Icons.Material.Filled.HealthAndSafety">Content Health</MudNavLink>
+        <MudNavLink Href="admin/connections" Icon="@Icons.Material.Filled.Link">Connections &amp; Merges</MudNavLink>
+        <MudNavLink Href="admin/notifications" Icon="@Icons.Material.Filled.Notifications">Notifications</MudNavLink>
+        <MudNavLink Href="admin/audit" Icon="@Icons.Material.Filled.History">Audit Trail</MudNavLink>
         <MudNavLink Href="admin/datamigration" Icon="@Icons.Material.Filled.Storage">Data Migration</MudNavLink>
         <MudNavLink Href="admin/ai-providers" Icon="@Icons.Material.Filled.SmartToy">AI Providers</MudNavLink>
         <MudNavLink Href="admin/ai-usage" Icon="@Icons.Material.Filled.Analytics">AI Usage</MudNavLink>

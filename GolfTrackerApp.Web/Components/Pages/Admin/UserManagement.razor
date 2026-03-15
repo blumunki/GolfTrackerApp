@@ -1,0 +1,293 @@
+@page "/admin/users"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject UserManager<ApplicationUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@inject ILogger<UserManagement> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>User Management</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.ManageAccounts" Class="mr-2" />
+    User Management
+</MudText>
+
+<MudButton Href="admin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-3">
+    Back to Admin Dashboard
+</MudButton>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Search & Filter ===== *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="6" md="4">
+            <MudTextField @bind-Value="searchTerm" Label="Search by email" Variant="Variant.Outlined"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          OnKeyDown="@HandleSearchKeyDown" Immediate="false" />
+        </MudItem>
+        <MudItem xs="12" sm="3" md="2">
+            <MudSelect @bind-Value="roleFilter" Label="Role" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("All")">All</MudSelectItem>
+                <MudSelectItem Value="@("Admin")">Admin</MudSelectItem>
+                <MudSelectItem Value="@("User")">User</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3" md="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadUsers" Class="mt-1"
+                       StartIcon="@Icons.Material.Filled.Search">
+                Search
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Users Table ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.body2" Color="Color.Tertiary" Class="mb-2">
+                Showing @filteredUsers.Count of @totalUserCount users
+            </MudText>
+            <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Linked Player</th>
+                        <th>Role</th>
+                        <th>AI Opted Out</th>
+                        <th>Email Confirmed</th>
+                        <th style="width: 200px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!filteredUsers.Any())
+                    {
+                        <tr>
+                            <td colspan="6" style="text-align: center;">
+                                <MudText Typo="Typo.body2" Color="Color.Tertiary">No users found.</MudText>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var user in filteredUsers)
+                    {
+                        <tr>
+                            <td>@user.Email</td>
+                            <td>@(user.LinkedPlayerName ?? "—")</td>
+                            <td>
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(user.Role == "Admin" ? Color.Error : Color.Default)">
+                                    @user.Role
+                                </MudChip>
+                            </td>
+                            <td>
+                                @if (user.AiInsightsOptOut)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.DoNotDisturb" Color="Color.Error" Size="Size.Small" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                }
+                            </td>
+                            <td>
+                                @if (user.EmailConfirmed)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Verified" Color="Color.Success" Size="Size.Small" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Size="Size.Small" />
+                                }
+                            </td>
+                            <td>
+                                @if (user.Role != "Admin")
+                                {
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                               OnClick="@(() => PromoteToAdmin(user))"
+                                               StartIcon="@Icons.Material.Filled.ArrowUpward">
+                                        Make Admin
+                                    </MudButton>
+                                }
+                                else if (user.UserId != currentAdminId)
+                                {
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Warning"
+                                               OnClick="@(() => DemoteFromAdmin(user))"
+                                               StartIcon="@Icons.Material.Filled.ArrowDownward">
+                                        Remove Admin
+                                    </MudButton>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Tertiary">Current user</MudText>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudCardContent>
+    </MudCard>
+
+    @* ===== Status Messages ===== *@
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <MudAlert Severity="@statusSeverity" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => statusMessage = null)">
+            @statusMessage
+        </MudAlert>
+    }
+}
+
+@code {
+    private bool loading = true;
+    private string searchTerm = string.Empty;
+    private string roleFilter = "All";
+    private string? statusMessage;
+    private Severity statusSeverity = Severity.Info;
+    private string? currentAdminId;
+    private int totalUserCount;
+
+    private List<UserViewModel> filteredUsers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get current admin user ID
+        var users = UserManager.Users;
+        await LoadUsers();
+        loading = false;
+    }
+
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadUsers();
+        }
+    }
+
+    private async Task LoadUsers()
+    {
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+
+            var query = context.Users
+                .Include(u => u.LinkedPlayer)
+                .AsNoTracking()
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim().ToLower();
+                query = query.Where(u => u.Email != null && u.Email.ToLower().Contains(term));
+            }
+
+            totalUserCount = await context.Users.CountAsync();
+            var allUsers = await query.OrderBy(u => u.Email).Take(100).ToListAsync();
+
+            // Get all admin user IDs
+            var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
+            var adminUserIds = new HashSet<string>();
+            if (adminRole != null)
+            {
+                adminUserIds = (await context.UserRoles
+                    .Where(ur => ur.RoleId == adminRole.Id)
+                    .Select(ur => ur.UserId)
+                    .ToListAsync())
+                    .ToHashSet();
+            }
+
+            // Determine current admin
+            var authState = await GetAuthenticationState();
+            currentAdminId = authState?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+            filteredUsers = allUsers.Select(u => new UserViewModel
+            {
+                UserId = u.Id,
+                Email = u.Email ?? "Unknown",
+                LinkedPlayerName = u.LinkedPlayer != null ? $"{u.LinkedPlayer.FirstName} {u.LinkedPlayer.LastName}" : null,
+                Role = adminUserIds.Contains(u.Id) ? "Admin" : "User",
+                AiInsightsOptOut = u.AiInsightsOptOut,
+                EmailConfirmed = u.EmailConfirmed
+            }).ToList();
+
+            // Apply role filter
+            if (roleFilter != "All")
+            {
+                filteredUsers = filteredUsers.Where(u => u.Role == roleFilter).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading users");
+            statusMessage = "Error loading users.";
+            statusSeverity = Severity.Error;
+        }
+    }
+
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private async Task<System.Security.Claims.ClaimsPrincipal?> GetAuthenticationState()
+    {
+        if (AuthenticationStateTask == null) return null;
+        var state = await AuthenticationStateTask;
+        return state.User;
+    }
+
+    private async Task PromoteToAdmin(UserViewModel userVm)
+    {
+        var user = await UserManager.FindByIdAsync(userVm.UserId);
+        if (user == null) return;
+
+        var result = await UserManager.AddToRoleAsync(user, "Admin");
+        if (result.Succeeded)
+        {
+            statusMessage = $"{user.Email} promoted to Admin.";
+            statusSeverity = Severity.Success;
+            userVm.Role = "Admin";
+        }
+        else
+        {
+            statusMessage = $"Failed to promote: {string.Join(", ", result.Errors.Select(e => e.Description))}";
+            statusSeverity = Severity.Error;
+        }
+    }
+
+    private async Task DemoteFromAdmin(UserViewModel userVm)
+    {
+        var user = await UserManager.FindByIdAsync(userVm.UserId);
+        if (user == null) return;
+
+        var result = await UserManager.RemoveFromRoleAsync(user, "Admin");
+        if (result.Succeeded)
+        {
+            statusMessage = $"{user.Email} demoted to User.";
+            statusSeverity = Severity.Success;
+            userVm.Role = "User";
+        }
+        else
+        {
+            statusMessage = $"Failed to demote: {string.Join(", ", result.Errors.Select(e => e.Description))}";
+            statusSeverity = Severity.Error;
+        }
+    }
+
+    private class UserViewModel
+    {
+        public string UserId { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string? LinkedPlayerName { get; set; }
+        public string Role { get; set; } = "User";
+        public bool AiInsightsOptOut { get; set; }
+        public bool EmailConfirmed { get; set; }
+    }
+}

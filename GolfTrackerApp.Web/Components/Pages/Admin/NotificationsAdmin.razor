@@ -1,0 +1,277 @@
+@page "/admin/notifications"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject ILogger<NotificationsAdmin> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>System Notifications</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Notifications" Class="mr-2" />
+    System Notifications
+</MudText>
+
+<MudButton Href="admin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-3">
+    Back to Admin Dashboard
+</MudButton>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Summary ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4">@totalNotifications</MudText>
+                    <MudText Typo="Typo.caption">Total (30d)</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@unreadNotifications</MudText>
+                    <MudText Typo="Typo.caption">Unread</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Success">@readNotifications</MudText>
+                    <MudText Typo="Typo.caption">Read</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Info">@distinctUsers</MudText>
+                    <MudText Typo="Typo.caption">Users with Notifications</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Filters ===== *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect @bind-Value="typeFilter" Label="Type" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("All")">All Types</MudSelectItem>
+                @foreach (var t in Enum.GetValues<NotificationType>())
+                {
+                    <MudSelectItem Value="@t.ToString()">@t</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="3">
+            <MudSelect @bind-Value="readFilter" Label="Read Status" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("All")">All</MudSelectItem>
+                <MudSelectItem Value="@("Unread")">Unread</MudSelectItem>
+                <MudSelectItem Value="@("Read")">Read</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="4" md="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadNotifications" Class="mt-1"
+                       StartIcon="@Icons.Material.Filled.FilterAlt">
+                Apply
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Type Breakdown ===== *@
+    @if (typeBreakdown.Any())
+    {
+        <MudCard Elevation="2" Class="mb-4">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" Class="mb-2">Notification Type Breakdown (30d)</MudText>
+                <MudSimpleTable Dense="true" Hover="true">
+                    <thead>
+                        <tr><th>Type</th><th>Count</th><th>Unread</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in typeBreakdown)
+                        {
+                            <tr>
+                                <td>@t.Type</td>
+                                <td>@t.Count</td>
+                                <td>
+                                    @if (t.UnreadCount > 0)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Warning">@t.UnreadCount</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <text>0</text>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudCard>
+    }
+
+    @* ===== Notifications Table ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-2">Recent Notifications</MudText>
+            <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Message</th>
+                        <th>Read</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!filteredNotifications.Any())
+                    {
+                        <tr>
+                            <td colspan="6" style="text-align: center;">
+                                <MudText Typo="Typo.body2" Color="Color.Tertiary">No notifications found.</MudText>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var n in filteredNotifications.Take(200))
+                    {
+                        <tr>
+                            <td style="white-space: nowrap;">@n.CreatedAt.ToString("dd MMM HH:mm")</td>
+                            <td>@(userEmails.GetValueOrDefault(n.UserId, n.UserId))</td>
+                            <td>
+                                <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(n.Type)">@n.Type</MudChip>
+                            </td>
+                            <td>@n.Title</td>
+                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                @n.Message
+                            </td>
+                            <td>
+                                @if (n.IsRead)
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.DoneAll" Color="Color.Success" Size="Size.Small" />
+                                }
+                                else
+                                {
+                                    <MudIcon Icon="@Icons.Material.Filled.MarkEmailUnread" Color="Color.Warning" Size="Size.Small" />
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudCardContent>
+    </MudCard>
+}
+
+@code {
+    private bool loading = true;
+    private string typeFilter = "All";
+    private string readFilter = "All";
+
+    private int totalNotifications;
+    private int unreadNotifications;
+    private int readNotifications;
+    private int distinctUsers;
+
+    private List<Notification> filteredNotifications = new();
+    private List<TypeBreakdown> typeBreakdown = new();
+    private Dictionary<string, string> userEmails = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadNotifications();
+        loading = false;
+    }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+            var since30d = DateTime.UtcNow.AddDays(-30);
+
+            // Summary
+            var allRecent = await context.Notifications
+                .AsNoTracking()
+                .Where(n => n.CreatedAt >= since30d)
+                .ToListAsync();
+
+            totalNotifications = allRecent.Count;
+            unreadNotifications = allRecent.Count(n => !n.IsRead);
+            readNotifications = allRecent.Count(n => n.IsRead);
+            distinctUsers = allRecent.Select(n => n.UserId).Distinct().Count();
+
+            // Type breakdown
+            typeBreakdown = allRecent
+                .GroupBy(n => n.Type)
+                .Select(g => new TypeBreakdown
+                {
+                    Type = g.Key.ToString(),
+                    Count = g.Count(),
+                    UnreadCount = g.Count(n => !n.IsRead)
+                })
+                .OrderByDescending(t => t.Count)
+                .ToList();
+
+            // Filtered list
+            var query = context.Notifications
+                .AsNoTracking()
+                .Where(n => n.CreatedAt >= since30d)
+                .AsQueryable();
+
+            if (typeFilter != "All" && Enum.TryParse<NotificationType>(typeFilter, out var parsedType))
+                query = query.Where(n => n.Type == parsedType);
+
+            if (readFilter == "Unread")
+                query = query.Where(n => !n.IsRead);
+            else if (readFilter == "Read")
+                query = query.Where(n => n.IsRead);
+
+            filteredNotifications = await query
+                .OrderByDescending(n => n.CreatedAt)
+                .Take(500)
+                .ToListAsync();
+
+            // Resolve user emails
+            var userIds = filteredNotifications.Select(n => n.UserId).Distinct().ToList();
+            userEmails = await context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Email ?? u.Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading notifications");
+        }
+    }
+
+    private Color GetTypeColor(NotificationType type) => type switch
+    {
+        NotificationType.ConnectionRequest => Color.Primary,
+        NotificationType.ConnectionAccepted => Color.Success,
+        NotificationType.ConnectionDeclined => Color.Error,
+        NotificationType.MergeRequest => Color.Info,
+        NotificationType.MergeCompleted => Color.Success,
+        NotificationType.MergeDeclined => Color.Error,
+        _ => Color.Default
+    };
+
+    private class TypeBreakdown
+    {
+        public string Type { get; set; } = string.Empty;
+        public int Count { get; set; }
+        public int UnreadCount { get; set; }
+    }
+}

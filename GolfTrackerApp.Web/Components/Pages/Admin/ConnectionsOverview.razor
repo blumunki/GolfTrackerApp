@@ -1,0 +1,268 @@
+@page "/admin/connections"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject ILogger<ConnectionsOverview> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>Connections &amp; Merges</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Link" Class="mr-2" />
+    Connections &amp; Merges
+</MudText>
+
+<MudButton Href="admin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-3">
+    Back to Admin Dashboard
+</MudButton>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Summary ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Success">@acceptedConnections</MudText>
+                    <MudText Typo="Typo.caption">Active Connections</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@pendingConnections</MudText>
+                    <MudText Typo="Typo.caption">Pending Connections</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Info">@completedMerges</MudText>
+                    <MudText Typo="Typo.caption">Completed Merges</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@pendingMerges</MudText>
+                    <MudText Typo="Typo.caption">Pending Merges</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Tabs ===== *@
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" Class="mb-4">
+        <MudTabPanel Text="Connections" BadgeData="@pendingConnections" BadgeColor="Color.Warning">
+            <MudCardContent>
+                <MudSelect @bind-Value="connectionStatusFilter" Label="Filter by status" Variant="Variant.Outlined"
+                           Class="mb-3" Style="max-width: 200px;">
+                    <MudSelectItem Value="@("All")">All</MudSelectItem>
+                    <MudSelectItem Value="@("Pending")">Pending</MudSelectItem>
+                    <MudSelectItem Value="@("Accepted")">Accepted</MudSelectItem>
+                    <MudSelectItem Value="@("Declined")">Declined</MudSelectItem>
+                </MudSelect>
+
+                <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Requesting User</th>
+                            <th>Target User</th>
+                            <th>Status</th>
+                            <th>Requested</th>
+                            <th>Responded</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in FilteredConnections)
+                        {
+                            <tr>
+                                <td>@c.Id</td>
+                                <td>@(c.RequestingUser?.Email ?? c.RequestingUserId)</td>
+                                <td>@(c.TargetUser?.Email ?? c.TargetUserId)</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetConnectionStatusColor(c.Status)">
+                                        @c.Status
+                                    </MudChip>
+                                </td>
+                                <td>@c.RequestedAt.ToString("dd MMM yyyy")</td>
+                                <td>@(c.RespondedAt?.ToString("dd MMM yyyy") ?? "—")</td>
+                            </tr>
+                        }
+                        @if (!FilteredConnections.Any())
+                        {
+                            <tr>
+                                <td colspan="6" style="text-align: center;">
+                                    <MudText Typo="Typo.body2" Color="Color.Tertiary">No connections found.</MudText>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Merge Requests" BadgeData="@pendingMerges" BadgeColor="Color.Warning">
+            <MudCardContent>
+                <MudSelect @bind-Value="mergeStatusFilter" Label="Filter by status" Variant="Variant.Outlined"
+                           Class="mb-3" Style="max-width: 200px;">
+                    <MudSelectItem Value="@("All")">All</MudSelectItem>
+                    <MudSelectItem Value="@("Pending")">Pending</MudSelectItem>
+                    <MudSelectItem Value="@("Accepted")">Accepted</MudSelectItem>
+                    <MudSelectItem Value="@("Declined")">Declined</MudSelectItem>
+                    <MudSelectItem Value="@("Cancelled")">Cancelled</MudSelectItem>
+                </MudSelect>
+
+                <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Requester</th>
+                            <th>Target User</th>
+                            <th>Source Player</th>
+                            <th>Target Player</th>
+                            <th>Status</th>
+                            <th>Rounds Merged</th>
+                            <th>Requested</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in FilteredMerges)
+                        {
+                            <tr>
+                                <td>@m.Id</td>
+                                <td>@(m.RequestingUser?.Email ?? m.RequestingUserId)</td>
+                                <td>@(m.TargetUser?.Email ?? m.TargetUserId)</td>
+                                <td>@(m.SourcePlayer != null ? $"{m.SourcePlayer.FirstName} {m.SourcePlayer.LastName}" : "—")</td>
+                                <td>@(m.TargetPlayer != null ? $"{m.TargetPlayer.FirstName} {m.TargetPlayer.LastName}" : "—")</td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetMergeStatusColor(m.Status)">
+                                        @m.Status
+                                    </MudChip>
+                                </td>
+                                <td>
+                                    @if (m.Status == MergeRequestStatus.Accepted)
+                                    {
+                                        <text>@m.RoundsMerged (@m.RoundsSkipped skipped)</text>
+                                    }
+                                    else
+                                    {
+                                        <text>—</text>
+                                    }
+                                </td>
+                                <td>@m.RequestedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                        @if (!FilteredMerges.Any())
+                        {
+                            <tr>
+                                <td colspan="8" style="text-align: center;">
+                                    <MudText Typo="Typo.body2" Color="Color.Tertiary">No merge requests found.</MudText>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+            </MudCardContent>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private bool loading = true;
+    private string connectionStatusFilter = "All";
+    private string mergeStatusFilter = "All";
+
+    // Counts
+    private int acceptedConnections;
+    private int pendingConnections;
+    private int completedMerges;
+    private int pendingMerges;
+
+    // Data
+    private List<PlayerConnection> connections = new();
+    private List<PlayerMergeRequest> mergeRequests = new();
+
+    private IEnumerable<PlayerConnection> FilteredConnections =>
+        connectionStatusFilter == "All"
+            ? connections
+            : connections.Where(c => c.Status.ToString() == connectionStatusFilter);
+
+    private IEnumerable<PlayerMergeRequest> FilteredMerges =>
+        mergeStatusFilter == "All"
+            ? mergeRequests
+            : mergeRequests.Where(m => m.Status.ToString() == mergeStatusFilter);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        loading = false;
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+
+            // Connections
+            connections = await context.PlayerConnections
+                .Include(c => c.RequestingUser)
+                .Include(c => c.TargetUser)
+                .AsNoTracking()
+                .OrderByDescending(c => c.RequestedAt)
+                .Take(200)
+                .ToListAsync();
+
+            acceptedConnections = connections.Count(c => c.Status == ConnectionStatus.Accepted);
+            pendingConnections = connections.Count(c => c.Status == ConnectionStatus.Pending);
+
+            // Merge requests
+            mergeRequests = await context.PlayerMergeRequests
+                .Include(m => m.RequestingUser)
+                .Include(m => m.TargetUser)
+                .Include(m => m.SourcePlayer)
+                .Include(m => m.TargetPlayer)
+                .AsNoTracking()
+                .OrderByDescending(m => m.RequestedAt)
+                .Take(200)
+                .ToListAsync();
+
+            completedMerges = mergeRequests.Count(m => m.Status == MergeRequestStatus.Accepted);
+            pendingMerges = mergeRequests.Count(m => m.Status == MergeRequestStatus.Pending);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading connections and merges");
+        }
+    }
+
+    private Color GetConnectionStatusColor(ConnectionStatus status) => status switch
+    {
+        ConnectionStatus.Accepted => Color.Success,
+        ConnectionStatus.Pending => Color.Warning,
+        ConnectionStatus.Declined => Color.Error,
+        _ => Color.Default
+    };
+
+    private Color GetMergeStatusColor(MergeRequestStatus status) => status switch
+    {
+        MergeRequestStatus.Accepted => Color.Success,
+        MergeRequestStatus.Pending => Color.Warning,
+        MergeRequestStatus.Declined => Color.Error,
+        MergeRequestStatus.Cancelled => Color.Default,
+        _ => Color.Default
+    };
+}

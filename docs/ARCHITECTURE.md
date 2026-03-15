@@ -171,7 +171,9 @@ GolfTrackerApp.Web/
 │   │   ├── GolfCourses/              # Course list, add, edit, details
 │   │   ├── Players/                  # Player list, add, edit, report
 │   │   ├── Rounds/                   # Round list, record, details
-│   │   └── Admin/                    # AI Providers, AI Usage, Data Migration
+│   │   └── Admin/                    # Dashboard, Users, Players, Content Health,
+│   │                                 # Connections, Notifications, Audit, Data Migration,
+│   │                                 # AI Providers, AI Usage
 │   ├── Layout/                       # MainLayout + NavMenu
 │   ├── Shared/                       # Dialogs, reusable components
 │   └── Account/                      # Identity UI pages (scaffolded)
@@ -530,6 +532,14 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 
 ### 10.7 Admin Pages
 
+- **Admin Dashboard** (`/admin`): System overview — user/player/round/course/connection/merge counts, recent users, content health summary, quick links
+- **User Management** (`/admin/users`): Search/filter users, view linked players, promote/demote admin roles, see AI opt-out and email confirmation status
+- **Player Management** (`/admin/players`): Search/filter players, inline editing (name, handicap), view linked accounts, round counts, linked/unlinked breakdown
+- **Content Health** (`/admin/content-health`): Health score, clubs without courses, courses without holes, hole count mismatches, par mismatches, duplicate stroke indices
+- **Connections & Merges** (`/admin/connections`): All connections/merge requests with status filters, pending counts, tabbed view
+- **System Notifications** (`/admin/notifications`): View all user notifications, type breakdown, read/unread stats, filterable by type and status
+- **Audit Trail** (`/admin/audit`): AI audit logs with filters (type, provider, status, time range), expandable prompt/response detail, token summaries
+- **Data Migration** (`/admin/datamigration`): Quick sync from CSV, manual file upload for reference data and rounds/scores
 - **AI Providers** (`/admin/ai-providers`): Enable/disable providers, set priority order, view API key status
 - **AI Usage** (`/admin/ai-usage`): Usage statistics, token consumption, provider breakdown, audit log viewer
 
@@ -545,9 +555,56 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 - **iOS**: `dotnet build -f net10.0-ios` → IPA (requires Xcode)
 - Mobile connects to the deployed Web API via `DevConfiguration.generated.cs` base URL
 
-## 12. Future Architecture Evolution
+## 12. Feature Roadmap
 
-The current MVP architecture is designed for easy evolution:
+Planned features organised by priority tier. Each item includes the affected platform(s).
+
+### 12.1 Mobile Feature Parity — Critical
+
+| Feature | Description | Platform |
+|---------|-------------|----------|
+| Edit Round | Correct scoring mistakes after submission (web has `IsEditMode`, mobile is write-only) | Mobile |
+| Player Connections | Send/accept/decline connection requests, manage social network | Mobile |
+| Notifications | View connection requests, merge alerts, system messages | Mobile |
+| Email/Password Auth | Standard login + registration (currently Google OAuth only; TODOs exist in code) | Mobile |
+
+### 12.2 Mobile Feature Parity — High Value
+
+| Feature | Description | Platform |
+|---------|-------------|----------|
+| Add/Edit Clubs & Courses | Create and update venues from the course | Mobile |
+| Player Merge | Consolidate duplicate player records | Mobile |
+| Advanced Analytics | Filtering by course/date/round type, multi-player comparison, par breakdown | Mobile |
+| Add/Edit Players | Create and manage player profiles | Mobile |
+
+### 12.3 Admin Area Enhancements
+
+| Feature | Status | Description | Platform |
+|---------|--------|-------------|----------|
+| Admin Dashboard | ✅ Done | System overview — user/round/course counts, recent activity, quick links | Web |
+| User Management | ✅ Done | View/search users, assign roles (promote/demote admin) | Web |
+| Player Management | ✅ Done | View/search/edit all players, linked accounts, round counts | Web |
+| Content Health | ✅ Done | Clubs without courses, hole count mismatches, par mismatches, stroke index duplicates | Web |
+| Connection & Merge Oversight | ✅ Done | View all connections/merges with status filters | Web |
+| System Notifications | ✅ Done | View all user notifications, type breakdown, read/unread stats | Web |
+| Audit Trail | ✅ Done | AI audit log viewer with filters, expandable prompt/response detail | Web |
+| Application Settings | Planned | Feature flags (maintenance mode, registration), configurable from UI | Web |
+| System Health | Planned | API response times, error rates, database size, background job status | Web |
+
+### 12.4 New Features (Both Platforms)
+
+| Feature | Description | Platform |
+|---------|-------------|----------|
+| Live Round Mode | Real-time scoring during play with auto-save (placeholder exists in web) | Both |
+| Handicap Tracking | Formal handicap index calculation and history over time | Both |
+| Goal Setting & Milestones | Set targets (break 90, improve par-3 average) with progress tracking | Both |
+| Structured Weather Data | Replace free-text notes with temperature, wind, conditions fields | Both |
+| Tee Selection & Course Rating | Track which tees were played for accurate handicap calculations | Both |
+| Export & Share | PDF round cards, share stats on social media, CSV export | Both |
+
+## 13. Future Architecture Evolution
+
+The current architecture is designed for easy evolution:
 
 1. **Extract shared library**: Move `Models/` and `Services/` interfaces to a `GolfTrackerApp.Shared` class library
 2. **Dedicated API project**: Move `Controllers/` to `GolfTrackerApp.Api`, reference the shared library

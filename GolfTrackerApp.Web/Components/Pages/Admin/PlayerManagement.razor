@@ -1,0 +1,325 @@
+@page "/admin/players"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject ILogger<PlayerManagement> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>Player Management</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" />
+    Player Management
+</MudText>
+
+<MudButton Href="admin" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Class="mb-3">
+    Back to Admin Dashboard
+</MudButton>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Summary ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4">@totalPlayers</MudText>
+                    <MudText Typo="Typo.caption">Total Players</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Success">@linkedPlayers</MudText>
+                    <MudText Typo="Typo.caption">Linked to Account</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="4">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudText Typo="Typo.h4" Color="Color.Warning">@orphanedPlayers</MudText>
+                    <MudText Typo="Typo.caption">Unlinked (Managed)</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Search & Filter ===== *@
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="5" md="4">
+            <MudTextField @bind-Value="searchTerm" Label="Search by name" Variant="Variant.Outlined"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          OnKeyDown="@HandleSearchKeyDown" Immediate="false" />
+        </MudItem>
+        <MudItem xs="12" sm="4" md="2">
+            <MudSelect @bind-Value="linkFilter" Label="Link status" Variant="Variant.Outlined">
+                <MudSelectItem Value="@("All")">All</MudSelectItem>
+                <MudSelectItem Value="@("Linked")">Linked</MudSelectItem>
+                <MudSelectItem Value="@("Unlinked")">Unlinked</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" sm="3" md="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadPlayers" Class="mt-1"
+                       StartIcon="@Icons.Material.Filled.Search">
+                Search
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Players Table ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Handicap</th>
+                        <th>Linked User</th>
+                        <th>Created By</th>
+                        <th>Rounds</th>
+                        <th style="width: 150px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!players.Any())
+                    {
+                        <tr>
+                            <td colspan="7" style="text-align: center;">
+                                <MudText Typo="Typo.body2" Color="Color.Tertiary">No players found.</MudText>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var p in players)
+                    {
+                        <tr>
+                            <td>@p.PlayerId</td>
+                            <td><strong>@p.FirstName @p.LastName</strong></td>
+                            <td>@(p.Handicap?.ToString("F1") ?? "—")</td>
+                            <td>
+                                @if (p.ApplicationUser != null)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">@p.ApplicationUser.Email</MudChip>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Warning">Unlinked</MudText>
+                                }
+                            </td>
+                            <td>@(p.CreatedByApplicationUser?.Email ?? "—")</td>
+                            <td>@p.RoundCount</td>
+                            <td>
+                                @if (editingPlayerId == p.PlayerId)
+                                {
+                                    <MudButtonGroup OverrideStyles="false">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Save" Color="Color.Success"
+                                                       Size="Size.Small" OnClick="@(() => SavePlayer(p))" />
+                                        <MudIconButton Icon="@Icons.Material.Filled.Cancel" Color="Color.Default"
+                                                       Size="Size.Small" OnClick="CancelEdit" />
+                                    </MudButtonGroup>
+                                }
+                                else
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary"
+                                                   Size="Size.Small" OnClick="@(() => StartEdit(p))" />
+                                }
+                            </td>
+                        </tr>
+                        @if (editingPlayerId == p.PlayerId)
+                        {
+                            <tr>
+                                <td colspan="7">
+                                    <MudGrid Spacing="2" Class="pa-2">
+                                        <MudItem xs="12" sm="3">
+                                            <MudTextField @bind-Value="editFirstName" Label="First Name" Variant="Variant.Outlined" />
+                                        </MudItem>
+                                        <MudItem xs="12" sm="3">
+                                            <MudTextField @bind-Value="editLastName" Label="Last Name" Variant="Variant.Outlined" />
+                                        </MudItem>
+                                        <MudItem xs="12" sm="3">
+                                            <MudNumericField @bind-Value="editHandicap" Label="Handicap" Variant="Variant.Outlined"
+                                                             Step="0.1" Format="F1" />
+                                        </MudItem>
+                                    </MudGrid>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudCardContent>
+    </MudCard>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <MudAlert Severity="@statusSeverity" Class="mb-4" ShowCloseIcon="true" CloseIconClicked="@(() => statusMessage = null)">
+            @statusMessage
+        </MudAlert>
+    }
+}
+
+@code {
+    private bool loading = true;
+    private string searchTerm = string.Empty;
+    private string linkFilter = "All";
+    private string? statusMessage;
+    private Severity statusSeverity = Severity.Info;
+    private int totalPlayers;
+    private int linkedPlayers;
+    private int orphanedPlayers;
+
+    // Edit state
+    private int? editingPlayerId;
+    private string editFirstName = string.Empty;
+    private string editLastName = string.Empty;
+    private double? editHandicap;
+
+    private List<PlayerViewModel> players = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPlayers();
+        loading = false;
+    }
+
+    private async Task HandleSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await LoadPlayers();
+        }
+    }
+
+    private async Task LoadPlayers()
+    {
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+
+            totalPlayers = await context.Players.CountAsync();
+            linkedPlayers = await context.Players.CountAsync(p => p.ApplicationUserId != null);
+            orphanedPlayers = totalPlayers - linkedPlayers;
+
+            var query = context.Players
+                .Include(p => p.ApplicationUser)
+                .Include(p => p.CreatedByApplicationUser)
+                .AsNoTracking()
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.Trim().ToLower();
+                query = query.Where(p => p.FirstName.ToLower().Contains(term) || p.LastName.ToLower().Contains(term));
+            }
+
+            if (linkFilter == "Linked")
+                query = query.Where(p => p.ApplicationUserId != null);
+            else if (linkFilter == "Unlinked")
+                query = query.Where(p => p.ApplicationUserId == null);
+
+            var dbPlayers = await query.OrderBy(p => p.LastName).ThenBy(p => p.FirstName).Take(100).ToListAsync();
+
+            // Get round counts
+            var playerIds = dbPlayers.Select(p => p.PlayerId).ToList();
+            var roundCounts = await context.RoundPlayers
+                .Where(rp => playerIds.Contains(rp.PlayerId))
+                .GroupBy(rp => rp.PlayerId)
+                .Select(g => new { PlayerId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.PlayerId, x => x.Count);
+
+            players = dbPlayers.Select(p => new PlayerViewModel
+            {
+                PlayerId = p.PlayerId,
+                FirstName = p.FirstName,
+                LastName = p.LastName,
+                Handicap = p.Handicap,
+                ApplicationUser = p.ApplicationUser,
+                CreatedByApplicationUser = p.CreatedByApplicationUser,
+                RoundCount = roundCounts.GetValueOrDefault(p.PlayerId, 0)
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading players");
+            statusMessage = "Error loading players.";
+            statusSeverity = Severity.Error;
+        }
+    }
+
+    private void StartEdit(PlayerViewModel player)
+    {
+        editingPlayerId = player.PlayerId;
+        editFirstName = player.FirstName;
+        editLastName = player.LastName;
+        editHandicap = player.Handicap;
+    }
+
+    private void CancelEdit()
+    {
+        editingPlayerId = null;
+    }
+
+    private async Task SavePlayer(PlayerViewModel playerVm)
+    {
+        if (string.IsNullOrWhiteSpace(editFirstName) || string.IsNullOrWhiteSpace(editLastName))
+        {
+            statusMessage = "First name and last name are required.";
+            statusSeverity = Severity.Warning;
+            return;
+        }
+
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+            var player = await context.Players.FindAsync(playerVm.PlayerId);
+            if (player == null)
+            {
+                statusMessage = "Player not found.";
+                statusSeverity = Severity.Error;
+                return;
+            }
+
+            player.FirstName = editFirstName.Trim();
+            player.LastName = editLastName.Trim();
+            player.Handicap = editHandicap;
+
+            await context.SaveChangesAsync();
+
+            // Update local view
+            playerVm.FirstName = player.FirstName;
+            playerVm.LastName = player.LastName;
+            playerVm.Handicap = player.Handicap;
+
+            editingPlayerId = null;
+            statusMessage = $"Player {player.FirstName} {player.LastName} updated.";
+            statusSeverity = Severity.Success;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving player {PlayerId}", playerVm.PlayerId);
+            statusMessage = "Error saving player.";
+            statusSeverity = Severity.Error;
+        }
+    }
+
+    private class PlayerViewModel
+    {
+        public int PlayerId { get; set; }
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public double? Handicap { get; set; }
+        public ApplicationUser? ApplicationUser { get; set; }
+        public ApplicationUser? CreatedByApplicationUser { get; set; }
+        public int RoundCount { get; set; }
+    }
+}

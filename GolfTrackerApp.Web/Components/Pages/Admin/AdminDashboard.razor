@@ -1,0 +1,294 @@
+@page "/admin"
+@attribute [Authorize(Roles = "Admin")]
+
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<AdminDashboard> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Class="mr-2" />
+    Admin Dashboard
+</MudText>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== System Overview Cards ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@totalUsers</MudText>
+                    <MudText Typo="Typo.caption">Registered Users</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Info" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@totalPlayers</MudText>
+                    <MudText Typo="Typo.caption">Players</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Color="Color.Success" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@totalRounds</MudText>
+                    <MudText Typo="Typo.caption">Rounds Played</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.LocationCity" Color="Color.Warning" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@totalClubs</MudText>
+                    <MudText Typo="Typo.caption">Golf Clubs</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Map" Color="Color.Tertiary" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@totalCourses</MudText>
+                    <MudText Typo="Typo.caption">Golf Courses</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Link" Color="Color.Secondary" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@activeConnections</MudText>
+                    <MudText Typo="Typo.caption">Active Connections</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.MergeType" Color="Color.Info" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@pendingMerges</MudText>
+                    <MudText Typo="Typo.caption">Pending Merges</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h4" Class="mt-2">@aiCalls7d</MudText>
+                    <MudText Typo="Typo.caption">AI Calls (7d)</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Recent Activity & Quick Links ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">Recent Users</MudText>
+                    @if (recentUsers.Any())
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <thead>
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Linked Player</th>
+                                    <th>AI Opted Out</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var u in recentUsers)
+                                {
+                                    <tr>
+                                        <td>@u.Email</td>
+                                        <td>@(u.LinkedPlayer != null ? $"{u.LinkedPlayer.FirstName} {u.LinkedPlayer.LastName}" : "—")</td>
+                                        <td>
+                                            @if (u.AiInsightsOptOut)
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.DoNotDisturb" Color="Color.Error" Size="Size.Small" />
+                                            }
+                                            else
+                                            {
+                                                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small" />
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Tertiary">No users found.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">Content Overview</MudText>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <tbody>
+                            <tr><td>Clubs without courses</td><td><strong>@clubsWithoutCourses</strong></td></tr>
+                            <tr><td>Courses without holes</td><td><strong>@coursesWithoutHoles</strong></td></tr>
+                            <tr><td>Players without user account</td><td><strong>@orphanedPlayers</strong></td></tr>
+                            <tr><td>Pending connection requests</td><td><strong>@pendingConnections</strong></td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Admin Quick Navigation ===== *@
+    <MudText Typo="Typo.h6" Class="mb-3">Admin Tools</MudText>
+    <MudGrid Spacing="3" Class="mb-4">
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/users" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.ManageAccounts" Class="py-3">
+                User Management
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/players" Variant="Variant.Outlined" Color="Color.Info" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.People" Class="py-3">
+                Player Management
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/content-health" Variant="Variant.Outlined" Color="Color.Success" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.HealthAndSafety" Class="py-3">
+                Content Health
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/connections" Variant="Variant.Outlined" Color="Color.Secondary" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.Link" Class="py-3">
+                Connections &amp; Merges
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/audit" Variant="Variant.Outlined" Color="Color.Warning" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.History" Class="py-3">
+                Audit Trail
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/datamigration" Variant="Variant.Outlined" Color="Color.Tertiary" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.Storage" Class="py-3">
+                Data Migration
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/ai-providers" Variant="Variant.Outlined" Color="Color.Primary" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.SmartToy" Class="py-3">
+                AI Providers
+            </MudButton>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="4">
+            <MudButton Href="admin/ai-usage" Variant="Variant.Outlined" Color="Color.Info" FullWidth="true"
+                        StartIcon="@Icons.Material.Filled.Analytics" Class="py-3">
+                AI Usage
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool loading = true;
+
+    // System counts
+    private int totalUsers;
+    private int totalPlayers;
+    private int totalRounds;
+    private int totalClubs;
+    private int totalCourses;
+    private int activeConnections;
+    private int pendingMerges;
+    private int aiCalls7d;
+
+    // Content health
+    private int clubsWithoutCourses;
+    private int coursesWithoutHoles;
+    private int orphanedPlayers;
+    private int pendingConnections;
+
+    // Recent users
+    private List<ApplicationUser> recentUsers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+            var now = DateTime.UtcNow;
+
+            // Core counts
+            totalUsers = await context.Users.CountAsync();
+            totalPlayers = await context.Players.CountAsync();
+            totalRounds = await context.Rounds.CountAsync();
+            totalClubs = await context.GolfClubs.CountAsync();
+            totalCourses = await context.GolfCourses.CountAsync();
+
+            // Connection & merge counts
+            activeConnections = await context.PlayerConnections
+                .CountAsync(c => c.Status == ConnectionStatus.Accepted);
+            pendingConnections = await context.PlayerConnections
+                .CountAsync(c => c.Status == ConnectionStatus.Pending);
+            pendingMerges = await context.PlayerMergeRequests
+                .CountAsync(m => m.Status == MergeRequestStatus.Pending);
+
+            // AI calls
+            aiCalls7d = await context.AiAuditLogs
+                .CountAsync(a => a.RequestedAt >= now.AddDays(-7));
+
+            // Content health
+            clubsWithoutCourses = await context.GolfClubs
+                .CountAsync(c => !c.GolfCourses.Any());
+            coursesWithoutHoles = await context.GolfCourses
+                .CountAsync(c => !c.Holes.Any());
+            orphanedPlayers = await context.Players
+                .CountAsync(p => p.ApplicationUserId == null);
+
+            // Recent users (last 10)
+            recentUsers = await context.Users
+                .Include(u => u.LinkedPlayer)
+                .OrderByDescending(u => u.Id) // No CreatedAt on IdentityUser, use Id as proxy
+                .Take(10)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading admin dashboard");
+        }
+        finally
+        {
+            loading = false;
+        }
+    }
+}
