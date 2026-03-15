@@ -13,12 +13,33 @@
     <!-- Search and Add Actions -->
     <div class="d-flex align-center justify-space-between mb-3">
         <MudText Typo="Typo.h4" Color="Color.Primary">🏌️ Rounds</MudText>
-        <MudIconButton Icon="@Icons.Material.Filled.Add" 
-                      Color="Color.Primary" 
-                      Size="Size.Large"
-                      Href="/record-round" />
+        <div class="d-flex gap-1">
+            <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                      StartIcon="@Icons.Material.Filled.PlayArrow"
+                      Href="/live-round">Live</MudButton>
+            <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                          Color="Color.Primary" 
+                          Size="Size.Large"
+                          Href="/record-round" />
+        </div>
     </div>
     
+    @if (inProgressRounds?.Any() == true)
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mb-3" Icon="@Icons.Material.Filled.FiberManualRecord">
+            <div class="d-flex flex-column gap-1">
+                <MudText Typo="Typo.caption" Style="font-weight: 600;">In-Progress:</MudText>
+                @foreach (var r in inProgressRounds)
+                {
+                    <MudButton Variant="Variant.Text" Color="Color.Success" Size="Size.Small"
+                              OnClick="@(() => NavigationManager.NavigateTo($"/live-round/{r.RoundId}", forceLoad: false))">
+                        @r.CourseName (@r.DatePlayed.ToString("dd MMM")) — Resume
+                    </MudButton>
+                }
+            </div>
+        </MudAlert>
+    }
+
     <!-- Search Bar -->
     <MudPaper Class="pa-3 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border-radius: 12px;">
         <MudTextField @bind-Value="searchString" 
@@ -341,6 +362,7 @@
 @code {
     private List<RoundResponse>? rounds;
     private List<RoundResponse>? filteredRounds;
+    private List<RoundResponse>? inProgressRounds;
     private List<ScoreResponse>? apiScores;
     private Dictionary<int, bool> expandedPlayers = new();
     private bool loading = true;
@@ -376,6 +398,9 @@
                 .ToList();
             
             totalRounds = rounds?.Count ?? 0;
+            
+            // Track in-progress rounds for resume
+            inProgressRounds = rounds?.Where(r => r.Status == "InProgress").ToList();
             
             // Build available player names for filter
             availablePlayerNames = rounds?

@@ -18,10 +18,31 @@
 
 <div class="gp-list-header">
     <h4>Golf Rounds</h4>
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/rounds/record" Size="Size.Small">
-        Record Round
-    </MudButton>
+    <div class="d-flex gap-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PlayArrow" Href="/rounds/live" Size="Size.Small">
+            Live Round
+        </MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/rounds/record" Size="Size.Small">
+            Record Round
+        </MudButton>
+    </div>
 </div>
+
+@if (!isLoading && inProgressRounds?.Any() == true)
+{
+    <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Dense="true" Class="mb-3" Icon="@Icons.Material.Filled.FiberManualRecord">
+        <div class="d-flex align-center gap-2 flex-wrap">
+            <MudText Typo="Typo.body2" Style="font-weight: 600;">In-Progress Rounds:</MudText>
+            @foreach (var r in inProgressRounds)
+            {
+                <MudButton Variant="Variant.Text" Color="Color.Success" Size="Size.Small"
+                           Href="@($"/rounds/live/{r.RoundId}")">
+                    @r.GolfCourse?.Name (@r.DatePlayed.ToString("dd MMM")) — Resume
+                </MudButton>
+            }
+        </div>
+    </MudAlert>
+}
 
 @if (isLoading)
 {
@@ -139,6 +160,7 @@ else
 @code {
     private List<Round>? rounds;
     private List<Round>? filteredRounds;
+    private List<Round>? inProgressRounds;
     private List<Player> allPlayers = new();
     private bool isLoading = true;
     private string searchString = "";
@@ -168,6 +190,7 @@ else
         try
         {
             rounds = await RoundService.SearchRoundsAsync(_currentUserId, _isCurrentUserAdmin, searchString);
+            inProgressRounds = rounds?.Where(r => r.Status == RoundCompletionStatus.InProgress).ToList();
             ApplyFilters();
         }
         catch (Exception ex)

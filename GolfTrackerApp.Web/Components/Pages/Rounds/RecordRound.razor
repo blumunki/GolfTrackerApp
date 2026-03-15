@@ -735,7 +735,7 @@ else // This case means isInitialized is false (still loading initial data)
 
     private void NavigateToLiveRound()
     {
-        Snackbar.Add("Live round scoring is coming soon! For now, use the standard wizard.", Severity.Info);
+        NavigationManager.NavigateTo("/rounds/live");
     }
 
     private async Task HandleStepperInteraction(StepperInteractionEventArgs args)

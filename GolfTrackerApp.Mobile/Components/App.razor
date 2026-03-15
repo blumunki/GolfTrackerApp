@@ -46,6 +46,24 @@
                             <RecordRoundPage />
                             break;
                         }
+                    case "live-round":
+                        {
+                            <LiveRoundPage />
+                            break;
+                        }
+                    case var page when page.StartsWith("live-round/"):
+                        {
+                            var idStr = currentPage.Substring("live-round/".Length);
+                            if (int.TryParse(idStr, out var resumeRoundId))
+                            {
+                                <LiveRoundPage ResumeRoundId="@resumeRoundId" />
+                            }
+                            else
+                            {
+                                <LiveRoundPage />
+                            }
+                            break;
+                        }
                     case "players":
                         <PlayersPage />
                         break;

@@ -598,7 +598,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 
 | Feature | Description | Platform |
 |---------|-------------|----------|
-| Live Round Mode | Real-time scoring during play with auto-save (placeholder exists in web) | Both |
+| Live Round Mode | ✅ Done — Real-time hole-by-hole scoring with auto-save after each hole, resume capability, running totals, full scorecard view | Both |
 | Handicap Tracking | Formal handicap index calculation and history over time | Both |
 | Goal Setting & Milestones | Set targets (break 90, improve par-3 average) with progress tracking | Both |
 | Structured Weather Data | Replace free-text notes with temperature, wind, conditions fields | Both |

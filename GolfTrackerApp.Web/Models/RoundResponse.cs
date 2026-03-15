@@ -33,3 +33,17 @@ public class ScoreUpdateDto
     public int? Putts { get; set; }
     public bool? FairwayHit { get; set; }
 }
+
+public class HoleScoreUpdateDto
+{
+    public int PlayerId { get; set; }
+    public int HoleId { get; set; }
+    public int Strokes { get; set; }
+    public int? Putts { get; set; }
+    public bool? FairwayHit { get; set; }
+}
+
+public class RoundStatusUpdateDto
+{
+    public string Status { get; set; } = string.Empty;
+}

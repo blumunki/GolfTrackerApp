@@ -1,0 +1,876 @@
+@using GolfTrackerApp.Mobile.Models
+@using GolfTrackerApp.Mobile.Services
+@using GolfTrackerApp.Mobile.Services.Api
+@using MudBlazor
+@inject IRoundApiService RoundApiService
+@inject IGolfClubApiService GolfClubApiService
+@inject IGolfCourseApiService GolfCourseApiService
+@inject IPlayerApiService PlayerApiService
+@inject AuthenticationStateService AuthStateService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<style>
+    .live-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #059669;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+    .live-badge .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: white;
+        animation: livePulse 1.5s ease-in-out infinite;
+    }
+    @@keyframes livePulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+    }
+    .lr-header {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        color: white;
+        border-radius: 16px;
+        padding: 16px 20px;
+        margin-bottom: 16px;
+    }
+    .lr-hole-header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #2d3748 100%);
+        color: white;
+        border-radius: 16px 16px 0 0;
+        padding: 20px;
+    }
+    .lr-score-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        border: 1px solid #e5e7eb;
+        margin-bottom: 16px;
+        overflow: hidden;
+    }
+    .lr-player-score {
+        background: #f9fafb;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        padding: 12px 16px;
+        margin-bottom: 12px;
+    }
+    .lr-score-display {
+        font-size: 3rem;
+        font-weight: 800;
+        min-width: 80px;
+        text-align: center;
+        color: #1a1a2e;
+    }
+    .lr-setup-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        border: 1px solid #e5e7eb;
+    }
+    .lr-setup-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #f3f4f6;
+        font-weight: 600;
+        font-size: 1rem;
+        color: #1a1a2e;
+    }
+    .lr-scorecard-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+    }
+    .lr-scorecard-table th, .lr-scorecard-table td {
+        padding: 6px 4px;
+        text-align: center;
+        border: 1px solid #e5e7eb;
+    }
+    .lr-scorecard-table th {
+        background: #1a1a2e;
+        color: white;
+        font-weight: 600;
+    }
+    .lr-scorecard-table .current-hole-col {
+        border: 2px solid #059669;
+    }
+    .lr-navigation {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 16px;
+    }
+    .lr-save-indicator {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: #059669;
+        padding: 4px 0;
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="pa-4">
+    @if (_isLoading)
+    {
+        <div class="d-flex flex-column align-center justify-center" style="min-height: 300px;">
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+            <MudText Typo="Typo.body1" Class="mt-3">@_loadingMessage</MudText>
+        </div>
+    }
+    else if (_phase == LivePhase.Setup)
+    {
+        <!-- SETUP -->
+        <MudText Typo="Typo.h5" Class="mb-2" Style="font-weight: 700; color: #1a1a2e;">Live Round</MudText>
+
+        <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;">
+            <div class="d-flex align-center gap-2">
+                <div class="dot" style="width: 8px; height: 8px; border-radius: 50%; background: white; animation: livePulse 1.5s ease-in-out infinite;"></div>
+                <div>
+                    <MudText Typo="Typo.body2" Style="font-weight: 700; color: white;">Score as you play</MudText>
+                    <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.8);">Auto-saves after every hole</MudText>
+                </div>
+            </div>
+        </div>
+
+        <div class="lr-setup-card">
+            <div class="lr-setup-header">📅 When &amp; Where</div>
+            <MudDatePicker Label="Date Played" @bind-Date="_datePlayed" Required="true" MaxDate="DateTime.Today" />
+
+            <MudSelect T="int" Label="Golf Club" Value="_selectedClubId" ValueChanged="OnClubSelected"
+                      Required="true" Class="mt-4">
+                <MudSelectItem T="int" Value="0">Select a club...</MudSelectItem>
+                @foreach (var club in _golfClubs)
+                {
+                    <MudSelectItem T="int" Value="club.GolfClubId">@club.Name</MudSelectItem>
+                }
+            </MudSelect>
+
+            @if (_selectedClubId > 0)
+            {
+                <MudSelect T="int" Label="Golf Course" @bind-Value="_selectedCourseId"
+                          Required="true" Disabled="!_coursesForClub.Any()" Class="mt-4">
+                    <MudSelectItem T="int" Value="0">
+                        @(_coursesForClub.Any() ? "Select a course..." : "No courses available")
+                    </MudSelectItem>
+                    @foreach (var course in _coursesForClub)
+                    {
+                        <MudSelectItem T="int" Value="course.GolfCourseId">@course.Name</MudSelectItem>
+                    }
+                </MudSelect>
+            }
+
+            <MudSelect T="int" Label="Holes to Play" @bind-Value="_holesPlayed" Required="true" Class="mt-4">
+                <MudSelectItem T="int" Value="9">9 holes</MudSelectItem>
+                <MudSelectItem T="int" Value="18">18 holes</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="string" Label="Round Type" @bind-Value="_roundType" Required="true" Class="mt-4">
+                <MudSelectItem T="string" Value="@("Friendly")">Friendly</MudSelectItem>
+                <MudSelectItem T="string" Value="@("Competitive")">Competitive</MudSelectItem>
+            </MudSelect>
+
+            <MudTextField T="string" Label="Notes (optional)" @bind-Value="_notes" Lines="2" Class="mt-4" />
+        </div>
+
+        <div class="lr-setup-card">
+            <div class="lr-setup-header">👥 Players</div>
+            @if (_selectedPlayers.Any())
+            {
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var player in _selectedPlayers)
+                    {
+                        <MudChip T="string" Color="Color.Primary" OnClose="() => RemovePlayer(player)">
+                            @player.FullName
+                        </MudChip>
+                    }
+                </div>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">No players selected</MudText>
+            }
+
+            <MudSelect T="int?" Label="Add Player" Value="_playerToAdd" ValueChanged="OnPlayerToAddChanged" Class="mt-2">
+                <MudSelectItem T="int?" Value="null">Select a player...</MudSelectItem>
+                @foreach (var player in _availablePlayers.Where(p => !_selectedPlayers.Any(sp => sp.Id == p.Id)))
+                {
+                    <MudSelectItem T="int?" Value="player.Id">@player.FullName</MudSelectItem>
+                }
+            </MudSelect>
+        </div>
+
+        <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Size="Size.Large"
+                  StartIcon="@Icons.Material.Filled.PlayArrow"
+                  OnClick="StartLiveRound" Disabled="!CanStart()">
+            Tee Off — Start Live Round
+        </MudButton>
+    }
+    else if (_phase == LivePhase.Playing)
+    {
+        <!-- PLAYING -->
+        <div class="lr-header">
+            <div class="d-flex justify-space-between align-center">
+                <div class="d-flex align-center gap-2">
+                    <span class="live-badge"><span class="dot"></span> LIVE</span>
+                </div>
+                <MudIconButton Icon="@Icons.Material.Filled.ViewList" Color="Color.Inherit" Size="Size.Small"
+                              OnClick="() => _showScorecard = !_showScorecard" />
+            </div>
+            <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.8); margin-top: 4px;">@_courseName</MudText>
+            <MudProgressLinear Value="@((_currentHoleIndex + 1) * 100.0 / _holes.Count)" Color="Color.Warning"
+                             Style="margin-top: 8px;" Rounded="true" Size="Size.Small" />
+            <div class="d-flex justify-space-between mt-1">
+                <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.7);">
+                    Hole @(_currentHoleIndex + 1) of @_holes.Count
+                </MudText>
+                <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.7);">
+                    @GetRunningTotal()
+                </MudText>
+            </div>
+        </div>
+
+        @if (_isSaving)
+        {
+            <div class="lr-save-indicator">
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Color="Color.Success" Style="width: 14px; height: 14px;" />
+                <span>Saving...</span>
+            </div>
+        }
+        else if (_lastSaveSuccess)
+        {
+            <div class="lr-save-indicator">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Style="font-size: 14px;" Color="Color.Success" />
+                <span>Saved</span>
+            </div>
+        }
+
+        @if (_showScorecard)
+        {
+            <MudPaper Class="pa-3 mb-3" Elevation="2" Style="border-radius: 12px;">
+                <div class="d-flex justify-space-between align-center mb-2">
+                    <MudText Typo="Typo.subtitle1" Style="font-weight: 700;">Scorecard</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="() => _showScorecard = false" Size="Size.Small" />
+                </div>
+                <div style="overflow-x: auto;">
+                    <table class="lr-scorecard-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Hole</th>
+                                @foreach (var hole in _holes)
+                                {
+                                    <th class="@(_holes.IndexOf(hole) == _currentHoleIndex ? "current-hole-col" : "")">@hole.HoleNumber</th>
+                                }
+                                <th>Total</th>
+                            </tr>
+                            <tr>
+                                <th style="text-align: left; background: #374151;">Par</th>
+                                @foreach (var hole in _holes)
+                                {
+                                    <th style="background: #374151;">@hole.Par</th>
+                                }
+                                <th style="background: #374151;">@_holes.Sum(h => h.Par)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var player in _selectedPlayers)
+                            {
+                                <tr>
+                                    <td style="text-align: left; font-weight: 600; white-space: nowrap;">@player.FirstName</td>
+                                    @foreach (var hole in _holes)
+                                    {
+                                        var score = GetScore(player.Id, hole.HoleId);
+                                        <td class="@(_holes.IndexOf(hole) == _currentHoleIndex ? "current-hole-col" : "")"
+                                            style="@GetScoreCellStyle(score.Strokes, hole.Par)">
+                                            @(score.Strokes?.ToString() ?? "-")
+                                        </td>
+                                    }
+                                    <td style="font-weight: 700;">
+                                        @{
+                                            var playerTotal = _scores.Where(s => s.Key.playerId == player.Id && s.Value.Strokes.HasValue)
+                                                .Sum(s => s.Value.Strokes!.Value);
+                                        }
+                                        @(playerTotal > 0 ? playerTotal.ToString() : "-")
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </MudPaper>
+        }
+
+        @if (_currentHoleIndex < _holes.Count)
+        {
+            var currentHole = _holes[_currentHoleIndex];
+
+            <div class="lr-score-card">
+                <div class="lr-hole-header">
+                    <div class="d-flex justify-space-between align-center">
+                        <div>
+                            <MudText Typo="Typo.h4" Style="font-weight: 800; color: white;">Hole @currentHole.HoleNumber</MudText>
+                            <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.8);">Par @currentHole.Par@(currentHole.LengthYards.HasValue ? $" • {currentHole.LengthYards} yards" : "")</MudText>
+                        </div>
+                        <div style="text-align: right;">
+                            <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.6);">SI</MudText>
+                            <MudText Typo="Typo.h5" Style="font-weight: 700; color: white;">@currentHole.StrokeIndex</MudText>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pa-4">
+                    @foreach (var player in _selectedPlayers)
+                    {
+                        var score = GetScore(player.Id, currentHole.HoleId);
+                        var vsParText = score.ScoreVsPar.HasValue
+                            ? (score.ScoreVsPar.Value < 0 ? $"{score.ScoreVsPar.Value}" : score.ScoreVsPar.Value == 0 ? "Par" : $"+{score.ScoreVsPar.Value}")
+                            : "";
+                        var vsParColor = score.ScoreVsPar.HasValue
+                            ? (score.ScoreVsPar.Value < 0 ? Color.Success : score.ScoreVsPar.Value == 0 ? Color.Info : Color.Warning)
+                            : Color.Default;
+
+                        <div class="lr-player-score">
+                            <div class="d-flex justify-space-between align-center mb-2">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600; color: #1a1a2e;">
+                                    @player.FullName
+                                </MudText>
+                                @if (!string.IsNullOrEmpty(vsParText))
+                                {
+                                    <MudChip T="string" Color="vsParColor" Size="Size.Small">@vsParText</MudChip>
+                                }
+                            </div>
+
+                            <div class="d-flex align-center justify-center" style="gap: 16px; padding: 8px 0;">
+                                <MudIconButton Icon="@Icons.Material.Filled.Remove"
+                                              Color="Color.Primary" Size="Size.Large"
+                                              OnClick="() => AdjustStrokes(player.Id, currentHole.HoleId, -1)"
+                                              Disabled="!score.Strokes.HasValue || score.Strokes.Value <= 1" />
+
+                                <div class="lr-score-display">
+                                    @(score.Strokes?.ToString() ?? "-")
+                                </div>
+
+                                <MudIconButton Icon="@Icons.Material.Filled.Add"
+                                              Color="Color.Primary" Size="Size.Large"
+                                              OnClick="() => AdjustStrokes(player.Id, currentHole.HoleId, 1)" />
+                            </div>
+
+                            <div class="d-flex gap-2 mt-2">
+                                <MudNumericField T="int?" Label="Putts" @bind-Value="score.Putts"
+                                               Min="0" Max="10" Variant="Variant.Outlined"
+                                               HideSpinButtons="true" Style="max-width: 100px;" />
+                                @if (currentHole.Par > 3)
+                                {
+                                    <MudCheckBox T="bool?" Label="Fairway Hit" @bind-Value="score.FairwayHit" Color="Color.Primary" />
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="lr-navigation">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="PreviousHole"
+                          Disabled="_currentHoleIndex == 0"
+                          StartIcon="@Icons.Material.Filled.ArrowBack" Style="flex: 1;">
+                    Previous
+                </MudButton>
+
+                @if (_currentHoleIndex < _holes.Count - 1)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="NextHole"
+                              EndIcon="@Icons.Material.Filled.ArrowForward" Style="flex: 1;">
+                        Next Hole
+                    </MudButton>
+                }
+                else
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Success" OnClick="FinishRound"
+                              StartIcon="@Icons.Material.Filled.Flag" Style="flex: 1;">
+                        Finish Round
+                    </MudButton>
+                }
+            </div>
+        }
+    }
+    else if (_phase == LivePhase.Finished)
+    {
+        <!-- FINISHED -->
+        <div class="text-center" style="padding: 32px 16px;">
+            <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Style="font-size: 4rem; color: #059669;" />
+            <MudText Typo="Typo.h5" Class="mt-3" Style="font-weight: 700;">Round Complete!</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1 mb-4">@_courseName</MudText>
+
+            @foreach (var player in _selectedPlayers)
+            {
+                var total = _scores.Where(s => s.Key.playerId == player.Id && s.Value.Strokes.HasValue).Sum(s => s.Value.Strokes!.Value);
+                var par = _holes.Sum(h => h.Par);
+                var diff = total - par;
+                var diffText = diff < 0 ? diff.ToString() : diff == 0 ? "E" : $"+{diff}";
+
+                <MudPaper Class="pa-4 mb-3" Elevation="2" Style="border-radius: 12px;">
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@player.FullName</MudText>
+                        <div class="d-flex align-center gap-3">
+                            <MudText Typo="Typo.h5" Style="font-weight: 800;">@total</MudText>
+                            <MudChip T="string" Color="@(diff < 0 ? Color.Success : diff == 0 ? Color.Info : Color.Warning)" Size="Size.Small">@diffText</MudChip>
+                        </div>
+                    </div>
+                </MudPaper>
+            }
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Class="mt-4"
+                      OnClick="@(() => Navigation.NavigateTo("/rounds", forceLoad: true))">
+                View All Rounds
+            </MudButton>
+        </div>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public int? ResumeRoundId { get; set; }
+
+    private enum LivePhase { Setup, Playing, Finished }
+    private LivePhase _phase = LivePhase.Setup;
+
+    private bool _isLoading = true;
+    private string _loadingMessage = "Loading...";
+    private bool _isSaving;
+    private bool _lastSaveSuccess;
+    private bool _showScorecard;
+
+    // Setup
+    private DateTime? _datePlayed = DateTime.Today;
+    private int _selectedClubId;
+    private int _selectedCourseId;
+    private int _holesPlayed = 18;
+    private string _roundType = "Friendly";
+    private string? _notes;
+    private List<GolfClub> _golfClubs = new();
+    private List<GolfCourse> _coursesForClub = new();
+    private List<Player> _availablePlayers = new();
+    private List<Player> _selectedPlayers = new();
+    private int? _playerToAdd;
+
+    // Playing
+    private int _liveRoundId;
+    private string _courseName = "";
+    private List<CourseHole> _holes = new();
+    private Dictionary<(int playerId, int holeId), HoleScoreEntry> _scores = new();
+    private int _currentHoleIndex;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var clubsTask = GolfClubApiService.GetAllGolfClubsAsync();
+            var playersTask = PlayerApiService.GetAllPlayersAsync();
+            await Task.WhenAll(clubsTask, playersTask);
+
+            _golfClubs = await clubsTask;
+            _availablePlayers = await playersTask;
+
+            // Auto-select current player
+            var currentPlayerId = AuthStateService.PlayerId;
+            if (currentPlayerId.HasValue)
+            {
+                var currentPlayer = _availablePlayers.FirstOrDefault(p => p.Id == currentPlayerId.Value);
+                if (currentPlayer != null) _selectedPlayers.Add(currentPlayer);
+            }
+
+            if (ResumeRoundId.HasValue)
+            {
+                _loadingMessage = "Resuming round...";
+                StateHasChanged();
+                await ResumeRound(ResumeRoundId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -- Setup --
+
+    private async Task OnClubSelected(int clubId)
+    {
+        _selectedClubId = clubId;
+        _selectedCourseId = 0;
+        _coursesForClub.Clear();
+        if (clubId > 0)
+        {
+            _coursesForClub = await GolfCourseApiService.GetCoursesForClubAsync(clubId);
+        }
+        StateHasChanged();
+    }
+
+    private void RemovePlayer(Player player) => _selectedPlayers.Remove(player);
+
+    private void OnPlayerToAddChanged(int? playerId)
+    {
+        if (playerId.HasValue)
+        {
+            var player = _availablePlayers.FirstOrDefault(p => p.Id == playerId.Value);
+            if (player != null && !_selectedPlayers.Any(p => p.Id == player.Id))
+                _selectedPlayers.Add(player);
+        }
+        _playerToAdd = null;
+    }
+
+    private bool CanStart() => _datePlayed.HasValue && _selectedCourseId > 0 && _selectedPlayers.Any();
+
+    // -- Start --
+
+    private async Task StartLiveRound()
+    {
+        if (!CanStart()) return;
+
+        try
+        {
+            _isLoading = true;
+            _loadingMessage = "Creating live round...";
+            StateHasChanged();
+
+            // Load course holes
+            var courseDetail = await GolfCourseApiService.GetGolfCourseByIdAsync(_selectedCourseId);
+            if (courseDetail == null || !courseDetail.Holes.Any())
+            {
+                Snackbar.Add("Course has no holes configured.", Severity.Error);
+                _isLoading = false;
+                return;
+            }
+
+            _holes = courseDetail.Holes.OrderBy(h => h.HoleNumber).Take(_holesPlayed).ToList();
+            _courseName = courseDetail.Name;
+
+            // Create round as InProgress (no scores yet)
+            var request = new CreateRoundRequest
+            {
+                GolfCourseId = _selectedCourseId,
+                DatePlayed = _datePlayed!.Value,
+                StartingHole = 1,
+                HolesPlayed = _holesPlayed,
+                RoundType = Enum.TryParse<RoundTypeOption>(_roundType, out var rt) ? rt : RoundTypeOption.Friendly,
+                Notes = _notes,
+                Status = RoundCompletionStatus.InProgress,
+                CreatedByApplicationUserId = AuthStateService.UserId ?? string.Empty,
+                RoundPlayers = _selectedPlayers.Select(p => new CreateRoundPlayerRequest { PlayerId = p.Id }).ToList(),
+                Scores = new List<CreateScoreRequest>() // Empty — scores saved hole by hole
+            };
+
+            var result = await RoundApiService.CreateRoundAsync(request);
+            if (result == null)
+            {
+                Snackbar.Add("Failed to create round.", Severity.Error);
+                _isLoading = false;
+                return;
+            }
+
+            _liveRoundId = result.RoundId;
+            InitializeScores();
+            _currentHoleIndex = 0;
+            _phase = LivePhase.Playing;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error starting round: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -- Resume --
+
+    private async Task ResumeRound(int roundId)
+    {
+        try
+        {
+            var round = await RoundApiService.GetRoundByIdAsync(roundId);
+            if (round == null)
+            {
+                Snackbar.Add("Round not found.", Severity.Error);
+                return;
+            }
+
+            _liveRoundId = round.RoundId;
+            _courseName = round.CourseName;
+
+            // Load course holes
+            var courseDetail = await GolfCourseApiService.GetGolfCourseByIdAsync(round.GolfCourseId);
+            if (courseDetail != null)
+            {
+                _holes = courseDetail.Holes.OrderBy(h => h.HoleNumber).Take(round.HolesPlayed).ToList();
+            }
+
+            // Rebuild players from existing scores
+            var scores = await RoundApiService.GetRoundScoresAsync(roundId);
+            var playerIds = scores.Select(s => s.PlayerId).Distinct().ToList();
+            _selectedPlayers = _availablePlayers.Where(p => playerIds.Contains(p.Id)).ToList();
+
+            // If no scores yet, use playing partners from round
+            if (!_selectedPlayers.Any())
+            {
+                // Fallback: at minimum add the current user
+                var currentPlayerId = AuthStateService.PlayerId;
+                if (currentPlayerId.HasValue)
+                {
+                    var me = _availablePlayers.FirstOrDefault(p => p.Id == currentPlayerId.Value);
+                    if (me != null) _selectedPlayers.Add(me);
+                }
+            }
+
+            InitializeScores();
+
+            // Load existing scores
+            int lastScoredHoleIndex = -1;
+            foreach (var s in scores)
+            {
+                var key = (s.PlayerId, s.HoleId);
+                if (_scores.ContainsKey(key))
+                {
+                    _scores[key].Strokes = s.Strokes;
+                    _scores[key].Putts = s.Putts;
+                    _scores[key].FairwayHit = s.FairwayHit;
+
+                    var holeIdx = _holes.FindIndex(h => h.HoleId == s.HoleId);
+                    if (holeIdx > lastScoredHoleIndex) lastScoredHoleIndex = holeIdx;
+                }
+            }
+
+            _currentHoleIndex = lastScoredHoleIndex >= 0 ? Math.Min(lastScoredHoleIndex + 1, _holes.Count - 1) : 0;
+
+            if (round.RoundType == "Completed")
+            {
+                Navigation.NavigateTo($"/rounds/{_liveRoundId}", forceLoad: false);
+                return;
+            }
+            else
+            {
+                _phase = LivePhase.Playing;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error resuming round: {ex.Message}", Severity.Error);
+        }
+    }
+
+    // -- Score Helpers --
+
+    private void InitializeScores()
+    {
+        _scores.Clear();
+        foreach (var player in _selectedPlayers)
+        {
+            foreach (var hole in _holes)
+            {
+                _scores[(player.Id, hole.HoleId)] = new HoleScoreEntry
+                {
+                    HoleId = hole.HoleId,
+                    HoleNumber = hole.HoleNumber,
+                    Par = hole.Par,
+                    StrokeIndex = hole.StrokeIndex
+                };
+            }
+        }
+    }
+
+    private HoleScoreEntry GetScore(int playerId, int holeId)
+    {
+        if (!_scores.ContainsKey((playerId, holeId)))
+        {
+            var hole = _holes.FirstOrDefault(h => h.HoleId == holeId);
+            _scores[(playerId, holeId)] = new HoleScoreEntry
+            {
+                HoleId = holeId,
+                HoleNumber = hole?.HoleNumber ?? 0,
+                Par = hole?.Par ?? 4,
+                StrokeIndex = hole?.StrokeIndex ?? 0
+            };
+        }
+        return _scores[(playerId, holeId)];
+    }
+
+    private void AdjustStrokes(int playerId, int holeId, int delta)
+    {
+        var score = GetScore(playerId, holeId);
+        if (!score.Strokes.HasValue)
+        {
+            score.Strokes = score.Par + (delta > 0 ? 0 : -1);
+            if (score.Strokes < 1) score.Strokes = 1;
+        }
+        else
+        {
+            var newVal = score.Strokes.Value + delta;
+            if (newVal >= 1) score.Strokes = newVal;
+        }
+    }
+
+    // -- Navigation --
+
+    private async Task NextHole()
+    {
+        await AutoSaveCurrentHole();
+        if (_currentHoleIndex < _holes.Count - 1)
+            _currentHoleIndex++;
+    }
+
+    private async Task PreviousHole()
+    {
+        await AutoSaveCurrentHole();
+        if (_currentHoleIndex > 0)
+            _currentHoleIndex--;
+    }
+
+    private async Task AutoSaveCurrentHole()
+    {
+        if (_liveRoundId == 0) return;
+
+        var currentHole = _holes[_currentHoleIndex];
+        var holeScores = new List<HoleScoreUpdateRequest>();
+
+        foreach (var player in _selectedPlayers)
+        {
+            var score = GetScore(player.Id, currentHole.HoleId);
+            if (score.Strokes.HasValue)
+            {
+                holeScores.Add(new HoleScoreUpdateRequest
+                {
+                    PlayerId = player.Id,
+                    HoleId = currentHole.HoleId,
+                    Strokes = score.Strokes.Value,
+                    Putts = score.Putts,
+                    FairwayHit = score.FairwayHit
+                });
+            }
+        }
+
+        if (holeScores.Any())
+        {
+            try
+            {
+                _isSaving = true;
+                _lastSaveSuccess = false;
+                StateHasChanged();
+
+                var success = await RoundApiService.SaveHoleScoresAsync(_liveRoundId, holeScores);
+                _lastSaveSuccess = success;
+
+                if (!success)
+                {
+                    Snackbar.Add("Auto-save failed. Scores still tracked locally.", Severity.Warning);
+                }
+            }
+            catch
+            {
+                Snackbar.Add("Auto-save failed. Scores still tracked locally.", Severity.Warning);
+            }
+            finally
+            {
+                _isSaving = false;
+            }
+        }
+    }
+
+    private async Task FinishRound()
+    {
+        try
+        {
+            _isLoading = true;
+            _loadingMessage = "Finishing round...";
+            StateHasChanged();
+
+            // Save current hole
+            await AutoSaveCurrentHole();
+
+            // Save all remaining holes that have scores
+            for (int i = 0; i < _holes.Count; i++)
+            {
+                if (i == _currentHoleIndex) continue;
+                var hole = _holes[i];
+                var holeScores = new List<HoleScoreUpdateRequest>();
+                foreach (var player in _selectedPlayers)
+                {
+                    var score = GetScore(player.Id, hole.HoleId);
+                    if (score.Strokes.HasValue)
+                    {
+                        holeScores.Add(new HoleScoreUpdateRequest
+                        {
+                            PlayerId = player.Id,
+                            HoleId = hole.HoleId,
+                            Strokes = score.Strokes.Value,
+                            Putts = score.Putts,
+                            FairwayHit = score.FairwayHit
+                        });
+                    }
+                }
+                if (holeScores.Any())
+                {
+                    await RoundApiService.SaveHoleScoresAsync(_liveRoundId, holeScores);
+                }
+            }
+
+            // Mark as completed
+            await RoundApiService.UpdateRoundStatusAsync(_liveRoundId, "Completed");
+
+            Snackbar.Add("Round completed!", Severity.Success);
+            Navigation.NavigateTo($"/rounds/{_liveRoundId}", forceLoad: false);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error finishing round: {ex.Message}", Severity.Error);
+            _phase = LivePhase.Playing;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // -- Display Helpers --
+
+    private string GetRunningTotal()
+    {
+        if (!_selectedPlayers.Any()) return "";
+        var firstPlayer = _selectedPlayers.First();
+        var scoredEntries = _scores.Where(s => s.Key.playerId == firstPlayer.Id && s.Value.Strokes.HasValue).ToList();
+        if (!scoredEntries.Any()) return "";
+
+        var totalStrokes = scoredEntries.Sum(s => s.Value.Strokes!.Value);
+        var totalPar = scoredEntries.Sum(s => s.Value.Par);
+        var diff = totalStrokes - totalPar;
+        var diffText = diff < 0 ? diff.ToString() : diff == 0 ? "E" : $"+{diff}";
+        return $"{totalStrokes} ({diffText})";
+    }
+
+    private string GetScoreCellStyle(int? strokes, int par)
+    {
+        if (!strokes.HasValue) return "";
+        var diff = strokes.Value - par;
+        return diff switch
+        {
+            <= -2 => "background: #fbbf24; color: white; font-weight: 700;",
+            -1 => "background: #dcfce7; font-weight: 600;",
+            0 => "font-weight: 600;",
+            1 => "background: #fee2e2; font-weight: 600;",
+            _ => "background: #fca5a5; font-weight: 700;"
+        };
+    }
+}

@@ -53,6 +53,7 @@ public class RoundsController : BaseApiController
             var rounds = roundEntities.Select(r => new
                 {
                     RoundId = r.RoundId,
+                    GolfCourseId = r.GolfCourseId,
                     CourseName = r.GolfCourse?.Name ?? "Unknown",
                     ClubName = r.GolfCourse?.GolfClub?.Name ?? "Unknown",
                     DatePlayed = r.DatePlayed,
@@ -63,6 +64,7 @@ public class RoundsController : BaseApiController
                     HolesPlayed = r.HolesPlayed,
                     PlayerCount = r.RoundPlayers.Count,
                     RoundType = r.RoundType.ToString(),
+                    Status = r.Status.ToString(),
                     PlayingPartners = r.RoundPlayers.Select(rp => rp.Player != null ? $"{rp.Player.FirstName} {rp.Player.LastName}" : "Unknown").ToList(),
                     Weather = "",
                     Notes = r.Notes ?? ""
@@ -348,6 +350,81 @@ public class RoundsController : BaseApiController
         {
             _logger.LogError(ex, "Error deleting round {RoundId}", id);
             return StatusCode(500, "An error occurred while deleting the round");
+        }
+    }
+
+    // --- Live Round Endpoints ---
+
+    [HttpPut("{id}/scores/hole")]
+    public async Task<ActionResult> SaveHoleScores(int id, [FromBody] List<HoleScoreUpdateDto> holeScores)
+    {
+        try
+        {
+            var round = await _context.Rounds.FirstOrDefaultAsync(r => r.RoundId == id);
+            if (round == null)
+                return NotFound($"Round with ID {id} not found");
+            if (round.CreatedByApplicationUserId != GetCurrentUserId())
+                return Forbid();
+
+            var existingScores = await _context.Scores.Where(s => s.RoundId == id).ToListAsync();
+
+            foreach (var update in holeScores)
+            {
+                var existing = existingScores.FirstOrDefault(s => s.PlayerId == update.PlayerId && s.HoleId == update.HoleId);
+                if (existing != null)
+                {
+                    existing.Strokes = update.Strokes;
+                    existing.Putts = update.Putts;
+                    existing.FairwayHit = update.FairwayHit;
+                }
+                else
+                {
+                    _context.Scores.Add(new Score
+                    {
+                        RoundId = id,
+                        PlayerId = update.PlayerId,
+                        HoleId = update.HoleId,
+                        Strokes = update.Strokes,
+                        Putts = update.Putts,
+                        FairwayHit = update.FairwayHit
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving hole scores for round {RoundId}", id);
+            return StatusCode(500, "An error occurred while saving hole scores");
+        }
+    }
+
+    [HttpPut("{id}/status")]
+    public async Task<ActionResult> UpdateRoundStatus(int id, [FromBody] RoundStatusUpdateDto statusUpdate)
+    {
+        try
+        {
+            var round = await _context.Rounds.FirstOrDefaultAsync(r => r.RoundId == id);
+            if (round == null)
+                return NotFound($"Round with ID {id} not found");
+            if (round.CreatedByApplicationUserId != GetCurrentUserId())
+                return Forbid();
+
+            if (Enum.TryParse<RoundCompletionStatus>(statusUpdate.Status, out var status))
+            {
+                round.Status = status;
+                await _context.SaveChangesAsync();
+                return Ok();
+            }
+
+            return BadRequest("Invalid status value");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating status for round {RoundId}", id);
+            return StatusCode(500, "An error occurred while updating round status");
         }
     }
 }

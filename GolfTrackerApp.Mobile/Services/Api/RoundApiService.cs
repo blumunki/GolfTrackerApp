@@ -12,6 +12,7 @@ namespace GolfTrackerApp.Mobile.Services.Api;
 public class RoundResponse
 {
     public int RoundId { get; set; }
+    public int GolfCourseId { get; set; }
     public DateTime DatePlayed { get; set; }
     public string CourseName { get; set; } = string.Empty;
     public string ClubName { get; set; } = string.Empty;
@@ -21,6 +22,7 @@ public class RoundResponse
     public string? Notes { get; set; }
     public int PlayerCount { get; set; }
     public string RoundType { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
     public string? CreatedByApplicationUserId { get; set; }
     public List<string> PlayingPartners { get; set; } = new();
 }
@@ -61,6 +63,20 @@ public class ScoreUpdateRequest
     public bool? FairwayHit { get; set; }
 }
 
+public class HoleScoreUpdateRequest
+{
+    public int PlayerId { get; set; }
+    public int HoleId { get; set; }
+    public int Strokes { get; set; }
+    public int? Putts { get; set; }
+    public bool? FairwayHit { get; set; }
+}
+
+public class RoundStatusUpdateRequest
+{
+    public string Status { get; set; } = string.Empty;
+}
+
 public interface IRoundApiService
 {
     Task<List<RoundResponse>> GetAllRoundsAsync();
@@ -69,6 +85,8 @@ public interface IRoundApiService
     Task<List<ScoreResponse>> GetRoundScoresAsync(int roundId);
     Task<RoundResponse?> CreateRoundAsync(CreateRoundRequest request);
     Task<bool> UpdateScoresAsync(int roundId, List<ScoreUpdateRequest> scores);
+    Task<bool> SaveHoleScoresAsync(int roundId, List<HoleScoreUpdateRequest> holeScores);
+    Task<bool> UpdateRoundStatusAsync(int roundId, string status);
     Task<bool> DeleteRoundAsync(int id);
 }
 
@@ -242,6 +260,41 @@ public class RoundApiService : IRoundApiService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating scores for round {RoundId}", roundId);
+            return false;
+        }
+    }
+
+    public async Task<bool> SaveHoleScoresAsync(int roundId, List<HoleScoreUpdateRequest> holeScores)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var json = JsonSerializer.Serialize(holeScores, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"api/rounds/{roundId}/scores/hole", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error saving hole scores for round {RoundId}", roundId);
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateRoundStatusAsync(int roundId, string status)
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+            var payload = new RoundStatusUpdateRequest { Status = status };
+            var json = JsonSerializer.Serialize(payload, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"api/rounds/{roundId}/status", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating status for round {RoundId}", roundId);
             return false;
         }
     }
