@@ -10,6 +10,9 @@
 
   <ItemGroup>
     <None Update="Data/golfapp.db" CopyToOutputDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    <Content Include="Data/GolfClubs.csv" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Data/GolfCourses.csv" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Data/Holes.csv" CopyToOutputDirectory="PreserveNewest" />
     <None Update="web.config" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -3,6 +3,7 @@
 @inject NavigationManager NavigationManager
 @inject IServiceScopeFactory ServiceScopeFactory // For resolving services in a long-running task
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IWebHostEnvironment WebHostEnvironment
 
 @using System.IO
 @using System.Globalization
@@ -14,6 +15,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Hosting
 @using Microsoft.EntityFrameworkCore
 @using System.Security.Claims // For ClaimTypes
 
@@ -23,6 +25,32 @@
 
 <MudText Typo="Typo.h4" Class="mb-2">Data Migration Utility</MudText>
 <MudText Typo="Typo.body2" Class="mb-4"><strong>Important:</strong> Upload files in the specified order. Ensure CSV files are UTF-8 encoded.</MudText>
+
+<MudPaper Class="pa-4 mb-6" Outlined="true" Style="border-color: var(--mud-palette-primary); border-width: 2px;">
+    <MudText Typo="Typo.h5" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Sync" Class="mr-1" /> Quick Sync Reference Data
+    </MudText>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        Reads <strong>GolfClubs.csv</strong>, <strong>GolfCourses.csv</strong>, and <strong>Holes.csv</strong> from the Data folder
+        and imports any new records. Existing data is left untouched — safe to run repeatedly.
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+               OnClick="SyncReferenceData" Disabled="@isSyncingReferenceData"
+               StartIcon="@Icons.Material.Filled.CloudSync">
+        @(isSyncingReferenceData ? "Syncing..." : "Sync Clubs, Courses & Holes")
+    </MudButton>
+    @if (isSyncingReferenceData)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2" />
+    }
+    @if (!string.IsNullOrEmpty(syncReferenceDataLog))
+    {
+        <pre class="log-output" style="max-height: 400px; overflow-y: auto;">@syncReferenceDataLog</pre>
+    }
+</MudPaper>
+
+<MudDivider Class="mb-4" />
+<MudText Typo="Typo.h5" Class="mb-4">Manual CSV Upload (One-Time Migration)</MudText>
 
 <MudPaper Class="pa-4 mb-4" Outlined="true">
     <MudText Typo="Typo.h6">1. Import Golf Clubs</MudText>
@@ -109,6 +137,266 @@
 
     private string _migrationAdminUserId = string.Empty;
     private bool _isMigrationAdmin = true; // Since page is [Authorize(Roles="Admin")]
+
+    // Quick Sync fields
+    private bool isSyncingReferenceData = false;
+    private string syncReferenceDataLog = string.Empty;
+
+    private async Task SyncReferenceData()
+    {
+        isSyncingReferenceData = true;
+        syncReferenceDataLog = string.Empty;
+        var log = new System.Text.StringBuilder();
+        StateHasChanged();
+
+        try
+        {
+            var dataPath = Path.Combine(WebHostEnvironment.ContentRootPath, "Data");
+
+            // --- 1. Sync Golf Clubs ---
+            var clubsFile = Path.Combine(dataPath, "GolfClubs.csv");
+            if (File.Exists(clubsFile))
+            {
+                log.AppendLine("=== Syncing Golf Clubs ===");
+                await SyncGolfClubsFromFile(clubsFile, log);
+            }
+            else
+            {
+                log.AppendLine($"⚠ GolfClubs.csv not found at: {clubsFile}");
+            }
+
+            syncReferenceDataLog = log.ToString();
+            StateHasChanged();
+
+            // --- 2. Sync Golf Courses ---
+            var coursesFile = Path.Combine(dataPath, "GolfCourses.csv");
+            if (File.Exists(coursesFile))
+            {
+                log.AppendLine("\n=== Syncing Golf Courses ===");
+                await SyncGolfCoursesFromFile(coursesFile, log);
+            }
+            else
+            {
+                log.AppendLine($"⚠ GolfCourses.csv not found at: {coursesFile}");
+            }
+
+            syncReferenceDataLog = log.ToString();
+            StateHasChanged();
+
+            // --- 3. Sync Holes ---
+            var holesFile2 = Path.Combine(dataPath, "Holes.csv");
+            if (File.Exists(holesFile2))
+            {
+                log.AppendLine("\n=== Syncing Holes ===");
+                await SyncHolesFromFile(holesFile2, log);
+            }
+            else
+            {
+                log.AppendLine($"⚠ Holes.csv not found at: {holesFile2}");
+            }
+
+            log.AppendLine("\n✅ Reference data sync complete.");
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\n❌ FATAL ERROR: {ex.Message}");
+        }
+        finally
+        {
+            syncReferenceDataLog = log.ToString();
+            isSyncingReferenceData = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SyncGolfClubsFromFile(string filePath, System.Text.StringBuilder log)
+    {
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var golfClubService = scope.ServiceProvider.GetRequiredService<IGolfClubService>();
+        var existingClubNames = (await golfClubService.GetAllGolfClubsAsync())
+            .Select(gc => gc.Name.ToLowerInvariant()).ToHashSet();
+
+        int added = 0, skipped = 0;
+
+        using var stream = File.OpenRead(filePath);
+        using var reader = new StreamReader(stream);
+        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+        });
+
+        await foreach (var record in csv.GetRecordsAsync<GolfClubCsvRecord>())
+        {
+            if (string.IsNullOrWhiteSpace(record.Name))
+            {
+                log.AppendLine("  Skipped row: Club Name is missing.");
+                skipped++;
+                continue;
+            }
+
+            if (existingClubNames.Contains(record.Name.ToLowerInvariant()))
+            {
+                skipped++;
+                continue;
+            }
+
+            var newClub = new GolfClub
+            {
+                Name = record.Name,
+                AddressLine1 = record.AddressLine1,
+                AddressLine2 = record.AddressLine2,
+                City = record.City,
+                CountyOrRegion = record.CountyOrRegion,
+                Postcode = record.Postcode,
+                Country = record.Country,
+                Website = record.Website
+            };
+            await golfClubService.AddGolfClubAsync(newClub);
+            existingClubNames.Add(newClub.Name.ToLowerInvariant());
+            added++;
+            log.AppendLine($"  ✚ Added club: {newClub.Name}");
+        }
+
+        log.AppendLine($"  Clubs: {added} added, {skipped} already exist");
+    }
+
+    private async Task SyncGolfCoursesFromFile(string filePath, System.Text.StringBuilder log)
+    {
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var golfCourseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+        var golfClubService = scope.ServiceProvider.GetRequiredService<IGolfClubService>();
+
+        var clubNameToId = (await golfClubService.GetAllGolfClubsAsync())
+            .ToDictionary(gc => gc.Name.ToLowerInvariant(), gc => gc.GolfClubId);
+
+        var existingCourses = (await golfCourseService.GetAllGolfCoursesAsync())
+            .Select(c => $"{c.GolfClubId}_{c.Name.ToLowerInvariant()}")
+            .ToHashSet();
+
+        int added = 0, skipped = 0;
+
+        using var stream = File.OpenRead(filePath);
+        using var reader = new StreamReader(stream);
+        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+        });
+
+        await foreach (var record in csv.GetRecordsAsync<GolfCourseCsvRecord>())
+        {
+            if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName))
+            {
+                log.AppendLine("  Skipped row: Course Name or Club Name is missing.");
+                skipped++;
+                continue;
+            }
+
+            if (!clubNameToId.TryGetValue(record.ClubName.ToLowerInvariant(), out var clubId))
+            {
+                log.AppendLine($"  ⚠ Club '{record.ClubName}' not found for course '{record.CourseName}' — sync clubs first.");
+                skipped++;
+                continue;
+            }
+
+            var key = $"{clubId}_{record.CourseName.ToLowerInvariant()}";
+            if (existingCourses.Contains(key))
+            {
+                skipped++;
+                continue;
+            }
+
+            var newCourse = new GolfCourse
+            {
+                GolfClubId = clubId,
+                Name = record.CourseName,
+                DefaultPar = record.DefaultPar,
+                NumberOfHoles = record.NumberOfHoles <= 0 ? 18 : record.NumberOfHoles
+            };
+            await golfCourseService.AddGolfCourseAsync(newCourse);
+            existingCourses.Add(key);
+            added++;
+            log.AppendLine($"  ✚ Added course: {record.CourseName} (Club: {record.ClubName})");
+        }
+
+        log.AppendLine($"  Courses: {added} added, {skipped} already exist");
+    }
+
+    private async Task SyncHolesFromFile(string filePath, System.Text.StringBuilder log)
+    {
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var holeService = scope.ServiceProvider.GetRequiredService<IHoleService>();
+        var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+
+        var courses = await courseService.GetAllGolfCoursesAsync();
+        var courseLookup = courses.ToDictionary(
+            c => $"{(c.GolfClub?.Name ?? "").ToLowerInvariant()}_{c.Name.ToLowerInvariant()}",
+            c => c.GolfCourseId
+        );
+
+        var existingHoles = new HashSet<string>();
+        foreach (var course in courses)
+        {
+            var holes = await holeService.GetHolesForCourseAsync(course.GolfCourseId);
+            foreach (var hole in holes)
+                existingHoles.Add($"{hole.GolfCourseId}_{hole.HoleNumber}");
+        }
+
+        int added = 0, skipped = 0;
+
+        using var stream = File.OpenRead(filePath);
+        using var reader = new StreamReader(stream);
+        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+        });
+
+        await foreach (var record in csv.GetRecordsAsync<HoleCsvRecord>())
+        {
+            if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName)
+                || record.HoleNumber <= 0 || record.Par <= 0)
+            {
+                log.AppendLine($"  Skipped row: invalid data — Club: '{record.ClubName}', Course: '{record.CourseName}', Hole: {record.HoleNumber}");
+                skipped++;
+                continue;
+            }
+
+            var courseKey = $"{record.ClubName.ToLowerInvariant()}_{record.CourseName.ToLowerInvariant()}";
+            if (!courseLookup.TryGetValue(courseKey, out var courseId))
+            {
+                log.AppendLine($"  ⚠ Course '{record.CourseName}' (Club: {record.ClubName}) not found — sync courses first.");
+                skipped++;
+                continue;
+            }
+
+            var holeKey = $"{courseId}_{record.HoleNumber}";
+            if (existingHoles.Contains(holeKey))
+            {
+                skipped++;
+                continue;
+            }
+
+            var newHole = new Hole
+            {
+                GolfCourseId = courseId,
+                HoleNumber = record.HoleNumber,
+                Par = record.Par,
+                StrokeIndex = record.StrokeIndex,
+                LengthYards = record.LengthYards
+            };
+            await holeService.AddHoleAsync(newHole);
+            existingHoles.Add(holeKey);
+            added++;
+            log.AppendLine($"  ✚ Added hole {record.HoleNumber} for {record.CourseName} (Club: {record.ClubName})");
+        }
+
+        log.AppendLine($"  Holes: {added} added, {skipped} already exist");
+    }
 
     public class GolfClubCsvRecord
     {
