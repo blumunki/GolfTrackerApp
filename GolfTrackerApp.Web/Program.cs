@@ -146,6 +146,7 @@ builder.Services.AddScoped<IAiRoutingService, AiRoutingService>();
 builder.Services.AddScoped<IAiAuditService, AiAuditService>();
 builder.Services.AddScoped<IAiChatService, AiChatService>();
 builder.Services.AddScoped<IAiProviderSettingsService, AiProviderSettingsService>();
+builder.Services.AddScoped<IApplicationSettingsService, ApplicationSettingsService>();
 builder.Services.AddHttpClient("AiProvider_OpenAI");
 builder.Services.AddHttpClient("AiProvider_Anthropic");
 builder.Services.AddHttpClient("AiProvider_Gemini");
@@ -197,6 +198,10 @@ using (var scope = app.Services.CreateScope())
         // Seed AI provider settings from config if table is empty
         var providerSettingsService = services.GetRequiredService<IAiProviderSettingsService>();
         await providerSettingsService.SeedFromConfigAsync();
+
+        // Seed application settings with defaults
+        var appSettingsService = services.GetRequiredService<IApplicationSettingsService>();
+        await appSettingsService.SeedDefaultsAsync();
 
         // Cleanup old AI audit logs based on retention policy
         var retentionDays = app.Configuration.GetValue<int>("AiInsights:AuditLogging:RetentionDays");
@@ -452,6 +457,27 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
                 ALTER TABLE [AspNetUsers] ADD [AiInsightsOptOut] BIT NOT NULL DEFAULT 0;
             ");
             logger.LogInformation("AiInsightsOptOut column added to AspNetUsers.");
+        }
+
+        // Check if ApplicationSettings table exists
+        if (!await TableExistsAsync(connection, "ApplicationSettings"))
+        {
+            logger.LogInformation("Creating ApplicationSettings table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [ApplicationSettings] (
+                    [Id] INT IDENTITY(1,1) NOT NULL,
+                    [Key] NVARCHAR(100) NOT NULL,
+                    [Value] NVARCHAR(500) NOT NULL,
+                    [Description] NVARCHAR(200) NULL,
+                    [Category] NVARCHAR(50) NOT NULL DEFAULT 'General',
+                    [ValueType] NVARCHAR(20) NOT NULL DEFAULT 'string',
+                    [UpdatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    [UpdatedByUserId] NVARCHAR(450) NULL,
+                    CONSTRAINT [PK_ApplicationSettings] PRIMARY KEY ([Id])
+                );
+                CREATE UNIQUE INDEX [IX_ApplicationSettings_Key] ON [ApplicationSettings] ([Key]);
+            ");
+            logger.LogInformation("ApplicationSettings table created.");
         }
     }
     finally

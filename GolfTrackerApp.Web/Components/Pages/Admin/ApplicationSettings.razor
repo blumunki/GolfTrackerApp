@@ -1,0 +1,148 @@
+@page "/admin/settings"
+@attribute [Authorize(Roles = "Admin")]
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
+@inject IApplicationSettingsService SettingsService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<ApplicationSettings> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>Application Settings</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.Settings" Class="mr-2" />
+    Application Settings
+</MudText>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudText Typo="Typo.body2" Color="Color.Tertiary" Class="mb-4">
+        Configure application-wide settings. Changes take effect immediately.
+    </MudText>
+
+    @foreach (var category in settingsByCategory)
+    {
+        <MudText Typo="Typo.h6" Class="mb-2 mt-4">@category.Key</MudText>
+        <MudPaper Elevation="2" Class="pa-4 mb-4">
+            @foreach (var setting in category.Value)
+            {
+                <div class="d-flex align-center gap-4 mb-3 py-2" style="border-bottom: 1px solid var(--mud-palette-lines-default);">
+                    <div style="flex: 1; min-width: 200px;">
+                        <MudText Typo="Typo.body1"><strong>@FormatKeyName(setting.Key)</strong></MudText>
+                        @if (!string.IsNullOrEmpty(setting.Description))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Tertiary">@setting.Description</MudText>
+                        }
+                    </div>
+                    <div style="min-width: 250px;">
+                        @if (setting.ValueType == "bool")
+                        {
+                            <MudSwitch T="bool"
+                                       Value="@(setting.Value == "true")"
+                                       Color="Color.Primary"
+                                       ValueChanged="@(async (bool val) => await SaveSetting(setting, val ? "true" : "false"))" />
+                        }
+                        else if (setting.ValueType == "int")
+                        {
+                            <MudNumericField T="int"
+                                             Value="@(int.TryParse(setting.Value, out var v) ? v : 0)"
+                                             Variant="Variant.Outlined"
+                                             Margin="Margin.Dense"
+                                             Style="max-width: 150px;"
+                                             ValueChanged="@(async (int val) => await SaveSetting(setting, val.ToString()))" />
+                        }
+                        else
+                        {
+                            <MudTextField T="string"
+                                          Value="@setting.Value"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Style="max-width: 300px;"
+                                          ValueChanged="@(async (string val) => await SaveSetting(setting, val))"
+                                          DebounceInterval="500" />
+                        }
+                    </div>
+                    <div style="min-width: 160px;">
+                        <MudText Typo="Typo.caption" Color="Color.Tertiary">
+                            @if (setting.UpdatedAt > DateTime.MinValue)
+                            {
+                                @setting.UpdatedAt.ToString("dd MMM yyyy HH:mm")
+                            }
+                        </MudText>
+                    </div>
+                </div>
+            }
+        </MudPaper>
+    }
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <MudAlert Severity="@statusSeverity" Class="mt-2" Dense="true" CloseIconClicked="() => statusMessage = null" ShowCloseIcon="true">
+            @statusMessage
+        </MudAlert>
+    }
+}
+
+@code {
+    private bool loading = true;
+    private List<ApplicationSetting> settings = new();
+    private Dictionary<string, List<ApplicationSetting>> settingsByCategory = new();
+    private string? statusMessage;
+    private Severity statusSeverity = Severity.Success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSettings();
+        loading = false;
+    }
+
+    private async Task LoadSettings()
+    {
+        settings = await SettingsService.GetAllAsync();
+        settingsByCategory = settings
+            .GroupBy(s => s.Category)
+            .OrderBy(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private async Task SaveSetting(ApplicationSetting setting, string newValue)
+    {
+        try
+        {
+            var userId = await GetUserIdAsync();
+            await SettingsService.SaveAsync(setting.Key, newValue, userId);
+            setting.Value = newValue;
+            setting.UpdatedAt = DateTime.UtcNow;
+            statusMessage = $"'{FormatKeyName(setting.Key)}' updated.";
+            statusSeverity = Severity.Success;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save setting {Key}", setting.Key);
+            statusMessage = $"Failed to save '{FormatKeyName(setting.Key)}'.";
+            statusSeverity = Severity.Error;
+        }
+        StateHasChanged();
+    }
+
+    private async Task<string> GetUserIdAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        return authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    }
+
+    private static string FormatKeyName(string key)
+    {
+        // Convert "MaintenanceMode" → "Maintenance Mode"
+        return System.Text.RegularExpressions.Regex.Replace(key, "([a-z])([A-Z])", "$1 $2");
+    }
+}

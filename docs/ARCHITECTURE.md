@@ -591,8 +591,8 @@ Planned features organised by priority tier. Each item includes the affected pla
 | Connection & Merge Oversight | ✅ Done | View all connections/merges with status filters | Web |
 | System Notifications | ✅ Done | View all user notifications, type breakdown, read/unread stats | Web |
 | Audit Trail | ✅ Done | AI audit log viewer with filters, expandable prompt/response detail | Web |
-| Application Settings | Planned | Feature flags (maintenance mode, registration), configurable from UI | Web |
-| System Health | Planned | API response times, error rates, database size, background job status | Web |
+| Application Settings | ✅ Done | Key-value settings store — maintenance mode, registration toggle, AI limits, site name, configurable from admin UI with auto-seeded defaults | Web |
+| System Health | ✅ Done | App uptime, memory usage, DB query time, database size, table row counts, 7-day activity stats, AI performance metrics, round status breakdown | Web |
 
 ### 12.4 New Features (Both Platforms)
 

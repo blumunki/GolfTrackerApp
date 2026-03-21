@@ -35,6 +35,9 @@ namespace GolfTrackerApp.Web.Data
         public DbSet<AiChatSessionMessage> AiChatSessionMessages { get; set; }
         public DbSet<AiProviderSettings> AiProviderSettings { get; set; }
 
+        // Application settings
+        public DbSet<ApplicationSetting> ApplicationSettings { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder); // Important: Call base method first for Identity models
@@ -190,6 +193,12 @@ namespace GolfTrackerApp.Web.Data
             builder.Entity<AiProviderSettings>(entity =>
             {
                 entity.HasIndex(s => s.ProviderName).IsUnique();
+            });
+
+            // Application Settings
+            builder.Entity<ApplicationSetting>(entity =>
+            {
+                entity.HasIndex(s => s.Key).IsUnique();
             });
         }
     }

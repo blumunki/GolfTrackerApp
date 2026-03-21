@@ -1,0 +1,389 @@
+@page "/admin/system-health"
+@attribute [Authorize(Roles = "Admin")]
+
+@using GolfTrackerApp.Web.Data
+@using GolfTrackerApp.Web.Models
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.EntityFrameworkCore
+@using System.Diagnostics
+@using System.Reflection
+@using System.Runtime.InteropServices
+
+@inject IDbContextFactory<ApplicationDbContext> ContextFactory
+@inject IConfiguration Configuration
+@inject IWebHostEnvironment HostEnvironment
+@inject ILogger<SystemHealth> Logger
+
+@rendermode InteractiveServer
+
+<PageTitle>System Health</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">
+    <MudIcon Icon="@Icons.Material.Filled.MonitorHeart" Class="mr-2" />
+    System Health
+</MudText>
+
+@if (loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @* ===== Status Overview ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="@(databaseHealthy ? Color.Success : Color.Error)" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@(databaseHealthy ? "Healthy" : "Error")</MudText>
+                    <MudText Typo="Typo.caption">Database</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Timer" Color="Color.Info" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@FormatUptime(appUptime)</MudText>
+                    <MudText Typo="Typo.caption">Uptime</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Speed" Color="Color.Warning" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@dbQueryTimeMs ms</MudText>
+                    <MudText Typo="Typo.caption">DB Query Time</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent Class="d-flex flex-column align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.Memory" Color="Color.Primary" Size="Size.Large" />
+                    <MudText Typo="Typo.h6" Class="mt-2">@FormatBytes(memoryUsage)</MudText>
+                    <MudText Typo="Typo.caption">Memory Usage</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Application Info ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Class="mr-1" Size="Size.Small" />
+                        Application Info
+                    </MudText>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <tbody>
+                            <tr><td>Environment</td><td><MudChip T="string" Color="@(HostEnvironment.IsDevelopment() ? Color.Warning : Color.Success)" Size="Size.Small">@HostEnvironment.EnvironmentName</MudChip></td></tr>
+                            <tr><td>.NET Runtime</td><td><strong>@RuntimeInformation.FrameworkDescription</strong></td></tr>
+                            <tr><td>OS</td><td><strong>@RuntimeInformation.OSDescription</strong></td></tr>
+                            <tr><td>Architecture</td><td><strong>@RuntimeInformation.OSArchitecture</strong></td></tr>
+                            <tr><td>Database Provider</td><td><strong>@databaseProvider</strong></td></tr>
+                            <tr><td>Process Start</td><td><strong>@processStart.ToString("dd MMM yyyy HH:mm:ss")</strong></td></tr>
+                            <tr><td>Server Time (UTC)</td><td><strong>@DateTime.UtcNow.ToString("dd MMM yyyy HH:mm:ss")</strong></td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Storage" Class="mr-1" Size="Size.Small" />
+                        Database Size
+                    </MudText>
+                    @if (!string.IsNullOrEmpty(databaseError))
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@databaseError</MudAlert>
+                    }
+                    else
+                    {
+                        @if (databaseSizeBytes > 0)
+                        {
+                            <MudText Typo="Typo.h4" Color="Color.Primary" Class="mb-2">@FormatBytes(databaseSizeBytes)</MudText>
+                        }
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <tbody>
+                                @if (databaseSizeBytes > 0)
+                                {
+                                    <tr><td>Total Database Size</td><td><strong>@FormatBytes(databaseSizeBytes)</strong></td></tr>
+                                }
+                                <tr><td>Connection Test</td><td><strong>@dbQueryTimeMs ms</strong></td></tr>
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Table Row Counts ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.TableChart" Class="mr-1" Size="Size.Small" />
+                Table Row Counts
+            </MudText>
+            <MudGrid Spacing="3">
+                @foreach (var table in tableCounts)
+                {
+                    <MudItem xs="6" sm="4" md="3">
+                        <MudPaper Elevation="1" Class="pa-3 d-flex flex-column align-center">
+                            <MudText Typo="Typo.h5" Color="Color.Primary">@table.Value.ToString("N0")</MudText>
+                            <MudText Typo="Typo.caption">@table.Key</MudText>
+                        </MudPaper>
+                    </MudItem>
+                }
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    @* ===== Recent Activity & AI Stats ===== *@
+    <MudGrid Spacing="4" Class="mb-4">
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Class="mr-1" Size="Size.Small" />
+                        Activity (Last 7 Days)
+                    </MudText>
+                    <MudSimpleTable Dense="true" Hover="true">
+                        <tbody>
+                            <tr><td>New Rounds</td><td><strong>@roundsLast7d</strong></td></tr>
+                            <tr><td>Scores Recorded</td><td><strong>@scoresLast7d</strong></td></tr>
+                            <tr><td>Notifications Sent</td><td><strong>@notificationsLast7d</strong></td></tr>
+                            <tr><td>AI Requests</td><td><strong>@aiCallsLast7d</strong></td></tr>
+                            <tr><td>AI Failures</td><td><MudText Color="@(aiFailuresLast7d > 0 ? Color.Error : Color.Success)"><strong>@aiFailuresLast7d</strong></MudText></td></tr>
+                        </tbody>
+                    </MudSimpleTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Class="mr-1" Size="Size.Small" />
+                        AI Performance (Last 7 Days)
+                    </MudText>
+                    @if (aiCallsLast7d > 0)
+                    {
+                        <MudSimpleTable Dense="true" Hover="true">
+                            <tbody>
+                                <tr><td>Success Rate</td><td><MudChip T="string" Color="@(aiSuccessRate >= 95 ? Color.Success : aiSuccessRate >= 80 ? Color.Warning : Color.Error)" Size="Size.Small">@aiSuccessRate.ToString("F1")%</MudChip></td></tr>
+                                <tr><td>Avg Response Time</td><td><strong>@avgAiResponseMs ms</strong></td></tr>
+                                <tr><td>Total Tokens Used</td><td><strong>@totalTokens7d.ToString("N0")</strong></td></tr>
+                                <tr><td>Avg Tokens/Request</td><td><strong>@(aiCallsLast7d > 0 ? (totalTokens7d / aiCallsLast7d).ToString("N0") : "0")</strong></td></tr>
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Tertiary">No AI requests in the last 7 days.</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    @* ===== Live Round Status ===== *@
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.SportsGolf" Class="mr-1" Size="Size.Small" />
+                Round Status Breakdown
+            </MudText>
+            <MudGrid Spacing="3">
+                <MudItem xs="6" sm="4" md="3">
+                    <MudPaper Elevation="1" Class="pa-3 d-flex flex-column align-center">
+                        <MudText Typo="Typo.h5" Color="Color.Success">@completedRounds</MudText>
+                        <MudText Typo="Typo.caption">Completed</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="4" md="3">
+                    <MudPaper Elevation="1" Class="pa-3 d-flex flex-column align-center">
+                        <MudText Typo="Typo.h5" Color="Color.Warning">@inProgressRounds</MudText>
+                        <MudText Typo="Typo.caption">In Progress</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" sm="4" md="3">
+                    <MudPaper Elevation="1" Class="pa-3 d-flex flex-column align-center">
+                        <MudText Typo="Typo.h5" Color="Color.Error">@abandonedRounds</MudText>
+                        <MudText Typo="Typo.caption">Abandoned</MudText>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        </MudCardContent>
+    </MudCard>
+
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+               OnClick="RefreshAll" Class="mt-2">
+        Refresh All
+    </MudButton>
+}
+
+@code {
+    private bool loading = true;
+
+    // Health status
+    private bool databaseHealthy;
+    private string? databaseError;
+    private long dbQueryTimeMs;
+    private TimeSpan appUptime;
+    private long memoryUsage;
+    private DateTime processStart;
+    private string databaseProvider = "";
+    private long databaseSizeBytes;
+
+    // Table counts
+    private Dictionary<string, int> tableCounts = new();
+
+    // Activity stats
+    private int roundsLast7d;
+    private int scoresLast7d;
+    private int notificationsLast7d;
+    private int aiCallsLast7d;
+    private int aiFailuresLast7d;
+    private double aiSuccessRate;
+    private int avgAiResponseMs;
+    private long totalTokens7d;
+
+    // Round status
+    private int completedRounds;
+    private int inProgressRounds;
+    private int abandonedRounds;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllMetrics();
+        loading = false;
+    }
+
+    private async Task RefreshAll()
+    {
+        loading = true;
+        StateHasChanged();
+        await LoadAllMetrics();
+        loading = false;
+    }
+
+    private async Task LoadAllMetrics()
+    {
+        // Process info
+        var process = Process.GetCurrentProcess();
+        processStart = process.StartTime.ToUniversalTime();
+        appUptime = DateTime.UtcNow - processStart;
+        memoryUsage = process.WorkingSet64;
+        databaseProvider = Configuration["DatabaseProvider"] ?? "Sqlite";
+
+        // Database health check
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            await using var context = await ContextFactory.CreateDbContextAsync();
+            var now = DateTime.UtcNow;
+            var sevenDaysAgo = now.AddDays(-7);
+
+            // Simple connectivity test
+            await context.Database.CanConnectAsync();
+            sw.Stop();
+            dbQueryTimeMs = sw.ElapsedMilliseconds;
+            databaseHealthy = true;
+            databaseError = null;
+
+            // Database size (SQLite-specific)
+            if (databaseProvider.Equals("Sqlite", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var connString = Configuration.GetConnectionString("DefaultConnection") ?? "";
+                    var dbPath = connString.Replace("DataSource=", "").Replace(";Cache=Shared", "").Trim();
+                    if (!Path.IsPathRooted(dbPath))
+                    {
+                        dbPath = Path.Combine(HostEnvironment.ContentRootPath, dbPath);
+                    }
+                    if (File.Exists(dbPath))
+                    {
+                        databaseSizeBytes = new FileInfo(dbPath).Length;
+                    }
+                }
+                catch { /* Non-critical */ }
+            }
+
+            // Table row counts
+            tableCounts = new Dictionary<string, int>
+            {
+                ["Users"] = await context.Users.CountAsync(),
+                ["Players"] = await context.Players.CountAsync(),
+                ["Rounds"] = await context.Rounds.CountAsync(),
+                ["Scores"] = await context.Scores.CountAsync(),
+                ["Golf Clubs"] = await context.GolfClubs.CountAsync(),
+                ["Golf Courses"] = await context.GolfCourses.CountAsync(),
+                ["Holes"] = await context.Holes.CountAsync(),
+                ["Connections"] = await context.PlayerConnections.CountAsync(),
+                ["Merge Requests"] = await context.PlayerMergeRequests.CountAsync(),
+                ["Notifications"] = await context.Notifications.CountAsync(),
+                ["AI Audit Logs"] = await context.AiAuditLogs.CountAsync(),
+                ["AI Chat Sessions"] = await context.AiChatSessions.CountAsync(),
+                ["Settings"] = await context.ApplicationSettings.CountAsync(),
+            };
+
+            // Activity in last 7 days
+            roundsLast7d = await context.Rounds.CountAsync(r => r.DatePlayed >= sevenDaysAgo);
+            scoresLast7d = await context.Scores.CountAsync(s => s.Round != null && s.Round.DatePlayed >= sevenDaysAgo);
+            notificationsLast7d = await context.Notifications.CountAsync(n => n.CreatedAt >= sevenDaysAgo);
+
+            // AI stats
+            var aiLogs7d = await context.AiAuditLogs
+                .Where(a => a.RequestedAt >= sevenDaysAgo)
+                .ToListAsync();
+            aiCallsLast7d = aiLogs7d.Count;
+            aiFailuresLast7d = aiLogs7d.Count(a => !a.Success);
+            aiSuccessRate = aiCallsLast7d > 0 ? (double)(aiCallsLast7d - aiFailuresLast7d) / aiCallsLast7d * 100 : 0;
+            avgAiResponseMs = aiCallsLast7d > 0 ? (int)aiLogs7d.Average(a => a.ResponseTimeMs) : 0;
+            totalTokens7d = aiLogs7d.Sum(a => a.TotalTokens);
+
+            // Round status breakdown
+            completedRounds = await context.Rounds.CountAsync(r => r.Status == RoundCompletionStatus.Completed);
+            inProgressRounds = await context.Rounds.CountAsync(r => r.Status == RoundCompletionStatus.InProgress);
+            abandonedRounds = await context.Rounds.CountAsync(r => r.Status == RoundCompletionStatus.Abandoned);
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            dbQueryTimeMs = sw.ElapsedMilliseconds;
+            databaseHealthy = false;
+            databaseError = ex.Message;
+            Logger.LogError(ex, "Error loading system health metrics");
+        }
+    }
+
+    private static string FormatUptime(TimeSpan ts)
+    {
+        if (ts.TotalDays >= 1)
+            return $"{(int)ts.TotalDays}d {ts.Hours}h";
+        if (ts.TotalHours >= 1)
+            return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        return $"{(int)ts.TotalMinutes}m";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes >= 1_073_741_824)
+            return $"{bytes / 1_073_741_824.0:F1} GB";
+        if (bytes >= 1_048_576)
+            return $"{bytes / 1_048_576.0:F1} MB";
+        if (bytes >= 1024)
+            return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes} B";
+    }
+}
