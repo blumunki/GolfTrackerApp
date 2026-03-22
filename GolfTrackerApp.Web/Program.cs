@@ -538,7 +538,7 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
             await context.Database.ExecuteSqlRawAsync(@"
                 ALTER TABLE [Scores] ADD [TeeSetId] INT NULL;
                 CREATE INDEX [IX_Scores_TeeSetId] ON [Scores] ([TeeSetId]);
-                ALTER TABLE [Scores] ADD CONSTRAINT [FK_Scores_TeeSets] FOREIGN KEY ([TeeSetId]) REFERENCES [TeeSets]([TeeSetId]) ON DELETE SET NULL;
+                ALTER TABLE [Scores] ADD CONSTRAINT [FK_Scores_TeeSets] FOREIGN KEY ([TeeSetId]) REFERENCES [TeeSets]([TeeSetId]) ON DELETE NO ACTION;
             ");
             logger.LogInformation("TeeSetId column added to Scores.");
         }
@@ -549,7 +549,7 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
             await context.Database.ExecuteSqlRawAsync(@"
                 ALTER TABLE [RoundPlayers] ADD [TeeSetId] INT NULL;
                 CREATE INDEX [IX_RoundPlayers_TeeSetId] ON [RoundPlayers] ([TeeSetId]);
-                ALTER TABLE [RoundPlayers] ADD CONSTRAINT [FK_RoundPlayers_TeeSets] FOREIGN KEY ([TeeSetId]) REFERENCES [TeeSets]([TeeSetId]) ON DELETE SET NULL;
+                ALTER TABLE [RoundPlayers] ADD CONSTRAINT [FK_RoundPlayers_TeeSets] FOREIGN KEY ([TeeSetId]) REFERENCES [TeeSets]([TeeSetId]) ON DELETE NO ACTION;
             ");
             logger.LogInformation("TeeSetId column added to RoundPlayers.");
         }

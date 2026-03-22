@@ -242,14 +242,14 @@ namespace GolfTrackerApp.Web.Data
                 .HasOne(rp => rp.TeeSet)
                 .WithMany()
                 .HasForeignKey(rp => rp.TeeSetId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             // Score → TeeSet (optional, denormalized)
             builder.Entity<Score>()
                 .HasOne(s => s.TeeSet)
                 .WithMany()
                 .HasForeignKey(s => s.TeeSetId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             // GolfSociety configuration
             builder.Entity<GolfSociety>(entity =>
