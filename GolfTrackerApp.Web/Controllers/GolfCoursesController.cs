@@ -9,11 +9,13 @@ namespace GolfTrackerApp.Web.Controllers;
 public class GolfCoursesController : BaseApiController
 {
     private readonly IGolfCourseService _golfCourseService;
+    private readonly ITeeSetService _teeSetService;
     private readonly ILogger<GolfCoursesController> _logger;
 
-    public GolfCoursesController(IGolfCourseService golfCourseService, ILogger<GolfCoursesController> logger)
+    public GolfCoursesController(IGolfCourseService golfCourseService, ITeeSetService teeSetService, ILogger<GolfCoursesController> logger)
     {
         _golfCourseService = golfCourseService;
+        _teeSetService = teeSetService;
         _logger = logger;
     }
 
@@ -44,6 +46,11 @@ public class GolfCoursesController : BaseApiController
             {
                 return NotFound($"Golf course with ID {id} not found");
             }
+
+            // Ensure all 3 standard tee sets exist for existing courses
+            await _teeSetService.EnsureStandardTeeSetsAsync(id);
+            // Reload to include any newly-created tee sets
+            course = (await _golfCourseService.GetGolfCourseByIdAsync(id))!;
             
             // Return DTO to avoid circular reference with GolfClub
             var response = new
@@ -60,6 +67,24 @@ public class GolfCoursesController : BaseApiController
                     h.Par,
                     h.StrokeIndex,
                     h.LengthYards
+                }).ToList(),
+                TeeSets = course.TeeSets?.OrderBy(ts => ts.SortOrder).Select(ts => new
+                {
+                    ts.TeeSetId,
+                    ts.Name,
+                    ts.Colour,
+                    ts.CourseRating,
+                    ts.SlopeRating,
+                    Gender = ts.Gender.ToString(),
+                    ts.SortOrder,
+                    HoleTees = ts.HoleTees?.Select(ht => new
+                    {
+                        ht.HoleTeeId,
+                        ht.HoleId,
+                        ht.Par,
+                        ht.StrokeIndex,
+                        ht.LengthYards
+                    }).ToList()
                 }).ToList()
             };
             

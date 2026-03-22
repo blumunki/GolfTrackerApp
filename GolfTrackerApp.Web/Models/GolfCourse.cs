@@ -24,6 +24,7 @@ namespace GolfTrackerApp.Web.Models
         public int NumberOfHoles { get; set; } = 18;
 
         public virtual ICollection<Hole> Holes { get; set; } = new List<Hole>();
+        public virtual ICollection<TeeSet> TeeSets { get; set; } = new List<TeeSet>();
         public virtual ICollection<Round> Rounds { get; set; } = new List<Round>();
     }
 }

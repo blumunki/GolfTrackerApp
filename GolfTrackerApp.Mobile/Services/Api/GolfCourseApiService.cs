@@ -47,6 +47,9 @@ public class GolfCourseDetailResponse
     
     [System.Text.Json.Serialization.JsonPropertyName("holes")]
     public List<CourseHole> Holes { get; set; } = new();
+
+    [System.Text.Json.Serialization.JsonPropertyName("teeSets")]
+    public List<TeeSetDto>? TeeSets { get; set; }
 }
 
 public interface IGolfCourseApiService

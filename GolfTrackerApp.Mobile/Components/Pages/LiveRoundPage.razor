@@ -158,7 +158,7 @@
 
             @if (_selectedClubId > 0)
             {
-                <MudSelect T="int" Label="Golf Course" @bind-Value="_selectedCourseId"
+                <MudSelect T="int" Label="Golf Course" Value="_selectedCourseId" ValueChanged="OnCourseSelected"
                           Required="true" Disabled="!_coursesForClub.Any()" Class="mt-4">
                     <MudSelectItem T="int" Value="0">
                         @(_coursesForClub.Any() ? "Select a course..." : "No courses available")
@@ -209,6 +209,33 @@
                 }
             </MudSelect>
         </div>
+
+        @if (_teeSetsForCourse.Any() && _selectedPlayers.Any())
+        {
+            <div class="lr-setup-card">
+                <div class="lr-setup-header">⛳ Tee Selection</div>
+                @foreach (var player in _selectedPlayers)
+                {
+                    <div class="d-flex align-center gap-2 mb-2">
+                        <MudText Typo="Typo.body2" Style="min-width: 100px; font-weight: 600;">@player.FullName</MudText>
+                        <MudSelect T="int?" Label="Tee" Dense="true"
+                                  Value="@(_teeSelections.GetValueOrDefault(player.Id))"
+                                  ValueChanged="@(v => _teeSelections[player.Id] = v)">
+                            <MudSelectItem T="int?" Value="@((int?)null)">Default</MudSelectItem>
+                            @foreach (var ts in _teeSetsForCourse)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)ts.TeeSetId)">
+                                    <div class="d-flex align-center gap-1">
+                                        <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:@ts.Colour;"></span>
+                                        @ts.Name
+                                    </div>
+                                </MudSelectItem>
+                            }
+                        </MudSelect>
+                    </div>
+                }
+            </div>
+        }
 
         <MudButton Variant="Variant.Filled" Color="Color.Success" FullWidth="true" Size="Size.Large"
                   StartIcon="@Icons.Material.Filled.PlayArrow"
@@ -468,6 +495,8 @@
     private List<CourseHole> _holes = new();
     private Dictionary<(int playerId, int holeId), HoleScoreEntry> _scores = new();
     private int _currentHoleIndex;
+    private List<TeeSetDto> _teeSetsForCourse = new();
+    private Dictionary<int, int?> _teeSelections = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -512,9 +541,23 @@
         _selectedClubId = clubId;
         _selectedCourseId = 0;
         _coursesForClub.Clear();
+        _teeSetsForCourse.Clear();
         if (clubId > 0)
         {
             _coursesForClub = await GolfCourseApiService.GetCoursesForClubAsync(clubId);
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnCourseSelected(int courseId)
+    {
+        _selectedCourseId = courseId;
+        _teeSetsForCourse.Clear();
+        if (courseId > 0)
+        {
+            var detail = await GolfCourseApiService.GetGolfCourseByIdAsync(courseId);
+            if (detail?.TeeSets != null)
+                _teeSetsForCourse = detail.TeeSets.OrderBy(t => t.SortOrder).ToList();
         }
         StateHasChanged();
     }
@@ -557,6 +600,7 @@
 
             _holes = courseDetail.Holes.OrderBy(h => h.HoleNumber).Take(_holesPlayed).ToList();
             _courseName = courseDetail.Name;
+            _teeSetsForCourse = courseDetail.TeeSets?.OrderBy(t => t.SortOrder).ToList() ?? new();
 
             // Create round as InProgress (no scores yet)
             var request = new CreateRoundRequest
@@ -569,7 +613,7 @@
                 Notes = _notes,
                 Status = RoundCompletionStatus.InProgress,
                 CreatedByApplicationUserId = AuthStateService.UserId ?? string.Empty,
-                RoundPlayers = _selectedPlayers.Select(p => new CreateRoundPlayerRequest { PlayerId = p.Id }).ToList(),
+                RoundPlayers = _selectedPlayers.Select(p => new CreateRoundPlayerRequest { PlayerId = p.Id, TeeSetId = _teeSelections.GetValueOrDefault(p.Id) }).ToList(),
                 Scores = new List<CreateScoreRequest>() // Empty — scores saved hole by hole
             };
 
@@ -676,17 +720,37 @@
 
     private void InitializeScores()
     {
+        // Build a lookup of tee-specific hole data
+        var teeHoleLookup = new Dictionary<(int teeSetId, int holeId), HoleTeeDto>();
+        foreach (var ts in _teeSetsForCourse)
+        {
+            foreach (var ht in ts.HoleTees ?? Enumerable.Empty<HoleTeeDto>())
+                teeHoleLookup[(ts.TeeSetId, ht.HoleId)] = ht;
+        }
+
         _scores.Clear();
         foreach (var player in _selectedPlayers)
         {
+            var playerTeeId = _teeSelections.GetValueOrDefault(player.Id);
             foreach (var hole in _holes)
             {
+                var par = hole.Par;
+                var si = hole.StrokeIndex;
+                var yards = hole.LengthYards;
+                if (playerTeeId.HasValue && teeHoleLookup.TryGetValue((playerTeeId.Value, hole.HoleId), out var ht))
+                {
+                    par = ht.Par;
+                    si = ht.StrokeIndex ?? si;
+                    yards = ht.LengthYards ?? yards;
+                }
                 _scores[(player.Id, hole.HoleId)] = new HoleScoreEntry
                 {
                     HoleId = hole.HoleId,
                     HoleNumber = hole.HoleNumber,
-                    Par = hole.Par,
-                    StrokeIndex = hole.StrokeIndex
+                    Par = par,
+                    StrokeIndex = si,
+                    LengthYards = yards,
+                    TeeSetId = playerTeeId
                 };
             }
         }

@@ -139,6 +139,18 @@ public static class MauiProgram
 #endif
 			;
 
+		builder.Services.AddHttpClient<ISocietyApiService, SocietyApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
+		builder.Services.AddHttpClient<IClubMembershipApiService, ClubMembershipApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
 		// Authentication services
 		builder.Services.AddSingleton<ConfigurationService>();
 		builder.Services.AddSingleton<AuthenticationStateService>();

@@ -599,11 +599,447 @@ Planned features organised by priority tier. Each item includes the affected pla
 | Feature | Description | Platform |
 |---------|-------------|----------|
 | Live Round Mode | ✅ Done — Real-time hole-by-hole scoring with auto-save after each hole, resume capability, running totals, full scorecard view | Both |
-| Handicap Tracking | Formal handicap index calculation and history over time | Both |
+| Tee Sets & Course Ratings | Track multiple tee colours per course with per-tee par, stroke index, yardage, course rating and slope rating | Both |
+| Golf Societies | Society management similar to clubs — creation, membership, events | Both |
+| Club & Society Membership | Users self-register as members of clubs and societies, with future admin approval | Both |
+| Competition Framework | Competition entities with scoring formats (Medal, Stableford, Match Play) linked to clubs/societies | Both |
+| Handicap Tracking | Multi-source handicaps (personal, club/regional, society) with WHS calculation and history | Both |
 | Goal Setting & Milestones | Set targets (break 90, improve par-3 average) with progress tracking | Both |
 | Structured Weather Data | Replace free-text notes with temperature, wind, conditions fields | Both |
-| Tee Selection & Course Rating | Track which tees were played for accurate handicap calculations | Both |
 | Export & Share | PDF round cards, share stats on social media, CSV export | Both |
+
+---
+
+### 12.5 Tee Sets, Societies, Competitions & Handicaps — Implementation Plan
+
+This is a large, interdependent set of features. The plan is split into 4 phases that must be delivered in order because each phase depends on the previous one.
+
+#### Current State (What Exists Today)
+
+| Entity | Key Fields | Notes |
+|--------|-----------|-------|
+| `Hole` | HoleNumber, Par, StrokeIndex, LengthYards | Single set of values per hole — no tee variants |
+| `GolfCourse` | Name, DefaultPar, NumberOfHoles | No course rating or slope rating |
+| `GolfClub` | Name, Address, Website | No membership concept |
+| `Round` | GolfCourseId, DatePlayed, RoundType (Friendly/Competitive), Status | No competition link, no tee tracking |
+| `RoundPlayer` | RoundId, PlayerId (composite PK) | No tee selection per player |
+| `Score` | RoundId, PlayerId, HoleId, Strokes, Putts, FairwayHit | Scores always reference default hole par |
+| `Player` | Handicap (single double?) | Single handicap value, no source or history |
+| Holes.csv | ClubName, CourseName, HoleNumber, Par, StrokeIndex, LengthYards | All yardages are default (Yellow) tees |
+
+---
+
+#### Phase 1: Tee Sets & Course Ratings ✅ Done
+
+**Goal**: Support multiple tee colours per course, with per-tee hole data. Track which tees each player plays from in every round.
+
+##### 1.1 New Models
+
+```
+TeeSet
+├── TeeSetId (PK)
+├── GolfCourseId (FK → GolfCourse)
+├── Name (string, e.g. "Yellow", "White", "Red", "Blue")
+├── Colour (string, hex or named colour for UI)
+├── CourseRating (decimal?, e.g. 71.2)
+├── SlopeRating (int?, e.g. 128)
+├── TotalYardage (int?, computed or stored)
+├── Gender (enum: Unisex/Male/Female — some tees are gender-specific)
+├── SortOrder (int — display ordering)
+└── Navigation: GolfCourse, HoleTees[]
+
+HoleTee
+├── HoleTeeId (PK)
+├── HoleId (FK → Hole)
+├── TeeSetId (FK → TeeSet)
+├── Par (int)
+├── StrokeIndex (int?)
+├── LengthYards (int?)
+└── Navigation: Hole, TeeSet
+```
+
+##### 1.2 Schema Changes to Existing Models
+
+| Model | Change | Reason |
+|-------|--------|--------|
+| `Hole` | Keep Par, StrokeIndex, LengthYards as "default tee" values | Backwards compatibility — existing scores still reference hole.Par |
+| `GolfCourse` | Add `DbSet<TeeSet>` navigation | Course owns its tee sets |
+| `RoundPlayer` | Add `TeeSetId (int?, FK → TeeSet)` | Track which tees each player plays from |
+| `Score` | Add `TeeSetId (int?, FK → TeeSet)` | Denormalised for efficient scorecard queries and handicap calculation |
+
+##### 1.3 Data Migration Strategy
+
+1. **Add TeeSet + HoleTee tables** via EF migration
+2. **Seed a "Yellow" TeeSet** for every existing GolfCourse
+3. **Copy existing Hole data** into HoleTee rows: `Hole.Par → HoleTee.Par`, `Hole.StrokeIndex → HoleTee.StrokeIndex`, `Hole.LengthYards → HoleTee.LengthYards`
+4. **Existing Hole columns remain** — they serve as the "default" view and keep all existing queries, scorecards, and reports working
+5. **RoundPlayer.TeeSetId** defaults to NULL for all historical rounds — null means "used default/Yellow tees"
+6. **No data loss, no breaking changes to existing queries**
+
+##### 1.4 CSV Import Updates
+
+**Holes.csv — New format** (backwards compatible):
+```
+ClubName,CourseName,HoleNumber,Par,StrokeIndex,LengthYards,TeeName
+Stockwood Park Golf Centre,Academy,1,3,3,76,Yellow
+Stockwood Park Golf Centre,Academy,1,3,3,82,White
+```
+- If `TeeName` column is missing → import as default hole data (current behaviour)
+- If `TeeName` is present → create TeeSet if needed, create HoleTee row
+- DataMigration.razor updated to handle both formats
+
+**New optional CSV: TeeSets.csv**
+```
+ClubName,CourseName,TeeName,Colour,CourseRating,SlopeRating,Gender,SortOrder
+Stockwood Park Golf Centre,Main Course,Yellow,#FFD700,68.5,121,Male,1
+Stockwood Park Golf Centre,Main Course,Red,#FF0000,70.2,125,Female,2
+```
+
+##### 1.5 UI Changes
+
+**Round Recording (Web + Mobile) — Setup phase:**
+- After player selection → new "Tee Selection" step
+- Dropdown per player showing available tee sets for the selected course
+- Default selection: first tee set (Yellow if available)
+- Players can play from different tees (adult Yellow, child Red)
+
+**Live Round — Playing phase:**
+- Hole card shows the correct par, stroke index and yardage for each player's tee
+- Running total vs-par calculated against player-specific par
+- Scorecard view shows tee colour badge next to each player name
+
+**Scorecard / Round Detail views:**
+- Show tee played next to player name
+- Par row reflects the tee played (if players on different tees, show per-player)
+
+**Course Detail page:**
+- Show tee set tabs/selector
+- Display hole table with per-tee data columns
+
+**Admin Content Health:**
+- Flag courses with no tee sets
+- Flag tee sets with missing hole data
+
+##### 1.6 API Changes
+
+| Endpoint | Change |
+|----------|--------|
+| `GET /api/golfcourses/{id}` | Include `teeSets[]` with nested `holeTees[]` |
+| `POST /api/rounds` (CreateRoundRequest) | Add `playerTeeSelections: [{playerId, teeSetId}]` |
+| `PUT /api/rounds/{id}/scores/hole` | Add optional `teeSetId` per score |
+| Mobile `GolfCourse` model | Add `TeeSets` collection |
+| Mobile `RoundResponse` | Add tee info per player |
+
+##### 1.7 Files Affected
+
+| Layer | Files |
+|-------|-------|
+| Models | `TeeSet.cs` (new), `HoleTee.cs` (new), `RoundPlayer.cs`, `Score.cs`, `GolfCourse.cs` |
+| Data | `ApplicationDbContext.cs`, new migration, `SeedData.cs`, CSV files |
+| Services | `IHoleService`, `HoleService`, `IGolfCourseService`, `GolfCourseService`, `IRoundService`, `RoundService`, `IScoreService`, `ScoreService` |
+| Controllers | `GolfCoursesController`, `RoundsController` |
+| Web Pages | `RecordRound.razor`, `LiveRound.razor`, `RoundDetails.razor`, Course detail page, `ContentHealth.razor`, `DataMigration.razor` |
+| Mobile | `GolfCourse.cs` (model), `RoundApiService.cs`, `RecordRoundPage.razor`, `LiveRoundPage.razor`, `RoundDetailPage.razor` |
+| Docs | `ARCHITECTURE.md` |
+
+---
+
+#### Phase 2: Golf Societies & Memberships ✅ Done
+
+**Goal**: Users can create and join golf societies. Users can also register as members of golf clubs. Both concepts support future admin roles.
+
+##### 2.1 New Models
+
+```
+GolfSociety
+├── GolfSocietyId (PK)
+├── Name (string, required)
+├── Description (string?)
+├── CreatedByUserId (FK → ApplicationUser)
+├── CreatedAt (DateTime)
+├── IsActive (bool)
+└── Navigation: Members[], Events[]
+
+SocietyMembership
+├── SocietyMembershipId (PK)
+├── GolfSocietyId (FK → GolfSociety)
+├── ApplicationUserId (FK → ApplicationUser)
+├── Role (enum: Member, Admin, Owner)
+├── JoinedAt (DateTime)
+├── IsActive (bool)
+└── Unique: (GolfSocietyId, ApplicationUserId)
+
+ClubMembership
+├── ClubMembershipId (PK)
+├── GolfClubId (FK → GolfClub)
+├── ApplicationUserId (FK → ApplicationUser)
+├── Role (enum: Member, Admin)
+├── MembershipNumber (string?, official club number)
+├── JoinedAt (DateTime)
+├── IsActive (bool)
+└── Unique: (GolfClubId, ApplicationUserId)
+```
+
+##### 2.2 Schema Changes to Existing Models
+
+| Model | Change | Reason |
+|-------|--------|--------|
+| `GolfClub` | Add `Memberships` navigation | Club has members |
+| `ApplicationUser` | Add `ClubMemberships` + `SocietyMemberships` navigations | User can be member of many clubs and societies |
+
+##### 2.3 Features
+
+**Society Management (Web + Mobile):**
+- Create society (name, description)
+- Browse/search societies
+- Join a society (self-registration, immediate)
+- View "My Societies" list
+- Society detail page — member list, recent rounds by members
+
+**Club Membership (Web + Mobile):**
+- "Join Club" from club detail page
+- Optional membership number
+- View "My Clubs" list
+- Club detail page shows member count
+
+**Admin (Web only):**
+- Admin overview: total societies, memberships
+- Future: approve/manage society and club admins
+
+##### 2.4 Files Affected
+
+| Layer | Files |
+|-------|-------|
+| Models | `GolfSociety.cs` (new), `SocietyMembership.cs` (new), `ClubMembership.cs` (new), `MembershipRole.cs` (new enum), `GolfClub.cs` |
+| Data | `ApplicationDbContext.cs`, `ApplicationUser.cs`, new migration |
+| Services | `IGolfSocietyService` (new), `IClubMembershipService` (new) |
+| Controllers | `SocietiesController` (new), `ClubMembershipsController` (new) |
+| Web Pages | `Societies/` folder (new: List, Detail, Create), `GolfClubs/` (add Join button), `Account/Manage` (My Clubs, My Societies) |
+| Mobile | Society models, API services, pages (list, detail, join), club join UI |
+| Nav | Add "Societies" link to both web nav and mobile nav |
+
+---
+
+#### Phase 3: Competitions & Scoring Formats
+
+**Goal**: Clubs and societies can create competitions. Rounds can be linked to competitions. Support multiple scoring formats.
+
+##### 3.1 New Models
+
+```
+ScoringFormat (enum)
+├── Medal (Stroke Play)
+├── Stableford
+├── ModifiedStableford
+├── MatchPlay
+├── BetterBall
+├── Scramble
+├── TexasScramble
+├── Fourball
+├── Foursomes
+├── Bogey
+
+Competition
+├── CompetitionId (PK)
+├── Name (string, required, e.g. "Monthly Medal March 2026")
+├── GolfClubId (FK → GolfClub, nullable)
+├── GolfSocietyId (FK → GolfSociety, nullable)
+├── GolfCourseId (FK → GolfCourse, nullable — where it's played)
+├── ScoringFormat (enum)
+├── Date (DateTime)
+├── Description (string?)
+├── IsOpen (bool — can anyone join, or members only)
+├── Status (enum: Upcoming, InProgress, Completed, Cancelled)
+├── CreatedByUserId (FK)
+├── CreatedAt (DateTime)
+└── Navigation: Rounds[], Entries[]
+
+CompetitionEntry
+├── CompetitionEntryId (PK)
+├── CompetitionId (FK → Competition)
+├── PlayerId (FK → Player)
+├── TeeSetId (FK → TeeSet, nullable)
+├── HandicapAtEntry (decimal? — snapshot of handicap used)
+├── GrossScore (int?)
+├── NetScore (int?)
+├── StablefordPoints (int?)
+├── Position (int?)
+└── Navigation: Competition, Player, TeeSet
+```
+
+##### 3.2 Schema Changes to Existing Models
+
+| Model | Change | Reason |
+|-------|--------|--------|
+| `Round` | Add `CompetitionId (int?, FK → Competition)` | Link round to competition |
+| `RoundTypeOption` | Expand: `Casual, ClubCompetition, SocietyEvent, OpenCompetition, FriendlyMatch` | Richer round context (backwards-compatible: map existing Friendly→Casual, Competitive→ClubCompetition) |
+
+##### 3.3 Features
+
+**Competition Management (Web + Mobile):**
+- Create competition (from club or society context)
+- Set scoring format, course, date
+- Enter/register for competition
+- Link a recorded round to a competition
+- Auto-calculate results based on scoring format
+
+**Scoring Format Logic:**
+- **Medal**: Gross strokes, net = gross - handicap
+- **Stableford**: Points per hole based on par and handicap strokes received
+- **Match Play**: Hole-by-hole win/loss/halve tracking
+
+**Results & Leaderboards:**
+- Competition results table (position, player, gross, net, points)
+- History of competitions per club/society
+
+##### 3.4 Files Affected
+
+| Layer | Files |
+|-------|-------|
+| Models | `Competition.cs` (new), `CompetitionEntry.cs` (new), `ScoringFormat.cs` (new enum), `Round.cs` |
+| Data | `ApplicationDbContext.cs`, new migration |
+| Services | `ICompetitionService` (new), `IScoringService` (new — scoring format calculations) |
+| Controllers | `CompetitionsController` (new) |
+| Web Pages | `Competitions/` folder (new: List, Detail, Create, Results), link from Club & Society pages |
+| Mobile | Competition models, API services, pages |
+| Round Recording | Add competition selector in setup, link round on save |
+
+---
+
+#### Phase 4: Multi-Source Handicap Tracking
+
+**Goal**: Track handicaps from three sources (personal, club/regional, society), maintain history, auto-calculate personal handicap using WHS principles.
+
+##### 4.1 New Models
+
+```
+HandicapSource (enum)
+├── Personal       — auto-calculated from all qualifying rounds
+├── ClubRegional   — official handicap from club/national body (manually entered or synced)
+├── Society        — calculated from society competition rounds
+
+HandicapRecord
+├── HandicapRecordId (PK)
+├── PlayerId (FK → Player)
+├── HandicapIndex (decimal, e.g. 18.4)
+├── Source (HandicapSource enum)
+├── GolfSocietyId (FK → GolfSociety, nullable — only for Society source)
+├── GolfClubId (FK → GolfClub, nullable — only for ClubRegional source)
+├── EffectiveDate (DateTime)
+├── ExpiryDate (DateTime? — for club handicaps with renewal)
+├── CalculationDetails (string? — JSON: which rounds, differentials, etc.)
+├── IsManualEntry (bool — true for club handicaps entered by user)
+├── CreatedAt (DateTime)
+└── Navigation: Player, GolfSociety?, GolfClub?
+
+ScoringDifferential
+├── ScoringDifferentialId (PK)
+├── PlayerId (FK → Player)
+├── RoundId (FK → Round)
+├── TeeSetId (FK → TeeSet)
+├── AdjustedGrossScore (int — after max score adjustments)
+├── CourseRating (decimal)
+├── SlopeRating (int)
+├── Differential (decimal — the calculated value)
+├── IsUsedInCalculation (bool — is this in the best 8 of 20?)
+├── CalculatedAt (DateTime)
+└── Navigation: Player, Round, TeeSet
+```
+
+##### 4.2 Schema Changes to Existing Models
+
+| Model | Change | Reason |
+|-------|--------|--------|
+| `Player` | Keep `Handicap` field as display/convenience | Shows the "active" handicap (user chooses which source is primary) |
+| `Player` | Add `PrimaryHandicapSource (HandicapSource?)` | Which handicap context is shown as "my handicap" |
+| `Player` | Add `HandicapRecords` navigation | History |
+
+##### 4.3 WHS Calculation Logic (Personal Handicap)
+
+1. After each qualifying round (completed, 18 holes, course has tee set with rating/slope):
+   - Calculate Score Differential: `(113 / SlopeRating) × (AdjustedGrossScore - CourseRating)`
+   - Store as `ScoringDifferential` record
+2. Handicap Index = average of best N differentials from last 20:
+   - 3 rounds: lowest 1, minus 2.0 adjustment
+   - 5 rounds: lowest 1
+   - 6 rounds: average of lowest 2
+   - 8 rounds: average of lowest 2
+   - 20 rounds: average of lowest 8
+3. Recalculate after every qualifying round
+4. Store new `HandicapRecord` with source=Personal
+
+**Society Handicap**: Same calculation but only using rounds linked to that society's competitions.
+
+**Club/Regional Handicap**: Manually entered by user (or imported). Updated when user receives new official handicap from their club.
+
+##### 4.4 Features
+
+**Handicap Dashboard (Web + Mobile):**
+- Show all active handicaps: Personal, Club (per club membership), Society (per society)
+- Handicap history chart over time
+- Scoring differentials table (last 20 rounds)
+- Which differentials are "counting" in the calculation
+
+**Round Completion Flow:**
+- After completing a round: auto-calculate scoring differential if tee set has rating/slope
+- Recalculate personal handicap index
+- If round is linked to a society competition: recalculate society handicap too
+- Notify user if handicap changed
+
+**Player Profile:**
+- Show handicap badges for each context
+- "Primary handicap" selector
+
+**Reports:**
+- Handicap progression over time
+- Handicap comparison across contexts
+- Best/worst differentials
+
+##### 4.5 Files Affected
+
+| Layer | Files |
+|-------|-------|
+| Models | `HandicapRecord.cs` (new), `ScoringDifferential.cs` (new), `HandicapSource.cs` (new enum), `Player.cs` |
+| Data | `ApplicationDbContext.cs`, new migration |
+| Services | `IHandicapService` (new — calculation engine), `IHandicapHistoryService` (new) |
+| Controllers | `HandicapsController` (new) |
+| Web Pages | `Handicaps/` folder (new: Dashboard, History), Player profile enhancements |
+| Mobile | Handicap models, API services, pages |
+| Round Flow | Post-round handicap recalculation trigger |
+
+---
+
+#### Dependency Chain & Build Order
+
+```
+Phase 1: Tee Sets          Phase 2: Societies
+    │                           │
+    │                           │
+    └────────┐    ┌─────────────┘
+             │    │
+             ▼    ▼
+        Phase 3: Competitions
+             │
+             ▼
+        Phase 4: Handicaps
+```
+
+- **Phases 1 and 2 are independent** — can be built in either order or even in parallel
+- **Phase 3 requires both** — competitions need tee sets (for handicap strokes) and societies/clubs (as hosts)
+- **Phase 4 requires Phase 3** — handicap calculation needs scoring differentials from competition rounds with tee set ratings
+
+**Recommended build order**: Phase 1 → Phase 2 → Phase 3 → Phase 4, because tee sets are the most fundamental data structure change and affect the most existing code.
+
+---
+
+#### Migration Safety Rules
+
+1. **All new columns are nullable or have defaults** — no breaking changes to existing data
+2. **Existing queries continue to work** — Hole.Par/StrokeIndex/LengthYards remain as the default view
+3. **Historical rounds don't need tee data** — `RoundPlayer.TeeSetId = null` means "default tees"
+4. **Enum expansions are additive** — `RoundTypeOption.Friendly` stays at value 0
+5. **CSV import is backwards compatible** — old format still works, new columns are optional
+6. **Each phase gets its own EF migration** — can be rolled back independently
 
 ## 13. Future Architecture Evolution
 

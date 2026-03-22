@@ -1,0 +1,96 @@
+@inject ISocietyApiService SocietyService
+@inject NavigationService NavService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    @if (_loading)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (_society == null)
+    {
+        <MudAlert Severity="Severity.Warning">Society not found.</MudAlert>
+    }
+    else
+    {
+        <div class="d-flex align-center gap-2 mb-2">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => NavService.NavigateTo("societies"))" />
+            <MudText Typo="Typo.h5" Style="font-weight: 700;">@_society.Name</MudText>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_society.Description))
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">@_society.Description</MudText>
+        }
+
+        <div class="d-flex gap-2 mb-4">
+            @if (_society.IsMember)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" OnClick="LeaveSociety">Leave</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="JoinSociety">Join</MudButton>
+            }
+        </div>
+
+        <MudText Typo="Typo.h6" Class="mb-2">Members (@_society.Members.Count)</MudText>
+
+        @if (_society.Members.Any())
+        {
+            @foreach (var m in _society.Members.OrderByDescending(m => m.Role))
+            {
+                <MudCard Class="mb-2" Elevation="0" Outlined>
+                    <MudCardContent Class="py-2">
+                        <div class="d-flex justify-space-between align-center">
+                            <div>
+                                <MudText Typo="Typo.body1">@m.UserName</MudText>
+                            </div>
+                            <MudChip T="string" Size="Size.Small" Color="@(m.Role == "Owner" ? Color.Warning : m.Role == "Admin" ? Color.Info : Color.Default)">@m.Role</MudChip>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            }
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No members yet.</MudText>
+        }
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public int SocietyId { get; set; }
+
+    private bool _loading = true;
+    private SocietyDetailDto? _society;
+
+    protected override async Task OnParametersSetAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _society = await SocietyService.GetSocietyByIdAsync(SocietyId);
+        _loading = false;
+    }
+
+    private async Task JoinSociety()
+    {
+        var ok = await SocietyService.JoinSocietyAsync(SocietyId);
+        if (ok)
+        {
+            Snackbar.Add("Joined!", Severity.Success);
+            await LoadData();
+        }
+    }
+
+    private async Task LeaveSociety()
+    {
+        var ok = await SocietyService.LeaveSocietyAsync(SocietyId);
+        if (ok)
+        {
+            Snackbar.Add("Left society.", Severity.Info);
+            NavService.NavigateTo("societies");
+        }
+    }
+}

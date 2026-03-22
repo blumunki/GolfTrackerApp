@@ -1,0 +1,86 @@
+@inject ITeeSetService TeeSetService
+@inject ISnackbar Snackbar
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="TeeSetModel.Name" Label="Tee Name" Required="true" Class="mt-2" />
+        <MudSelect T="string" @bind-Value="TeeSetModel.Colour" Label="Colour" Class="mt-3">
+            @foreach (var c in TeeColours)
+            {
+                <MudSelectItem T="string" Value="@c.Hex">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="width:16px;height:16px;border-radius:50%;background:@c.Hex;border:1px solid #ccc;display:inline-block;"></span>
+                        @c.Name
+                    </div>
+                </MudSelectItem>
+            }
+        </MudSelect>
+        <MudNumericField T="decimal?" @bind-Value="TeeSetModel.CourseRating" Label="Course Rating" Class="mt-3" Format="F1" />
+        <MudNumericField T="int?" @bind-Value="TeeSetModel.SlopeRating" Label="Slope Rating" Min="55" Max="155" Class="mt-3" />
+        <MudSelect T="TeeGender" @bind-Value="TeeSetModel.Gender" Label="Gender" Class="mt-3">
+            <MudSelectItem T="TeeGender" Value="TeeGender.Unisex">Unisex</MudSelectItem>
+            <MudSelectItem T="TeeGender" Value="TeeGender.Male">Men's</MudSelectItem>
+            <MudSelectItem T="TeeGender" Value="TeeGender.Female">Ladies'</MudSelectItem>
+        </MudSelect>
+        <MudNumericField @bind-Value="TeeSetModel.SortOrder" Label="Sort Order" Min="1" Max="10" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public TeeSet TeeSetModel { get; set; } = new();
+    [Parameter] public string Title { get; set; } = "Add Tee Set";
+
+    private static readonly (string Name, string Hex)[] TeeColours = new[]
+    {
+        ("Yellow", "#FFD700"),
+        ("White", "#FFFFFF"),
+        ("Red", "#DC2626"),
+        ("Blue", "#2563EB"),
+        ("Black", "#1A1A2E"),
+        ("Green", "#16A34A"),
+        ("Gold", "#B8860B"),
+        ("Orange", "#EA580C")
+    };
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(TeeSetModel.Name))
+        {
+            Snackbar.Add("Tee name is required.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            if (TeeSetModel.TeeSetId == 0)
+            {
+                await TeeSetService.AddTeeSetAsync(TeeSetModel);
+                Snackbar.Add("Tee set added.", Severity.Success);
+            }
+            else
+            {
+                await TeeSetService.UpdateTeeSetAsync(TeeSetModel);
+                Snackbar.Add("Tee set updated.", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

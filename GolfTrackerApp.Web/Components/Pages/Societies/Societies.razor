@@ -1,0 +1,201 @@
+@page "/societies"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject IGolfSocietyService SocietyService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+
+<PageTitle>Golf Societies</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4" Style="font-weight: 700;">Golf Societies</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+            Create Society
+        </MudButton>
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!_societies.Any())
+    {
+        <MudAlert Severity="Severity.Info">No societies found. Create one to get started!</MudAlert>
+    }
+    else
+    {
+        <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-3">
+            <MudTabPanel Text="All Societies" BadgeData="@_societies.Count" BadgeColor="Color.Primary">
+                <MudGrid Spacing="3">
+                    @foreach (var society in _societies)
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard Elevation="2" Style="cursor:pointer;" @onclick="() => ViewSociety(society.GolfSocietyId)">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">@society.Name</MudText>
+                                    </CardHeaderContent>
+                                    <CardHeaderActions>
+                                        @if (society.IsMember)
+                                        {
+                                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Member</MudChip>
+                                        }
+                                    </CardHeaderActions>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(society.Description ?? "No description")</MudText>
+                                    <div class="d-flex align-center gap-2 mt-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.caption">@society.MemberCount member@(society.MemberCount != 1 ? "s" : "")</MudText>
+                                    </div>
+                                </MudCardContent>
+                                <MudCardActions>
+                                    @if (!society.IsMember)
+                                    {
+                                        <span @onclick:stopPropagation="true">
+                                            <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="@(() => JoinSociety(society.GolfSocietyId))">Join</MudButton>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span @onclick:stopPropagation="true">
+                                            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="@(() => ViewSociety(society.GolfSocietyId))">View</MudButton>
+                                        </span>
+                                    }
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudTabPanel>
+            <MudTabPanel Text="My Societies" BadgeData="@_mySocieties.Count" BadgeColor="Color.Success">
+                <MudGrid Spacing="3">
+                    @foreach (var society in _mySocieties)
+                    {
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudCard Elevation="2" Style="cursor:pointer;" @onclick="() => ViewSociety(society.GolfSocietyId)">
+                                <MudCardHeader>
+                                    <CardHeaderContent>
+                                        <MudText Typo="Typo.h6">@society.Name</MudText>
+                                    </CardHeaderContent>
+                                    <CardHeaderActions>
+                                        <MudChip T="string" Color="Color.Info" Size="Size.Small">@society.MyRole</MudChip>
+                                    </CardHeaderActions>
+                                </MudCardHeader>
+                                <MudCardContent>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">@(society.Description ?? "No description")</MudText>
+                                    <div class="d-flex align-center gap-2 mt-2">
+                                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
+                                        <MudText Typo="Typo.caption">@society.MemberCount member@(society.MemberCount != 1 ? "s" : "")</MudText>
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            </MudTabPanel>
+        </MudTabs>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private string _userId = string.Empty;
+    private List<SocietyListItem> _societies = new();
+    private List<MySocietyListItem> _mySocieties = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        try
+        {
+            var allSocieties = await SocietyService.GetAllSocietiesAsync();
+            _societies = allSocieties.Select(s => new SocietyListItem
+            {
+                GolfSocietyId = s.GolfSocietyId,
+                Name = s.Name,
+                Description = s.Description,
+                MemberCount = s.Memberships.Count,
+                IsMember = s.Memberships.Any(m => m.UserId == _userId)
+            }).ToList();
+
+            var mySocieties = await SocietyService.GetSocietiesForUserAsync(_userId);
+            _mySocieties = mySocieties.Select(s => new MySocietyListItem
+            {
+                GolfSocietyId = s.GolfSocietyId,
+                Name = s.Name,
+                Description = s.Description,
+                MemberCount = s.Memberships.Count,
+                MyRole = s.Memberships.FirstOrDefault(m => m.UserId == _userId)?.Role.ToString() ?? "Member"
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading societies: {ex.Message}", Severity.Error);
+        }
+        _loading = false;
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<CreateSocietyDialog>();
+        var dialog = await DialogService.ShowAsync<CreateSocietyDialog>("Create Society", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled && result.Data is GolfSociety created)
+        {
+            await LoadData();
+            Snackbar.Add($"Society '{created.Name}' created!", Severity.Success);
+        }
+    }
+
+    private async Task JoinSociety(int societyId)
+    {
+        try
+        {
+            await SocietyService.JoinSocietyAsync(societyId, _userId);
+            Snackbar.Add("Joined society!", Severity.Success);
+            await LoadData();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private void ViewSociety(int societyId) => NavigationManager.NavigateTo($"/societies/{societyId}");
+
+    private class SocietyListItem
+    {
+        public int GolfSocietyId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int MemberCount { get; set; }
+        public bool IsMember { get; set; }
+    }
+
+    private class MySocietyListItem
+    {
+        public int GolfSocietyId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public int MemberCount { get; set; }
+        public string MyRole { get; set; } = "Member";
+    }
+}

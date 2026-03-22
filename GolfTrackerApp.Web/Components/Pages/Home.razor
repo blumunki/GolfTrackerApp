@@ -949,7 +949,7 @@
         {
             aiInsight = await AiInsightService.GetDashboardInsightsAsync(userId, forceRefresh);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             aiInsight = new AiInsightResult
             {

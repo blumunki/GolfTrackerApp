@@ -1,4 +1,5 @@
 @inject IHoleService HoleService
+@inject ITeeSetService TeeSetService
 @inject ISnackbar Snackbar
 
 @using GolfTrackerApp.Web.Models
@@ -15,8 +16,20 @@
             <DataAnnotationsValidator />
             <MudNumericField @bind-Value="HoleModel.HoleNumber" For="@(() => HoleModel.HoleNumber)" Label="Hole Number" Required="true" Min="1" />
             <MudNumericField @bind-Value="HoleModel.Par" For="@(() => HoleModel.Par)" Label="Par" Required="true" Min="3" Max="6" Class="mt-3" />
-            <MudNumericField @bind-Value="HoleModel.LengthYards" For="@(() => HoleModel.LengthYards)" Label="Length (Yards)" Class="mt-3" />
             <MudNumericField @bind-Value="HoleModel.StrokeIndex" For="@(() => HoleModel.StrokeIndex)" Label="Stroke Index" Min="1" Max="18" Class="mt-3" />
+
+            @if (_teeYardageEntries.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Yardages by Tee</MudText>
+                @foreach (var entry in _teeYardageEntries)
+                {
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <span style="width:14px;height:14px;border-radius:50%;background:@entry.Colour;border:1px solid #ccc;display:inline-block;flex-shrink:0;"></span>
+                        <MudNumericField T="int?" @bind-Value="entry.LengthYards" Label="@($"{entry.TeeSetName} (yards)")"
+                                         Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1;" HideSpinButtons="true" />
+                    </div>
+                }
+            }
             <button type="submit" class="golf-hidden-submit"></button>
         </EditForm>
     </DialogContent>
@@ -32,6 +45,35 @@
     [Parameter] public string Title { get; set; } = "Add Hole";
     [Parameter] public string ButtonText { get; set; } = "Save";
 
+    private List<TeeYardageEntry> _teeYardageEntries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load tee sets for the hole's course
+        var teeSets = await TeeSetService.GetTeeSetsForCourseAsync(HoleModel.GolfCourseId);
+        if (teeSets == null || !teeSets.Any()) return;
+
+        foreach (var ts in teeSets)
+        {
+            int? existingYards = null;
+
+            // If editing an existing hole, load its HoleTee data
+            if (HoleModel.HoleId > 0)
+            {
+                var existing = ts.HoleTees?.FirstOrDefault(ht => ht.HoleId == HoleModel.HoleId);
+                existingYards = existing?.LengthYards;
+            }
+
+            _teeYardageEntries.Add(new TeeYardageEntry
+            {
+                TeeSetId = ts.TeeSetId,
+                TeeSetName = ts.Name,
+                Colour = ts.Colour,
+                LengthYards = existingYards
+            });
+        }
+    }
+
     private async Task Submit()
     {
         try
@@ -46,6 +88,20 @@
                 await HoleService.UpdateHoleAsync(HoleModel);
                 Snackbar.Add("Hole updated successfully.", Severity.Success);
             }
+
+            // Save per-tee yardages
+            foreach (var entry in _teeYardageEntries)
+            {
+                await TeeSetService.AddOrUpdateHoleTeeAsync(new HoleTee
+                {
+                    HoleId = HoleModel.HoleId,
+                    TeeSetId = entry.TeeSetId,
+                    Par = HoleModel.Par,
+                    StrokeIndex = HoleModel.StrokeIndex,
+                    LengthYards = entry.LengthYards
+                });
+            }
+
             MudDialog.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)
@@ -56,4 +112,12 @@
     }
 
     void Cancel() => MudDialog.Cancel();
+
+    private class TeeYardageEntry
+    {
+        public int TeeSetId { get; set; }
+        public string TeeSetName { get; set; } = "";
+        public string Colour { get; set; } = "#FFD700";
+        public int? LengthYards { get; set; }
+    }
 }

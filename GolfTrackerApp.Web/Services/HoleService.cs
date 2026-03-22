@@ -75,6 +75,7 @@ namespace GolfTrackerApp.Web.Services
             
             return await _context.Holes
                                  .Where(h => h.GolfCourseId == golfCourseId)
+                                 .Include(h => h.HoleTees)
                                  .OrderBy(h => h.HoleNumber)
                                  .ToListAsync();
         }

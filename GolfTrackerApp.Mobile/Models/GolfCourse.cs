@@ -24,6 +24,54 @@ public class GolfCourse
     
     // Convenience accessor
     public string? GolfClubName => GolfClub?.Name;
+
+    [JsonPropertyName("teeSets")]
+    public List<TeeSetDto>? TeeSets { get; set; }
+}
+
+public class TeeSetDto
+{
+    [JsonPropertyName("teeSetId")]
+    public int TeeSetId { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("colour")]
+    public string Colour { get; set; } = "#FFD700";
+
+    [JsonPropertyName("courseRating")]
+    public decimal? CourseRating { get; set; }
+
+    [JsonPropertyName("slopeRating")]
+    public int? SlopeRating { get; set; }
+
+    [JsonPropertyName("gender")]
+    public string Gender { get; set; } = "Unisex";
+
+    [JsonPropertyName("sortOrder")]
+    public int SortOrder { get; set; }
+
+    [JsonPropertyName("holeTees")]
+    public List<HoleTeeDto>? HoleTees { get; set; }
+}
+
+public class HoleTeeDto
+{
+    [JsonPropertyName("holeTeeId")]
+    public int HoleTeeId { get; set; }
+
+    [JsonPropertyName("holeId")]
+    public int HoleId { get; set; }
+
+    [JsonPropertyName("par")]
+    public int Par { get; set; }
+
+    [JsonPropertyName("strokeIndex")]
+    public int? StrokeIndex { get; set; }
+
+    [JsonPropertyName("lengthYards")]
+    public int? LengthYards { get; set; }
 }
 
 public class GolfClubRef

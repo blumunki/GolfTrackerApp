@@ -19,5 +19,8 @@ public class ApplicationUser : IdentityUser
 
     [ForeignKey("LinkedPlayerId")]
     public virtual Player? LinkedPlayer { get; set; }
+
+    public virtual ICollection<ClubMembership> ClubMemberships { get; set; } = new List<ClubMembership>();
+    public virtual ICollection<SocietyMembership> SocietyMemberships { get; set; } = new List<SocietyMembership>();
 }
 

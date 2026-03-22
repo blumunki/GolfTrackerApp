@@ -1,0 +1,138 @@
+@inject ITeeSetService TeeSetService
+@inject IHoleService HoleService
+@inject ISnackbar Snackbar
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <div class="d-flex align-center gap-2">
+            <span style="width:14px;height:14px;border-radius:50%;background:@TeeColour;border:1px solid #ccc;display:inline-block;"></span>
+            <MudText Typo="Typo.h6">@TeeSetName — Hole Data</MudText>
+        </div>
+    </TitleContent>
+    <DialogContent>
+        @if (isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Hover="true" Style="overflow-x:auto;">
+                <thead>
+                    <tr>
+                        <th>Hole</th>
+                        <th>Par</th>
+                        <th>SI</th>
+                        <th>Yards</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in entries)
+                    {
+                        <tr>
+                            <td><strong>@entry.HoleNumber</strong></td>
+                            <td>
+                                <MudNumericField T="int" @bind-Value="entry.Par" Min="3" Max="6"
+                                                 Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                 Style="max-width:70px;" HideSpinButtons="true" />
+                            </td>
+                            <td>
+                                <MudNumericField T="int?" @bind-Value="entry.StrokeIndex" Min="1" Max="18"
+                                                 Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                 Style="max-width:70px;" HideSpinButtons="true" />
+                            </td>
+                            <td>
+                                <MudNumericField T="int?" @bind-Value="entry.LengthYards" Min="50" Max="700"
+                                                 Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                 Style="max-width:90px;" HideSpinButtons="true" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Save" Disabled="@isSaving">
+            @(isSaving ? "Saving..." : "Save All")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public int TeeSetId { get; set; }
+    [Parameter] public int CourseId { get; set; }
+    [Parameter] public string TeeSetName { get; set; } = "";
+    [Parameter] public string TeeColour { get; set; } = "#FFD700";
+
+    private List<HoleTeeEntry> entries = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var holes = await HoleService.GetHolesForCourseAsync(CourseId);
+        var holeTees = await TeeSetService.GetHoleTeesForTeeSetAsync(TeeSetId);
+        var holeTeeMap = holeTees.ToDictionary(ht => ht.HoleId);
+
+        entries = holes.OrderBy(h => h.HoleNumber).Select(h =>
+        {
+            holeTeeMap.TryGetValue(h.HoleId, out var existing);
+            return new HoleTeeEntry
+            {
+                HoleId = h.HoleId,
+                HoleNumber = h.HoleNumber,
+                Par = existing?.Par ?? h.Par,
+                StrokeIndex = existing?.StrokeIndex ?? h.StrokeIndex,
+                LengthYards = existing?.LengthYards ?? h.LengthYards
+            };
+        }).ToList();
+
+        isLoading = false;
+    }
+
+    private async Task Save()
+    {
+        isSaving = true;
+        try
+        {
+            foreach (var entry in entries)
+            {
+                await TeeSetService.AddOrUpdateHoleTeeAsync(new HoleTee
+                {
+                    HoleId = entry.HoleId,
+                    TeeSetId = TeeSetId,
+                    Par = entry.Par,
+                    StrokeIndex = entry.StrokeIndex,
+                    LengthYards = entry.LengthYards
+                });
+            }
+            Snackbar.Add("Hole tee data saved.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+
+    private class HoleTeeEntry
+    {
+        public int HoleId { get; set; }
+        public int HoleNumber { get; set; }
+        public int Par { get; set; }
+        public int? StrokeIndex { get; set; }
+        public int? LengthYards { get; set; }
+    }
+}

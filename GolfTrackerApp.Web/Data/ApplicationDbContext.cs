@@ -38,6 +38,15 @@ namespace GolfTrackerApp.Web.Data
         // Application settings
         public DbSet<ApplicationSetting> ApplicationSettings { get; set; }
 
+        // Tee sets (Phase 1)
+        public DbSet<TeeSet> TeeSets { get; set; }
+        public DbSet<HoleTee> HoleTees { get; set; }
+
+        // Societies & memberships (Phase 2)
+        public DbSet<GolfSociety> GolfSocieties { get; set; }
+        public DbSet<SocietyMembership> SocietyMemberships { get; set; }
+        public DbSet<ClubMembership> ClubMemberships { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder); // Important: Call base method first for Identity models
@@ -199,6 +208,88 @@ namespace GolfTrackerApp.Web.Data
             builder.Entity<ApplicationSetting>(entity =>
             {
                 entity.HasIndex(s => s.Key).IsUnique();
+            });
+
+            // TeeSet configuration
+            builder.Entity<TeeSet>(entity =>
+            {
+                entity.HasOne(ts => ts.GolfCourse)
+                    .WithMany(gc => gc.TeeSets)
+                    .HasForeignKey(ts => ts.GolfCourseId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(ts => new { ts.GolfCourseId, ts.Name }).IsUnique();
+            });
+
+            // HoleTee configuration
+            builder.Entity<HoleTee>(entity =>
+            {
+                entity.HasOne(ht => ht.Hole)
+                    .WithMany(h => h.HoleTees)
+                    .HasForeignKey(ht => ht.HoleId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(ht => ht.TeeSet)
+                    .WithMany(ts => ts.HoleTees)
+                    .HasForeignKey(ht => ht.TeeSetId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(ht => new { ht.HoleId, ht.TeeSetId }).IsUnique();
+            });
+
+            // RoundPlayer → TeeSet (optional)
+            builder.Entity<RoundPlayer>()
+                .HasOne(rp => rp.TeeSet)
+                .WithMany()
+                .HasForeignKey(rp => rp.TeeSetId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Score → TeeSet (optional, denormalized)
+            builder.Entity<Score>()
+                .HasOne(s => s.TeeSet)
+                .WithMany()
+                .HasForeignKey(s => s.TeeSetId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // GolfSociety configuration
+            builder.Entity<GolfSociety>(entity =>
+            {
+                entity.HasOne(gs => gs.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(gs => gs.CreatedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // SocietyMembership configuration
+            builder.Entity<SocietyMembership>(entity =>
+            {
+                entity.HasOne(sm => sm.GolfSociety)
+                    .WithMany(gs => gs.Memberships)
+                    .HasForeignKey(sm => sm.GolfSocietyId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(sm => sm.User)
+                    .WithMany(u => u.SocietyMemberships)
+                    .HasForeignKey(sm => sm.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(sm => new { sm.GolfSocietyId, sm.UserId }).IsUnique();
+            });
+
+            // ClubMembership configuration
+            builder.Entity<ClubMembership>(entity =>
+            {
+                entity.HasOne(cm => cm.GolfClub)
+                    .WithMany(gc => gc.ClubMemberships)
+                    .HasForeignKey(cm => cm.GolfClubId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(cm => cm.User)
+                    .WithMany(u => u.ClubMemberships)
+                    .HasForeignKey(cm => cm.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(cm => new { cm.GolfClubId, cm.UserId }).IsUnique();
             });
         }
     }

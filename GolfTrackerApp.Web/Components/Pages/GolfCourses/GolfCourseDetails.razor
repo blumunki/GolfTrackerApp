@@ -13,6 +13,7 @@
 @inject IPlayerService PlayerService
 @inject IAiInsightService AiInsightService
 @inject IConfiguration Configuration
+@inject ITeeSetService TeeSetService
 
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Services
@@ -67,7 +68,18 @@ else
                 <MudIcon Icon="@Icons.Material.Filled.SportsGolf" Size="Size.Small" />
                 @course.NumberOfHoles Holes
             </span>
-            @if (holes.Any() && holes.Any(h => h.LengthYards.HasValue && h.LengthYards > 0))
+            @foreach (var ts in _teeSets)
+            {
+                var totalYards = GetTeeTotalYards(ts.TeeSetId);
+                if (totalYards > 0)
+                {
+                    <span class="course-meta-item">
+                        <span style="width:10px;height:10px;border-radius:50%;background:@ts.Colour;border:1px solid rgba(255,255,255,0.4);display:inline-block;"></span>
+                        @totalYards yds
+                    </span>
+                }
+            }
+            @if (!_teeSets.Any() && holes.Any() && holes.Any(h => h.LengthYards.HasValue && h.LengthYards > 0))
             {
                 <span class="course-meta-item">
                     <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" />
@@ -168,8 +180,20 @@ else
             <HeaderContent>
                 <MudTh>Hole</MudTh>
                 <MudTh>Par</MudTh>
-                <MudTh>Length (Yards)</MudTh>
-                <MudTh>Stroke Index</MudTh>
+                @foreach (var ts in _teeSets)
+                {
+                    <MudTh>
+                        <div style="display:flex;align-items:center;gap:4px;">
+                            <span style="width:10px;height:10px;border-radius:50%;background:@ts.Colour;border:1px solid #ccc;display:inline-block;"></span>
+                            @ts.Name
+                        </div>
+                    </MudTh>
+                }
+                @if (!_teeSets.Any())
+                {
+                    <MudTh>Yards</MudTh>
+                }
+                <MudTh>SI</MudTh>
                 @if (isAuthenticated && holeAverages.Any())
                 {
                     <MudTh>Your Avg</MudTh>
@@ -183,8 +207,16 @@ else
             <RowTemplate>
                 <MudTd DataLabel="Hole"><span class="hole-number-cell">@context.HoleNumber</span></MudTd>
                 <MudTd DataLabel="Par"><span class="hole-par-cell">@context.Par</span></MudTd>
-                <MudTd DataLabel="Length">@(context.LengthYards?.ToString() ?? "-")</MudTd>
-                <MudTd DataLabel="SI">@context.StrokeIndex</MudTd>
+                @foreach (var ts in _teeSets)
+                {
+                    var ht = GetHoleTeeForSet(context.HoleId, ts.TeeSetId);
+                    <MudTd DataLabel="@ts.Name">@(ht?.LengthYards?.ToString() ?? "-")</MudTd>
+                }
+                @if (!_teeSets.Any())
+                {
+                    <MudTd DataLabel="Yards">@(context.LengthYards?.ToString() ?? "-")</MudTd>
+                }
+                <MudTd DataLabel="SI">@(context.StrokeIndex?.ToString() ?? "-")</MudTd>
                 @if (isAuthenticated && holeAverages.Any())
                 {
                     var avg = GetHoleAverage(context.HoleId);
@@ -320,6 +352,10 @@ else
     private bool isLoading = true;
     private List<BreadcrumbItem> _breadcrumbs = new();
 
+    // Tee set data
+    private List<TeeSet> _teeSets = new();
+    private Dictionary<(int HoleId, int TeeSetId), HoleTee> _holeTeeMap = new();
+
     // Performance data properties
     private string? currentUserId;
     private int _currentPlayerId;
@@ -369,6 +405,15 @@ else
             if (course != null)
             {
                 holes = await HoleService.GetHolesForCourseAsync(course.GolfCourseId);
+
+                // Ensure all 3 standard tee sets exist (White, Yellow, Red)
+                await TeeSetService.EnsureStandardTeeSetsAsync(course.GolfCourseId);
+
+                // Load tee sets for the course
+                _teeSets = await TeeSetService.GetTeeSetsForCourseAsync(course.GolfCourseId);
+                _holeTeeMap = _teeSets
+                    .SelectMany(ts => ts.HoleTees ?? Enumerable.Empty<HoleTee>())
+                    .ToDictionary(ht => (ht.HoleId, ht.TeeSetId));
 
                 // Setup breadcrumbs for easy navigation
                 _breadcrumbs = new List<BreadcrumbItem>
@@ -663,5 +708,20 @@ else
                 Snackbar.Add($"Error deleting hole: {ex.Message}", Severity.Error);
             }
         }
+    }
+
+    // ── Tee Set Helpers ──
+
+    private HoleTee? GetHoleTeeForSet(int holeId, int teeSetId)
+    {
+        _holeTeeMap.TryGetValue((holeId, teeSetId), out var ht);
+        return ht;
+    }
+
+    private int GetTeeTotalYards(int teeSetId)
+    {
+        return _holeTeeMap
+            .Where(kvp => kvp.Key.TeeSetId == teeSetId)
+            .Sum(kvp => kvp.Value.LengthYards ?? 0);
     }
 }

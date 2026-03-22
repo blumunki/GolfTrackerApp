@@ -1,0 +1,174 @@
+@page "/societies/{SocietyId:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject IGolfSocietyService SocietyService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authorization
+@using MudBlazor
+
+<PageTitle>@(_society?.Name ?? "Society Details")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    @if (_loading)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (_society == null)
+    {
+        <MudAlert Severity="Severity.Error">Society not found.</MudAlert>
+    }
+    else
+    {
+        <MudBreadcrumbs Items="@(new List<BreadcrumbItem> { new("Societies", "/societies"), new(_society.Name, null, true) })" Class="mb-3" />
+
+        <div class="d-flex justify-space-between align-center mb-4">
+            <div>
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">@_society.Name</MudText>
+                @if (!string.IsNullOrEmpty(_society.Description))
+                {
+                    <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-1">@_society.Description</MudText>
+                }
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Created @_society.CreatedAt.ToString("d MMMM yyyy") by @(_society.CreatedByUser?.UserName ?? "Unknown")</MudText>
+            </div>
+            <div class="d-flex gap-2">
+                @if (!_isMember)
+                {
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="JoinSociety">Join Society</MudButton>
+                }
+                else if (_myRole != MembershipRole.Owner)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="LeaveSociety">Leave</MudButton>
+                }
+                @if (_myRole == MembershipRole.Owner)
+                {
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="DeleteSociety">Delete Society</MudButton>
+                }
+            </div>
+        </div>
+
+        <MudText Typo="Typo.h6" Class="mb-3" Style="font-weight: 600;">Members (@_society.Memberships.Count)</MudText>
+        <MudTable Items="@_society.Memberships.OrderByDescending(m => m.Role).ThenBy(m => m.JoinedAt)" Hover="true" Dense="true" Elevation="2">
+            <HeaderContent>
+                <MudTh>User</MudTh>
+                <MudTh>Role</MudTh>
+                <MudTh>Joined</MudTh>
+                @if (_myRole >= MembershipRole.Admin)
+                {
+                    <MudTh>Actions</MudTh>
+                }
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@(context.User?.UserName ?? "Unknown")</MudTd>
+                <MudTd>
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@(context.Role == MembershipRole.Owner ? Color.Warning : (context.Role == MembershipRole.Admin ? Color.Info : Color.Default))">
+                        @context.Role
+                    </MudChip>
+                </MudTd>
+                <MudTd>@context.JoinedAt.ToString("d MMM yyyy")</MudTd>
+                @if (_myRole >= MembershipRole.Admin)
+                {
+                    <MudTd>
+                        @if (context.UserId != _userId && context.Role != MembershipRole.Owner)
+                        {
+                            @if (_myRole == MembershipRole.Owner)
+                            {
+                                <MudTooltip Text="@(context.Role == MembershipRole.Admin ? "Demote to Member" : "Promote to Admin")">
+                                    <MudIconButton Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Small"
+                                                   OnClick="@(() => ToggleAdmin(context))" />
+                                </MudTooltip>
+                            }
+                        }
+                    </MudTd>
+                }
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    [Parameter] public int SocietyId { get; set; }
+
+    private bool _loading = true;
+    private string _userId = string.Empty;
+    private GolfSociety? _society;
+    private bool _isMember;
+    private MembershipRole _myRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+        await LoadSociety();
+    }
+
+    private async Task LoadSociety()
+    {
+        _loading = true;
+        _society = await SocietyService.GetSocietyByIdAsync(SocietyId);
+        if (_society != null)
+        {
+            var myMembership = _society.Memberships.FirstOrDefault(m => m.UserId == _userId);
+            _isMember = myMembership != null;
+            _myRole = myMembership?.Role ?? MembershipRole.Member;
+        }
+        _loading = false;
+    }
+
+    private async Task JoinSociety()
+    {
+        try
+        {
+            await SocietyService.JoinSocietyAsync(SocietyId, _userId);
+            Snackbar.Add("Joined!", Severity.Success);
+            await LoadSociety();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private async Task LeaveSociety()
+    {
+        try
+        {
+            await SocietyService.LeaveSocietyAsync(SocietyId, _userId);
+            Snackbar.Add("Left society.", Severity.Info);
+            NavigationManager.NavigateTo("/societies");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private async Task DeleteSociety()
+    {
+        var result = await SocietyService.DeleteSocietyAsync(SocietyId, _userId);
+        if (result)
+        {
+            Snackbar.Add("Society deleted.", Severity.Info);
+            NavigationManager.NavigateTo("/societies");
+        }
+        else
+        {
+            Snackbar.Add("Only the owner can delete a society.", Severity.Error);
+        }
+    }
+
+    private async Task ToggleAdmin(SocietyMembership membership)
+    {
+        var newRole = membership.Role == MembershipRole.Admin ? MembershipRole.Member : MembershipRole.Admin;
+        await SocietyService.UpdateMemberRoleAsync(SocietyId, membership.UserId, newRole, _userId);
+        await LoadSociety();
+    }
+}

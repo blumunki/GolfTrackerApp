@@ -1,0 +1,108 @@
+@inject ISocietyApiService SocietyService
+@inject NavigationService NavService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h5" Style="font-weight: 700;">Societies</MudText>
+        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" OnClick="ShowCreateForm" />
+    </div>
+
+    @if (_showCreate)
+    {
+        <MudCard Class="mb-4" Elevation="2">
+            <MudCardContent>
+                <MudTextField @bind-Value="_newName" Label="Society Name" Required="true" Class="mb-2" />
+                <MudTextField @bind-Value="_newDescription" Label="Description" Lines="2" />
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Size="Size.Small" OnClick="() => _showCreate = false">Cancel</MudButton>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateSociety" Disabled="@(string.IsNullOrWhiteSpace(_newName))">Create</MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+
+    @if (_loading)
+    {
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+    }
+    else if (!_societies.Any())
+    {
+        <MudAlert Severity="Severity.Info">No societies found. Create one to get started!</MudAlert>
+    }
+    else
+    {
+        @foreach (var society in _societies)
+        {
+            <MudCard Class="mb-3" Elevation="1" @onclick="@(() => NavService.NavigateTo($"society-detail/{society.GolfSocietyId}"))" Style="cursor:pointer;">
+                <MudCardContent>
+                    <div class="d-flex justify-space-between align-center">
+                        <MudText Typo="Typo.h6">@society.Name</MudText>
+                        @if (society.IsMember)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Member</MudChip>
+                        }
+                    </div>
+                    @if (!string.IsNullOrEmpty(society.Description))
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@society.Description</MudText>
+                    }
+                    <div class="d-flex align-center gap-1 mt-1">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
+                        <MudText Typo="Typo.caption">@society.MemberCount member@(society.MemberCount != 1 ? "s" : "")</MudText>
+                    </div>
+                </MudCardContent>
+                @if (!society.IsMember)
+                {
+                    <MudCardActions>
+                        <span @onclick:stopPropagation="true">
+                            <MudButton Size="Size.Small" Color="Color.Primary" OnClick="@(() => JoinSociety(society.GolfSocietyId))">Join</MudButton>
+                        </span>
+                    </MudCardActions>
+                }
+            </MudCard>
+        }
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private bool _showCreate;
+    private string _newName = string.Empty;
+    private string? _newDescription;
+    private List<GolfSocietyDto> _societies = new();
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        _loading = true;
+        _societies = await SocietyService.GetAllSocietiesAsync();
+        _loading = false;
+    }
+
+    private void ShowCreateForm() => _showCreate = true;
+
+    private async Task CreateSociety()
+    {
+        var created = await SocietyService.CreateSocietyAsync(_newName.Trim(), _newDescription?.Trim());
+        if (created != null)
+        {
+            Snackbar.Add($"Society '{created.Name}' created!", Severity.Success);
+            _showCreate = false;
+            _newName = string.Empty;
+            _newDescription = null;
+            await LoadData();
+        }
+    }
+
+    private async Task JoinSociety(int societyId)
+    {
+        var ok = await SocietyService.JoinSocietyAsync(societyId);
+        if (ok)
+        {
+            Snackbar.Add("Joined!", Severity.Success);
+            await LoadData();
+        }
+    }
+}

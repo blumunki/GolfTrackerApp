@@ -154,6 +154,22 @@
                     case "notifications":
                         <NotificationsPage />
                         break;
+                    case "societies":
+                        <SocietiesPage />
+                        break;
+                    case var page when page.StartsWith("society-detail/"):
+                        {
+                            var idStr = currentPage.Substring("society-detail/".Length);
+                            if (int.TryParse(idStr, out var societyId))
+                            {
+                                <SocietyDetailPage SocietyId="@societyId" />
+                            }
+                            else
+                            {
+                                <SocietiesPage />
+                            }
+                        }
+                        break;
                     default:
                         <Home />
                         break;

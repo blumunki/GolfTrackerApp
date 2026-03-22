@@ -16,5 +16,9 @@ namespace GolfTrackerApp.Web.Models
         public int PlayerId { get; set; }
         [ForeignKey("PlayerId")]
         public virtual Player? Player { get; set; }
+
+        public int? TeeSetId { get; set; }
+        [ForeignKey("TeeSetId")]
+        public virtual TeeSet? TeeSet { get; set; }
     }
 }

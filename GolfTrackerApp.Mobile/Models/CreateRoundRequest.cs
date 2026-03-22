@@ -52,6 +52,9 @@ public class CreateRoundPlayerRequest
 {
     [JsonPropertyName("playerId")]
     public int PlayerId { get; set; }
+
+    [JsonPropertyName("teeSetId")]
+    public int? TeeSetId { get; set; }
 }
 
 public class CreateScoreRequest
@@ -78,9 +81,11 @@ public class HoleScoreEntry
     public int HoleNumber { get; set; }
     public int Par { get; set; }
     public int StrokeIndex { get; set; }
+    public int? LengthYards { get; set; }
     public int? Strokes { get; set; }
     public int? Putts { get; set; }
     public bool? FairwayHit { get; set; }
+    public int? TeeSetId { get; set; }
     
     public int? ScoreVsPar => Strokes.HasValue && Par != 0 ? Strokes - Par : null;
 }

@@ -11,4 +11,5 @@ public class HoleScoreEntryModel
     public int? Putts { get; set; }
     public bool? FairwayHit { get; set; }
     public int? ScoreVsPar => Strokes.HasValue && Par != 0 ? Strokes - Par : null;
+    public int? TeeSetId { get; set; }
 }

@@ -43,6 +43,11 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds)
         {
+            return await AddRoundAsync(round, playerIds, null);
+        }
+
+        public async Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds, Dictionary<int, int?>? teeSelections)
+        {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             if (string.IsNullOrEmpty(round.CreatedByApplicationUserId))
@@ -88,7 +93,8 @@ namespace GolfTrackerApp.Web.Services
 
                     foreach (var playerId in playerIds)
                     {
-                        round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId });
+                        int? teeSetId = teeSelections != null && teeSelections.TryGetValue(playerId, out var tsId) ? tsId : null;
+                        round.RoundPlayers.Add(new RoundPlayer { RoundId = round.RoundId, PlayerId = playerId, TeeSetId = teeSetId });
                     }
                     await _context.SaveChangesAsync();
                 
@@ -160,6 +166,8 @@ namespace GolfTrackerApp.Web.Services
                                     .ThenInclude(s => s!.Hole)
                                 .Include(r => r.RoundPlayers!)
                                     .ThenInclude(rp => rp!.Player)
+                                .Include(r => r.RoundPlayers!)
+                                    .ThenInclude(rp => rp!.TeeSet)
                                 .AsSplitQuery()
                                 .FirstOrDefaultAsync(r => r.RoundId == id);
         }
@@ -327,11 +335,17 @@ namespace GolfTrackerApp.Web.Services
 
         public async Task<Scorecard> PrepareScorecardAsync(int courseId, int startingHole, int holesPlayed, List<Player> players)
         {
+            return await PrepareScorecardAsync(courseId, startingHole, holesPlayed, players, null);
+        }
+
+        public async Task<Scorecard> PrepareScorecardAsync(int courseId, int startingHole, int holesPlayed, List<Player> players, Dictionary<int, int?>? teeSelections)
+        {
             await using var _context = await _contextFactory.CreateDbContextAsync();
             
             var allCourseHoles = await _context.Holes
                 .AsNoTracking()
                 .Where(h => h.GolfCourseId == courseId)
+                .Include(h => h.HoleTees)
                 .OrderBy(h => h.HoleNumber)
                 .ToListAsync();
 
@@ -340,7 +354,6 @@ namespace GolfTrackerApp.Web.Services
                 throw new InvalidOperationException($"Course with ID {courseId} has no holes.");
             }
 
-            // --- This is your logic, now centralized in the service ---
             var playedHoles = new List<Hole>();
             int currentHoleNum = startingHole;
             int maxHoleNumOnCourse = allCourseHoles.Max(h => h.HoleNumber);
@@ -362,17 +375,27 @@ namespace GolfTrackerApp.Web.Services
             var scores = new Dictionary<int, List<HoleScoreEntryModel>>();
             foreach (var player in players)
             {
-                var scoresForPlayer = playedHoles.Select(hole => new HoleScoreEntryModel
+                int? playerTeeSetId = teeSelections != null && teeSelections.TryGetValue(player.PlayerId, out var tsId) ? tsId : null;
+                
+                var scoresForPlayer = playedHoles.Select(hole =>
                 {
-                    HoleId = hole.HoleId,
-                    HoleNumber = hole.HoleNumber,
-                    Par = hole.Par,
-                    StrokeIndex = hole.StrokeIndex ?? 0,
-                    LengthYards = hole.LengthYards,
+                    // Check if we have tee-specific data
+                    var holeTee = playerTeeSetId.HasValue
+                        ? hole.HoleTees?.FirstOrDefault(ht => ht.TeeSetId == playerTeeSetId.Value)
+                        : null;
+
+                    return new HoleScoreEntryModel
+                    {
+                        HoleId = hole.HoleId,
+                        HoleNumber = hole.HoleNumber,
+                        Par = holeTee?.Par ?? hole.Par,
+                        StrokeIndex = holeTee?.StrokeIndex ?? hole.StrokeIndex ?? 0,
+                        LengthYards = holeTee?.LengthYards ?? hole.LengthYards,
+                        TeeSetId = playerTeeSetId,
+                    };
                 }).ToList();
                 scores.Add(player.PlayerId, scoresForPlayer);
             }
-            // --- End of moved logic ---
 
             return new Scorecard
             {

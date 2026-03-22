@@ -12,6 +12,7 @@ namespace GolfTrackerApp.Web.Services
         Task<Round?> GetRoundByIdAsync(int id); // Potentially add user context for authorization later
         // AddRoundAsync will take the Round object which should have CreatedByApplicationUserId pre-filled
         Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds);
+        Task<Round> AddRoundAsync(Round round, IEnumerable<int> playerIds, Dictionary<int, int?>? teeSelections);
         Task<Round?> UpdateRoundAsync(Round round, IEnumerable<int>? playerIdsToUpdate = null);
         Task<bool> DeleteRoundAsync(int id);
         // GetRoundsForPlayerAsync might implicitly use requestingUserId if it's different from playerId parameter
@@ -21,6 +22,7 @@ namespace GolfTrackerApp.Web.Services
         Task<List<Round>> GetRecentRoundsAsync(string requestingUserId, bool isUserAdmin, int count);
         Task<List<Round>> SearchRoundsAsync(string requestingUserId, bool isUserAdmin, string searchTerm); 
         Task<Scorecard> PrepareScorecardAsync(int courseId, int startingHole, int holesPlayed, List<Player> players);
+        Task<Scorecard> PrepareScorecardAsync(int courseId, int startingHole, int holesPlayed, List<Player> players, Dictionary<int, int?>? teeSelections);
 
         // New methods for club/course specific recent rounds
         Task<List<Round>> GetRecentRoundsForClubAsync(string requestingUserId, int clubId, int count);

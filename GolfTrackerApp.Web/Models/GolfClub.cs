@@ -35,5 +35,6 @@ namespace GolfTrackerApp.Web.Models
 
         // Navigation property: A club can have multiple courses
         public virtual ICollection<GolfCourse> GolfCourses { get; set; } = new List<GolfCourse>();
+        public virtual ICollection<ClubMembership> ClubMemberships { get; set; } = new List<ClubMembership>();
     }
 }

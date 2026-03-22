@@ -24,5 +24,6 @@ namespace GolfTrackerApp.Web.Models
 
         // Navigation property for Scores on this hole
         public virtual ICollection<Score> Scores { get; set; } = new List<Score>();
+        public virtual ICollection<HoleTee> HoleTees { get; set; } = new List<HoleTee>();
     }
 }

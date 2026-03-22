@@ -15,6 +15,7 @@
 @inject IRoundService RoundService
 @inject IScoreService ScoreService
 @inject IHoleService HoleService
+@inject ITeeSetService TeeSetService
 @using GolfTrackerApp.Web.Models
 @using GolfTrackerApp.Web.Data
 @using GolfTrackerApp.Web.Components.Shared
@@ -128,6 +129,35 @@
                         }
                     <MudButton OnClick="OpenQuickAddPlayerDialogAsync" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" Class="mt-2">Add Guest Player</MudButton>
                 </div>
+
+                @if (_teeSetsForCourse.Any() && _roundEntryModel.SelectedPlayers.Any())
+                {
+                    <div class="wizard-card">
+                        <div class="wizard-card-header">
+                            <div class="icon orange">🏌️</div>
+                            <h6>Tee Selection</h6>
+                        </div>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">Choose which tees each player is playing from</MudText>
+                        @foreach (var player in _roundEntryModel.SelectedPlayers)
+                        {
+                            <MudSelect T="int?" Label="@($"{player.FirstName} {player.LastName}")" Class="mb-2"
+                                       Value="@(_teeSelections.GetValueOrDefault(player.PlayerId))"
+                                       ValueChanged="@(v => _teeSelections[player.PlayerId] = v)">
+                                <MudSelectItem T="int?" Value="@((int?)null)">Default (course tees)</MudSelectItem>
+                                @foreach (var ts in _teeSetsForCourse)
+                                {
+                                    <MudSelectItem T="int?" Value="@((int?)ts.TeeSetId)">
+                                        <div class="d-flex align-center gap-2">
+                                            <div style="width:14px;height:14px;border-radius:50%;background:@ts.Colour;border:1px solid #ccc;"></div>
+                                            @ts.Name
+                                            @if (ts.CourseRating.HasValue) { <span class="ml-1" style="font-size:0.8em;color:#888;">CR @ts.CourseRating.Value / SR @(ts.SlopeRating ?? 0)</span> }
+                                        </div>
+                                    </MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    </div>
+                }
 
                 <div class="wizard-card">
                     <div class="wizard-card-header">
@@ -288,6 +318,8 @@ else // This case means isInitialized is false (still loading initial data)
     private List<Hole> _playedHolesOrdered = new();
     private int _currentDbRoundId = 0;
     private int _maxHolesForCourse = 18;
+    private List<TeeSet> _teeSetsForCourse = new();
+    private Dictionary<int, int?> _teeSelections = new();
 
     // --- Lifecycle & Setup ---
     protected override async Task OnInitializedAsync()
@@ -472,10 +504,13 @@ else // This case means isInitialized is false (still loading initial data)
         var selectedCourseId = _roundEntryModel.GolfCourseId;
         _allHolesForSelectedCourse.Clear();
         _playedHolesOrdered.Clear();
+        _teeSetsForCourse.Clear();
+        _teeSelections.Clear();
         _maxHolesForCourse = 18; 
         if (selectedCourseId > 0)
         {
             _allHolesForSelectedCourse = await HoleService.GetHolesForCourseAsync(selectedCourseId);
+            _teeSetsForCourse = await TeeSetService.GetTeeSetsForCourseAsync(selectedCourseId);
             if(_allHolesForSelectedCourse.Any())
             {
                  // Ensure there's at least one hole before calling Max, or check GolfCourse.NumberOfHoles
@@ -640,7 +675,7 @@ else // This case means isInitialized is false (still loading initial data)
         try
         {
             var playerIdsForRound = _roundEntryModel.SelectedPlayers.Select(p => p.PlayerId).ToList();
-            Round createdRound = await RoundService.AddRoundAsync(newDbRound, playerIdsForRound);
+            Round createdRound = await RoundService.AddRoundAsync(newDbRound, playerIdsForRound, _teeSelections.Any() ? _teeSelections : null);
             _currentDbRoundId = createdRound.RoundId;
 
             // Call the service method to get the prepared scorecard
@@ -648,7 +683,8 @@ else // This case means isInitialized is false (still loading initial data)
                 _roundEntryModel.GolfCourseId,
                 _roundEntryModel.StartingHole,
                 _roundEntryModel.HolesPlayed,
-                _roundEntryModel.SelectedPlayers);
+                _roundEntryModel.SelectedPlayers,
+                _teeSelections.Any() ? _teeSelections : null);
 
             // Update the UI model with the data from the service
             _playedHolesOrdered = scorecard.PlayedHoles;

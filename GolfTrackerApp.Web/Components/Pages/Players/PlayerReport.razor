@@ -552,7 +552,7 @@ else
             _aiInsight = await AiInsightService.GetPlayerReportInsightsAsync(
                 _currentUserId!, PlayerId, _selectedCourseId, _selectedHolesPlayed);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             _aiInsight = new AiInsightResult
             {

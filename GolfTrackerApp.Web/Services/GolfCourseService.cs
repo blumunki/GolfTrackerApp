@@ -11,11 +11,13 @@ namespace GolfTrackerApp.Web.Services
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILogger<GolfCourseService> _logger;
+        private readonly ITeeSetService _teeSetService;
 
-        public GolfCourseService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<GolfCourseService> logger)
+        public GolfCourseService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<GolfCourseService> logger, ITeeSetService teeSetService)
         {
             _contextFactory = contextFactory;
             _logger = logger;
+            _teeSetService = teeSetService;
         }
 
         public async Task<GolfCourse> AddGolfCourseAsync(GolfCourse golfCourse)
@@ -31,6 +33,10 @@ namespace GolfTrackerApp.Web.Services
 
             _context.GolfCourses.Add(golfCourse);
             await _context.SaveChangesAsync();
+
+            // Auto-create the 3 standard tee sets (White, Yellow, Red)
+            await _teeSetService.EnsureStandardTeeSetsAsync(golfCourse.GolfCourseId);
+
             return golfCourse;
         }
 
@@ -88,6 +94,8 @@ namespace GolfTrackerApp.Web.Services
                                 .AsNoTracking()
                                 .Include(gc => gc.GolfClub)
                                 .Include(gc => gc.Holes)
+                                .Include(gc => gc.TeeSets)
+                                    .ThenInclude(ts => ts.HoleTees)
                                 .FirstOrDefaultAsync(gc => gc.GolfCourseId == id);
         }
 

@@ -52,7 +52,18 @@
                     <MudIcon Icon="@Icons.Material.Filled.SportsGolf" Size="Size.Small" Style="font-size:14px;" />
                     @course.NumberOfHoles Holes
                 </span>
-                @if (course.Holes.Any() && course.Holes.Any(h => h.LengthYards.HasValue && h.LengthYards > 0))
+                @foreach (var ts in _teeSets)
+                {
+                    var total = GetTeeTotalYards(ts.TeeSetId);
+                    if (total > 0)
+                    {
+                        <span style="display:flex; align-items:center; gap:4px;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:@ts.Colour;border:1px solid rgba(255,255,255,0.4);display:inline-block;"></span>
+                            @total
+                        </span>
+                    }
+                }
+                @if (!_teeSets.Any() && course.Holes.Any() && course.Holes.Any(h => h.LengthYards.HasValue && h.LengthYards > 0))
                 {
                     <span style="display:flex; align-items:center; gap:4px;">
                         <MudIcon Icon="@Icons.Material.Filled.Straighten" Size="Size.Small" Style="font-size:14px;" />
@@ -149,12 +160,35 @@
             <div style="padding:0 12px;">
                 <div style="font-size:1rem; font-weight:700; color:#1a1a2e; margin-bottom:10px;">Hole Details</div>
 
+                @if (course.TeeSets != null && course.TeeSets.Any())
+                {
+                    @* Tee colour legend *@
+                    <div style="display:flex; gap:10px; margin-bottom:8px; font-size:0.7rem; color:#6b7280;">
+                        @foreach (var ts in _teeSets)
+                        {
+                            <div style="display:flex; align-items:center; gap:3px;">
+                                <span style="width:10px;height:10px;border-radius:50%;background:@ts.Colour;border:1px solid #ccc;display:inline-block;"></span>
+                                @ts.Name
+                            </div>
+                        }
+                    </div>
+                }
+
                 <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; margin-bottom:16px;">
                     @* Table Header *@
-                    <div style="display:grid; grid-template-columns:50px 50px 1fr 60px; background:#f8fafc; padding:10px 14px; border-bottom:2px solid #e5e7eb; font-size:0.7rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px;">
-                        <div>Hole</div>
+                    <div style="display:grid; grid-template-columns:36px 36px @(string.Join(" ", _teeSets.Select(_ => "1fr"))) @(!_teeSets.Any() ? "1fr" : "") 40px; background:#f8fafc; padding:8px 10px; border-bottom:2px solid #e5e7eb; font-size:0.65rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:0.3px;">
+                        <div>#</div>
                         <div>Par</div>
-                        <div>Yards</div>
+                        @foreach (var ts in _teeSets)
+                        {
+                            <div style="text-align:center;">
+                                <span style="width:8px;height:8px;border-radius:50%;background:@ts.Colour;border:1px solid #ccc;display:inline-block;"></span>
+                            </div>
+                        }
+                        @if (!_teeSets.Any())
+                        {
+                            <div>Yds</div>
+                        }
                         <div style="text-align:right;">SI</div>
                     </div>
 
@@ -162,28 +196,40 @@
                     @foreach (var hole in course.Holes.OrderBy(h => h.HoleNumber))
                     {
                         var isEven = hole.HoleNumber % 2 == 0;
-                        <div style="display:grid; grid-template-columns:50px 50px 1fr 60px; padding:10px 14px; border-bottom:1px solid #f3f4f6; @(isEven ? "background:#fafbfc;" : "")">
-                            <div style="font-weight:700; color:#1a1a2e; font-size:0.9rem;">@hole.HoleNumber</div>
+                        <div style="display:grid; grid-template-columns:36px 36px @(string.Join(" ", _teeSets.Select(_ => "1fr"))) @(!_teeSets.Any() ? "1fr" : "") 40px; padding:7px 10px; border-bottom:1px solid #f3f4f6; @(isEven ? "background:#fafbfc;" : "")">
+                            <div style="font-weight:700; color:#1a1a2e; font-size:0.85rem;">@hole.HoleNumber</div>
                             <div>
-                                <span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; font-weight:700; font-size:0.8rem; @GetParBadgeStyle(hole.Par)">
+                                <span style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; font-weight:700; font-size:0.75rem; @GetParBadgeStyle(hole.Par)">
                                     @hole.Par
                                 </span>
                             </div>
-                            <div style="color:#4b5563; font-size:0.85rem;">@(hole.LengthYards?.ToString() ?? "-")</div>
-                            <div style="text-align:right; color:#6b7280; font-size:0.85rem;">@hole.StrokeIndex</div>
+                            @foreach (var ts in _teeSets)
+                            {
+                                var ht = GetHoleTeeForSet(hole.HoleId, ts.TeeSetId);
+                                <div style="text-align:center; color:#4b5563; font-size:0.8rem;">@(ht?.LengthYards?.ToString() ?? "-")</div>
+                            }
+                            @if (!_teeSets.Any())
+                            {
+                                <div style="color:#4b5563; font-size:0.8rem;">@(hole.LengthYards?.ToString() ?? "-")</div>
+                            }
+                            <div style="text-align:right; color:#6b7280; font-size:0.8rem;">@hole.StrokeIndex</div>
                         </div>
                     }
 
                     @* Totals Row *@
-                    <div style="display:grid; grid-template-columns:50px 50px 1fr 60px; padding:10px 14px; background:#f0f4ff; font-weight:700; border-top:2px solid #e5e7eb;">
-                        <div style="color:#1a1a2e; font-size:0.85rem;">Total</div>
-                        <div style="color:#1a1a2e; font-size:0.85rem;">@course.DefaultPar</div>
-                        <div style="color:#4b5563; font-size:0.85rem;">
-                            @{
-                                var totalYards = course.Holes.Sum(h => h.LengthYards ?? 0);
-                            }
-                            @(totalYards > 0 ? totalYards.ToString() : "-")
-                        </div>
+                    <div style="display:grid; grid-template-columns:36px 36px @(string.Join(" ", _teeSets.Select(_ => "1fr"))) @(!_teeSets.Any() ? "1fr" : "") 40px; padding:8px 10px; background:#f0f4ff; font-weight:700; border-top:2px solid #e5e7eb;">
+                        <div style="color:#1a1a2e; font-size:0.8rem;">Tot</div>
+                        <div style="color:#1a1a2e; font-size:0.8rem;">@course.DefaultPar</div>
+                        @foreach (var ts in _teeSets)
+                        {
+                            var total = GetTeeTotalYards(ts.TeeSetId);
+                            <div style="text-align:center; color:#4b5563; font-size:0.8rem;">@(total > 0 ? total.ToString() : "-")</div>
+                        }
+                        @if (!_teeSets.Any())
+                        {
+                            var legacyTotal = course.Holes.Sum(h => h.LengthYards ?? 0);
+                            <div style="color:#4b5563; font-size:0.8rem;">@(legacyTotal > 0 ? legacyTotal.ToString() : "-")</div>
+                        }
                         <div></div>
                     </div>
                 </div>
@@ -269,6 +315,10 @@
     private List<RoundResponse> courseRounds = new();
     private bool isLoading = true;
 
+    // Tee sets
+    private List<TeeSetDto> _teeSets = new();
+    private Dictionary<(int HoleId, int TeeSetId), HoleTeeDto> _holeTeeMap = new();
+
     // Edit Course dialog
     private bool showEditCourseDialog;
     private bool editCourseFormValid;
@@ -316,6 +366,16 @@
                     .Where(r => string.Equals(r.CourseName, course.Name, StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(r => r.DatePlayed)
                     .ToList();
+
+                // Build tee data
+                if (course.TeeSets != null && course.TeeSets.Any())
+                {
+                    _teeSets = course.TeeSets.OrderBy(t => t.SortOrder).ToList();
+                    _holeTeeMap = _teeSets
+                        .Where(ts => ts.HoleTees != null)
+                        .SelectMany(ts => ts.HoleTees!.Select(ht => (ts.TeeSetId, ht)))
+                        .ToDictionary(x => (x.ht.HoleId, x.TeeSetId), x => x.ht);
+                }
             }
         }
         catch (Exception ex)
@@ -443,4 +503,12 @@
             StateHasChanged();
         }
     }
+
+    // ── Tee Set Helpers ──
+
+    private HoleTeeDto? GetHoleTeeForSet(int holeId, int teeSetId)
+        => _holeTeeMap.TryGetValue((holeId, teeSetId), out var ht) ? ht : null;
+
+    private int GetTeeTotalYards(int teeSetId)
+        => _holeTeeMap.Where(kv => kv.Key.TeeSetId == teeSetId).Sum(kv => kv.Value.LengthYards ?? 0);
 }

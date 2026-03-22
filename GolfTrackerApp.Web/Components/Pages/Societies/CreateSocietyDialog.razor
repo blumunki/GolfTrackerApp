@@ -1,0 +1,42 @@
+@inject IGolfSocietyService SocietyService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@using GolfTrackerApp.Web.Models
+@using GolfTrackerApp.Web.Services
+@using System.Security.Claims
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Society Name" Required="true" RequiredError="Name is required" Class="mb-3" />
+        <MudTextField @bind-Value="_description" Label="Description (optional)" Lines="3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Create" Disabled="@(string.IsNullOrWhiteSpace(_name))">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string _name = string.Empty;
+    private string? _description;
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task Create()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty;
+
+        var society = new GolfSociety
+        {
+            Name = _name.Trim(),
+            Description = _description?.Trim()
+        };
+
+        var created = await SocietyService.CreateSocietyAsync(society, userId);
+        MudDialog.Close(DialogResult.Ok(created));
+    }
+}

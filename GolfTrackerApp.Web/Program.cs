@@ -139,6 +139,9 @@ builder.Services.AddScoped<IRoundWorkflowService, RoundWorkflowService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IConnectionService, ConnectionService>();
 builder.Services.AddScoped<IMergeService, MergeService>();
+builder.Services.AddScoped<ITeeSetService, TeeSetService>();
+builder.Services.AddScoped<IGolfSocietyService, GolfSocietyService>();
+builder.Services.AddScoped<IClubMembershipService, ClubMembershipService>();
 
 // AI Insights services
 builder.Services.AddScoped<IAiInsightService, AiInsightService>();
@@ -202,6 +205,10 @@ using (var scope = app.Services.CreateScope())
         // Seed application settings with defaults
         var appSettingsService = services.GetRequiredService<IApplicationSettingsService>();
         await appSettingsService.SeedDefaultsAsync();
+
+        // Seed default tee sets for courses that have holes but no tee sets
+        var teeSetService = services.GetRequiredService<ITeeSetService>();
+        await teeSetService.SeedDefaultTeeSetsAsync();
 
         // Cleanup old AI audit logs based on retention policy
         var retentionDays = app.Configuration.GetValue<int>("AiInsights:AuditLogging:RetentionDays");
@@ -478,6 +485,134 @@ static async Task EnsureNewTablesExistAsync(ApplicationDbContext context, ILogge
                 CREATE UNIQUE INDEX [IX_ApplicationSettings_Key] ON [ApplicationSettings] ([Key]);
             ");
             logger.LogInformation("ApplicationSettings table created.");
+        }
+
+        // -- Phase 1: Tee Sets & Course Ratings --
+
+        if (!await TableExistsAsync(connection, "TeeSets"))
+        {
+            logger.LogInformation("Creating TeeSets table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [TeeSets] (
+                    [TeeSetId] INT IDENTITY(1,1) NOT NULL,
+                    [GolfCourseId] INT NOT NULL,
+                    [Name] NVARCHAR(50) NOT NULL,
+                    [Colour] NVARCHAR(7) NOT NULL DEFAULT '#FFD700',
+                    [CourseRating] DECIMAL(4,1) NULL,
+                    [SlopeRating] INT NULL,
+                    [Gender] INT NOT NULL DEFAULT 0,
+                    [SortOrder] INT NOT NULL DEFAULT 0,
+                    CONSTRAINT [PK_TeeSets] PRIMARY KEY ([TeeSetId]),
+                    CONSTRAINT [FK_TeeSets_GolfCourses] FOREIGN KEY ([GolfCourseId]) REFERENCES [GolfCourses]([GolfCourseId]) ON DELETE CASCADE
+                );
+                CREATE UNIQUE INDEX [IX_TeeSets_GolfCourseId_Name] ON [TeeSets] ([GolfCourseId], [Name]);
+            ");
+            logger.LogInformation("TeeSets table created.");
+        }
+
+        if (!await TableExistsAsync(connection, "HoleTees"))
+        {
+            logger.LogInformation("Creating HoleTees table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [HoleTees] (
+                    [HoleTeeId] INT IDENTITY(1,1) NOT NULL,
+                    [HoleId] INT NOT NULL,
+                    [TeeSetId] INT NOT NULL,
+                    [Par] INT NOT NULL,
+                    [StrokeIndex] INT NULL,
+                    [LengthYards] INT NULL,
+                    CONSTRAINT [PK_HoleTees] PRIMARY KEY ([HoleTeeId]),
+                    CONSTRAINT [FK_HoleTees_Holes] FOREIGN KEY ([HoleId]) REFERENCES [Holes]([HoleId]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_HoleTees_TeeSets] FOREIGN KEY ([TeeSetId]) REFERENCES [TeeSets]([TeeSetId]) ON DELETE NO ACTION
+                );
+                CREATE UNIQUE INDEX [IX_HoleTees_HoleId_TeeSetId] ON [HoleTees] ([HoleId], [TeeSetId]);
+                CREATE INDEX [IX_HoleTees_TeeSetId] ON [HoleTees] ([TeeSetId]);
+            ");
+            logger.LogInformation("HoleTees table created.");
+        }
+
+        // Add TeeSetId columns to Scores and RoundPlayers
+        if (!await ColumnExistsAsync(connection, "Scores", "TeeSetId"))
+        {
+            logger.LogInformation("Adding TeeSetId column to Scores...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE [Scores] ADD [TeeSetId] INT NULL;
+                CREATE INDEX [IX_Scores_TeeSetId] ON [Scores] ([TeeSetId]);
+                ALTER TABLE [Scores] ADD CONSTRAINT [FK_Scores_TeeSets] FOREIGN KEY ([TeeSetId]) REFERENCES [TeeSets]([TeeSetId]) ON DELETE SET NULL;
+            ");
+            logger.LogInformation("TeeSetId column added to Scores.");
+        }
+
+        if (!await ColumnExistsAsync(connection, "RoundPlayers", "TeeSetId"))
+        {
+            logger.LogInformation("Adding TeeSetId column to RoundPlayers...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE [RoundPlayers] ADD [TeeSetId] INT NULL;
+                CREATE INDEX [IX_RoundPlayers_TeeSetId] ON [RoundPlayers] ([TeeSetId]);
+                ALTER TABLE [RoundPlayers] ADD CONSTRAINT [FK_RoundPlayers_TeeSets] FOREIGN KEY ([TeeSetId]) REFERENCES [TeeSets]([TeeSetId]) ON DELETE SET NULL;
+            ");
+            logger.LogInformation("TeeSetId column added to RoundPlayers.");
+        }
+
+        // -- Phase 2: Golf Societies & Memberships --
+
+        if (!await TableExistsAsync(connection, "GolfSocieties"))
+        {
+            logger.LogInformation("Creating GolfSocieties table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [GolfSocieties] (
+                    [GolfSocietyId] INT IDENTITY(1,1) NOT NULL,
+                    [Name] NVARCHAR(100) NOT NULL,
+                    [Description] NVARCHAR(500) NULL,
+                    [CreatedByUserId] NVARCHAR(450) NOT NULL,
+                    [CreatedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    [IsActive] BIT NOT NULL DEFAULT 1,
+                    CONSTRAINT [PK_GolfSocieties] PRIMARY KEY ([GolfSocietyId]),
+                    CONSTRAINT [FK_GolfSocieties_AspNetUsers] FOREIGN KEY ([CreatedByUserId]) REFERENCES [AspNetUsers]([Id]) ON DELETE NO ACTION
+                );
+            ");
+            logger.LogInformation("GolfSocieties table created.");
+        }
+
+        if (!await TableExistsAsync(connection, "SocietyMemberships"))
+        {
+            logger.LogInformation("Creating SocietyMemberships table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [SocietyMemberships] (
+                    [SocietyMembershipId] INT IDENTITY(1,1) NOT NULL,
+                    [GolfSocietyId] INT NOT NULL,
+                    [UserId] NVARCHAR(450) NOT NULL,
+                    [Role] INT NOT NULL DEFAULT 0,
+                    [JoinedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    CONSTRAINT [PK_SocietyMemberships] PRIMARY KEY ([SocietyMembershipId]),
+                    CONSTRAINT [FK_SocietyMemberships_GolfSocieties] FOREIGN KEY ([GolfSocietyId]) REFERENCES [GolfSocieties]([GolfSocietyId]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_SocietyMemberships_AspNetUsers] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE
+                );
+                CREATE UNIQUE INDEX [IX_SocietyMemberships_GolfSocietyId_UserId] ON [SocietyMemberships] ([GolfSocietyId], [UserId]);
+                CREATE INDEX [IX_SocietyMemberships_UserId] ON [SocietyMemberships] ([UserId]);
+            ");
+            logger.LogInformation("SocietyMemberships table created.");
+        }
+
+        if (!await TableExistsAsync(connection, "ClubMemberships"))
+        {
+            logger.LogInformation("Creating ClubMemberships table...");
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE [ClubMemberships] (
+                    [ClubMembershipId] INT IDENTITY(1,1) NOT NULL,
+                    [GolfClubId] INT NOT NULL,
+                    [UserId] NVARCHAR(450) NOT NULL,
+                    [Role] INT NOT NULL DEFAULT 0,
+                    [MembershipNumber] NVARCHAR(50) NULL,
+                    [JoinedAt] DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+                    CONSTRAINT [PK_ClubMemberships] PRIMARY KEY ([ClubMembershipId]),
+                    CONSTRAINT [FK_ClubMemberships_GolfClubs] FOREIGN KEY ([GolfClubId]) REFERENCES [GolfClubs]([GolfClubId]) ON DELETE CASCADE,
+                    CONSTRAINT [FK_ClubMemberships_AspNetUsers] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers]([Id]) ON DELETE CASCADE
+                );
+                CREATE UNIQUE INDEX [IX_ClubMemberships_GolfClubId_UserId] ON [ClubMemberships] ([GolfClubId], [UserId]);
+                CREATE INDEX [IX_ClubMemberships_UserId] ON [ClubMemberships] ([UserId]);
+            ");
+            logger.LogInformation("ClubMemberships table created.");
         }
     }
     finally

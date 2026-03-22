@@ -93,7 +93,7 @@
 
 <MudPaper Class="pa-4 mb-4" Outlined="true">
     <MudText Typo="Typo.h6">4. Import Holes</MudText>
-    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex (optional), LengthYards (optional)</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex (optional), LengthYards (optional). 3 standard tee sets (White, Yellow, Red) will be created; yardages assigned to Yellow.</MudText>
     <InputFile OnChange="HandleHolesUpload" accept=".csv" />
     <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessHoles" Disabled="@(holesFile == null || isProcessingHoles || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers)">
         @(isProcessingHoles ? "Processing..." : "Import Holes")
@@ -396,6 +396,21 @@
         }
 
         log.AppendLine($"  Holes: {added} added, {skipped} already exist");
+
+        // Seed standard tee sets (White, Yellow, Red) for courses that gained holes
+        if (added > 0)
+        {
+            try
+            {
+                var teeSetService = scope.ServiceProvider.GetRequiredService<ITeeSetService>();
+                await teeSetService.SeedDefaultTeeSetsAsync();
+                log.AppendLine("  Standard tee sets (White, Yellow, Red) seeded for courses with new holes.");
+            }
+            catch (Exception teeEx)
+            {
+                log.AppendLine($"  Warning: Could not seed default tee sets: {teeEx.Message}");
+            }
+        }
     }
 
     public class GolfClubCsvRecord
@@ -1003,6 +1018,21 @@
                 }
             }
             log.AppendLine($"\nHoles import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
+
+            // Seed standard tee sets (White, Yellow, Red) for courses that gained holes
+            if (successCount > 0)
+            {
+                try
+                {
+                    var teeSetService = scope.ServiceProvider.GetRequiredService<ITeeSetService>();
+                    await teeSetService.SeedDefaultTeeSetsAsync();
+                    log.AppendLine("Standard tee sets (White, Yellow, Red) seeded for courses with new holes.");
+                }
+                catch (Exception teeEx)
+                {
+                    log.AppendLine($"Warning: Could not seed default tee sets: {teeEx.Message}");
+                }
+            }
         }
         catch (CsvHelperException csvEx)
         {
