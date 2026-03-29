@@ -11,6 +11,9 @@ using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Globalization;
+using CsvHelper;
+using CsvHelper.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -197,6 +200,9 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("Seeding database...");
         await SeedData.InitializeAsync(services);
         logger.LogInformation("Database seeding completed.");
+
+        // Auto-sync clubs and courses from CSV files
+        await SyncClubsAndCoursesFromCsvAsync(services, app.Environment.ContentRootPath, logger);
 
         // Seed AI provider settings from config if table is empty
         var providerSettingsService = services.GetRequiredService<IAiProviderSettingsService>();
@@ -635,4 +641,247 @@ static async Task<bool> ColumnExistsAsync(System.Data.Common.DbConnection connec
     command.CommandText = $"SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
     var result = await command.ExecuteScalarAsync();
     return Convert.ToInt32(result) > 0;
+}
+
+static async Task SyncClubsAndCoursesFromCsvAsync(IServiceProvider services, string contentRootPath, ILogger logger)
+{
+    var dataPath = Path.Combine(contentRootPath, "Data");
+
+    var golfClubService = services.GetRequiredService<IGolfClubService>();
+    var golfCourseService = services.GetRequiredService<IGolfCourseService>();
+
+    // Sync clubs
+    var clubsFile = Path.Combine(dataPath, "GolfClubs.csv");
+    if (File.Exists(clubsFile))
+    {
+        var existingClubNames = (await golfClubService.GetAllGolfClubsAsync())
+            .Select(gc => gc.Name.ToLowerInvariant()).ToHashSet();
+
+        int added = 0;
+        using var stream = File.OpenRead(clubsFile);
+        using var reader = new StreamReader(stream);
+        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+        });
+
+        await foreach (var record in csv.GetRecordsAsync<GolfClubCsvRecord>())
+        {
+            if (string.IsNullOrWhiteSpace(record.Name)) continue;
+            if (existingClubNames.Contains(record.Name.ToLowerInvariant())) continue;
+
+            var newClub = new GolfClub
+            {
+                Name = record.Name,
+                AddressLine1 = record.AddressLine1,
+                AddressLine2 = record.AddressLine2,
+                City = record.City,
+                CountyOrRegion = record.CountyOrRegion,
+                Postcode = record.Postcode,
+                Country = record.Country,
+                Website = record.Website
+            };
+            await golfClubService.AddGolfClubAsync(newClub);
+            existingClubNames.Add(newClub.Name.ToLowerInvariant());
+            added++;
+            logger.LogInformation("Auto-added golf club: {ClubName}", newClub.Name);
+        }
+
+        if (added > 0) logger.LogInformation("Auto-synced {Count} new golf club(s) from CSV.", added);
+    }
+
+    // Sync courses
+    var coursesFile = Path.Combine(dataPath, "GolfCourses.csv");
+    if (File.Exists(coursesFile))
+    {
+        var clubNameToId = (await golfClubService.GetAllGolfClubsAsync())
+            .ToDictionary(gc => gc.Name.ToLowerInvariant(), gc => gc.GolfClubId);
+
+        var existingCourses = (await golfCourseService.GetAllGolfCoursesAsync())
+            .Select(c => $"{c.GolfClubId}_{c.Name.ToLowerInvariant()}")
+            .ToHashSet();
+
+        int added = 0;
+        using var stream = File.OpenRead(coursesFile);
+        using var reader = new StreamReader(stream);
+        using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+        });
+
+        await foreach (var record in csv.GetRecordsAsync<GolfCourseCsvRecord>())
+        {
+            if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName)) continue;
+            if (!clubNameToId.TryGetValue(record.ClubName.ToLowerInvariant(), out var clubId)) continue;
+
+            var key = $"{clubId}_{record.CourseName.ToLowerInvariant()}";
+            if (existingCourses.Contains(key)) continue;
+
+            var newCourse = new GolfCourse
+            {
+                GolfClubId = clubId,
+                Name = record.CourseName,
+                DefaultPar = record.DefaultPar,
+                NumberOfHoles = record.NumberOfHoles <= 0 ? 18 : record.NumberOfHoles
+            };
+            await golfCourseService.AddGolfCourseAsync(newCourse);
+            existingCourses.Add(key);
+            added++;
+            logger.LogInformation("Auto-added golf course: {CourseName} at {ClubName}", record.CourseName, record.ClubName);
+        }
+
+        if (added > 0) logger.LogInformation("Auto-synced {Count} new golf course(s) from CSV.", added);
+    }
+
+    // Sync holes
+    var holesFile = Path.Combine(dataPath, "Holes.csv");
+    if (File.Exists(holesFile))
+    {
+        var courses = await golfCourseService.GetAllGolfCoursesAsync();
+        var courseLookup = courses.ToDictionary(
+            c => $"{(c.GolfClub?.Name ?? "").ToLowerInvariant()}_{c.Name.ToLowerInvariant()}",
+            c => c.GolfCourseId
+        );
+
+        var holeService = services.GetRequiredService<IHoleService>();
+        var existingHoles = new HashSet<string>();
+        foreach (var course in courses)
+        {
+            var holes = await holeService.GetHolesForCourseAsync(course.GolfCourseId);
+            foreach (var hole in holes)
+                existingHoles.Add($"{hole.GolfCourseId}_{hole.HoleNumber}");
+        }
+
+        int holesAdded = 0;
+        var holeTeeYardages = new Dictionary<int, List<(int HoleId, int? White, int? Yellow, int? Red)>>();
+        var affectedCourseIds = new HashSet<int>();
+
+        using var hStream = File.OpenRead(holesFile);
+        using var hReader = new StreamReader(hStream);
+        using var hCsv = new CsvReader(hReader, new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+        });
+
+        await foreach (var record in hCsv.GetRecordsAsync<HoleCsvRecord>())
+        {
+            if (string.IsNullOrWhiteSpace(record.CourseName) || string.IsNullOrWhiteSpace(record.ClubName)
+                || record.HoleNumber <= 0 || record.Par <= 0)
+                continue;
+
+            var courseKey = $"{record.ClubName.ToLowerInvariant()}_{record.CourseName.ToLowerInvariant()}";
+            if (!courseLookup.TryGetValue(courseKey, out var courseId)) continue;
+
+            var holeKey = $"{courseId}_{record.HoleNumber}";
+            if (existingHoles.Contains(holeKey)) continue;
+
+            var newHole = new Hole
+            {
+                GolfCourseId = courseId,
+                HoleNumber = record.HoleNumber,
+                Par = record.Par,
+                StrokeIndex = record.StrokeIndex,
+                LengthYards = record.YellowYards ?? record.LengthYards
+            };
+            await holeService.AddHoleAsync(newHole);
+            existingHoles.Add(holeKey);
+            holesAdded++;
+
+            if (record.WhiteYards.HasValue || record.YellowYards.HasValue || record.RedYards.HasValue)
+            {
+                if (!holeTeeYardages.ContainsKey(courseId))
+                    holeTeeYardages[courseId] = new List<(int HoleId, int? White, int? Yellow, int? Red)>();
+                holeTeeYardages[courseId].Add((newHole.HoleId, record.WhiteYards, record.YellowYards ?? record.LengthYards, record.RedYards));
+            }
+
+            affectedCourseIds.Add(courseId);
+        }
+
+        if (holesAdded > 0)
+        {
+            logger.LogInformation("Auto-synced {Count} new hole(s) from CSV.", holesAdded);
+
+            var teeSetService = services.GetRequiredService<ITeeSetService>();
+            foreach (var courseId in affectedCourseIds)
+            {
+                await teeSetService.EnsureStandardTeeSetsAsync(courseId);
+            }
+
+            // Update HoleTee records with per-tee yardages from CSV
+            foreach (var (courseId, holeEntries) in holeTeeYardages)
+            {
+                var teeSets = await teeSetService.GetTeeSetsForCourseAsync(courseId);
+                var whiteTee = teeSets.FirstOrDefault(ts => ts.Name == "White");
+                var yellowTee = teeSets.FirstOrDefault(ts => ts.Name == "Yellow");
+                var redTee = teeSets.FirstOrDefault(ts => ts.Name == "Red");
+
+                foreach (var (holeId, whiteYards, yellowYards, redYards) in holeEntries)
+                {
+                    if (whiteTee != null && whiteYards.HasValue)
+                        await UpdateHoleTeeYardageAsync(teeSetService, holeId, whiteTee.TeeSetId, whiteYards.Value);
+                    if (yellowTee != null && yellowYards.HasValue)
+                        await UpdateHoleTeeYardageAsync(teeSetService, holeId, yellowTee.TeeSetId, yellowYards.Value);
+                    if (redTee != null && redYards.HasValue)
+                        await UpdateHoleTeeYardageAsync(teeSetService, holeId, redTee.TeeSetId, redYards.Value);
+                }
+            }
+        }
+    }
+}
+
+static async Task UpdateHoleTeeYardageAsync(ITeeSetService teeSetService, int holeId, int teeSetId, int yards)
+{
+    var holeTees = await teeSetService.GetHoleTeesForTeeSetAsync(teeSetId);
+    var existing = holeTees.FirstOrDefault(ht => ht.HoleId == holeId);
+    if (existing != null)
+    {
+        existing.LengthYards = yards;
+        await teeSetService.AddOrUpdateHoleTeeAsync(existing);
+    }
+    else
+    {
+        await teeSetService.AddOrUpdateHoleTeeAsync(new HoleTee
+        {
+            HoleId = holeId, TeeSetId = teeSetId, LengthYards = yards
+        });
+    }
+}
+
+record GolfClubCsvRecord
+{
+    public string? Name { get; set; }
+    public string? AddressLine1 { get; set; }
+    public string? AddressLine2 { get; set; }
+    public string? City { get; set; }
+    public string? CountyOrRegion { get; set; }
+    public string? Postcode { get; set; }
+    public string? Country { get; set; }
+    public string? Website { get; set; }
+}
+
+record GolfCourseCsvRecord
+{
+    public string? ClubName { get; set; }
+    public string? CourseName { get; set; }
+    public int DefaultPar { get; set; }
+    public int NumberOfHoles { get; set; } = 18;
+}
+
+record HoleCsvRecord
+{
+    public string? ClubName { get; set; }
+    public string? CourseName { get; set; }
+    public int HoleNumber { get; set; }
+    public int Par { get; set; }
+    public int? StrokeIndex { get; set; }
+    public int? WhiteYards { get; set; }
+    public int? YellowYards { get; set; }
+    public int? RedYards { get; set; }
+    public int? LengthYards { get; set; }
 }

@@ -93,7 +93,7 @@
 
 <MudPaper Class="pa-4 mb-4" Outlined="true">
     <MudText Typo="Typo.h6">4. Import Holes</MudText>
-    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex (optional), LengthYards (optional). 3 standard tee sets (White, Yellow, Red) will be created; yardages assigned to Yellow.</MudText>
+    <MudText Typo="Typo.caption" Class="mb-2">CSV Format: ClubName, CourseName, HoleNumber, Par, StrokeIndex, WhiteYards, YellowYards, RedYards. Tee yardage columns are optional; legacy LengthYards column maps to Yellow.</MudText>
     <InputFile OnChange="HandleHolesUpload" accept=".csv" />
     <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="ProcessHoles" Disabled="@(holesFile == null || isProcessingHoles || isProcessingGolfClubs || isProcessingGolfCourses || isProcessingPlayers)">
         @(isProcessingHoles ? "Processing..." : "Import Holes")
@@ -346,6 +346,8 @@
         }
 
         int added = 0, skipped = 0;
+        var holeTeeYardages = new Dictionary<int, List<(int HoleId, int? White, int? Yellow, int? Red)>>();
+        var affectedCourseIds = new HashSet<int>();
 
         using var stream = File.OpenRead(filePath);
         using var reader = new StreamReader(stream);
@@ -387,24 +389,44 @@
                 HoleNumber = record.HoleNumber,
                 Par = record.Par,
                 StrokeIndex = record.StrokeIndex,
-                LengthYards = record.LengthYards
+                LengthYards = record.YellowYards ?? record.LengthYards
             };
             await holeService.AddHoleAsync(newHole);
             existingHoles.Add(holeKey);
             added++;
+
+            // Track per-tee yardages for post-seed update
+            if (record.WhiteYards.HasValue || record.YellowYards.HasValue || record.RedYards.HasValue)
+            {
+                if (!holeTeeYardages.ContainsKey(courseId))
+                    holeTeeYardages[courseId] = new List<(int HoleId, int? White, int? Yellow, int? Red)>();
+                holeTeeYardages[courseId].Add((newHole.HoleId, record.WhiteYards, record.YellowYards ?? record.LengthYards, record.RedYards));
+            }
+
             log.AppendLine($"  ✚ Added hole {record.HoleNumber} for {record.CourseName} (Club: {record.ClubName})");
+
+            affectedCourseIds.Add(courseId);
         }
 
         log.AppendLine($"  Holes: {added} added, {skipped} already exist");
 
-        // Seed standard tee sets (White, Yellow, Red) for courses that gained holes
+        // Ensure standard tee sets + HoleTee records for all affected courses
         if (added > 0)
         {
             try
             {
                 var teeSetService = scope.ServiceProvider.GetRequiredService<ITeeSetService>();
-                await teeSetService.SeedDefaultTeeSetsAsync();
-                log.AppendLine("  Standard tee sets (White, Yellow, Red) seeded for courses with new holes.");
+                foreach (var courseId in affectedCourseIds)
+                {
+                    await teeSetService.EnsureStandardTeeSetsAsync(courseId);
+                }
+                log.AppendLine("  Standard tee sets (White, Yellow, Red) ensured for courses with new holes.");
+
+                // Update HoleTee records with per-tee yardages from CSV
+                if (holeTeeYardages.Any())
+                {
+                    await UpdateHoleTeeYardagesFromCsv(teeSetService, holeTeeYardages, log);
+                }
             }
             catch (Exception teeEx)
             {
@@ -449,6 +471,50 @@
     private string playersImportLog = string.Empty;
     private bool isProcessingPlayers = false;
 
+    private async Task UpdateHoleTeeYardagesFromCsv(
+        ITeeSetService teeSetService,
+        Dictionary<int, List<(int HoleId, int? White, int? Yellow, int? Red)>> holeTeeYardages,
+        System.Text.StringBuilder log)
+    {
+        foreach (var (courseId, holeEntries) in holeTeeYardages)
+        {
+            var teeSets = await teeSetService.GetTeeSetsForCourseAsync(courseId);
+            var whiteTee = teeSets.FirstOrDefault(ts => ts.Name == "White");
+            var yellowTee = teeSets.FirstOrDefault(ts => ts.Name == "Yellow");
+            var redTee = teeSets.FirstOrDefault(ts => ts.Name == "Red");
+
+            foreach (var (holeId, whiteYards, yellowYards, redYards) in holeEntries)
+            {
+                // Update yardage on existing HoleTee records (seeding already created them with Par/SI)
+                if (whiteTee != null && whiteYards.HasValue)
+                    await UpdateHoleTeeYardage(teeSetService, holeId, whiteTee.TeeSetId, whiteYards.Value);
+                if (yellowTee != null && yellowYards.HasValue)
+                    await UpdateHoleTeeYardage(teeSetService, holeId, yellowTee.TeeSetId, yellowYards.Value);
+                if (redTee != null && redYards.HasValue)
+                    await UpdateHoleTeeYardage(teeSetService, holeId, redTee.TeeSetId, redYards.Value);
+            }
+        }
+        log.AppendLine("  Per-tee yardages (White/Yellow/Red) updated from CSV data.");
+    }
+
+    private async Task UpdateHoleTeeYardage(ITeeSetService teeSetService, int holeId, int teeSetId, int yards)
+    {
+        var holeTees = await teeSetService.GetHoleTeesForTeeSetAsync(teeSetId);
+        var existing = holeTees.FirstOrDefault(ht => ht.HoleId == holeId);
+        if (existing != null)
+        {
+            existing.LengthYards = yards;
+            await teeSetService.AddOrUpdateHoleTeeAsync(existing);
+        }
+        else
+        {
+            await teeSetService.AddOrUpdateHoleTeeAsync(new HoleTee
+            {
+                HoleId = holeId, TeeSetId = teeSetId, LengthYards = yards
+            });
+        }
+    }
+
     // Add to @code block in DataMigration.razor
     public class HoleCsvRecord
     {
@@ -456,8 +522,11 @@
         public string? CourseName { get; set; }   // Primary identifier for the course within a club
         public int HoleNumber { get; set; }
         public int Par { get; set; }
-        public int? StrokeIndex { get; set; } // Nullable if not always present
-        public int? LengthYards { get; set; } // Nullable if not always present
+        public int? StrokeIndex { get; set; }
+        public int? WhiteYards { get; set; }
+        public int? YellowYards { get; set; }
+        public int? RedYards { get; set; }
+        public int? LengthYards { get; set; } // Legacy fallback — mapped to Yellow if YellowYards is empty
     }
 
     private IBrowserFile? holesFile;
@@ -958,6 +1027,8 @@
 
         int successCount = 0;
         int skippedCount = 0;
+        var holeTeeYardages = new Dictionary<int, List<(int HoleId, int? White, int? Yellow, int? Red)>>();
+        var affectedCourseIds = new HashSet<int>();
 
         try
         {
@@ -1003,13 +1074,24 @@
                         HoleNumber = record.HoleNumber,
                         Par = record.Par,
                         StrokeIndex = record.StrokeIndex,
-                        LengthYards = record.LengthYards
+                        LengthYards = record.YellowYards ?? record.LengthYards
                     };
 
                     await holeService.AddHoleAsync(newHole);
                     existingHolesLookup.Add(holeLookupKey); // Add to local cache
                     successCount++;
+
+                    // Track per-tee yardages for post-seed update
+                    if (record.WhiteYards.HasValue || record.YellowYards.HasValue || record.RedYards.HasValue)
+                    {
+                        if (!holeTeeYardages.ContainsKey(golfCourseId))
+                            holeTeeYardages[golfCourseId] = new List<(int HoleId, int? White, int? Yellow, int? Red)>();
+                        holeTeeYardages[golfCourseId].Add((newHole.HoleId, record.WhiteYards, record.YellowYards ?? record.LengthYards, record.RedYards));
+                    }
+
                     log.AppendLine($"Added: Hole {newHole.HoleNumber} for {record.CourseName} (Club: {record.ClubName})");
+
+                    affectedCourseIds.Add(golfCourseId);
                 }
                 catch (Exception rowEx)
                 {
@@ -1019,14 +1101,23 @@
             }
             log.AppendLine($"\nHoles import complete. Added: {successCount}, Skipped/Errors: {skippedCount}");
 
-            // Seed standard tee sets (White, Yellow, Red) for courses that gained holes
+            // Ensure standard tee sets + HoleTee records for all affected courses
             if (successCount > 0)
             {
                 try
                 {
                     var teeSetService = scope.ServiceProvider.GetRequiredService<ITeeSetService>();
-                    await teeSetService.SeedDefaultTeeSetsAsync();
-                    log.AppendLine("Standard tee sets (White, Yellow, Red) seeded for courses with new holes.");
+                    foreach (var courseId in affectedCourseIds)
+                    {
+                        await teeSetService.EnsureStandardTeeSetsAsync(courseId);
+                    }
+                    log.AppendLine("Standard tee sets (White, Yellow, Red) ensured for courses with new holes.");
+
+                    // Update HoleTee records with per-tee yardages from CSV
+                    if (holeTeeYardages.Any())
+                    {
+                        await UpdateHoleTeeYardagesFromCsv(teeSetService, holeTeeYardages, log);
+                    }
                 }
                 catch (Exception teeEx)
                 {

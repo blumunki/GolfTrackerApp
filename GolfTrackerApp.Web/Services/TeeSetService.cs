@@ -183,13 +183,14 @@ public class TeeSetService : ITeeSetService
 
         var existingTees = await context.TeeSets
             .Where(ts => ts.GolfCourseId == golfCourseId)
-            .Select(ts => ts.Name)
             .ToListAsync();
+
+        var existingTeeNames = existingTees.Select(ts => ts.Name).ToHashSet();
 
         var newTeeSets = new List<TeeSet>();
         foreach (var (name, colour, gender, sortOrder) in StandardTees)
         {
-            if (existingTees.Contains(name)) continue;
+            if (existingTeeNames.Contains(name)) continue;
 
             var teeSet = new TeeSet
             {
@@ -203,19 +204,32 @@ public class TeeSetService : ITeeSetService
             newTeeSets.Add(teeSet);
         }
 
-        if (!newTeeSets.Any()) return;
-        await context.SaveChangesAsync();
+        if (newTeeSets.Any())
+            await context.SaveChangesAsync();
 
-        // Create empty HoleTee records for existing holes
-        var holeIds = await context.Holes
+        // Backfill missing HoleTee records for ALL tee sets (existing + new)
+        var allTeeSets = existingTees.Concat(newTeeSets).ToList();
+        var holes = await context.Holes
             .Where(h => h.GolfCourseId == golfCourseId)
             .Select(h => new { h.HoleId, h.Par, h.StrokeIndex })
             .ToListAsync();
 
-        foreach (var ts in newTeeSets)
+        if (!holes.Any()) return;
+
+        var existingHoleTees = await context.HoleTees
+            .Where(ht => allTeeSets.Select(ts => ts.TeeSetId).Contains(ht.TeeSetId))
+            .Select(ht => new { ht.HoleId, ht.TeeSetId })
+            .ToListAsync();
+
+        var existingHoleTeeKeys = existingHoleTees.Select(x => (x.HoleId, x.TeeSetId)).ToHashSet();
+
+        var added = false;
+        foreach (var ts in allTeeSets)
         {
-            foreach (var hole in holeIds)
+            foreach (var hole in holes)
             {
+                if (existingHoleTeeKeys.Contains((hole.HoleId, ts.TeeSetId))) continue;
+
                 context.HoleTees.Add(new HoleTee
                 {
                     HoleId = hole.HoleId,
@@ -223,9 +237,11 @@ public class TeeSetService : ITeeSetService
                     Par = hole.Par,
                     StrokeIndex = hole.StrokeIndex
                 });
+                added = true;
             }
         }
 
-        await context.SaveChangesAsync();
+        if (added)
+            await context.SaveChangesAsync();
     }
 }
