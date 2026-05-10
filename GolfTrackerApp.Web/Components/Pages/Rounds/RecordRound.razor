@@ -713,6 +713,10 @@ else // This case means isInitialized is false (still loading initial data)
             {
                     // Set explicitly — IHttpContextAccessor is unreliable in Blazor Server (SignalR context)
                     newPlayer.CreatedByApplicationUserId = _currentUserId;
+                    var createdPlayer = await PlayerService.AddPlayerAsync(newPlayer);
+
+                // Add the new player to our main list of available players
+                _availablePlayers.Add(createdPlayer);
 
                 // Add the new player to the list of selected players for this round
                 if (!_roundEntryModel.SelectedPlayers.Any(p => p.PlayerId == createdPlayer.PlayerId))
