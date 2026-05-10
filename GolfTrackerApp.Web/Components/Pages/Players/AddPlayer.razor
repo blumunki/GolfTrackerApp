@@ -93,7 +93,8 @@ else
                 return;
             }
 
-            // The service will handle setting CreatedByApplicationUserId
+            // Set explicitly — IHttpContextAccessor is unreliable in Blazor Server (SignalR context)
+            playerToCreate.CreatedByApplicationUserId = _currentUserId;
             await PlayerService.AddPlayerAsync(playerToCreate);
             Snackbar.Add("Player created successfully!", Severity.Success);
             NavigationManager.NavigateTo("/players");
