@@ -49,6 +49,29 @@
     }
 </MudPaper>
 
+<MudPaper Class="pa-4 mb-6" Outlined="true" Style="border-color: var(--mud-palette-secondary); border-width: 2px;">
+    <MudText Typo="Typo.h5" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Sync" Class="mr-1" /> Sync Rounds &amp; Scores
+    </MudText>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        Reads <strong>Rounds.csv</strong> and <strong>Scores.csv</strong> from the Data folder
+        and imports any new records. Existing rounds and scores are left untouched — safe to run repeatedly.
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Large"
+               OnClick="SyncRoundsAndScores" Disabled="@isSyncingRoundsAndScores"
+               StartIcon="@Icons.Material.Filled.CloudSync">
+        @(isSyncingRoundsAndScores ? "Syncing..." : "Sync Rounds & Scores")
+    </MudButton>
+    @if (isSyncingRoundsAndScores)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Secondary" Class="mt-2" />
+    }
+    @if (!string.IsNullOrEmpty(syncRoundsAndScoresLog))
+    {
+        <pre class="log-output" style="max-height: 400px; overflow-y: auto;">@syncRoundsAndScoresLog</pre>
+    }
+</MudPaper>
+
 <MudDivider Class="mb-4" />
 <MudText Typo="Typo.h5" Class="mb-4">Manual CSV Upload (One-Time Migration)</MudText>
 
@@ -141,6 +164,10 @@
     // Quick Sync fields
     private bool isSyncingReferenceData = false;
     private string syncReferenceDataLog = string.Empty;
+
+    // Rounds & Scores Sync fields
+    private bool isSyncingRoundsAndScores = false;
+    private string syncRoundsAndScoresLog = string.Empty;
 
     private async Task SyncReferenceData()
     {
@@ -433,6 +460,269 @@
                 log.AppendLine($"  Warning: Could not seed default tee sets: {teeEx.Message}");
             }
         }
+    }
+
+    private async Task SyncRoundsAndScores()
+    {
+        isSyncingRoundsAndScores = true;
+        syncRoundsAndScoresLog = string.Empty;
+        var log = new System.Text.StringBuilder();
+        StateHasChanged();
+
+        try
+        {
+            var dataPath = Path.Combine(WebHostEnvironment.ContentRootPath, "Data");
+
+            var roundsFilePath = Path.Combine(dataPath, "Rounds.csv");
+            if (File.Exists(roundsFilePath))
+            {
+                log.AppendLine("=== Syncing Rounds ===");
+                await SyncRoundsFromFile(roundsFilePath, log);
+            }
+            else
+            {
+                log.AppendLine($"⚠ Rounds.csv not found at: {roundsFilePath}");
+            }
+
+            syncRoundsAndScoresLog = log.ToString();
+            StateHasChanged();
+
+            var scoresFilePath = Path.Combine(dataPath, "Scores.csv");
+            if (File.Exists(scoresFilePath))
+            {
+                log.AppendLine("\n=== Syncing Scores ===");
+                await SyncScoresFromFile(scoresFilePath, log);
+            }
+            else
+            {
+                log.AppendLine($"⚠ Scores.csv not found at: {scoresFilePath}");
+            }
+
+            log.AppendLine("\n✅ Rounds & Scores sync complete.");
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\n❌ FATAL ERROR: {ex.Message}");
+        }
+        finally
+        {
+            syncRoundsAndScoresLog = log.ToString();
+            isSyncingRoundsAndScores = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SyncRoundsFromFile(string filePath, System.Text.StringBuilder log)
+    {
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+        var playerService = scope.ServiceProvider.GetRequiredService<IPlayerService>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var coursesFromDb = await courseService.GetAllGolfCoursesAsync();
+        var courseLookup = coursesFromDb.ToDictionary(
+            c => $"{(c.GolfClub?.Name ?? "").ToLowerInvariant()}_{c.Name.ToLowerInvariant()}",
+            c => c.GolfCourseId
+        );
+
+        var playersFromDb = await playerService.GetAllPlayersAsync(_migrationAdminUserId, true);
+        var playerLookup = playersFromDb.ToDictionary(
+            p => $"{p.FirstName?.ToLowerInvariant()} {p.LastName?.ToLowerInvariant()}".Trim(),
+            p => p.PlayerId
+        );
+
+        var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+            PrepareHeaderForMatch = args => args.Header.ToLower().Replace(" ", "").Replace("_", ""),
+        };
+
+        var allCsvRows = new List<RoundCsvRecord>();
+        using (var stream = File.OpenRead(filePath))
+        using (var reader = new StreamReader(stream))
+        using (var csv = new CsvReader(reader, csvConfig))
+        {
+            await foreach (var record in csv.GetRecordsAsync<RoundCsvRecord>())
+                allCsvRows.Add(record);
+        }
+
+        var groupedBySharedRound = allCsvRows.GroupBy(row =>
+        {
+            var dateParsed = DateTime.TryParseExact(row.Date?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
+                ? dt.ToShortDateString() : row.Date;
+            return $"{row.ClubName?.ToLowerInvariant()}_{row.ActualCourseName?.ToLowerInvariant()}_{dateParsed}_{row.RoundType?.ToLowerInvariant()}_{row.StartingHole}_{row.HolesPlayed}";
+        });
+
+        int newRounds = 0, newLinks = 0, skipped = 0;
+        var processedKeys = new Dictionary<string, int>();
+
+        foreach (var group in groupedBySharedRound)
+        {
+            var first = group.First();
+            string logKey = $"{first.ClubName} / {first.ActualCourseName} / {first.Date?.Trim()} / {first.RoundType}";
+
+            var courseLookupKey = $"{(first.ClubName ?? "").ToLowerInvariant()}_{(first.ActualCourseName ?? "").ToLowerInvariant()}";
+            if (!courseLookup.TryGetValue(courseLookupKey, out var golfCourseId))
+            {
+                log.AppendLine($"  ⚠ Course not found: {logKey}");
+                skipped += group.Count();
+                continue;
+            }
+
+            if (!DateTime.TryParseExact(first.Date?.Trim(), "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var roundDate))
+            {
+                log.AppendLine($"  ⚠ Invalid date '{first.Date}' for: {logKey}");
+                skipped += group.Count();
+                continue;
+            }
+
+            if (!Enum.TryParse<RoundTypeOption>(first.RoundType, true, out var roundTypeEnum))
+            {
+                log.AppendLine($"  ⚠ Invalid RoundType '{first.RoundType}' for: {logKey}");
+                skipped += group.Count();
+                continue;
+            }
+
+            int currentDbRoundId;
+            if (!processedKeys.TryGetValue(group.Key, out currentDbRoundId))
+            {
+                var existingRound = await dbContext.Rounds.FirstOrDefaultAsync(r =>
+                    r.GolfCourseId == golfCourseId &&
+                    r.DatePlayed == roundDate &&
+                    r.StartingHole == first.StartingHole &&
+                    r.HolesPlayed == first.HolesPlayed &&
+                    r.RoundType == roundTypeEnum);
+
+                if (existingRound != null)
+                {
+                    currentDbRoundId = existingRound.RoundId;
+                }
+                else
+                {
+                    var newRound = new Round
+                    {
+                        GolfCourseId = golfCourseId,
+                        DatePlayed = roundDate,
+                        StartingHole = first.StartingHole,
+                        HolesPlayed = first.HolesPlayed,
+                        RoundType = roundTypeEnum,
+                        Notes = null,
+                        CreatedByApplicationUserId = _migrationAdminUserId,
+                        Status = RoundCompletionStatus.Completed
+                    };
+                    dbContext.Rounds.Add(newRound);
+                    await dbContext.SaveChangesAsync();
+                    currentDbRoundId = newRound.RoundId;
+                    newRounds++;
+                    log.AppendLine($"  ✚ Added round: {logKey}");
+                }
+                processedKeys[group.Key] = currentDbRoundId;
+            }
+
+            foreach (var playerRow in group)
+            {
+                var nameKey = (playerRow.PlayerName ?? "").ToLowerInvariant().Trim();
+                if (!playerLookup.TryGetValue(nameKey, out var playerId))
+                {
+                    log.AppendLine($"  ⚠ Player '{playerRow.PlayerName}' not found for round ID {currentDbRoundId}");
+                    skipped++;
+                    continue;
+                }
+
+                bool alreadyLinked = await dbContext.RoundPlayers
+                    .AnyAsync(rp => rp.RoundId == currentDbRoundId && rp.PlayerId == playerId);
+                if (alreadyLinked) continue;
+
+                dbContext.RoundPlayers.Add(new RoundPlayer { RoundId = currentDbRoundId, PlayerId = playerId });
+                newLinks++;
+            }
+            await dbContext.SaveChangesAsync();
+        }
+
+        log.AppendLine($"  Rounds: {newRounds} new, {newLinks} new player links, {skipped} skipped");
+    }
+
+    private async Task SyncScoresFromFile(string filePath, System.Text.StringBuilder log)
+    {
+        await using var scope = ServiceScopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var allRoundsWithDetails = await dbContext.Rounds
+            .AsNoTracking()
+            .Include(r => r.GolfCourse!.GolfClub)
+            .Include(r => r.RoundPlayers!)
+                .ThenInclude(rp => rp.Player)
+            .ToListAsync();
+
+        var roundPlayerLookup = new Dictionary<string, (int RoundId, int PlayerId)>();
+        foreach (var r in allRoundsWithDetails)
+        {
+            foreach (var rp in r.RoundPlayers ?? Enumerable.Empty<RoundPlayer>())
+            {
+                if (rp.Player == null || r.GolfCourse == null || r.GolfCourse.GolfClub == null) continue;
+                var dateStr = r.DatePlayed.ToString("dd/MM/yyyy");
+                var playerName = $"{rp.Player.FirstName} {rp.Player.LastName}".Trim();
+                var roundTypeStr = r.RoundType.ToString();
+                var key = $"{r.GolfCourse.GolfClub.Name} - {r.GolfCourse.Name} - {playerName} - {roundTypeStr} - {dateStr}".ToLowerInvariant();
+                roundPlayerLookup.TryAdd(key, (r.RoundId, rp.PlayerId));
+            }
+        }
+
+        var holeLookup = (await dbContext.Holes.AsNoTracking().ToListAsync())
+            .ToDictionary(h => (h.GolfCourseId, h.HoleNumber), h => h.HoleId);
+
+        var existingScores = (await dbContext.Scores.AsNoTracking()
+            .Select(s => new { s.RoundId, s.PlayerId, s.HoleId }).ToListAsync())
+            .Select(s => (s.RoundId, s.PlayerId, s.HoleId)).ToHashSet();
+
+        var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+        {
+            HasHeaderRecord = true,
+            MissingFieldFound = null,
+            HeaderValidated = null,
+            PrepareHeaderForMatch = args => args.Header.ToLower().Replace(" ", "").Replace("_", "")
+        };
+
+        var allScoreCsvRows = new List<ScoreCsvRecord>();
+        using (var stream = File.OpenRead(filePath))
+        using (var reader = new StreamReader(stream))
+        using (var csv = new CsvReader(reader, csvConfig))
+        {
+            await foreach (var record in csv.GetRecordsAsync<ScoreCsvRecord>())
+                allScoreCsvRows.Add(record);
+        }
+
+        int added = 0, skipped = 0;
+        foreach (var record in allScoreCsvRows)
+        {
+            if (string.IsNullOrWhiteSpace(record.RoundText) || record.HoleNumber <= 0) { skipped++; continue; }
+
+            var rtParts = record.RoundText.Split(new[] { " - " }, StringSplitOptions.None);
+            if (rtParts.Length < 5) { skipped++; continue; }
+
+            var key = $"{rtParts[0]} - {rtParts[1]} - {rtParts[2]} - {rtParts[3]} - {rtParts[4]}".ToLowerInvariant();
+            if (!roundPlayerLookup.TryGetValue(key, out var ids)) { skipped++; continue; }
+
+            var round = allRoundsWithDetails.FirstOrDefault(r => r.RoundId == ids.RoundId);
+            if (round == null || !holeLookup.TryGetValue((round.GolfCourseId, record.HoleNumber), out var holeId)) { skipped++; continue; }
+
+            if (existingScores.Contains((ids.RoundId, ids.PlayerId, holeId))) { skipped++; continue; }
+
+            dbContext.Scores.Add(new Score { RoundId = ids.RoundId, PlayerId = ids.PlayerId, HoleId = holeId, Strokes = record.Strokes });
+            existingScores.Add((ids.RoundId, ids.PlayerId, holeId));
+            added++;
+
+            if (added % 500 == 0)
+            {
+                await dbContext.SaveChangesAsync();
+                syncRoundsAndScoresLog = log.ToString() + $"\n  ...{added} scores processed so far...";
+                StateHasChanged();
+            }
+        }
+        await dbContext.SaveChangesAsync();
+        log.AppendLine($"  Scores: {added} added, {skipped} already exist or skipped");
     }
 
     public class GolfClubCsvRecord
