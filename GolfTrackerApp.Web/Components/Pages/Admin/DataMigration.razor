@@ -357,6 +357,7 @@
         await using var scope = ServiceScopeFactory.CreateAsyncScope();
         var holeService = scope.ServiceProvider.GetRequiredService<IHoleService>();
         var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+        var teeSetService = scope.ServiceProvider.GetRequiredService<ITeeSetService>();
 
         var courses = await courseService.GetAllGolfCoursesAsync();
         var courseLookup = courses.ToDictionary(
@@ -364,15 +365,16 @@
             c => c.GolfCourseId
         );
 
-        var existingHoles = new HashSet<string>();
+        // Build a lookup of existing holes keyed by "courseId_holeNumber" → Hole entity
+        var existingHoleLookup = new Dictionary<string, Hole>();
         foreach (var course in courses)
         {
             var holes = await holeService.GetHolesForCourseAsync(course.GolfCourseId);
             foreach (var hole in holes)
-                existingHoles.Add($"{hole.GolfCourseId}_{hole.HoleNumber}");
+                existingHoleLookup[$"{hole.GolfCourseId}_{hole.HoleNumber}"] = hole;
         }
 
-        int added = 0, skipped = 0;
+        int added = 0, updated = 0, skipped = 0;
         var holeTeeYardages = new Dictionary<int, List<(int HoleId, int? White, int? Yellow, int? Red)>>();
         var affectedCourseIds = new HashSet<int>();
 
@@ -403,51 +405,76 @@
                 continue;
             }
 
+            int? csvLengthYards = record.YellowYards ?? record.LengthYards;
             var holeKey = $"{courseId}_{record.HoleNumber}";
-            if (existingHoles.Contains(holeKey))
+
+            if (existingHoleLookup.TryGetValue(holeKey, out var existingHole))
             {
-                skipped++;
-                continue;
+                // --- Update pass: check if core hole data or tee yardages have changed ---
+                var holeChanged = false;
+                if (existingHole.Par != record.Par) { existingHole.Par = record.Par; holeChanged = true; }
+                if (existingHole.StrokeIndex != record.StrokeIndex) { existingHole.StrokeIndex = record.StrokeIndex; holeChanged = true; }
+                if (existingHole.LengthYards != csvLengthYards) { existingHole.LengthYards = csvLengthYards; holeChanged = true; }
+
+                if (holeChanged)
+                {
+                    await holeService.UpdateHoleAsync(existingHole);
+                    updated++;
+                    log.AppendLine($"  ↺ Updated hole {record.HoleNumber} for {record.CourseName} (Club: {record.ClubName}) — Par/SI/Length changed");
+                }
+
+                // Always re-queue tee yardages for existing holes if CSV has values,
+                // so newly populated White/Red columns get picked up too.
+                if (record.WhiteYards.HasValue || record.YellowYards.HasValue || record.RedYards.HasValue)
+                {
+                    if (!holeTeeYardages.ContainsKey(courseId))
+                        holeTeeYardages[courseId] = new List<(int HoleId, int? White, int? Yellow, int? Red)>();
+                    holeTeeYardages[courseId].Add((existingHole.HoleId, record.WhiteYards, record.YellowYards ?? record.LengthYards, record.RedYards));
+                    affectedCourseIds.Add(courseId);
+                }
+
+                if (!holeChanged) skipped++;
             }
-
-            var newHole = new Hole
+            else
             {
-                GolfCourseId = courseId,
-                HoleNumber = record.HoleNumber,
-                Par = record.Par,
-                StrokeIndex = record.StrokeIndex,
-                LengthYards = record.YellowYards ?? record.LengthYards
-            };
-            await holeService.AddHoleAsync(newHole);
-            existingHoles.Add(holeKey);
-            added++;
+                // --- Insert pass: brand new hole ---
+                var newHole = new Hole
+                {
+                    GolfCourseId = courseId,
+                    HoleNumber = record.HoleNumber,
+                    Par = record.Par,
+                    StrokeIndex = record.StrokeIndex,
+                    LengthYards = csvLengthYards
+                };
+                await holeService.AddHoleAsync(newHole);
+                existingHoleLookup[holeKey] = newHole;
+                added++;
 
-            // Track per-tee yardages for post-seed update
-            if (record.WhiteYards.HasValue || record.YellowYards.HasValue || record.RedYards.HasValue)
-            {
-                if (!holeTeeYardages.ContainsKey(courseId))
-                    holeTeeYardages[courseId] = new List<(int HoleId, int? White, int? Yellow, int? Red)>();
-                holeTeeYardages[courseId].Add((newHole.HoleId, record.WhiteYards, record.YellowYards ?? record.LengthYards, record.RedYards));
+                if (record.WhiteYards.HasValue || record.YellowYards.HasValue || record.RedYards.HasValue)
+                {
+                    if (!holeTeeYardages.ContainsKey(courseId))
+                        holeTeeYardages[courseId] = new List<(int HoleId, int? White, int? Yellow, int? Red)>();
+                    holeTeeYardages[courseId].Add((newHole.HoleId, record.WhiteYards, record.YellowYards ?? record.LengthYards, record.RedYards));
+                }
+
+                log.AppendLine($"  ✚ Added hole {record.HoleNumber} for {record.CourseName} (Club: {record.ClubName})");
+                affectedCourseIds.Add(courseId);
             }
-
-            log.AppendLine($"  ✚ Added hole {record.HoleNumber} for {record.CourseName} (Club: {record.ClubName})");
-
-            affectedCourseIds.Add(courseId);
         }
 
-        log.AppendLine($"  Holes: {added} added, {skipped} already exist");
+        log.AppendLine($"  Holes: {added} added, {updated} updated, {skipped} unchanged");
 
         // Ensure standard tee sets + HoleTee records for all affected courses
-        if (added > 0)
+        if (affectedCourseIds.Any())
         {
             try
             {
-                var teeSetService = scope.ServiceProvider.GetRequiredService<ITeeSetService>();
                 foreach (var courseId in affectedCourseIds)
                 {
                     await teeSetService.EnsureStandardTeeSetsAsync(courseId);
                 }
-                log.AppendLine("  Standard tee sets (White, Yellow, Red) ensured for courses with new holes.");
+                if (added > 0)
+                    log.AppendLine("  Standard tee sets (White, Yellow, Red) ensured for courses with new holes.");
 
                 // Update HoleTee records with per-tee yardages from CSV
                 if (holeTeeYardages.Any())
@@ -457,7 +484,7 @@
             }
             catch (Exception teeEx)
             {
-                log.AppendLine($"  Warning: Could not seed default tee sets: {teeEx.Message}");
+                log.AppendLine($"  Warning: Could not update tee sets: {teeEx.Message}");
             }
         }
     }
