@@ -555,7 +555,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
 | 3 | Competitions & Scoring Formats | ❌ Not started | Specced in §12.5 only |
-| 4a | Personal WHS handicap (differentials + index + backfill) | ❌ Not started | Does **not** require Phase 3 — see revised dependency chain |
+| 4a | Personal WHS handicap (differentials + index + backfill) | 🚧 In progress | WHS math done (`WhsCalculator`, pure + unit-tested); models, persistence, and completion hook pending. Does **not** require Phase 3 |
 | 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
 | 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | 🚧 In progress | See `docs/WORKLOG.md` items 0-1…0-10 |
@@ -987,6 +987,8 @@ ScoringDifferential
 
 3. Recalculate after every qualifying round (trigger: status transition to `Completed` inside `RoundService`)
 4. Store new `HandicapRecord` with source=Personal (only when the index changed)
+
+Steps 1–2 are implemented as pure functions in `GolfTrackerApp.Core/Services/WhsCalculator.cs` (`ComputeAdjustedGrossScore`, `ComputeDifferential`, `ComputeIndex` — index capped at 54.0, plus handicaps negative, half-away-from-zero rounding). Steps 3–4 (persistence + trigger) are WORKLOG 2-1/2-3.
 
 **Society Handicap**: Same calculation but only using rounds linked to that society's competitions.
 
