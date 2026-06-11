@@ -6,6 +6,9 @@ This script is tailored to the reviewed 64-row production drift report from
 2026-06-11. It changes schema only; it does not update or delete application
 rows.
 
+Catalog metadata comparisons explicitly use DATABASE_DEFAULT because Azure SQL
+can use a different catalog collation from the application database.
+
 Run docs/sql-server-drift-check.sql immediately before and after this script.
 Do not run this script unless the pre-run drift report matches the reviewed
 report and both orphan checks return zero.
@@ -20,10 +23,10 @@ DECLARE @ConfirmedBackupTaken bit = 0;
 DECLARE @ConfirmedReviewedDriftErrorCount int = -1;
 DECLARE @ConfirmedOrphanChecksReturnedZero bit = 0;
 
-IF DB_NAME() IN (N'master', N'model', N'msdb', N'tempdb')
+IF DB_NAME() COLLATE DATABASE_DEFAULT IN (N'master', N'model', N'msdb', N'tempdb')
     THROW 51000, 'Refusing to run against a SQL Server system database.', 1;
 
-IF DB_NAME() <> @ConfirmedDatabaseName
+IF DB_NAME() COLLATE DATABASE_DEFAULT <> @ConfirmedDatabaseName COLLATE DATABASE_DEFAULT
     THROW 51001, 'DB_NAME() does not match @ConfirmedDatabaseName.', 1;
 
 IF @ConfirmedBackupTaken <> 1
@@ -53,8 +56,8 @@ IF NOT EXISTS (
     FROM sys.columns columnObject
     JOIN sys.types typeObject ON typeObject.user_type_id = columnObject.user_type_id
     WHERE columnObject.object_id = OBJECT_ID(N'dbo.TeeSets')
-      AND columnObject.name = N'Colour'
-      AND typeObject.name = N'nvarchar'
+      AND columnObject.name COLLATE DATABASE_DEFAULT = N'Colour'
+      AND typeObject.name COLLATE DATABASE_DEFAULT = N'nvarchar'
       AND columnObject.max_length = 14
       AND columnObject.is_nullable = 0
 )
@@ -65,8 +68,8 @@ IF NOT EXISTS (
     FROM sys.columns columnObject
     JOIN sys.types typeObject ON typeObject.user_type_id = columnObject.user_type_id
     WHERE columnObject.object_id = OBJECT_ID(N'dbo.TeeSets')
-      AND columnObject.name = N'CourseRating'
-      AND typeObject.name = N'decimal'
+      AND columnObject.name COLLATE DATABASE_DEFAULT = N'CourseRating'
+      AND typeObject.name COLLATE DATABASE_DEFAULT = N'decimal'
       AND columnObject.precision = 4
       AND columnObject.scale = 1
       AND columnObject.is_nullable = 1
@@ -93,8 +96,8 @@ IF EXISTS (
     THROW 51009, 'Orphans now exist for dbo.Scores.TeeSetId.', 1;
 
 DECLARE @Defaults TABLE (
-    TableName sysname NOT NULL,
-    ColumnName sysname NOT NULL,
+    TableName sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    ColumnName sysname COLLATE DATABASE_DEFAULT NOT NULL,
     PRIMARY KEY (TableName, ColumnName)
 );
 
@@ -135,20 +138,20 @@ IF (
         ON columnObject.object_id = tableObject.object_id
        AND columnObject.column_id = defaultObject.parent_column_id
     JOIN @Defaults expected
-        ON expected.TableName = tableObject.name
-       AND expected.ColumnName = columnObject.name
-    WHERE schemaObject.name = N'dbo'
+        ON expected.TableName = tableObject.name COLLATE DATABASE_DEFAULT
+       AND expected.ColumnName = columnObject.name COLLATE DATABASE_DEFAULT
+    WHERE schemaObject.name COLLATE DATABASE_DEFAULT = N'dbo'
 ) <> 26
     THROW 51010, 'The reviewed set of 26 legacy defaults has changed.', 1;
 
 DECLARE @ForeignKeyRenames TABLE (
-    TableName sysname NOT NULL,
-    OldName sysname NOT NULL PRIMARY KEY,
-    NewName sysname NOT NULL,
-    ColumnName sysname NOT NULL,
-    ReferencedTable sysname NOT NULL,
-    ReferencedColumn sysname NOT NULL,
-    DeleteAction nvarchar(60) NOT NULL
+    TableName sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    OldName sysname COLLATE DATABASE_DEFAULT NOT NULL PRIMARY KEY,
+    NewName sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    ColumnName sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    ReferencedTable sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    ReferencedColumn sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    DeleteAction nvarchar(60) COLLATE DATABASE_DEFAULT NOT NULL
 );
 
 INSERT INTO @ForeignKeyRenames
@@ -171,7 +174,8 @@ VALUES
 IF EXISTS (
     SELECT 1
     FROM @ForeignKeyRenames rename
-    LEFT JOIN sys.foreign_keys foreignKey ON foreignKey.name = rename.OldName
+    LEFT JOIN sys.foreign_keys foreignKey
+        ON foreignKey.name COLLATE DATABASE_DEFAULT = rename.OldName
     LEFT JOIN sys.tables parentTable ON parentTable.object_id = foreignKey.parent_object_id
     LEFT JOIN sys.schemas parentSchema ON parentSchema.schema_id = parentTable.schema_id
     LEFT JOIN sys.tables referencedTable ON referencedTable.object_id = foreignKey.referenced_object_id
@@ -185,22 +189,23 @@ IF EXISTS (
         ON referencedColumn.object_id = referencedTable.object_id
        AND referencedColumn.column_id = foreignKeyColumn.referenced_column_id
     WHERE foreignKey.object_id IS NULL
-       OR parentSchema.name <> N'dbo'
-       OR parentTable.name <> rename.TableName
-       OR parentColumn.name <> rename.ColumnName
-       OR referencedTable.name <> rename.ReferencedTable
-       OR referencedColumn.name <> rename.ReferencedColumn
-       OR REPLACE(foreignKey.delete_referential_action_desc, N'_', N' ') <> rename.DeleteAction
+       OR parentSchema.name COLLATE DATABASE_DEFAULT <> N'dbo'
+       OR parentTable.name COLLATE DATABASE_DEFAULT <> rename.TableName
+       OR parentColumn.name COLLATE DATABASE_DEFAULT <> rename.ColumnName
+       OR referencedTable.name COLLATE DATABASE_DEFAULT <> rename.ReferencedTable
+       OR referencedColumn.name COLLATE DATABASE_DEFAULT <> rename.ReferencedColumn
+       OR REPLACE(foreignKey.delete_referential_action_desc, N'_', N' ')
+            COLLATE DATABASE_DEFAULT <> rename.DeleteAction
        OR OBJECT_ID(N'dbo.' + rename.NewName, N'F') IS NOT NULL
 )
     THROW 51011, 'The reviewed foreign-key names, shapes, or delete actions have changed.', 1;
 
 DECLARE @IndexRenames TABLE (
-    TableName sysname NOT NULL,
-    OldName sysname NOT NULL,
-    NewName sysname NOT NULL,
+    TableName sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    OldName sysname COLLATE DATABASE_DEFAULT NOT NULL,
+    NewName sysname COLLATE DATABASE_DEFAULT NOT NULL,
     IsUnique bit NOT NULL,
-    Columns nvarchar(400) NOT NULL,
+    Columns nvarchar(400) COLLATE DATABASE_DEFAULT NOT NULL,
     PRIMARY KEY (TableName, OldName)
 );
 
@@ -215,7 +220,8 @@ IF EXISTS (
     OUTER APPLY (
         SELECT
             indexObject.is_unique AS IsUnique,
-            STRING_AGG(CONVERT(nvarchar(max), columnObject.name), N',')
+            STRING_AGG(CONVERT(nvarchar(max), columnObject.name)
+                COLLATE DATABASE_DEFAULT, N',')
                 WITHIN GROUP (ORDER BY indexColumn.key_ordinal) AS Columns
         FROM sys.indexes indexObject
         JOIN sys.tables tableObject ON tableObject.object_id = indexObject.object_id
@@ -226,9 +232,9 @@ IF EXISTS (
         JOIN sys.columns columnObject
             ON columnObject.object_id = indexColumn.object_id
            AND columnObject.column_id = indexColumn.column_id
-        WHERE schemaObject.name = N'dbo'
-          AND tableObject.name = rename.TableName
-          AND indexObject.name = rename.OldName
+        WHERE schemaObject.name COLLATE DATABASE_DEFAULT = N'dbo'
+          AND tableObject.name COLLATE DATABASE_DEFAULT = rename.TableName
+          AND indexObject.name COLLATE DATABASE_DEFAULT = rename.OldName
           AND indexColumn.is_included_column = 0
           AND indexColumn.key_ordinal > 0
         GROUP BY indexObject.is_unique
@@ -251,8 +257,9 @@ BEGIN TRY
 
     DECLARE @DropDefaultsSql nvarchar(max) = N'';
     SELECT @DropDefaultsSql = @DropDefaultsSql +
-        N'ALTER TABLE dbo.' + QUOTENAME(tableObject.name) +
-        N' DROP CONSTRAINT ' + QUOTENAME(defaultObject.name) + N';' + CHAR(10)
+        N'ALTER TABLE dbo.' + QUOTENAME(tableObject.name COLLATE DATABASE_DEFAULT) +
+        N' DROP CONSTRAINT ' + QUOTENAME(defaultObject.name COLLATE DATABASE_DEFAULT) +
+        N';' + CHAR(10)
     FROM sys.default_constraints defaultObject
     JOIN sys.tables tableObject ON tableObject.object_id = defaultObject.parent_object_id
     JOIN sys.schemas schemaObject ON schemaObject.schema_id = tableObject.schema_id
@@ -260,9 +267,9 @@ BEGIN TRY
         ON columnObject.object_id = tableObject.object_id
        AND columnObject.column_id = defaultObject.parent_column_id
     JOIN @Defaults expected
-        ON expected.TableName = tableObject.name
-       AND expected.ColumnName = columnObject.name
-    WHERE schemaObject.name = N'dbo';
+        ON expected.TableName = tableObject.name COLLATE DATABASE_DEFAULT
+       AND expected.ColumnName = columnObject.name COLLATE DATABASE_DEFAULT
+    WHERE schemaObject.name COLLATE DATABASE_DEFAULT = N'dbo';
 
     EXEC sys.sp_executesql @DropDefaultsSql;
 
