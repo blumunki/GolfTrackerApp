@@ -190,6 +190,69 @@ public sealed class HandicapServiceTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task Backfill_ReportsQualifiedOfProcessedAndBuildsHistory()
+    {
+        var (player, course, teeSetId) = await SeedBaseAsync();
+        var nineHoleCourse = await TestDataBuilder.SeedCourseAsync(
+            _factory, clubName: "Nine Hole Club", courseName: "Short", holes: 9);
+
+        // Three qualifying rounds (diffs 18.8, 35.8, 52.7), one level-par round
+        // (diff 1.9), and one nine-hole round that cannot qualify. No hooks fired —
+        // this is pre-existing history.
+        foreach (var (strokes, daysAgo) in new[] { (5, 5), (6, 4), (7, 3), (4, 2) })
+        {
+            await TestDataBuilder.SeedCompletedRoundAsync(
+                _factory, course.GolfCourseId, player.PlayerId,
+                datePlayed: DateTime.UtcNow.Date.AddDays(-daysAgo),
+                strokesPerHole: strokes, teeSetId: teeSetId);
+        }
+        await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, nineHoleCourse.GolfCourseId, player.PlayerId,
+            datePlayed: DateTime.UtcNow.Date.AddDays(-1));
+
+        var result = await _handicapService.BackfillPersonalHandicapsAsync();
+
+        Assert.Equal(5, result.RoundsProcessed);
+        Assert.Equal(4, result.RoundsQualified);
+        Assert.Equal(4, result.DifferentialsWritten);
+        Assert.Equal(1, result.PlayersWithIndex);
+        // History evolves in playing order: index 16.8 after the 3rd round
+        // (lowest 18.8 − 2.0), then 0.9 after the 4th (lowest 1.9 − 1.0).
+        Assert.Equal(2, result.HandicapRecordsCreated);
+
+        await using var context = await _factory.CreateDbContextAsync();
+        var indexes = await context.HandicapRecords
+            .OrderBy(h => h.EffectiveDate)
+            .Select(h => h.HandicapIndex)
+            .ToListAsync();
+        Assert.Equal(new[] { 16.8m, 0.9m }, indexes);
+    }
+
+    [Fact]
+    public async Task Backfill_IsIdempotentAcrossRuns()
+    {
+        var (player, course, teeSetId) = await SeedBaseAsync();
+        foreach (var (strokes, daysAgo) in new[] { (5, 3), (6, 2), (7, 1) })
+        {
+            await TestDataBuilder.SeedCompletedRoundAsync(
+                _factory, course.GolfCourseId, player.PlayerId,
+                datePlayed: DateTime.UtcNow.Date.AddDays(-daysAgo),
+                strokesPerHole: strokes, teeSetId: teeSetId);
+        }
+
+        var first = await _handicapService.BackfillPersonalHandicapsAsync();
+        var second = await _handicapService.BackfillPersonalHandicapsAsync();
+
+        Assert.Equal(1, first.HandicapRecordsCreated);
+        Assert.Equal(0, second.HandicapRecordsCreated); // indexes unchanged
+        Assert.Equal(first.RoundsQualified, second.RoundsQualified);
+
+        await using var context = await _factory.CreateDbContextAsync();
+        Assert.Equal(3, await context.ScoringDifferentials.CountAsync());
+        Assert.Equal(1, await context.HandicapRecords.CountAsync());
+    }
+
     private async Task<(Player Player, GolfCourse Course, int TeeSetId)> SeedBaseAsync()
     {
         await TestDataBuilder.SeedUserAsync(_factory);

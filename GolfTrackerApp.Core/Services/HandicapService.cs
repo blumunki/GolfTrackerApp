@@ -19,7 +19,7 @@ public class HandicapService : IHandicapService
         _logger = logger;
     }
 
-    public async Task OnRoundCompletedAsync(int roundId)
+    public async Task<int> OnRoundCompletedAsync(int roundId)
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
 
@@ -34,9 +34,10 @@ public class HandicapService : IHandicapService
             || round.Status != RoundCompletionStatus.Completed
             || round.HolesPlayed != QualifyingHoles)
         {
-            return;
+            return 0;
         }
 
+        var differentialsWritten = 0;
         foreach (var roundPlayer in round.RoundPlayers)
         {
             var scores = round.Scores
@@ -85,9 +86,53 @@ public class HandicapService : IHandicapService
             existing.Differential = differential;
             existing.CalculatedAt = DateTime.UtcNow;
             await context.SaveChangesAsync();
+            differentialsWritten++;
 
             await RecalculatePersonalIndexAsync(context, roundPlayer.PlayerId, round.DatePlayed);
         }
+
+        return differentialsWritten;
+    }
+
+    public async Task<HandicapBackfillResult> BackfillPersonalHandicapsAsync()
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        // Oldest first so HandicapRecord history evolves in playing order.
+        var roundIds = await context.Rounds
+            .Where(r => r.Status == RoundCompletionStatus.Completed)
+            .OrderBy(r => r.DatePlayed)
+                .ThenBy(r => r.RoundId)
+            .Select(r => r.RoundId)
+            .ToListAsync();
+
+        var recordsBefore = await context.HandicapRecords
+            .CountAsync(h => h.Source == HandicapSource.Personal);
+
+        var result = new HandicapBackfillResult { RoundsProcessed = roundIds.Count };
+        foreach (var roundId in roundIds)
+        {
+            var written = await OnRoundCompletedAsync(roundId);
+            if (written > 0)
+            {
+                result.RoundsQualified++;
+            }
+            result.DifferentialsWritten += written;
+        }
+
+        result.HandicapRecordsCreated = await context.HandicapRecords
+            .CountAsync(h => h.Source == HandicapSource.Personal) - recordsBefore;
+        result.PlayersWithIndex = await context.HandicapRecords
+            .Where(h => h.Source == HandicapSource.Personal)
+            .Select(h => h.PlayerId)
+            .Distinct()
+            .CountAsync();
+
+        _logger.LogInformation(
+            "Handicap backfill: {Qualified} of {Processed} rounds qualified, {Differentials} differentials, {Records} new records.",
+            result.RoundsQualified, result.RoundsProcessed, result.DifferentialsWritten, result.HandicapRecordsCreated);
+
+        return result;
     }
 
     private async Task RecalculatePersonalIndexAsync(ApplicationDbContext context, int playerId, DateTime effectiveDate)
