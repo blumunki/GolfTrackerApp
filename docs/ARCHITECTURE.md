@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Golf Tracker App is a cross-platform golf performance tracking system consisting of two front-end applications — a Blazor Server web app and a .NET MAUI Blazor Hybrid mobile app — sharing a centralised API backend and business logic layer hosted within the web project.
+Golf Tracker App is a cross-platform golf performance tracking system consisting of two front-end applications — a Blazor Server web app and a .NET MAUI Blazor Hybrid mobile app — sharing a centralised API backend hosted by the web project and a business/data layer compiled into `GolfTrackerApp.Core`.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -80,10 +80,12 @@ Golf Tracker App is a cross-platform golf performance tracking system consisting
                                    /api/* endpoints
 ```
 
+The logical service, AI provider, and Entity Framework layers shown inside the Web host are implemented by the referenced `GolfTrackerApp.Core` project. Their legacy `GolfTrackerApp.Web.*` namespaces remain temporarily until WORKLOG item 1-2.
+
 ## 2. Design Principles
 
 ### 2.1 Centralised Business Logic
-All business logic lives in the Web project's **Service Layer**. Both the web Blazor components and the API controllers consume the same services via dependency injection. This guarantees:
+All business logic lives in the Core project's **Service Layer**. Both the web Blazor components and the API controllers consume the same services via dependency injection. This guarantees:
 - Identical behaviour on web and mobile
 - A single place to fix bugs or add features
 - No risk of logic drift between platforms
@@ -92,16 +94,35 @@ All business logic lives in the Web project's **Service Layer**. Both the web Bl
 The mobile app communicates exclusively through REST API endpoints. Every feature available on mobile has a corresponding API controller action. This creates a clean contract between client and server.
 
 ### 2.3 Future-Proof API Separation
-The current architecture intentionally hosts API controllers within the Web project for MVP simplicity. The service layer is fully interface-driven (`IGolfClubService`, `IRoundService`, etc.), making it straightforward to:
-1. Extract services into a shared class library
+The current architecture intentionally hosts API controllers within the Web project for MVP simplicity. Models, services, and data access are extracted into `GolfTrackerApp.Core`, and the service layer is fully interface-driven (`IGolfClubService`, `IRoundService`, etc.), making it straightforward to:
+1. Rename the remaining legacy `GolfTrackerApp.Web.*` Core namespaces
 2. Move API controllers into a dedicated API project
 3. Deploy web and API independently
 
-This refactor requires no changes to business logic — only DI registration and project references.
+These later refactors require no changes to business logic — only namespaces, DI registration, and project references.
 
 ## 3. Component Architecture
 
-### 3.1 Web Project (GolfTrackerApp.Web)
+### 3.1 Core Project (GolfTrackerApp.Core)
+
+```
+GolfTrackerApp.Core/
+├── Models/                             # Domain models (EF entities + DTOs)
+├── Services/                           # Business logic (interfaces + implementations)
+│   └── AiProviders/                    # AI provider implementations
+└── Data/
+    ├── ApplicationDbContext.cs         # EF Core context (Identity + domain entities)
+    ├── ProviderContexts.cs             # Provider-specific contexts + design-time factories
+    ├── ApplicationUser.cs              # Identity user
+    ├── SeedData.cs                     # Initial data seeding
+    └── Migrations/                     # Provider-split EF Core migrations
+        ├── Sqlite/                     # Development migration chain
+        └── SqlServer/                  # Production migration chain
+```
+
+Core source files retain their existing `GolfTrackerApp.Web.*` namespaces until WORKLOG item 1-2. This extraction changes project ownership only.
+
+### 3.2 Web Project (GolfTrackerApp.Web)
 
 ```
 GolfTrackerApp.Web/
@@ -119,54 +140,7 @@ GolfTrackerApp.Web/
 │   ├── PlayersController.cs           # Player CRUD + reports
 │   ├── ReportsController.cs           # Aggregated reporting endpoints
 │   └── RoundsController.cs            # Round CRUD
-├── Services/                           # Business logic (interfaces + implementations)
-│   ├── IGolfClubService.cs            # Golf club operations
-│   ├── IGolfCourseService.cs          # Golf course operations
-│   ├── IRoundService.cs               # Round CRUD + queries
-│   ├── IPlayerService.cs             # Player CRUD + search
-│   ├── IReportService.cs             # Performance stats, comparisons, distributions
-│   ├── IScoreService.cs              # Score CRUD + scorecard save
-│   ├── IHoleService.cs               # Hole CRUD
-│   ├── IConnectionService.cs         # Player-to-player social connections
-│   ├── IMergeService.cs              # Managed player merge workflow
-│   ├── INotificationService.cs       # User notifications
-│   ├── IRoundWorkflowService.cs      # Multi-step round recording orchestrator
-│   ├── IAiInsightService.cs          # Golf-specific AI insight orchestration
-│   ├── IAiRoutingService.cs          # Multi-provider routing + failover
-│   ├── IAiAuditService.cs            # AI audit logging + rate limiting
-│   ├── IAiChatService.cs             # Persistent chat session management
-│   ├── IAiProviderSettingsService.cs  # Admin provider on/off + priority
-│   └── AiProviders/                   # AI provider implementations
-│       ├── OpenAiProviderService.cs
-│       ├── AnthropicProviderService.cs
-│       ├── GeminiProviderService.cs
-│       ├── GrokProviderService.cs
-│       ├── MistralProviderService.cs
-│       ├── DeepSeekProviderService.cs
-│       ├── MetaLlamaProviderService.cs
-│       └── ManusProviderService.cs
-├── Models/                            # Domain models (EF entities + DTOs)
-│   ├── Round.cs, Score.cs, Player.cs  # Core entities
-│   ├── GolfClub.cs, GolfCourse.cs, Hole.cs
-│   ├── PlayerConnection.cs           # Social connections
-│   ├── PlayerMergeRequest.cs         # Merge workflow
-│   ├── Notification.cs               # In-app notifications
-│   ├── AiProviderConfig.cs           # AI provider configuration model
-│   ├── AiProviderSettings.cs         # DB entity for provider on/off + priority
-│   ├── AiInsightResult.cs            # AI response DTO
-│   ├── AiChatMessage.cs              # Chat message DTO + AiChatRequest
-│   ├── AiAuditLog.cs                 # Audit log entity
-│   ├── AiChatSession.cs              # Chat session entity
-│   ├── AiChatSessionMessage.cs       # Chat message entity
-│   └── [Various DTOs]                # Report view models, chart data, etc.
-├── Data/
-│   ├── ApplicationDbContext.cs        # EF Core context (Identity + domain entities)
-│   ├── ProviderContexts.cs             # Provider-specific contexts + design-time factories
-│   ├── ApplicationUser.cs            # Identity user (extends IdentityUser with LinkedPlayerId, AiInsightsOptOut)
-│   ├── SeedData.cs                   # Initial data seeding
-│   └── Migrations/                   # Provider-split EF Core migrations
-│       ├── Sqlite/                   # Development migration chain
-│       └── SqlServer/                # Production migration chain
+├── Data/                               # Host-owned CSV seed assets + local SQLite database
 ├── Components/
 │   ├── Pages/                        # Blazor Server page components
 │   │   ├── Home.razor                # Dashboard with AI insights widget
@@ -188,7 +162,7 @@ GolfTrackerApp.Web/
     └── utilities/                    # Utility classes
 ```
 
-### 3.2 Mobile Project (GolfTrackerApp.Mobile)
+### 3.3 Mobile Project (GolfTrackerApp.Mobile)
 
 ```
 GolfTrackerApp.Mobile/
@@ -324,22 +298,22 @@ Development and production use **different database providers** with different c
 | Aspect | Development (SQLite) | Production (SQL Server) |
 |--------|---------------------|------------------------|
 | **Provider** | `Microsoft.EntityFrameworkCore.Sqlite` | `Microsoft.EntityFrameworkCore.SqlServer` |
-| **Migration context** | `SqliteApplicationDbContext` → `Data/Migrations/Sqlite/` | `SqlServerApplicationDbContext` → `Data/Migrations/SqlServer/` |
+| **Migration context** | `SqliteApplicationDbContext` → `GolfTrackerApp.Core/Data/Migrations/Sqlite/` | `SqlServerApplicationDbContext` → `GolfTrackerApp.Core/Data/Migrations/SqlServer/` |
 | **Runtime schema management** | EF Core Migrations (`context.Database.Migrate()`) | `EnsureCreated()` + manual SQL in `EnsureNewTablesExistAsync()` — **until WORKLOG 0-9 lands**, then `Migrate()` |
 | **Column types** | `INTEGER`, `TEXT`, `REAL` | `INT`, `NVARCHAR(n)`, `DATETIME2`, `BIT`, etc. |
 | **Cascade deletes** | Generally permissive | Strict — rejects `ON DELETE SET NULL` / `CASCADE` if it creates multiple cascade paths |
 | **Config key** | `"DatabaseProvider": "Sqlite"` (in `appsettings.Development.json`) | `"DatabaseProvider": "SqlServer"` (in `appsettings.Production.json`) |
 
-Migrations are split per provider via derived context types in `Data/ProviderContexts.cs` (EF Core discovers all migrations attributed to a context type in the migrations assembly, so each provider's set is attached to its own derived context). Application code is unaffected — DI forwards `ApplicationDbContext` / `IDbContextFactory<ApplicationDbContext>` to the active provider's context (`Program.cs`).
+Migrations are split per provider via derived context types in `GolfTrackerApp.Core/Data/ProviderContexts.cs` (EF Core discovers all migrations attributed to a context type in the migrations assembly, so each provider's set is attached to its own derived context). Application code is unaffected — DI forwards `ApplicationDbContext` / `IDbContextFactory<ApplicationDbContext>` to the active provider's context (`Program.cs`).
 
 Production must be reconciled and marked with the SQL Server baseline before runtime migration application is enabled. Follow `docs/sql-server-baseline-runbook.md`: its drift check is read-only and compares the model's tables, columns, defaults, primary keys, indexes, and foreign keys to `20260611161345_InitialSqlServer`; its guarded marker writes only the matching `__EFMigrationsHistory` row after a human confirms a clean check and verified backup. WORKLOG item `0-9` stays blocked until that human-run production step is recorded.
 
 **When making any database schema change, you MUST:**
 
-1. **Create BOTH migrations** (from `GolfTrackerApp.Web/`):
+1. **Create BOTH migrations** (from the repository root):
    ```bash
-   dotnet ef migrations add <Name> --context SqliteApplicationDbContext --output-dir Data/Migrations/Sqlite
-   dotnet ef migrations add <Name> --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
+   dotnet ef migrations add <Name> --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqliteApplicationDbContext --output-dir Data/Migrations/Sqlite
+   dotnet ef migrations add <Name> --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
    ```
 
 2. **Transition state (until WORKLOG 0-9 lands):** also update `EnsureNewTablesExistAsync()` in `Program.cs` for SQL Server production:
@@ -352,13 +326,13 @@ Production must be reconciled and marked with the SQL Server baseline before run
    - `ON DELETE CASCADE` is only safe when there's a single path from parent to dependent
    - `ON DELETE SET NULL` also triggers the cascade-path check on SQL Server
 
-4. **Test both providers** before deploying schema changes. For SQLite, apply the chain to a scratch DB: set `GOLFTRACKER_DESIGNTIME_CONNECTION` and run `dotnet ef database update --context SqliteApplicationDbContext`. Never point it at production.
+4. **Test both providers** before deploying schema changes. For SQLite, apply the chain to a scratch DB: set `GOLFTRACKER_DESIGNTIME_CONNECTION` and run `dotnet ef database update --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqliteApplicationDbContext`. Never point it at production.
 
 ## 6. Service Layer Design
 
 All services follow the same pattern:
-- **Interface** in `Services/I{Name}Service.cs`
-- **Implementation** in `Services/{Name}Service.cs`
+- **Interface** in `GolfTrackerApp.Core/Services/I{Name}Service.cs`
+- **Implementation** in `GolfTrackerApp.Core/Services/{Name}Service.cs`
 - **Dependency**: `IDbContextFactory<ApplicationDbContext>` injected via constructor
 - **Lifetime**: All registered as scoped services in DI
 
@@ -586,6 +560,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
 | 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | 🚧 In progress | See `docs/WORKLOG.md` items 0-1…0-10 |
+| — | Core project extraction | 🚧 In progress | Models, services, data, and migrations moved; namespace rename and test/CI retarget remain (1-2, 1-3) |
 | — | Proactive AI coaching (background jobs) | ❌ Not started | AI layer is user-triggered only today |
 | — | Course data expansion (OSM geometry, AI-assisted entry) + hole visuals | ❌ Not started | |
 
@@ -1091,9 +1066,9 @@ club handicaps       ▼
 
 The current architecture is designed for easy evolution:
 
-1. **Extract shared library**: Move `Models/` and `Services/` interfaces to a `GolfTrackerApp.Shared` class library
-2. **Dedicated API project**: Move `Controllers/` to `GolfTrackerApp.Api`, reference the shared library
+1. **Complete Core extraction**: Rename legacy `GolfTrackerApp.Web.*` namespaces in `GolfTrackerApp.Core`, then retarget tests and CI
+2. **Dedicated API project**: Move `Controllers/` to `GolfTrackerApp.Api`, reference `GolfTrackerApp.Core`
 3. **Independent deployment**: Web and API can scale independently
 4. **Additional clients**: Any platform (React, Flutter, etc.) can consume the same API
 
-The interface-driven service layer ensures this refactor is mechanical — no business logic changes required.
+The interface-driven service layer keeps these refactors mechanical — no business logic changes required.

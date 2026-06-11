@@ -108,7 +108,7 @@ var databaseProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
 
 // Use DbContextFactory to avoid threading issues in Blazor Server.
 // Each provider has its own derived context type carrying its own migration set
-// (see Data/ProviderContexts.cs). Application code keeps depending on
+// (see GolfTrackerApp.Core/Data/ProviderContexts.cs). Application code keeps depending on
 // ApplicationDbContext / IDbContextFactory<ApplicationDbContext> via the
 // forwarding registrations below.
 if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))

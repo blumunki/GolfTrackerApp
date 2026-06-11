@@ -4,7 +4,7 @@ Shared conventions for all agents (Claude, Codex, Gemini) and humans working on 
 
 ## 1. Service layer conventions
 
-- Every service is an **interface + implementation pair** in `GolfTrackerApp.Web/Services/`: `I{Name}Service.cs` + `{Name}Service.cs`.
+- Every service is an **interface + implementation pair** in `GolfTrackerApp.Core/Services/`: `I{Name}Service.cs` + `{Name}Service.cs`.
 - Register as **scoped** in `Program.cs` DI.
 - Services depend on **`IDbContextFactory<ApplicationDbContext>`** — never inject `ApplicationDbContext` directly (Blazor Server threading). Create a context per operation with `await _contextFactory.CreateDbContextAsync()` inside a `using`/`await using`.
 - Business logic lives only in services. Blazor components and API controllers are thin callers — both must go through the same service so web and mobile behave identically.
@@ -14,16 +14,16 @@ Shared conventions for all agents (Claude, Codex, Gemini) and humans working on 
 
 Dev uses **SQLite** (EF migrations, `Data/golfapp.db`). Prod uses **SQL Server**.
 
-Migrations are split per provider using derived context types (`Data/ProviderContexts.cs`): `SqliteApplicationDbContext` owns `Data/Migrations/Sqlite/`, `SqlServerApplicationDbContext` owns `Data/Migrations/SqlServer/`. **Every schema change needs BOTH migrations** (run from `GolfTrackerApp.Web/`):
+Migrations are split per provider using derived context types (`GolfTrackerApp.Core/Data/ProviderContexts.cs`): `SqliteApplicationDbContext` owns `GolfTrackerApp.Core/Data/Migrations/Sqlite/`, `SqlServerApplicationDbContext` owns `GolfTrackerApp.Core/Data/Migrations/SqlServer/`. **Every schema change needs BOTH migrations** (run from the repository root):
 
 ```bash
-dotnet ef migrations add <Name> --context SqliteApplicationDbContext --output-dir Data/Migrations/Sqlite
-dotnet ef migrations add <Name> --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
+dotnet ef migrations add <Name> --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqliteApplicationDbContext --output-dir Data/Migrations/Sqlite
+dotnet ef migrations add <Name> --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
 ```
 
 > ⚠️ **Transition state (until WORKLOG item 0-9 lands):** production SQL Server does **not** apply migrations at runtime yet — it still uses `EnsureCreated()` plus hand-written SQL in `EnsureNewTablesExistAsync()` in `Program.cs`. So until 0-9 lands, any new table/column needs the two migrations above **and** a matching block in `EnsureNewTablesExistAsync()` using SQL Server types (`NVARCHAR(n)` not `TEXT`, `INT` not `INTEGER`, `DATETIME2`, `BIT`; `ON DELETE NO ACTION` where multiple cascade paths exist). Remove this warning when 0-9 lands.
 
-Set `GOLFTRACKER_DESIGNTIME_CONNECTION` to point `dotnet ef database update` at a scratch database for verification — never at production.
+Set `GOLFTRACKER_DESIGNTIME_CONNECTION` and use `--project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web` to point `dotnet ef database update` at a scratch database for verification — never at production.
 
 - Never run schema commands against production. Baseline/reconciliation scripts in `docs/` are executed by a human only.
 - All new columns must be nullable or defaulted — no breaking changes to existing data.

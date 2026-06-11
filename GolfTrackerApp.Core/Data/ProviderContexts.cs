@@ -7,12 +7,12 @@ namespace GolfTrackerApp.Web.Data;
 // migration attributed to a context type within the migrations assembly, so the
 // two sets must be attached to two distinct context types:
 //
-//   SqliteApplicationDbContext    → Data/Migrations/Sqlite/    (development)
-//   SqlServerApplicationDbContext → Data/Migrations/SqlServer/ (production)
+//   SqliteApplicationDbContext    → Core/Data/Migrations/Sqlite/    (development)
+//   SqlServerApplicationDbContext → Core/Data/Migrations/SqlServer/ (production)
 //
-// Adding a schema change requires BOTH:
-//   dotnet ef migrations add <Name> --context SqliteApplicationDbContext --output-dir Data/Migrations/Sqlite
-//   dotnet ef migrations add <Name> --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
+// Adding a schema change requires BOTH provider migrations. Run dotnet ef from
+// the repository root with --project GolfTrackerApp.Core and
+// --startup-project GolfTrackerApp.Web; see docs/CONTRIBUTING-AGENTS.md.
 //
 // The derived types add no model or behaviour — application code keeps using
 // ApplicationDbContext via the forwarding registrations in Program.cs.
