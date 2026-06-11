@@ -118,7 +118,8 @@ namespace GolfTrackerApp.Web.Services
                             HoleId = holeScore.HoleId,
                             Strokes = holeScore.Strokes.Value,
                             Putts = holeScore.Putts,
-                            FairwayHit = holeScore.FairwayHit
+                            FairwayHit = holeScore.FairwayHit,
+                            TeeSetId = holeScore.TeeSetId
                         });
                     }
                 }

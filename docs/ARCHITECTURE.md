@@ -690,7 +690,7 @@ HoleTee
 | `Hole` | Keep Par, StrokeIndex, LengthYards as "default tee" values | Backwards compatibility — existing scores still reference hole.Par |
 | `GolfCourse` | Add `DbSet<TeeSet>` navigation | Course owns its tee sets |
 | `RoundPlayer` | Add `TeeSetId (int?, FK → TeeSet)` | Track which tees each player plays from |
-| `Score` | Add `TeeSetId (int?, FK → TeeSet)` | Denormalised for efficient scorecard queries and handicap calculation |
+| `Score` | Add `TeeSetId (int?, FK → TeeSet)` | Denormalised for efficient scorecard queries and handicap calculation; populated from scorecard entries when saved |
 
 ##### 1.3 Data Migration Strategy
 

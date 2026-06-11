@@ -107,12 +107,8 @@ public sealed class ScoreServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveScorecard_CurrentlyDropsTeeSetId()
+    public async Task SaveScorecard_PersistsTeeSetId()
     {
-        // Characterizes a known limitation: HoleScoreEntryModel carries TeeSetId
-        // (set by PrepareScorecardAsync) but SaveScorecardAsync does not copy it
-        // onto the Score rows. Fix tracked as WORKLOG item 0-11; update this test
-        // to assert the tee is persisted when that lands.
         var (round, player, holes) = await SeedInProgressRoundAsync();
         int teeSetId;
         await using (var context = await _factory.CreateDbContextAsync())
@@ -125,7 +121,7 @@ public sealed class ScoreServiceTests : IDisposable
             h => new HoleScoreEntryModel { HoleId = h.HoleId, Strokes = 5, TeeSetId = teeSetId }));
 
         await using var verify = await _factory.CreateDbContextAsync();
-        Assert.All(await verify.Scores.ToListAsync(), s => Assert.Null(s.TeeSetId));
+        Assert.All(await verify.Scores.ToListAsync(), s => Assert.Equal(teeSetId, s.TeeSetId));
     }
 
     // ---- Score CRUD ----
