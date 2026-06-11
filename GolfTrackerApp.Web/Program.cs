@@ -125,7 +125,7 @@ if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
             sqlOptions.CommandTimeout(60);
         });
     }, ServiceLifetime.Scoped);
-    builder.Services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(sp =>
+    builder.Services.AddScoped<IDbContextFactory<ApplicationDbContext>>(sp =>
         new DerivedDbContextFactory<SqlServerApplicationDbContext>(
             sp.GetRequiredService<IDbContextFactory<SqlServerApplicationDbContext>>()));
     // Scoped ApplicationDbContext for Identity's AddEntityFrameworkStores
@@ -138,7 +138,7 @@ else
     {
         options.UseSqlite(connectionString);
     }, ServiceLifetime.Scoped);
-    builder.Services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(sp =>
+    builder.Services.AddScoped<IDbContextFactory<ApplicationDbContext>>(sp =>
         new DerivedDbContextFactory<SqliteApplicationDbContext>(
             sp.GetRequiredService<IDbContextFactory<SqliteApplicationDbContext>>()));
     builder.Services.AddScoped<ApplicationDbContext>(sp =>
