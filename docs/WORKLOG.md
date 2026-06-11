@@ -24,7 +24,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 0-5 | CI workflow (ci.yml build+test on PR/push; test gate in azure-deploy.yml) | 0 | Done | Claude | 2026-06-11 | No MAUI build in CI |
 | 0-6 | Agent docs (CLAUDE/AGENTS/GEMINI.md, CONTRIBUTING-AGENTS.md, this board) | 0 | Done | Claude | 2026-06-11 | |
 | 0-7 | Provider-split migration folders (Sqlite/SqlServer) + design-time factory | 0 | Done | Codex | 2026-06-11 | Derived contexts + split migrations documented; SQLite scratch migration chain and 49 tests verified |
-| 0-8 | SQL Server drift-check + baseline scripts in docs/ (human runs against prod) | 0 | In Progress | Codex | 2026-06-11 | Baseline migration ID: 20260611161345_InitialSqlServer |
+| 0-8 | SQL Server drift-check + baseline scripts in docs/ (human runs against prod) | 0 | Done | Codex | 2026-06-11 | Runbook + read-only drift check + guarded marker added; human production execution still required before 0-9 |
 | 0-9 | Program.cs: replace EnsureCreated/EnsureNewTablesExistAsync with Migrate() for both providers | 0 | Blocked | | | Blocked by 0-8 baseline being applied to prod |
 | 0-10 | ARCHITECTURE.md §12 status table + Phase 4 handicap restructure | 0 | Done | Claude | 2026-06-11 | Added §12.0, 4a/4b/4c increments, full WHS table, fixed dependency chain |
 | 1-1 | Create GolfTrackerApp.Core project + move Models/Services/Data (no rename) | 1 | Available | | | Unblocked — 0-1..0-4 done. Move ProviderContexts.cs + both migration folders too |
