@@ -20,7 +20,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 0-2 | ReportService unit tests (dashboard stats, distributions, comparisons) | 0 | Available | | | Use SqliteTestDbFactory from 0-1 |
 | 0-3 | RoundService characterization tests (Add/Update, tee selections, access filtering, PrepareScorecard) | 0 | Available | | | Must land before Phase 2 touches RoundService |
 | 0-4 | ScoreService + TeeSetService unit tests | 0 | Available | | | |
-| 0-5 | CI workflow (ci.yml build+test on PR/push; test gate in azure-deploy.yml) | 0 | In Progress | Claude | 2026-06-11 | No MAUI build in CI |
+| 0-5 | CI workflow (ci.yml build+test on PR/push; test gate in azure-deploy.yml) | 0 | Done | Claude | 2026-06-11 | No MAUI build in CI |
 | 0-6 | Agent docs (CLAUDE/AGENTS/GEMINI.md, CONTRIBUTING-AGENTS.md, this board) | 0 | Done | Claude | 2026-06-11 | |
 | 0-7 | Provider-split migration folders (Sqlite/SqlServer) + design-time factory | 0 | Available | | | Code only — no prod touch |
 | 0-8 | SQL Server drift-check + baseline scripts in docs/ (human runs against prod) | 0 | Blocked | | | Blocked by 0-7 |

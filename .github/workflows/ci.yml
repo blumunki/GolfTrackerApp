@@ -1,0 +1,33 @@
+name: CI
+
+# Builds the Web project and runs the test suite on every PR and push to main.
+# The MAUI mobile project is intentionally excluded (workload install is slow
+# and flaky on hosted runners); device builds use run-android.sh / run-ios.sh.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build web project
+        run: dotnet build GolfTrackerApp.Web/GolfTrackerApp.Web.csproj --configuration Release
+
+      - name: Run tests
+        run: dotnet test GolfTrackerApp.Web.Tests/GolfTrackerApp.Web.Tests.csproj --configuration Release

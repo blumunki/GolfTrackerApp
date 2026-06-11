@@ -29,6 +29,10 @@ jobs:
         # Builds specifically the Web project, not the Mobile one
         run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release
 
+      - name: Run tests
+        # A red test blocks the deploy
+        run: dotnet test GolfTrackerApp.Web.Tests/GolfTrackerApp.Web.Tests.csproj --configuration Release
+
       - name: dotnet publish
         # Publishes the output to a 'publish' folder
         run: dotnet publish ${{ env.PROJECT_PATH }} -c Release -o ${{ env.PROJECT_PATH }}/publish
