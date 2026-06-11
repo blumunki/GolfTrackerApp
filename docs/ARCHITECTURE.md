@@ -562,6 +562,25 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 
 Planned features organised by priority tier. Each item includes the affected platform(s).
 
+### 12.0 Implementation Status (keep this table accurate)
+
+> **Rule for all contributors (human or AI agent):** when you complete roadmap work — or discover that this table is wrong — update it in the same commit. Work items and ownership live in `docs/WORKLOG.md`.
+
+| Phase | Feature area | Status | Notes |
+|-------|-------------|--------|-------|
+| — | Mobile feature parity (§12.1–12.2) | ✅ Done | |
+| — | Admin area (§12.3) | ✅ Done | |
+| — | Live Round Mode | ✅ Done | Single-device scorecard entry; no real-time multi-player sync, no hole maps |
+| 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
+| 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
+| 3 | Competitions & Scoring Formats | ❌ Not started | Specced in §12.5 only |
+| 4a | Personal WHS handicap (differentials + index + backfill) | ❌ Not started | Does **not** require Phase 3 — see revised dependency chain |
+| 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
+| 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
+| 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | 🚧 In progress | See `docs/WORKLOG.md` items 0-1…0-10 |
+| — | Proactive AI coaching (background jobs) | ❌ Not started | AI layer is user-triggered only today |
+| — | Course data expansion (OSM geometry, AI-assisted entry) + hole visuals | ❌ Not started | |
+
 ### 12.1 Mobile Feature Parity — Critical
 
 | Feature | Status | Description | Platform |
@@ -599,9 +618,9 @@ Planned features organised by priority tier. Each item includes the affected pla
 | Feature | Description | Platform |
 |---------|-------------|----------|
 | Live Round Mode | ✅ Done — Real-time hole-by-hole scoring with auto-save after each hole, resume capability, running totals, full scorecard view | Both |
-| Tee Sets & Course Ratings | Track multiple tee colours per course with per-tee par, stroke index, yardage, course rating and slope rating | Both |
-| Golf Societies | Society management similar to clubs — creation, membership, events | Both |
-| Club & Society Membership | Users self-register as members of clubs and societies, with future admin approval | Both |
+| Tee Sets & Course Ratings | ✅ Done — Multiple tee colours per course with per-tee par, stroke index, yardage, course rating and slope rating | Both |
+| Golf Societies | ✅ Done — Society creation, membership, roles (events arrive with Phase 3 Competitions) | Both |
+| Club & Society Membership | ✅ Done — Users self-register as members of clubs and societies, with future admin approval | Both |
 | Competition Framework | Competition entities with scoring formats (Medal, Stableford, Match Play) linked to clubs/societies | Both |
 | Handicap Tracking | Multi-source handicaps (personal, club/regional, society) with WHS calculation and history | Both |
 | Goal Setting & Milestones | Set targets (break 90, improve par-3 average) with progress tracking | Both |
@@ -910,6 +929,14 @@ CompetitionEntry
 
 **Goal**: Track handicaps from three sources (personal, club/regional, society), maintain history, auto-calculate personal handicap using WHS principles.
 
+**Delivery increments** (Phase 4 is decoupled from Phase 3 — see revised dependency chain):
+
+| Increment | Scope | Depends on |
+|-----------|-------|-----------|
+| **4a** | `ScoringDifferential` + personal WHS index, recalculated on round completion (hook in `RoundService` — all web/mobile/live completion paths converge there), plus an idempotent admin backfill over historical rounds | Tee sets with rating/slope (✅ exist) |
+| **4b** | Manual club/regional handicap entry with history, handicap dashboard UI (web + mobile), primary-handicap selector | 4a models |
+| **4c** | Society handicaps (same engine filtered to rounds linked to a society's competitions) | Phase 3 (Competitions) |
+
 ##### 4.1 New Models
 
 ```
@@ -957,16 +984,27 @@ ScoringDifferential
 ##### 4.3 WHS Calculation Logic (Personal Handicap)
 
 1. After each qualifying round (completed, 18 holes, course has tee set with rating/slope):
-   - Calculate Score Differential: `(113 / SlopeRating) × (AdjustedGrossScore - CourseRating)`
+   - Calculate Score Differential: `(113 / SlopeRating) × (AdjustedGrossScore - CourseRating)`, rounded to 1 decimal
+   - **Adjusted Gross Score, v1 simplification**: cap each hole at `par + 5` (the WHS rule for players without an established index). v2 (later): net double bogey using the player's index at round date and `Hole.StrokeIndex`.
    - Store as `ScoringDifferential` record
-2. Handicap Index = average of best N differentials from last 20:
-   - 3 rounds: lowest 1, minus 2.0 adjustment
-   - 5 rounds: lowest 1
-   - 6 rounds: average of lowest 2
-   - 8 rounds: average of lowest 2
-   - 20 rounds: average of lowest 8
-3. Recalculate after every qualifying round
-4. Store new `HandicapRecord` with source=Personal
+2. Handicap Index from the last 20 differentials — full WHS table:
+
+   | Differentials available | Calculation | Adjustment |
+   |------------------------|-------------|------------|
+   | 3 | Lowest 1 | −2.0 |
+   | 4 | Lowest 1 | −1.0 |
+   | 5 | Lowest 1 | — |
+   | 6 | Average of lowest 2 | −1.0 |
+   | 7–8 | Average of lowest 2 | — |
+   | 9–11 | Average of lowest 3 | — |
+   | 12–14 | Average of lowest 4 | — |
+   | 15–16 | Average of lowest 5 | — |
+   | 17–18 | Average of lowest 6 | — |
+   | 19 | Average of lowest 7 | — |
+   | 20 | Average of lowest 8 | — |
+
+3. Recalculate after every qualifying round (trigger: status transition to `Completed` inside `RoundService`)
+4. Store new `HandicapRecord` with source=Personal (only when the index changed)
 
 **Society Handicap**: Same calculation but only using rounds linked to that society's competitions.
 
@@ -1012,23 +1050,23 @@ ScoringDifferential
 #### Dependency Chain & Build Order
 
 ```
-Phase 1: Tee Sets          Phase 2: Societies
-    │                           │
-    │                           │
-    └────────┐    ┌─────────────┘
-             │    │
-             ▼    ▼
-        Phase 3: Competitions
-             │
-             ▼
-        Phase 4: Handicaps
+Phase 1: Tee Sets ✅        Phase 2: Societies ✅
+    │      │                    │
+    │      └────────┐    ┌──────┘
+    │               │    │
+    ▼               ▼    ▼
+Phase 4a/4b:    Phase 3: Competitions
+Personal +           │
+club handicaps       ▼
+                Phase 4c: Society handicaps
 ```
 
-- **Phases 1 and 2 are independent** — can be built in either order or even in parallel
+- **Phases 1 and 2 are complete** ✅
 - **Phase 3 requires both** — competitions need tee sets (for handicap strokes) and societies/clubs (as hosts)
-- **Phase 4 requires Phase 3** — handicap calculation needs scoring differentials from competition rounds with tee set ratings
+- **Phase 4a/4b do NOT require Phase 3** — personal differentials only need tee sets with rating/slope (which exist); club handicaps are manually entered
+- **Only Phase 4c (society handicaps) requires Phase 3** — it filters differentials to rounds linked to a society's competitions
 
-**Recommended build order**: Phase 1 → Phase 2 → Phase 3 → Phase 4, because tee sets are the most fundamental data structure change and affect the most existing code.
+**Recommended build order**: Phase 4a → 4b (top priority, delivers handicaps) → Phase 3 → Phase 4c.
 
 ---
 
