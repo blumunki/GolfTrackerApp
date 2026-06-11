@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GolfTrackerApp.Web\GolfTrackerApp.Web.csproj" />
+    <ProjectReference Include="..\GolfTrackerApp.Core\GolfTrackerApp.Core.csproj" />
   </ItemGroup>
 
 </Project>

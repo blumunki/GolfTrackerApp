@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'GolfTrackerApp.Web/**' # Only trigger if changes happen in the Web folder
+      - 'GolfTrackerApp.Web/**'  # Deploy when the Web host changes…
+      - 'GolfTrackerApp.Core/**' # …or the Core library it serves
   workflow_dispatch:
 
 env:

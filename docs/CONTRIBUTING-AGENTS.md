@@ -51,7 +51,7 @@ Set `GOLFTRACKER_DESIGNTIME_CONNECTION` and use `--project GolfTrackerApp.Core -
 ## 6. Git & commits
 
 - **Trunk-based, solo-developer workflow: work directly on `main`, locally.** No pull requests. Small, single-purpose commits (see Working Agreement rule 3).
-- **Do not push unless the user asks you to.** Pushing `main` is the release step: it runs CI, and deploys the Web project to Azure when `GolfTrackerApp.Web/` changed (gated on tests). The user pushes when they're happy.
+- **Do not push unless the user asks you to.** Pushing `main` is the release step: it runs CI, and deploys the Web project to Azure when `GolfTrackerApp.Web/` or `GolfTrackerApp.Core/` changed (gated on tests). The user pushes when they're happy.
 - For risky or multi-session work only (production DB scripts, namespace renames, large design passes): use a short-lived local branch, merge into `main` locally when green, delete the branch. Still no PR.
 - Commit messages: imperative summary line ≤ 72 chars; reference the WORKLOG item ID where applicable (e.g. `0-1: add SqliteTestDbFactory`).
 

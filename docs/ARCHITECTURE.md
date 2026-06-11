@@ -559,7 +559,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
 | 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | 🚧 In progress | See `docs/WORKLOG.md` items 0-1…0-10 |
-| — | Core project extraction | 🚧 In progress | Models, services, data, and migrations moved and renamed to `GolfTrackerApp.Core.*`; test/CI retarget remains (1-3) |
+| — | Core project extraction | ✅ Done | Models, services, data, and migrations live in `GolfTrackerApp.Core` (`GolfTrackerApp.Core.*` namespaces); tests reference Core directly; deploy triggers on Web + Core paths |
 | — | Proactive AI coaching (background jobs) | ❌ Not started | AI layer is user-triggered only today |
 | — | Course data expansion (OSM geometry, AI-assisted entry) + hole visuals | ❌ Not started | |
 
@@ -1065,9 +1065,8 @@ club handicaps       ▼
 
 The current architecture is designed for easy evolution:
 
-1. **Complete Core extraction**: Retarget the test project to Core and update CI path filters
-2. **Dedicated API project**: Move `Controllers/` to `GolfTrackerApp.Api`, reference `GolfTrackerApp.Core`
-3. **Independent deployment**: Web and API can scale independently
-4. **Additional clients**: Any platform (React, Flutter, etc.) can consume the same API
+1. **Dedicated API project**: Move `Controllers/` to `GolfTrackerApp.Api`, reference `GolfTrackerApp.Core`
+2. **Independent deployment**: Web and API can scale independently
+3. **Additional clients**: Any platform (React, Flutter, etc.) can consume the same API
 
 The interface-driven service layer keeps these refactors mechanical — no business logic changes required.
