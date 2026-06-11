@@ -133,6 +133,7 @@ GolfTrackerApp.Web/
 │   ├── DashboardController.cs         # Dashboard stats for mobile
 │   ├── GolfClubsController.cs         # Golf club CRUD
 │   ├── GolfCoursesController.cs       # Golf course CRUD
+│   ├── HandicapsController.cs         # Handicap records/differentials + manual club handicap CRUD
 │   ├── InsightsController.cs          # AI insights + chat API endpoints
 │   ├── MergeController.cs             # Managed player merge workflow
 │   ├── NotificationsController.cs     # User notification CRUD + mark-read
@@ -552,7 +553,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
 | 3 | Competitions & Scoring Formats | ❌ Not started | Specced in §12.5 only |
 | 4a | Personal WHS handicap (differentials + index + backfill) | ✅ Done | WHS math, models + migrations, round-completion hook (both paths), and idempotent admin backfill (`/admin/handicap-backfill`). UI dashboards are 4b |
-| 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
+| 4b | Manual club/regional handicaps + handicap UI | 🚧 In progress | Manual club handicap CRUD + `/api/handicaps` endpoints done (2-5); web/mobile dashboards pending (2-6, 2-7) |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
 | 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | ✅ Done | Production SQL Server baseline verified; both providers apply migrations at startup |
 | — | Core project extraction | ✅ Done | Models, services, data, and migrations live in `GolfTrackerApp.Core` (`GolfTrackerApp.Core.*` namespaces); tests reference Core directly; deploy triggers on Web + Core paths |
@@ -990,7 +991,7 @@ Steps 1–2 are implemented as pure functions in `GolfTrackerApp.Core/Services/W
 
 **Society Handicap**: Same calculation but only using rounds linked to that society's competitions.
 
-**Club/Regional Handicap**: Manually entered by user (or imported). Updated when user receives new official handicap from their club.
+**Club/Regional Handicap**: Manually entered by user (or imported). Updated when user receives new official handicap from their club. Implemented: `IHandicapService` manual CRUD (calculated records are protected from manual edits; `Player.Handicap` tracks the latest club entry when `PrimaryHandicapSource` is ClubRegional) plus `HandicapsController` (`/api/handicaps`): per-player `records`/`active`/`differentials` reads and `club` create/update/delete, owner-or-self authorized.
 
 ##### 4.4 Features
 
