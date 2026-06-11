@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace GolfTrackerApp.Web.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250530100031_AddRoundDetails")]
-    partial class AddRoundDetails
+    [DbContext(typeof(SqliteApplicationDbContext))]
+    [Migration("20250528133354_AddGolfClubAndLinkToCourse")]
+    partial class AddGolfClubAndLinkToCourse
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -190,6 +190,7 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ApplicationUserId")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FirstName")
@@ -224,18 +225,8 @@ namespace GolfTrackerApp.Web.Migrations
                     b.Property<int>("GolfCourseId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("HolesPlayed")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
-
-                    b.Property<int>("RoundType")
-                        .HasMaxLength(50)
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("StartingHole")
-                        .HasColumnType("INTEGER");
 
                     b.HasKey("RoundId");
 
@@ -448,7 +439,9 @@ namespace GolfTrackerApp.Web.Migrations
                 {
                     b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "ApplicationUser")
                         .WithMany()
-                        .HasForeignKey("ApplicationUserId");
+                        .HasForeignKey("ApplicationUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("ApplicationUser");
                 });

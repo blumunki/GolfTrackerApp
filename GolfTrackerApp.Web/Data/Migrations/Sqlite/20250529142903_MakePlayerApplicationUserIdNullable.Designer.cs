@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace GolfTrackerApp.Web.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250528133354_AddGolfClubAndLinkToCourse")]
-    partial class AddGolfClubAndLinkToCourse
+    [DbContext(typeof(SqliteApplicationDbContext))]
+    [Migration("20250529142903_MakePlayerApplicationUserIdNullable")]
+    partial class MakePlayerApplicationUserIdNullable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -190,7 +190,6 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ApplicationUserId")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FirstName")
@@ -439,9 +438,7 @@ namespace GolfTrackerApp.Web.Migrations
                 {
                     b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "ApplicationUser")
                         .WithMany()
-                        .HasForeignKey("ApplicationUserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ApplicationUserId");
 
                     b.Navigation("ApplicationUser");
                 });

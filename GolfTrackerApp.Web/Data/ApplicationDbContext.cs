@@ -15,6 +15,13 @@ namespace GolfTrackerApp.Web.Data
         {
         }
 
+        // Allows the provider-specific derived contexts (SqliteApplicationDbContext /
+        // SqlServerApplicationDbContext) to pass their own typed options through.
+        protected ApplicationDbContext(DbContextOptions options)
+            : base(options)
+        {
+        }
+
         // Add DbSet properties for your application models
         public DbSet<Player> Players { get; set; }
         public DbSet<GolfClub> GolfClubs { get; set; }

@@ -8,11 +8,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Migrations
+namespace GolfTrackerApp.Web.Data.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250529142903_MakePlayerApplicationUserIdNullable")]
-    partial class MakePlayerApplicationUserIdNullable
+    [DbContext(typeof(SqliteApplicationDbContext))]
+    [Migration("20260129164244_RestrictDeleteBehavior")]
+    partial class RestrictDeleteBehavior
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -192,6 +192,10 @@ namespace GolfTrackerApp.Web.Migrations
                     b.Property<string>("ApplicationUserId")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CreatedByApplicationUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -209,6 +213,8 @@ namespace GolfTrackerApp.Web.Migrations
 
                     b.HasIndex("ApplicationUserId");
 
+                    b.HasIndex("CreatedByApplicationUserId");
+
                     b.ToTable("Players");
                 });
 
@@ -218,16 +224,34 @@ namespace GolfTrackerApp.Web.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("CreatedByApplicationUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("DatePlayed")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("GolfCourseId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("HolesPlayed")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("RoundType")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StartingHole")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("RoundId");
+
+                    b.HasIndex("CreatedByApplicationUserId");
 
                     b.HasIndex("GolfCourseId");
 
@@ -440,16 +464,32 @@ namespace GolfTrackerApp.Web.Migrations
                         .WithMany()
                         .HasForeignKey("ApplicationUserId");
 
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "CreatedByApplicationUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByApplicationUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("ApplicationUser");
+
+                    b.Navigation("CreatedByApplicationUser");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Round", b =>
                 {
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "CreatedByApplicationUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByApplicationUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("GolfTrackerApp.Web.Models.GolfCourse", "GolfCourse")
                         .WithMany("Rounds")
                         .HasForeignKey("GolfCourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("CreatedByApplicationUser");
 
                     b.Navigation("GolfCourse");
                 });
@@ -459,13 +499,13 @@ namespace GolfTrackerApp.Web.Migrations
                     b.HasOne("GolfTrackerApp.Web.Models.Player", "Player")
                         .WithMany("RoundPlayers")
                         .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Round", "Round")
                         .WithMany("RoundPlayers")
                         .HasForeignKey("RoundId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Player");
@@ -478,13 +518,13 @@ namespace GolfTrackerApp.Web.Migrations
                     b.HasOne("GolfTrackerApp.Web.Models.Hole", "Hole")
                         .WithMany("Scores")
                         .HasForeignKey("HoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Player", "Player")
                         .WithMany("Scores")
                         .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Round", "Round")

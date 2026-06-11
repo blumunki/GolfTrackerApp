@@ -8,17 +8,17 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Migrations
+namespace GolfTrackerApp.Web.Data.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250604135025_AddRoundStatus")]
-    partial class AddRoundStatus
+    [DbContext(typeof(SqliteApplicationDbContext))]
+    [Migration("20260313203453_AddAiInsightsOptOut")]
+    partial class AddAiInsightsOptOut
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.2");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
 
             modelBuilder.Entity("GolfTrackerApp.Web.Data.ApplicationUser", b =>
                 {
@@ -26,6 +26,9 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("AccessFailedCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AiInsightsOptOut")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ConcurrencyStamp")
@@ -37,6 +40,9 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("LinkedPlayerId")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("LockoutEnabled")
@@ -74,6 +80,8 @@ namespace GolfTrackerApp.Web.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("LinkedPlayerId");
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
@@ -82,6 +90,161 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasDatabaseName("UserNameIndex");
 
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiAuditLog", b =>
+                {
+                    b.Property<int>("AiAuditLogId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("AiChatSessionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ApplicationUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InsightType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ModelUsed")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PromptSent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProviderName")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ResponseReceived")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ResponseTimeMs")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TotalTokens")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("AiAuditLogId");
+
+                    b.HasIndex("AiChatSessionId");
+
+                    b.HasIndex("RequestedAt");
+
+                    b.HasIndex("ApplicationUserId", "RequestedAt");
+
+                    b.ToTable("AiAuditLogs");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiChatSession", b =>
+                {
+                    b.Property<int>("AiChatSessionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ApplicationUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("LastMessageAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AiChatSessionId");
+
+                    b.HasIndex("ApplicationUserId", "LastMessageAt");
+
+                    b.ToTable("AiChatSessions");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiChatSessionMessage", b =>
+                {
+                    b.Property<int>("AiChatSessionMessageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("AiChatSessionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AiChatSessionMessageId");
+
+                    b.HasIndex("AiChatSessionId", "Timestamp");
+
+                    b.ToTable("AiChatSessionMessages");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiProviderSettings", b =>
+                {
+                    b.Property<int>("AiProviderSettingsId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AiProviderSettingsId");
+
+                    b.HasIndex("ProviderName")
+                        .IsUnique();
+
+                    b.ToTable("AiProviderSettings");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfClub", b =>
@@ -183,6 +346,49 @@ namespace GolfTrackerApp.Web.Migrations
                     b.ToTable("Holes");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ActionUrl")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("RelatedEntityId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsRead", "CreatedAt");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Player", b =>
                 {
                     b.Property<int>("PlayerId")
@@ -218,6 +424,91 @@ namespace GolfTrackerApp.Web.Migrations
                     b.ToTable("Players");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.PlayerConnection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RequestingUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TargetUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetUserId");
+
+                    b.HasIndex("RequestingUserId", "TargetUserId")
+                        .IsUnique();
+
+                    b.ToTable("PlayerConnections");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.PlayerMergeRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RequestingUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RoundsMerged")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RoundsSkipped")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SourcePlayerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TargetPlayerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TargetUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestingUserId");
+
+                    b.HasIndex("SourcePlayerId");
+
+                    b.HasIndex("TargetPlayerId");
+
+                    b.HasIndex("TargetUserId");
+
+                    b.ToTable("PlayerMergeRequests");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Round", b =>
                 {
                     b.Property<int>("RoundId")
@@ -241,7 +532,6 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("RoundType")
-                        .HasMaxLength(50)
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("StartingHole")
@@ -437,6 +727,56 @@ namespace GolfTrackerApp.Web.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Data.ApplicationUser", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.Player", "LinkedPlayer")
+                        .WithMany()
+                        .HasForeignKey("LinkedPlayerId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("LinkedPlayer");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiAuditLog", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.AiChatSession", "AiChatSession")
+                        .WithMany("AuditLogs")
+                        .HasForeignKey("AiChatSessionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "ApplicationUser")
+                        .WithMany()
+                        .HasForeignKey("ApplicationUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AiChatSession");
+
+                    b.Navigation("ApplicationUser");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiChatSession", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "ApplicationUser")
+                        .WithMany()
+                        .HasForeignKey("ApplicationUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApplicationUser");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiChatSessionMessage", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.AiChatSession", "AiChatSession")
+                        .WithMany("Messages")
+                        .HasForeignKey("AiChatSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("AiChatSession");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfCourse", b =>
                 {
                     b.HasOne("GolfTrackerApp.Web.Models.GolfClub", "GolfClub")
@@ -459,6 +799,17 @@ namespace GolfTrackerApp.Web.Migrations
                     b.Navigation("GolfCourse");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.Notification", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Player", b =>
                 {
                     b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "ApplicationUser")
@@ -474,6 +825,60 @@ namespace GolfTrackerApp.Web.Migrations
                     b.Navigation("ApplicationUser");
 
                     b.Navigation("CreatedByApplicationUser");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.PlayerConnection", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "RequestingUser")
+                        .WithMany()
+                        .HasForeignKey("RequestingUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "TargetUser")
+                        .WithMany()
+                        .HasForeignKey("TargetUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RequestingUser");
+
+                    b.Navigation("TargetUser");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.PlayerMergeRequest", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "RequestingUser")
+                        .WithMany()
+                        .HasForeignKey("RequestingUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Models.Player", "SourcePlayer")
+                        .WithMany()
+                        .HasForeignKey("SourcePlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Models.Player", "TargetPlayer")
+                        .WithMany()
+                        .HasForeignKey("TargetPlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "TargetUser")
+                        .WithMany()
+                        .HasForeignKey("TargetUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RequestingUser");
+
+                    b.Navigation("SourcePlayer");
+
+                    b.Navigation("TargetPlayer");
+
+                    b.Navigation("TargetUser");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Round", b =>
@@ -500,13 +905,13 @@ namespace GolfTrackerApp.Web.Migrations
                     b.HasOne("GolfTrackerApp.Web.Models.Player", "Player")
                         .WithMany("RoundPlayers")
                         .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Round", "Round")
                         .WithMany("RoundPlayers")
                         .HasForeignKey("RoundId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Player");
@@ -519,13 +924,13 @@ namespace GolfTrackerApp.Web.Migrations
                     b.HasOne("GolfTrackerApp.Web.Models.Hole", "Hole")
                         .WithMany("Scores")
                         .HasForeignKey("HoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Player", "Player")
                         .WithMany("Scores")
                         .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Round", "Round")
@@ -590,6 +995,13 @@ namespace GolfTrackerApp.Web.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiChatSession", b =>
+                {
+                    b.Navigation("AuditLogs");
+
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfClub", b =>

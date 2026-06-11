@@ -8,11 +8,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Data.Migrations
+namespace GolfTrackerApp.Web.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260129164244_RestrictDeleteBehavior")]
-    partial class RestrictDeleteBehavior
+    [DbContext(typeof(SqliteApplicationDbContext))]
+    [Migration("20250604135025_AddRoundStatus")]
+    partial class AddRoundStatus
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -241,6 +241,7 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("RoundType")
+                        .HasMaxLength(50)
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("StartingHole")
@@ -499,13 +500,13 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.HasOne("GolfTrackerApp.Web.Models.Player", "Player")
                         .WithMany("RoundPlayers")
                         .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Round", "Round")
                         .WithMany("RoundPlayers")
                         .HasForeignKey("RoundId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Player");
@@ -518,13 +519,13 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.HasOne("GolfTrackerApp.Web.Models.Hole", "Hole")
                         .WithMany("Scores")
                         .HasForeignKey("HoleId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Player", "Player")
                         .WithMany("Scores")
                         .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("GolfTrackerApp.Web.Models.Round", "Round")

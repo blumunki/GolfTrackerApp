@@ -14,11 +14,16 @@ Shared conventions for all agents (Claude, Codex, Gemini) and humans working on 
 
 Dev uses **SQLite** (EF migrations, `Data/golfapp.db`). Prod uses **SQL Server**.
 
-> ⚠️ **Current state (until WORKLOG item 0-9 lands):** production SQL Server does **not** use migrations. It uses `EnsureCreated()` plus hand-written SQL in `EnsureNewTablesExistAsync()` in `Program.cs`. Any new table or column therefore needs **both**:
-> 1. An EF Core migration (for SQLite dev): `cd GolfTrackerApp.Web && dotnet ef migrations add <Name>`
-> 2. A matching block in `EnsureNewTablesExistAsync()` (for SQL Server prod) using SQL Server types: `NVARCHAR(n)` not `TEXT`, `INT` not `INTEGER`, `DATETIME2`, `BIT`. Use `ON DELETE NO ACTION` where multiple cascade paths exist (SQL Server rejects them).
->
-> **After 0-9 lands**, replace this rule with: every schema change = one migration in `Data/Migrations/Sqlite/` AND one in `Data/Migrations/SqlServer/` (via the design-time factory `--provider` switch). Update this section when that happens.
+Migrations are split per provider using derived context types (`Data/ProviderContexts.cs`): `SqliteApplicationDbContext` owns `Data/Migrations/Sqlite/`, `SqlServerApplicationDbContext` owns `Data/Migrations/SqlServer/`. **Every schema change needs BOTH migrations** (run from `GolfTrackerApp.Web/`):
+
+```bash
+dotnet ef migrations add <Name> --context SqliteApplicationDbContext --output-dir Data/Migrations/Sqlite
+dotnet ef migrations add <Name> --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
+```
+
+> ⚠️ **Transition state (until WORKLOG item 0-9 lands):** production SQL Server does **not** apply migrations at runtime yet — it still uses `EnsureCreated()` plus hand-written SQL in `EnsureNewTablesExistAsync()` in `Program.cs`. So until 0-9 lands, any new table/column needs the two migrations above **and** a matching block in `EnsureNewTablesExistAsync()` using SQL Server types (`NVARCHAR(n)` not `TEXT`, `INT` not `INTEGER`, `DATETIME2`, `BIT`; `ON DELETE NO ACTION` where multiple cascade paths exist). Remove this warning when 0-9 lands.
+
+Set `GOLFTRACKER_DESIGNTIME_CONNECTION` to point `dotnet ef database update` at a scratch database for verification — never at production.
 
 - Never run schema commands against production. Baseline/reconciliation scripts in `docs/` are executed by a human only.
 - All new columns must be nullable or defaulted — no breaking changes to existing data.

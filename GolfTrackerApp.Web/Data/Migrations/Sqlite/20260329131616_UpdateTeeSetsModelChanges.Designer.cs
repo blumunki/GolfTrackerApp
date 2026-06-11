@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace GolfTrackerApp.Web.Data.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
+    [DbContext(typeof(SqliteApplicationDbContext))]
     [Migration("20260329131616_UpdateTeeSetsModelChanges")]
     partial class UpdateTeeSetsModelChanges
     {

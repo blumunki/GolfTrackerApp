@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace GolfTrackerApp.Web.Data.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260308204315_AddAiInsightsTables")]
-    partial class AddAiInsightsTables
+    [DbContext(typeof(SqliteApplicationDbContext))]
+    [Migration("20260322140653_AddTeeSetsAndSocieties")]
+    partial class AddTeeSetsAndSocieties
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -26,6 +26,9 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("AccessFailedCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AiInsightsOptOut")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ConcurrencyStamp")
@@ -212,6 +215,116 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.ToTable("AiChatSessionMessages");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.AiProviderSettings", b =>
+                {
+                    b.Property<int>("AiProviderSettingsId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ProviderName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("AiProviderSettingsId");
+
+                    b.HasIndex("ProviderName")
+                        .IsUnique();
+
+                    b.ToTable("AiProviderSettings");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.ApplicationSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("ApplicationSettings");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.ClubMembership", b =>
+                {
+                    b.Property<int>("ClubMembershipId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("GolfClubId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MembershipNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("ClubMembershipId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GolfClubId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ClubMemberships");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfClub", b =>
                 {
                     b.Property<int>("GolfClubId")
@@ -283,6 +396,38 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.ToTable("GolfCourses");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfSociety", b =>
+                {
+                    b.Property<int>("GolfSocietyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("GolfSocietyId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.ToTable("GolfSocieties");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Hole", b =>
                 {
                     b.Property<int>("HoleId")
@@ -309,6 +454,37 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.HasIndex("GolfCourseId");
 
                     b.ToTable("Holes");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.HoleTee", b =>
+                {
+                    b.Property<int>("HoleTeeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("HoleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("LengthYards")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Par")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("StrokeIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TeeSetId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("HoleTeeId");
+
+                    b.HasIndex("TeeSetId");
+
+                    b.HasIndex("HoleId", "TeeSetId")
+                        .IsUnique();
+
+                    b.ToTable("HoleTees");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Notification", b =>
@@ -522,9 +698,14 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Property<int>("PlayerId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("TeeSetId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("RoundId", "PlayerId");
 
                     b.HasIndex("PlayerId");
+
+                    b.HasIndex("TeeSetId");
 
                     b.ToTable("RoundPlayers");
                 });
@@ -553,6 +734,9 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Property<int>("Strokes")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("TeeSetId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("ScoreId");
 
                     b.HasIndex("HoleId");
@@ -561,7 +745,77 @@ namespace GolfTrackerApp.Web.Data.Migrations
 
                     b.HasIndex("RoundId");
 
+                    b.HasIndex("TeeSetId");
+
                     b.ToTable("Scores");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.SocietyMembership", b =>
+                {
+                    b.Property<int>("SocietyMembershipId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("GolfSocietyId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("SocietyMembershipId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GolfSocietyId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("SocietyMemberships");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.TeeSet", b =>
+                {
+                    b.Property<int>("TeeSetId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Colour")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("CourseRating")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Gender")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("GolfCourseId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("SlopeRating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("TeeSetId");
+
+                    b.HasIndex("GolfCourseId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("TeeSets");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -742,6 +996,25 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("AiChatSession");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.ClubMembership", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.GolfClub", "GolfClub")
+                        .WithMany("ClubMemberships")
+                        .HasForeignKey("GolfClubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "User")
+                        .WithMany("ClubMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GolfClub");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfCourse", b =>
                 {
                     b.HasOne("GolfTrackerApp.Web.Models.GolfClub", "GolfClub")
@@ -753,6 +1026,17 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("GolfClub");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfSociety", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Hole", b =>
                 {
                     b.HasOne("GolfTrackerApp.Web.Models.GolfCourse", "GolfCourse")
@@ -762,6 +1046,25 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("GolfCourse");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.HoleTee", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.Hole", "Hole")
+                        .WithMany("HoleTees")
+                        .HasForeignKey("HoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Models.TeeSet", "TeeSet")
+                        .WithMany("HoleTees")
+                        .HasForeignKey("TeeSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Hole");
+
+                    b.Navigation("TeeSet");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Notification", b =>
@@ -879,9 +1182,16 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("GolfTrackerApp.Web.Models.TeeSet", "TeeSet")
+                        .WithMany()
+                        .HasForeignKey("TeeSetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Player");
 
                     b.Navigation("Round");
+
+                    b.Navigation("TeeSet");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Score", b =>
@@ -904,11 +1214,48 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("GolfTrackerApp.Web.Models.TeeSet", "TeeSet")
+                        .WithMany()
+                        .HasForeignKey("TeeSetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Hole");
 
                     b.Navigation("Player");
 
                     b.Navigation("Round");
+
+                    b.Navigation("TeeSet");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.SocietyMembership", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.GolfSociety", "GolfSociety")
+                        .WithMany("Memberships")
+                        .HasForeignKey("GolfSocietyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "User")
+                        .WithMany("SocietyMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GolfSociety");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.TeeSet", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.GolfCourse", "GolfCourse")
+                        .WithMany("TeeSets")
+                        .HasForeignKey("GolfCourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GolfCourse");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -962,6 +1309,13 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Data.ApplicationUser", b =>
+                {
+                    b.Navigation("ClubMemberships");
+
+                    b.Navigation("SocietyMemberships");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.AiChatSession", b =>
                 {
                     b.Navigation("AuditLogs");
@@ -971,6 +1325,8 @@ namespace GolfTrackerApp.Web.Data.Migrations
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfClub", b =>
                 {
+                    b.Navigation("ClubMemberships");
+
                     b.Navigation("GolfCourses");
                 });
 
@@ -979,10 +1335,19 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("Holes");
 
                     b.Navigation("Rounds");
+
+                    b.Navigation("TeeSets");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfSociety", b =>
+                {
+                    b.Navigation("Memberships");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Hole", b =>
                 {
+                    b.Navigation("HoleTees");
+
                     b.Navigation("Scores");
                 });
 
@@ -998,6 +1363,11 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("RoundPlayers");
 
                     b.Navigation("Scores");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.TeeSet", b =>
+                {
+                    b.Navigation("HoleTees");
                 });
 #pragma warning restore 612, 618
         }

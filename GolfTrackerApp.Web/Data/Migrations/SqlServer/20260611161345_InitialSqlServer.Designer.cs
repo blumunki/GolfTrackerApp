@@ -3,80 +3,85 @@ using System;
 using GolfTrackerApp.Web.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Data.Migrations
+namespace GolfTrackerApp.Web.Data.Migrations.SqlServer
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260313203453_AddAiInsightsOptOut")]
-    partial class AddAiInsightsOptOut
+    [DbContext(typeof(SqlServerApplicationDbContext))]
+    [Migration("20260611161345_InitialSqlServer")]
+    partial class InitialSqlServer
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
+            modelBuilder
+                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+
+            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
             modelBuilder.Entity("GolfTrackerApp.Web.Data.ApplicationUser", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("AccessFailedCount")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<bool>("AiInsightsOptOut")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<int?>("LinkedPlayerId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<bool>("LockoutEnabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("NormalizedUserName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("PasswordHash")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("PhoneNumber")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("PhoneNumberConfirmed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<string>("SecurityStamp")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("TwoFactorEnabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
 
@@ -87,7 +92,8 @@ namespace GolfTrackerApp.Web.Data.Migrations
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()
-                        .HasDatabaseName("UserNameIndex");
+                        .HasDatabaseName("UserNameIndex")
+                        .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
                 });
@@ -96,55 +102,57 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("AiAuditLogId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AiAuditLogId"));
 
                     b.Property<int?>("AiChatSessionId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("ApplicationUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("CompletionTokens")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("ErrorMessage")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<string>("InsightType")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("ModelUsed")
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("PromptSent")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("PromptTokens")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("ProviderName")
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("RequestedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("ResponseReceived")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("ResponseTimeMs")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<bool>("Success")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<int>("TotalTokens")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.HasKey("AiAuditLogId");
 
@@ -161,24 +169,26 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("AiChatSessionId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AiChatSessionId"));
 
                     b.Property<string>("ApplicationUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<bool>("IsArchived")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<DateTime>("LastMessageAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Title")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(100)");
 
                     b.HasKey("AiChatSessionId");
 
@@ -191,22 +201,24 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("AiChatSessionMessageId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AiChatSessionMessageId"));
 
                     b.Property<int>("AiChatSessionId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("Content")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateTime>("Timestamp")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.HasKey("AiChatSessionMessageId");
 
@@ -219,25 +231,27 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("AiProviderSettingsId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AiProviderSettingsId"));
 
                     b.Property<bool>("Enabled")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<int>("Priority")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("ProviderName")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("UpdatedByUserId")
                         .HasMaxLength(450)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("AiProviderSettingsId");
 
@@ -247,44 +261,128 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.ToTable("AiProviderSettings");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.ApplicationSetting", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedByUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ValueType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.ToTable("ApplicationSettings");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.ClubMembership", b =>
+                {
+                    b.Property<int>("ClubMembershipId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ClubMembershipId"));
+
+                    b.Property<int>("GolfClubId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MembershipNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("ClubMembershipId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GolfClubId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ClubMemberships");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfClub", b =>
                 {
                     b.Property<int>("GolfClubId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GolfClubId"));
 
                     b.Property<string>("AddressLine1")
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("AddressLine2")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("City")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Country")
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("CountyOrRegion")
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Postcode")
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Website")
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(200)");
 
                     b.HasKey("GolfClubId");
 
@@ -295,21 +393,23 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("GolfCourseId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GolfCourseId"));
 
                     b.Property<int>("DefaultPar")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("GolfClubId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("NumberOfHoles")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.HasKey("GolfCourseId");
 
@@ -318,26 +418,62 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.ToTable("GolfCourses");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfSociety", b =>
+                {
+                    b.Property<int>("GolfSocietyId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("GolfSocietyId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("GolfSocietyId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.ToTable("GolfSocieties");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Hole", b =>
                 {
                     b.Property<int>("HoleId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HoleId"));
 
                     b.Property<int>("GolfCourseId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("HoleNumber")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int?>("LengthYards")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("Par")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int?>("StrokeIndex")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.HasKey("HoleId");
 
@@ -346,41 +482,76 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.ToTable("Holes");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.HoleTee", b =>
+                {
+                    b.Property<int>("HoleTeeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("HoleTeeId"));
+
+                    b.Property<int>("HoleId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("LengthYards")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Par")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StrokeIndex")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TeeSetId")
+                        .HasColumnType("int");
+
+                    b.HasKey("HoleTeeId");
+
+                    b.HasIndex("TeeSetId");
+
+                    b.HasIndex("HoleId", "TeeSetId")
+                        .IsUnique();
+
+                    b.ToTable("HoleTees");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Notification", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ActionUrl")
                         .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<bool>("IsRead")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<string>("Message")
                         .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<int?>("RelatedEntityId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<int>("Type")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
@@ -393,27 +564,29 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("PlayerId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PlayerId"));
 
                     b.Property<string>("ApplicationUserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("CreatedByApplicationUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<double?>("Handicap")
-                        .HasColumnType("REAL");
+                        .HasColumnType("float");
 
                     b.Property<string>("LastName")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("PlayerId");
 
@@ -428,24 +601,26 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("RequestedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("RequestingUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime?>("RespondedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("TargetUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
@@ -461,40 +636,42 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Message")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime>("RequestedAt")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("RequestingUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<int>("RoundsMerged")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("RoundsSkipped")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("SourcePlayerId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("TargetPlayerId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("TargetUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
@@ -513,32 +690,34 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("RoundId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RoundId"));
 
                     b.Property<string>("CreatedByApplicationUserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<DateTime>("DatePlayed")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("GolfCourseId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("HolesPlayed")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<string>("Notes")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("RoundType")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("StartingHole")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("Status")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.HasKey("RoundId");
 
@@ -552,14 +731,19 @@ namespace GolfTrackerApp.Web.Data.Migrations
             modelBuilder.Entity("GolfTrackerApp.Web.Models.RoundPlayer", b =>
                 {
                     b.Property<int>("RoundId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("PlayerId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TeeSetId")
+                        .HasColumnType("int");
 
                     b.HasKey("RoundId", "PlayerId");
 
                     b.HasIndex("PlayerId");
+
+                    b.HasIndex("TeeSetId");
 
                     b.ToTable("RoundPlayers");
                 });
@@ -568,25 +752,30 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("ScoreId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ScoreId"));
 
                     b.Property<bool?>("FairwayHit")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("bit");
 
                     b.Property<int>("HoleId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("PlayerId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int?>("Putts")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("RoundId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
 
                     b.Property<int>("Strokes")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TeeSetId")
+                        .HasColumnType("int");
 
                     b.HasKey("ScoreId");
 
@@ -596,31 +785,106 @@ namespace GolfTrackerApp.Web.Data.Migrations
 
                     b.HasIndex("RoundId");
 
+                    b.HasIndex("TeeSetId");
+
                     b.ToTable("Scores");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.SocietyMembership", b =>
+                {
+                    b.Property<int>("SocietyMembershipId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SocietyMembershipId"));
+
+                    b.Property<int>("GolfSocietyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("SocietyMembershipId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("GolfSocietyId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("SocietyMemberships");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.TeeSet", b =>
+                {
+                    b.Property<int>("TeeSetId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("TeeSetId"));
+
+                    b.Property<string>("Colour")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal?>("CourseRating")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("Gender")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GolfCourseId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("SlopeRating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("TeeSetId");
+
+                    b.HasIndex("GolfCourseId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("TeeSets");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("NormalizedName")
                         .HasMaxLength(256)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedName")
                         .IsUnique()
-                        .HasDatabaseName("RoleNameIndex");
+                        .HasDatabaseName("RoleNameIndex")
+                        .HasFilter("[NormalizedName] IS NOT NULL");
 
                     b.ToTable("AspNetRoles", (string)null);
                 });
@@ -629,17 +893,19 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("RoleId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
@@ -652,17 +918,19 @@ namespace GolfTrackerApp.Web.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ClaimType")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("ClaimValue")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
 
@@ -674,17 +942,17 @@ namespace GolfTrackerApp.Web.Data.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ProviderKey")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("ProviderDisplayName")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("UserId")
                         .IsRequired()
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("LoginProvider", "ProviderKey");
 
@@ -696,10 +964,10 @@ namespace GolfTrackerApp.Web.Data.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<string>", b =>
                 {
                     b.Property<string>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("RoleId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.HasKey("UserId", "RoleId");
 
@@ -711,16 +979,16 @@ namespace GolfTrackerApp.Web.Data.Migrations
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
                     b.Property<string>("UserId")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("LoginProvider")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Name")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(450)");
 
                     b.Property<string>("Value")
-                        .HasColumnType("TEXT");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("UserId", "LoginProvider", "Name");
 
@@ -777,6 +1045,25 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("AiChatSession");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.ClubMembership", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.GolfClub", "GolfClub")
+                        .WithMany("ClubMemberships")
+                        .HasForeignKey("GolfClubId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "User")
+                        .WithMany("ClubMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GolfClub");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfCourse", b =>
                 {
                     b.HasOne("GolfTrackerApp.Web.Models.GolfClub", "GolfClub")
@@ -788,6 +1075,17 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("GolfClub");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfSociety", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Hole", b =>
                 {
                     b.HasOne("GolfTrackerApp.Web.Models.GolfCourse", "GolfCourse")
@@ -797,6 +1095,25 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("GolfCourse");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.HoleTee", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.Hole", "Hole")
+                        .WithMany("HoleTees")
+                        .HasForeignKey("HoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Models.TeeSet", "TeeSet")
+                        .WithMany("HoleTees")
+                        .HasForeignKey("TeeSetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Hole");
+
+                    b.Navigation("TeeSet");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Notification", b =>
@@ -914,9 +1231,16 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("GolfTrackerApp.Web.Models.TeeSet", "TeeSet")
+                        .WithMany()
+                        .HasForeignKey("TeeSetId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Player");
 
                     b.Navigation("Round");
+
+                    b.Navigation("TeeSet");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Score", b =>
@@ -939,11 +1263,48 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("GolfTrackerApp.Web.Models.TeeSet", "TeeSet")
+                        .WithMany()
+                        .HasForeignKey("TeeSetId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Hole");
 
                     b.Navigation("Player");
 
                     b.Navigation("Round");
+
+                    b.Navigation("TeeSet");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.SocietyMembership", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.GolfSociety", "GolfSociety")
+                        .WithMany("Memberships")
+                        .HasForeignKey("GolfSocietyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Web.Data.ApplicationUser", "User")
+                        .WithMany("SocietyMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GolfSociety");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.TeeSet", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Web.Models.GolfCourse", "GolfCourse")
+                        .WithMany("TeeSets")
+                        .HasForeignKey("GolfCourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("GolfCourse");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -997,6 +1358,13 @@ namespace GolfTrackerApp.Web.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Web.Data.ApplicationUser", b =>
+                {
+                    b.Navigation("ClubMemberships");
+
+                    b.Navigation("SocietyMemberships");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Web.Models.AiChatSession", b =>
                 {
                     b.Navigation("AuditLogs");
@@ -1006,6 +1374,8 @@ namespace GolfTrackerApp.Web.Data.Migrations
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfClub", b =>
                 {
+                    b.Navigation("ClubMemberships");
+
                     b.Navigation("GolfCourses");
                 });
 
@@ -1014,10 +1384,19 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("Holes");
 
                     b.Navigation("Rounds");
+
+                    b.Navigation("TeeSets");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.GolfSociety", b =>
+                {
+                    b.Navigation("Memberships");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Web.Models.Hole", b =>
                 {
+                    b.Navigation("HoleTees");
+
                     b.Navigation("Scores");
                 });
 
@@ -1033,6 +1412,11 @@ namespace GolfTrackerApp.Web.Data.Migrations
                     b.Navigation("RoundPlayers");
 
                     b.Navigation("Scores");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Web.Models.TeeSet", b =>
+                {
+                    b.Navigation("HoleTees");
                 });
 #pragma warning restore 612, 618
         }

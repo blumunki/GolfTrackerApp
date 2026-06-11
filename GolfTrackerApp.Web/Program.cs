@@ -106,11 +106,14 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 var databaseProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
 
-// Use DbContextFactory to avoid threading issues in Blazor Server
-// The lifetime parameter also registers ApplicationDbContext as a scoped service (for Identity)
-builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
+// Use DbContextFactory to avoid threading issues in Blazor Server.
+// Each provider has its own derived context type carrying its own migration set
+// (see Data/ProviderContexts.cs). Application code keeps depending on
+// ApplicationDbContext / IDbContextFactory<ApplicationDbContext> via the
+// forwarding registrations below.
+if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
 {
-    if (databaseProvider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+    builder.Services.AddDbContextFactory<SqlServerApplicationDbContext>(options =>
     {
         options.UseSqlServer(connectionString, sqlOptions =>
         {
@@ -121,12 +124,26 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
                 errorNumbersToAdd: null);
             sqlOptions.CommandTimeout(60);
         });
-    }
-    else
+    }, ServiceLifetime.Scoped);
+    builder.Services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(sp =>
+        new DerivedDbContextFactory<SqlServerApplicationDbContext>(
+            sp.GetRequiredService<IDbContextFactory<SqlServerApplicationDbContext>>()));
+    // Scoped ApplicationDbContext for Identity's AddEntityFrameworkStores
+    builder.Services.AddScoped<ApplicationDbContext>(sp =>
+        sp.GetRequiredService<SqlServerApplicationDbContext>());
+}
+else
+{
+    builder.Services.AddDbContextFactory<SqliteApplicationDbContext>(options =>
     {
         options.UseSqlite(connectionString);
-    }
-}, ServiceLifetime.Scoped);
+    }, ServiceLifetime.Scoped);
+    builder.Services.AddSingleton<IDbContextFactory<ApplicationDbContext>>(sp =>
+        new DerivedDbContextFactory<SqliteApplicationDbContext>(
+            sp.GetRequiredService<IDbContextFactory<SqliteApplicationDbContext>>()));
+    builder.Services.AddScoped<ApplicationDbContext>(sp =>
+        sp.GetRequiredService<SqliteApplicationDbContext>());
+}
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
