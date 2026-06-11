@@ -8,6 +8,9 @@ The baseline migration represents the schema that production must already have:
 - EF Core product version: `10.0.3`
 - Migration context: `SqlServerApplicationDbContext`
 
+**Completion status:** production reconciliation, baseline recording, and
+zero-drift verification completed on 2026-06-11.
+
 The scripts are deliberately separate. The drift check is read-only. The
 reconciliation script makes only the reviewed production schema corrections.
 The baseline script writes only the EF migration history table/row and never
@@ -55,8 +58,8 @@ creates or changes application tables.
 12. Rerun the drift check. Confirm the baseline row is reported and the schema
    remains clean.
 
-After successful human execution, update `docs/WORKLOG.md` to record that the
-production baseline was applied. Only then may `0-9` be unblocked.
+The successful human execution is recorded in `docs/WORKLOG.md`; runtime
+migration application was enabled by WORKLOG item `0-9`.
 
 The reviewed reconciliation widens two TeeSet columns, removes legacy default
 constraints, normalises legacy foreign-key/index names, and adds the missing

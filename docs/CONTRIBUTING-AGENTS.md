@@ -21,7 +21,7 @@ dotnet ef migrations add <Name> --project GolfTrackerApp.Core --startup-project 
 dotnet ef migrations add <Name> --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
 ```
 
-> ⚠️ **Transition state (until WORKLOG item 0-9 lands):** production SQL Server does **not** apply migrations at runtime yet — it still uses `EnsureCreated()` plus hand-written SQL in `EnsureNewTablesExistAsync()` in `Program.cs`. So until 0-9 lands, any new table/column needs the two migrations above **and** a matching block in `EnsureNewTablesExistAsync()` using SQL Server types (`NVARCHAR(n)` not `TEXT`, `INT` not `INTEGER`, `DATETIME2`, `BIT`; `ON DELETE NO ACTION` where multiple cascade paths exist). Remove this warning when 0-9 lands.
+Both providers apply migrations at application startup. The production SQL Server baseline was reconciled, recorded, and verified on 2026-06-11.
 
 Set `GOLFTRACKER_DESIGNTIME_CONNECTION` and use `--project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web` to point `dotnet ef database update` at a scratch database for verification — never at production.
 

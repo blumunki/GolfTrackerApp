@@ -298,14 +298,14 @@ Development and production use **different database providers** with different c
 |--------|---------------------|------------------------|
 | **Provider** | `Microsoft.EntityFrameworkCore.Sqlite` | `Microsoft.EntityFrameworkCore.SqlServer` |
 | **Migration context** | `SqliteApplicationDbContext` → `GolfTrackerApp.Core/Data/Migrations/Sqlite/` | `SqlServerApplicationDbContext` → `GolfTrackerApp.Core/Data/Migrations/SqlServer/` |
-| **Runtime schema management** | EF Core Migrations (`context.Database.Migrate()`) | `EnsureCreated()` + manual SQL in `EnsureNewTablesExistAsync()` — **until WORKLOG 0-9 lands**, then `Migrate()` |
+| **Runtime schema management** | EF Core Migrations (`context.Database.MigrateAsync()`) | EF Core Migrations (`context.Database.MigrateAsync()`) |
 | **Column types** | `INTEGER`, `TEXT`, `REAL` | `INT`, `NVARCHAR(n)`, `DATETIME2`, `BIT`, etc. |
 | **Cascade deletes** | Generally permissive | Strict — rejects `ON DELETE SET NULL` / `CASCADE` if it creates multiple cascade paths |
 | **Config key** | `"DatabaseProvider": "Sqlite"` (in `appsettings.Development.json`) | `"DatabaseProvider": "SqlServer"` (in `appsettings.Production.json`) |
 
 Migrations are split per provider via derived context types in `GolfTrackerApp.Core/Data/ProviderContexts.cs` (EF Core discovers all migrations attributed to a context type in the migrations assembly, so each provider's set is attached to its own derived context). Application code is unaffected — DI forwards `ApplicationDbContext` / `IDbContextFactory<ApplicationDbContext>` to the active provider's context (`Program.cs`).
 
-Production must be reconciled and marked with the SQL Server baseline before runtime migration application is enabled. Follow `docs/sql-server-baseline-runbook.md`: its drift check is read-only and compares the model's tables, columns, defaults, primary keys, indexes, and foreign keys to `20260611161345_InitialSqlServer`; its guarded reconciliation script aligns the reviewed legacy production schema; its guarded marker writes only the matching `__EFMigrationsHistory` row after a human confirms a clean check and verified backup. The SQL Server baseline uses `NO ACTION` for the optional `AspNetUsers.LinkedPlayerId` and `AiAuditLogs.AiChatSessionId` relationships to avoid cascade cycles while SQLite retains `SET NULL`. WORKLOG item `0-9` stays blocked until that human-run production step is recorded.
+Production was reconciled and marked with SQL Server baseline `20260611161345_InitialSqlServer` on 2026-06-11. Both providers now apply migrations at startup. The SQL Server baseline uses `NO ACTION` for the optional `AspNetUsers.LinkedPlayerId` and `AiAuditLogs.AiChatSessionId` relationships to avoid cascade cycles while SQLite retains `SET NULL`. The completed human procedure remains documented in `docs/sql-server-baseline-runbook.md`.
 
 **When making any database schema change, you MUST:**
 
@@ -315,17 +315,12 @@ Production must be reconciled and marked with the SQL Server baseline before run
    dotnet ef migrations add <Name> --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
    ```
 
-2. **Transition state (until WORKLOG 0-9 lands):** also update `EnsureNewTablesExistAsync()` in `Program.cs` for SQL Server production:
-   - New tables: Add a `TableExistsAsync` check and `CREATE TABLE` with SQL Server types
-   - New columns on existing tables: Add a `ColumnExistsAsync` check and `ALTER TABLE ... ADD`
-   - Use `NVARCHAR(n)` not `TEXT`, `INT` not `INTEGER`, `DATETIME2` not `TEXT`, `BIT` not `INTEGER`
-
-3. **Avoid cascade conflicts on SQL Server:**
+2. **Avoid cascade conflicts on SQL Server:**
    - Use `ON DELETE NO ACTION` for foreign keys where multiple cascade paths exist (e.g., `AspNetUsers` ↔ `Players`)
    - `ON DELETE CASCADE` is only safe when there's a single path from parent to dependent
    - `ON DELETE SET NULL` also triggers the cascade-path check on SQL Server
 
-4. **Test both providers** before deploying schema changes. For SQLite, apply the chain to a scratch DB: set `GOLFTRACKER_DESIGNTIME_CONNECTION` and run `dotnet ef database update --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqliteApplicationDbContext`. Never point it at production.
+3. **Test both providers** before deploying schema changes. For SQLite, apply the chain to a scratch DB: set `GOLFTRACKER_DESIGNTIME_CONNECTION` and run `dotnet ef database update --project GolfTrackerApp.Core --startup-project GolfTrackerApp.Web --context SqliteApplicationDbContext`. Never point it at production.
 
 ## 6. Service Layer Design
 
@@ -558,7 +553,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 4a | Personal WHS handicap (differentials + index + backfill) | 🚧 In progress | WHS math done (`WhsCalculator`, pure + unit-tested); models, persistence, and completion hook pending. Does **not** require Phase 3 |
 | 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
-| 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | 🚧 In progress | See `docs/WORKLOG.md` items 0-1…0-10 |
+| 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | ✅ Done | Production SQL Server baseline verified; both providers apply migrations at startup |
 | — | Core project extraction | ✅ Done | Models, services, data, and migrations live in `GolfTrackerApp.Core` (`GolfTrackerApp.Core.*` namespaces); tests reference Core directly; deploy triggers on Web + Core paths |
 | — | Proactive AI coaching (background jobs) | ❌ Not started | AI layer is user-triggered only today |
 | — | Course data expansion (OSM geometry, AI-assisted entry) + hole visuals | ❌ Not started | |
