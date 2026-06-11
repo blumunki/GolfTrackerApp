@@ -1,9 +1,9 @@
 // In GolfTrackerApp.Web/Data/ApplicationDbContext.cs
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using GolfTrackerApp.Web.Models; // Add this using statement
+using GolfTrackerApp.Core.Models; // Add this using statement
 
-namespace GolfTrackerApp.Web.Data
+namespace GolfTrackerApp.Core.Data
 {
     // Ensure ApplicationUser exists or use IdentityUser
     // public class ApplicationUser : IdentityUser {} // If not already defined elsewhere by template

@@ -1,4 +1,4 @@
-using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Core.Data;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;

@@ -1,4 +1,4 @@
-namespace GolfTrackerApp.Web.Models;
+namespace GolfTrackerApp.Core.Models;
 
 // This class will hold all the necessary data for the scorecard UI
 public class Scorecard

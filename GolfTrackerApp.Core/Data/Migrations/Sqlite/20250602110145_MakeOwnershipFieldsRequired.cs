@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Migrations
+namespace GolfTrackerApp.Core.Migrations
 {
     /// <inheritdoc />
     public partial class MakeOwnershipFieldsRequired : Migration

@@ -1,11 +1,11 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
-using GolfTrackerApp.Web.Data;
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Data;
+using GolfTrackerApp.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace GolfTrackerApp.Web.Services
+namespace GolfTrackerApp.Core.Services
 {
     public class AiInsightService : IAiInsightService
     {

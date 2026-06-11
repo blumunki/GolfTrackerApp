@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Models;
 using Microsoft.Extensions.Logging;
 
-namespace GolfTrackerApp.Web.Services.AiProviders
+namespace GolfTrackerApp.Core.Services.AiProviders
 {
     public class AnthropicProviderService : IAiProviderService
     {

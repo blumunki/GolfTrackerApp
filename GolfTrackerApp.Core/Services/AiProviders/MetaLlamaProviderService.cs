@@ -1,6 +1,6 @@
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Models;
 
-namespace GolfTrackerApp.Web.Services.AiProviders
+namespace GolfTrackerApp.Core.Services.AiProviders
 {
     /// <summary>
     /// Placeholder — Meta Llama provider is not yet implemented.

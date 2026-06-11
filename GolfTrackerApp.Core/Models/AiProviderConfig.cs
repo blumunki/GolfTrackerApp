@@ -1,4 +1,4 @@
-namespace GolfTrackerApp.Web.Models
+namespace GolfTrackerApp.Core.Models
 {
     public class AiProviderConfig
     {

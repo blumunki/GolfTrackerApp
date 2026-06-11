@@ -1,4 +1,4 @@
-namespace GolfTrackerApp.Web.Models;
+namespace GolfTrackerApp.Core.Models;
 
 /// <summary>
 /// DTO for Round responses to avoid circular references

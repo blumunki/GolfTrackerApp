@@ -2,7 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema; // For ForeignKey
 
-namespace GolfTrackerApp.Web.Models
+namespace GolfTrackerApp.Core.Models
 {
     public class GolfCourse
     {

@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore; // For EnsureCreated/Migrate
 using Microsoft.Extensions.DependencyInjection;
 
-namespace GolfTrackerApp.Web.Data
+namespace GolfTrackerApp.Core.Data
 {
     public static class SeedData
     {

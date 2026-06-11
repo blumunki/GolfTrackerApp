@@ -1,8 +1,8 @@
 using System.Collections.Concurrent;
-using GolfTrackerApp.Web.Models;
-using GolfTrackerApp.Web.Services.AiProviders;
+using GolfTrackerApp.Core.Models;
+using GolfTrackerApp.Core.Services.AiProviders;
 
-namespace GolfTrackerApp.Web.Services
+namespace GolfTrackerApp.Core.Services
 {
     public class AiRoutingService : IAiRoutingService
     {

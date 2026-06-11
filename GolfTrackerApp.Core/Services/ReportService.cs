@@ -1,9 +1,9 @@
-using GolfTrackerApp.Web.Data;
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Data;
+using GolfTrackerApp.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace GolfTrackerApp.Web.Services;
+namespace GolfTrackerApp.Core.Services;
 
 public class ReportService : IReportService
 {

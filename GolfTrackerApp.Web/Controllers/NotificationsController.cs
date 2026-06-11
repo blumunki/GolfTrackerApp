@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using GolfTrackerApp.Web.Services;
+using GolfTrackerApp.Core.Services;
 
 namespace GolfTrackerApp.Web.Controllers;
 

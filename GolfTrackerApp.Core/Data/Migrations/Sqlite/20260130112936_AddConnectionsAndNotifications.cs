@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Data.Migrations
+namespace GolfTrackerApp.Core.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddConnectionsAndNotifications : Migration

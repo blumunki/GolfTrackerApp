@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Core.Data;
 
-namespace GolfTrackerApp.Web.Models;
+namespace GolfTrackerApp.Core.Models;
 
 /// <summary>
 /// Represents a request to merge a managed player's data into a connected player's profile.

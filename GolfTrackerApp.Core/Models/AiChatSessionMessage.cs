@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace GolfTrackerApp.Web.Models
+namespace GolfTrackerApp.Core.Models
 {
     public class AiChatSessionMessage
     {

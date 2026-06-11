@@ -4,8 +4,8 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using GolfTrackerApp.Web.Data;
-using GolfTrackerApp.Web.Models.Api;
+using GolfTrackerApp.Core.Data;
+using GolfTrackerApp.Core.Models.Api;
 using Google.Apis.Auth;
 using Microsoft.AspNetCore.Authorization;
 

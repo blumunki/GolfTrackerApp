@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using GolfTrackerApp.Web.Services;
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Services;
+using GolfTrackerApp.Core.Models;
 
 namespace GolfTrackerApp.Web.Controllers;
 

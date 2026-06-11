@@ -1,4 +1,4 @@
-namespace GolfTrackerApp.Web.Models;
+namespace GolfTrackerApp.Core.Models;
 
 /// <summary>
 /// Contains comparison data for multiple players across shared rounds or all rounds.
