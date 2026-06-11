@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Migrations
+namespace GolfTrackerApp.Core.Migrations
 {
     /// <inheritdoc />
     public partial class CreateIdentitySchema : Migration

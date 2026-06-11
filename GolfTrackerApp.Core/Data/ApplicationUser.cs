@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations.Schema;
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Models;
 using Microsoft.AspNetCore.Identity;
 
-namespace GolfTrackerApp.Web.Data;
+namespace GolfTrackerApp.Core.Data;
 
 public class ApplicationUser : IdentityUser
 {

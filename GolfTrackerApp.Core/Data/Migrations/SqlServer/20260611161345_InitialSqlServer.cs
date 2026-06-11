@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace GolfTrackerApp.Web.Data.Migrations.SqlServer
+namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
 {
     /// <inheritdoc />
     public partial class InitialSqlServer : Migration

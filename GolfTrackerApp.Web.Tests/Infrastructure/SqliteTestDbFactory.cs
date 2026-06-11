@@ -1,4 +1,4 @@
-using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Core.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 

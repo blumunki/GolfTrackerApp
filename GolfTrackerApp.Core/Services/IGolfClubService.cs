@@ -1,9 +1,9 @@
 // In GolfTrackerApp.Web/Services/IGolfClubService.cs
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Models;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace GolfTrackerApp.Web.Services
+namespace GolfTrackerApp.Core.Services
 {
     public interface IGolfClubService
     {

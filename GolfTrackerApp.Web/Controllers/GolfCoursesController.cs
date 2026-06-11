@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
-using GolfTrackerApp.Web.Models;
-using GolfTrackerApp.Web.Services;
+using GolfTrackerApp.Core.Models;
+using GolfTrackerApp.Core.Services;
 
 namespace GolfTrackerApp.Web.Controllers;
 

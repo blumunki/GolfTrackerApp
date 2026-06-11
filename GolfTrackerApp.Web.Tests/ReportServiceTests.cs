@@ -1,5 +1,5 @@
-using GolfTrackerApp.Web.Models;
-using GolfTrackerApp.Web.Services;
+using GolfTrackerApp.Core.Models;
+using GolfTrackerApp.Core.Services;
 using GolfTrackerApp.Web.Tests.Infrastructure;
 using Microsoft.Extensions.Logging.Abstractions;
 

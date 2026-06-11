@@ -1,9 +1,9 @@
 // In GolfTrackerApp.Web/Models/Round.cs
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Core.Data;
 
-namespace GolfTrackerApp.Web.Models
+namespace GolfTrackerApp.Core.Models
 {
     public enum RoundTypeOption
     {

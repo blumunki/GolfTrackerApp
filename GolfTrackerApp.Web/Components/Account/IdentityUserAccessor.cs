@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Identity;
-using GolfTrackerApp.Web.Data;
+using GolfTrackerApp.Core.Data;
 
 namespace GolfTrackerApp.Web.Components.Account;
 

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
-namespace GolfTrackerApp.Web.Data;
+namespace GolfTrackerApp.Core.Data;
 
 // Each database provider has its own migration set. EF Core discovers every
 // migration attributed to a context type within the migrations assembly, so the

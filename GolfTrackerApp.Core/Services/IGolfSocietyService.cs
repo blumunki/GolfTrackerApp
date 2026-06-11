@@ -1,6 +1,6 @@
-using GolfTrackerApp.Web.Models;
+using GolfTrackerApp.Core.Models;
 
-namespace GolfTrackerApp.Web.Services;
+namespace GolfTrackerApp.Core.Services;
 
 public interface IGolfSocietyService
 {

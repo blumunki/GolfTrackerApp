@@ -2,9 +2,9 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.AspNetCore.Identity;
-using GolfTrackerApp.Web.Data; // Assuming this is the namespace where ApplicationUser is defined
+using GolfTrackerApp.Core.Data; // Assuming this is the namespace where ApplicationUser is defined
 
-namespace GolfTrackerApp.Web.Models
+namespace GolfTrackerApp.Core.Models
 {
     public class Player
     {

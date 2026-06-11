@@ -1,4 +1,4 @@
-namespace GolfTrackerApp.Web.Models.Api;
+namespace GolfTrackerApp.Core.Models.Api;
 
 public class LoginRequest
 {

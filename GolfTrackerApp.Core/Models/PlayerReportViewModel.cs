@@ -1,4 +1,4 @@
-namespace GolfTrackerApp.Web.Models;
+namespace GolfTrackerApp.Core.Models;
 
 // This class will hold all the data needed by the PlayerReport.razor page
 public class PlayerReportViewModel
