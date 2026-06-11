@@ -36,9 +36,10 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 2-3 | HandicapService.OnRoundCompletedAsync + RoundService completion hook + integration test | 2 | Done | Claude | 2026-06-11 | Both completion paths hooked (UpdateRoundAsync + SaveScorecardAsync); idempotent recalc; 8 integration tests; 107 total green |
 | 2-4 | Handicap backfill admin action (idempotent, reports n-of-m qualified) | 2 | Done | Claude | 2026-06-11 | BackfillPersonalHandicapsAsync (oldest-first replay) + /admin/handicap-backfill page; repeat-run idempotency tested; 109 tests green. Phase 4a complete |
 | 2-5 | Manual club handicap CRUD + HandicapsController | 2 | Done | Claude | 2026-06-11 | Service CRUD (calculated records protected) + reads for dashboards; /api/handicaps endpoints owner-authorized; 121 tests green |
-| 2-6 | Web handicap dashboard (active handicaps, history chart, last-20 differentials) | 2 | In Progress | Claude | 2026-06-11 | Unblocked by 2-3/2-5. IHandicapService has all needed reads (GetActiveHandicaps, GetHandicapRecords, GetRecentDifferentials) |
+| 2-6 | Web handicap dashboard (active handicaps, history chart, last-20 differentials) | 2 | Done | Claude | 2026-06-11 | /handicaps page + nav link; counting indicators per WHS table; 121 tests green |
 | 2-7 | Mobile handicap page (DTOs + API service + dashboard) | 2 | Available | | 2026-06-11 | Unblocked by 2-5. Server DTOs in Core/Models/Api/HandicapDtos.cs; mirror with [JsonPropertyName] on mobile per API compat rules |
 | 2-8 | Recalculate differentials when scores are edited via RoundsController.UpdateRoundScores (move edit into a service + fire OnRoundCompletedAsync) | 2 | Available | | 2026-06-11 | Found in 2-3: mobile score edits leave differentials stale; controller edits scores directly (thin-controller violation) |
+| 2-9 | Manual club handicap entry UI (web) + primary-handicap selector | 2 | Available | | 2026-06-11 | Remaining 4b web UI; service CRUD + API exist (2-5). Selector updates Player.PrimaryHandicapSource and refreshes Player.Handicap |
 
 Phases 3–6 items are seeded when their phase starts — see the development plan summary in `docs/ARCHITECTURE.md` §12.
 
