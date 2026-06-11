@@ -136,6 +136,27 @@ public sealed class WhsCalculatorTests
         Assert.Equal(8, WhsCalculator.ComputeAdjustedGrossScore(holes));
     }
 
+    // --- CountingDifferentialsCount: the "lowest k" column of the WHS table ---
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(2, 0)]
+    [InlineData(3, 1)]
+    [InlineData(5, 1)]
+    [InlineData(6, 2)]
+    [InlineData(8, 2)]
+    [InlineData(11, 3)]
+    [InlineData(14, 4)]
+    [InlineData(16, 5)]
+    [InlineData(18, 6)]
+    [InlineData(19, 7)]
+    [InlineData(20, 8)]
+    [InlineData(25, 8)] // beyond the window size behaves like 20
+    public void CountingDifferentialsCount_MatchesWhsTable(int available, int expected)
+    {
+        Assert.Equal(expected, WhsCalculator.CountingDifferentialsCount(available));
+    }
+
     /// <summary>Differentials 10.0, 11.0, 12.0, … (most recent first).</summary>
     private static IEnumerable<decimal> ConsecutiveDifferentials(int count) =>
         Enumerable.Range(10, count).Select(d => (decimal)d);

@@ -43,9 +43,28 @@ public static class WhsCalculator
     public static decimal? ComputeIndex(IEnumerable<decimal> differentialsMostRecentFirst)
     {
         var window = differentialsMostRecentFirst.Take(DifferentialWindow).ToList();
+        var (lowestCount, adjustment) = GetTableEntry(window.Count);
 
-        // WHS table: how many of the lowest differentials count, and the flat adjustment.
-        (int lowestCount, decimal adjustment) = window.Count switch
+        if (lowestCount == 0)
+        {
+            return null;
+        }
+
+        var average = window.OrderBy(d => d).Take(lowestCount).Average();
+        var index = Math.Round(average - adjustment, 1, MidpointRounding.AwayFromZero);
+        return Math.Min(index, MaxIndex);
+    }
+
+    /// <summary>
+    /// How many of the lowest differentials count towards the index for a window of
+    /// the given size (the "lowest k" column of the WHS table; 0 when no index exists).
+    /// </summary>
+    public static int CountingDifferentialsCount(int differentialCount) =>
+        GetTableEntry(Math.Min(differentialCount, DifferentialWindow)).LowestCount;
+
+    /// <summary>WHS table: how many lowest differentials count, and the flat adjustment.</summary>
+    private static (int LowestCount, decimal Adjustment) GetTableEntry(int differentialCount) =>
+        differentialCount switch
         {
             < 3 => (0, 0m),
             3 => (1, 2.0m),
@@ -60,16 +79,6 @@ public static class WhsCalculator
             19 => (7, 0m),
             _ => (8, 0m),
         };
-
-        if (lowestCount == 0)
-        {
-            return null;
-        }
-
-        var average = window.OrderBy(d => d).Take(lowestCount).Average();
-        var index = Math.Round(average - adjustment, 1, MidpointRounding.AwayFromZero);
-        return Math.Min(index, MaxIndex);
-    }
 
     /// <summary>
     /// Adjusted gross score: each hole capped at par + <see cref="MaxStrokesOverPar"/>.
