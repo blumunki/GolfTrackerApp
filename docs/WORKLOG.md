@@ -24,14 +24,14 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 0-5 | CI workflow (ci.yml build+test on PR/push; test gate in azure-deploy.yml) | 0 | Done | Claude | 2026-06-11 | No MAUI build in CI |
 | 0-6 | Agent docs (CLAUDE/AGENTS/GEMINI.md, CONTRIBUTING-AGENTS.md, this board) | 0 | Done | Claude | 2026-06-11 | |
 | 0-7 | Provider-split migration folders (Sqlite/SqlServer) + design-time factory | 0 | Done | Codex | 2026-06-11 | Derived contexts + split migrations documented; SQLite scratch migration chain and 49 tests verified |
-| 0-8 | SQL Server drift-check + baseline scripts in docs/ (human runs against prod) | 0 | Done | Codex | 2026-06-11 | Runbook + read-only drift check + guarded marker added; human production execution still required before 0-9 |
-| 0-9 | Program.cs: replace EnsureCreated/EnsureNewTablesExistAsync with Migrate() for both providers | 0 | Blocked | | | Blocked by 0-8 baseline being applied to prod |
+| 0-8 | SQL Server drift-check + baseline scripts in docs/ (human runs against prod) | 0 | Done | Codex | 2026-06-11 | Production reconciled, baseline recorded, and zero-drift verification completed by human |
+| 0-9 | Program.cs: replace EnsureCreated/EnsureNewTablesExistAsync with Migrate() for both providers | 0 | In Progress | Codex | 2026-06-11 | Production baseline applied and verified; replacing legacy startup schema path |
 | 0-10 | ARCHITECTURE.md §12 status table + Phase 4 handicap restructure | 0 | Done | Claude | 2026-06-11 | Added §12.0, 4a/4b/4c increments, full WHS table, fixed dependency chain |
-| 0-12 | Correct SQL Server baseline delete actions + add guarded production reconciliation script | 0 | Done | Codex | 2026-06-11 | SQL Server baseline corrected; guarded reconciliation handles Azure SQL catalog/database collation differences; human execution remains |
+| 0-12 | Correct SQL Server baseline delete actions + add guarded production reconciliation script | 0 | Done | Codex | 2026-06-11 | Guarded reconciliation completed successfully against production; zero drift verified |
 | 1-1 | Create GolfTrackerApp.Core project + move Models/Services/Data (no rename) | 1 | Done | Codex | 2026-06-11 | Core owns Models/Services/Data + both migration chains; namespaces preserved; 49 tests and both provider models verified |
 | 1-2 | Namespace rename GolfTrackerApp.Web.* → GolfTrackerApp.Core.* + fix usings | 1 | Done | Claude | 2026-06-11 | 222-file mechanical rename incl. migration snapshot strings; has-pending-model-changes clean both providers; 49 tests green |
 | 1-3 | Retarget test project to Core + update CI/deploy path filters | 1 | Done | Claude | 2026-06-11 | Tests reference Core directly; azure-deploy also triggers on Core/**; 49 tests green. Phase 1 complete |
-| 2-1 | Handicap models (HandicapSource, ScoringDifferential, HandicapRecord) + dual migrations | 2 | Blocked | | | Blocked by 0-7/0-9 (dual-migration pipeline) |
+| 2-1 | Handicap models (HandicapSource, ScoringDifferential, HandicapRecord) + dual migrations | 2 | Blocked | | | Blocked by 0-9 (runtime migration switch) |
 | 2-2 | WHS math: pure ComputeDifferential/ComputeIndex + full unit tests (TDD) | 2 | Done | Claude | 2026-06-11 | WhsCalculator (+ ComputeAdjustedGrossScore, par+5 cap); 34 tests, every WHS table row covered; 83 total green |
 | 2-3 | HandicapService.OnRoundCompletedAsync + RoundService completion hook + integration test | 2 | Blocked | | | Blocked by 2-1, 2-2, 0-3. NOTE: ScoreService.SaveScorecardAsync also completes rounds directly — the hook must cover both paths |
 | 2-4 | Handicap backfill admin action (idempotent, reports n-of-m qualified) | 2 | Blocked | | | Blocked by 2-3 |
