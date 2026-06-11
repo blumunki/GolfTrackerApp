@@ -27,7 +27,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 0-8 | SQL Server drift-check + baseline scripts in docs/ (human runs against prod) | 0 | Done | Codex | 2026-06-11 | Runbook + read-only drift check + guarded marker added; human production execution still required before 0-9 |
 | 0-9 | Program.cs: replace EnsureCreated/EnsureNewTablesExistAsync with Migrate() for both providers | 0 | Blocked | | | Blocked by 0-8 baseline being applied to prod |
 | 0-10 | ARCHITECTURE.md §12 status table + Phase 4 handicap restructure | 0 | Done | Claude | 2026-06-11 | Added §12.0, 4a/4b/4c increments, full WHS table, fixed dependency chain |
-| 1-1 | Create GolfTrackerApp.Core project + move Models/Services/Data (no rename) | 1 | Available | | | Unblocked — 0-1..0-4 done. Move ProviderContexts.cs + both migration folders too |
+| 1-1 | Create GolfTrackerApp.Core project + move Models/Services/Data (no rename) | 1 | In Progress | Codex | 2026-06-11 | Unblocked — 0-1..0-4 done. Move ProviderContexts.cs + both migration folders too |
 | 1-2 | Namespace rename GolfTrackerApp.Web.* → GolfTrackerApp.Core.* + fix usings | 1 | Blocked | | | Blocked by 1-1; zero logic changes allowed |
 | 1-3 | Retarget test project to Core + update CI/deploy path filters | 1 | Blocked | | | Blocked by 1-2 |
 | 2-1 | Handicap models (HandicapSource, ScoringDifferential, HandicapRecord) + dual migrations | 2 | Blocked | | | Blocked by 0-7/0-9 (dual-migration pipeline) |
