@@ -19,7 +19,8 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 0-1 | Create test project + SqliteTestDbFactory + TestDataBuilder + smoke tests | 0 | Done | Claude | 2026-06-11 | 3 smoke tests green |
 | 0-2 | ReportService unit tests (dashboard stats, distributions, comparisons) | 0 | Done | Claude | 2026-06-11 | 13 tests; TestDataBuilder gained mixed-par courses + multi-player rounds |
 | 0-3 | RoundService characterization tests (Add/Update, tee selections, access filtering, PrepareScorecard) | 0 | Done | Claude | 2026-06-11 | 19 tests; status-transition test marks the Phase 2 hook point |
-| 0-4 | ScoreService + TeeSetService unit tests | 0 | In Progress | Claude | 2026-06-11 | |
+| 0-4 | ScoreService + TeeSetService unit tests | 0 | Done | Claude | 2026-06-11 | 14 tests; found 0-11 and a second completion path (see 2-3 note) |
+| 0-11 | Fix SaveScorecardAsync dropping TeeSetId from HoleScoreEntryModel | 0 | Available | | | Pinned by ScoreServiceTests.SaveScorecard_CurrentlyDropsTeeSetId — update that test when fixing. Tee info is a WHS input |
 | 0-5 | CI workflow (ci.yml build+test on PR/push; test gate in azure-deploy.yml) | 0 | Done | Claude | 2026-06-11 | No MAUI build in CI |
 | 0-6 | Agent docs (CLAUDE/AGENTS/GEMINI.md, CONTRIBUTING-AGENTS.md, this board) | 0 | Done | Claude | 2026-06-11 | |
 | 0-7 | Provider-split migration folders (Sqlite/SqlServer) + design-time factory | 0 | Available | | | Code only — no prod touch |
@@ -31,7 +32,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 1-3 | Retarget test project to Core + update CI/deploy path filters | 1 | Blocked | | | Blocked by 1-2 |
 | 2-1 | Handicap models (HandicapSource, ScoringDifferential, HandicapRecord) + dual migrations | 2 | Blocked | | | Blocked by 0-7/0-9 (dual-migration pipeline) |
 | 2-2 | WHS math: pure ComputeDifferential/ComputeIndex + full unit tests (TDD) | 2 | Available | | | Pure functions — no DB dependency, can start anytime |
-| 2-3 | HandicapService.OnRoundCompletedAsync + RoundService completion hook + integration test | 2 | Blocked | | | Blocked by 2-1, 2-2, 0-3 |
+| 2-3 | HandicapService.OnRoundCompletedAsync + RoundService completion hook + integration test | 2 | Blocked | | | Blocked by 2-1, 2-2, 0-3. NOTE: ScoreService.SaveScorecardAsync also completes rounds directly — the hook must cover both paths |
 | 2-4 | Handicap backfill admin action (idempotent, reports n-of-m qualified) | 2 | Blocked | | | Blocked by 2-3 |
 | 2-5 | Manual club handicap CRUD + HandicapsController | 2 | Blocked | | | Blocked by 2-1 |
 | 2-6 | Web handicap dashboard (active handicaps, history chart, last-20 differentials) | 2 | Blocked | | | Blocked by 2-3, 2-5 |
