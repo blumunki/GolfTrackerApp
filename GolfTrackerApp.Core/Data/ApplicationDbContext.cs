@@ -54,6 +54,10 @@ namespace GolfTrackerApp.Core.Data
         public DbSet<SocietyMembership> SocietyMemberships { get; set; }
         public DbSet<ClubMembership> ClubMemberships { get; set; }
 
+        // Handicaps (Phase 4)
+        public DbSet<HandicapRecord> HandicapRecords { get; set; }
+        public DbSet<ScoringDifferential> ScoringDifferentials { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder); // Important: Call base method first for Identity models
@@ -300,6 +304,55 @@ namespace GolfTrackerApp.Core.Data
                     .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasIndex(cm => new { cm.GolfClubId, cm.UserId }).IsUnique();
+            });
+
+            // HandicapRecord configuration (Phase 4)
+            builder.Entity<HandicapRecord>(entity =>
+            {
+                // Handicap history is derived data — it dies with the player.
+                entity.HasOne(hr => hr.Player)
+                    .WithMany(p => p.HandicapRecords)
+                    .HasForeignKey(hr => hr.PlayerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(hr => hr.GolfSociety)
+                    .WithMany()
+                    .HasForeignKey(hr => hr.GolfSocietyId)
+                    .OnDelete(optionalRelationshipDeleteBehavior);
+
+                entity.HasOne(hr => hr.GolfClub)
+                    .WithMany()
+                    .HasForeignKey(hr => hr.GolfClubId)
+                    .OnDelete(optionalRelationshipDeleteBehavior);
+
+                entity.HasIndex(hr => new { hr.PlayerId, hr.Source, hr.EffectiveDate });
+            });
+
+            // ScoringDifferential configuration (Phase 4)
+            builder.Entity<ScoringDifferential>(entity =>
+            {
+                // Restrict like Score → Player: AspNetUsers cascades into both Players
+                // and Rounds, so a second cascade path into this table via Player would
+                // be rejected by SQL Server (multiple cascade paths).
+                entity.HasOne(sd => sd.Player)
+                    .WithMany()
+                    .HasForeignKey(sd => sd.PlayerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(sd => sd.Round)
+                    .WithMany()
+                    .HasForeignKey(sd => sd.RoundId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Restrict like HoleTee → TeeSet; differentials snapshot their inputs.
+                entity.HasOne(sd => sd.TeeSet)
+                    .WithMany()
+                    .HasForeignKey(sd => sd.TeeSetId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                // One differential per player per round (keeps the backfill idempotent).
+                entity.HasIndex(sd => new { sd.PlayerId, sd.RoundId }).IsUnique();
+                entity.HasIndex(sd => new { sd.PlayerId, sd.CalculatedAt });
             });
         }
     }

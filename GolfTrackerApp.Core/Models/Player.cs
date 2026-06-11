@@ -18,7 +18,11 @@ namespace GolfTrackerApp.Core.Models
         [StringLength(50)]
         public string LastName { get; set; } = string.Empty;
 
+        // Display/convenience value: the "active" handicap from the primary source.
         public double? Handicap { get; set; }
+
+        // Which handicap context is shown as "my handicap" (null = legacy manual value).
+        public HandicapSource? PrimaryHandicapSource { get; set; }
 
         // ApplicationUserId is now nullable
         public string? ApplicationUserId { get; set; } // Removed [Required], made nullable (string?)
@@ -34,5 +38,6 @@ namespace GolfTrackerApp.Core.Models
 
         public virtual ICollection<Score> Scores { get; set; } = new List<Score>();
         public virtual ICollection<RoundPlayer> RoundPlayers { get; set; } = new List<RoundPlayer>();
+        public virtual ICollection<HandicapRecord> HandicapRecords { get; set; } = new List<HandicapRecord>();
     }
 }
