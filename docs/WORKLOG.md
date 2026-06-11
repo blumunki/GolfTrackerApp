@@ -20,7 +20,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 0-2 | ReportService unit tests (dashboard stats, distributions, comparisons) | 0 | Done | Claude | 2026-06-11 | 13 tests; TestDataBuilder gained mixed-par courses + multi-player rounds |
 | 0-3 | RoundService characterization tests (Add/Update, tee selections, access filtering, PrepareScorecard) | 0 | Done | Claude | 2026-06-11 | 19 tests; status-transition test marks the Phase 2 hook point |
 | 0-4 | ScoreService + TeeSetService unit tests | 0 | Done | Claude | 2026-06-11 | 14 tests; found 0-11 and a second completion path (see 2-3 note) |
-| 0-11 | Fix SaveScorecardAsync dropping TeeSetId from HoleScoreEntryModel | 0 | In Progress | Codex | 2026-06-11 | Pinned by ScoreServiceTests.SaveScorecard_CurrentlyDropsTeeSetId — update that test when fixing. Tee info is a WHS input |
+| 0-11 | Fix SaveScorecardAsync dropping TeeSetId from HoleScoreEntryModel | 0 | Done | Codex | 2026-06-11 | ScoreService now persists TeeSetId from scorecard entries; regression test updated |
 | 0-5 | CI workflow (ci.yml build+test on PR/push; test gate in azure-deploy.yml) | 0 | Done | Claude | 2026-06-11 | No MAUI build in CI |
 | 0-6 | Agent docs (CLAUDE/AGENTS/GEMINI.md, CONTRIBUTING-AGENTS.md, this board) | 0 | Done | Claude | 2026-06-11 | |
 | 0-7 | Provider-split migration folders (Sqlite/SqlServer) + design-time factory | 0 | Done | Codex | 2026-06-11 | Derived contexts + split migrations documented; SQLite scratch migration chain and 49 tests verified |
