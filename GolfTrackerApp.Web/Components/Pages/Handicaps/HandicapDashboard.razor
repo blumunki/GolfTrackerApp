@@ -1,0 +1,176 @@
+@page "/handicaps"
+@attribute [Authorize]
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IPlayerService PlayerService
+@inject IHandicapService HandicapService
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
+@rendermode InteractiveServer
+
+<PageTitle>My Handicap</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">My Handicap</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_player is null)
+{
+    <MudAlert Severity="Severity.Info">
+        Your account is not linked to a player profile yet, so there are no handicaps to show.
+    </MudAlert>
+}
+else
+{
+    <!-- Active handicaps -->
+    <MudGrid Class="mb-4">
+        @if (!_activeHandicaps.Any())
+        {
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info">
+                    No handicaps yet. A personal WHS index appears automatically once you have
+                    completed three 18-hole rounds on tees with a course rating and slope.
+                </MudAlert>
+            </MudItem>
+        }
+        @foreach (var handicap in _activeHandicaps)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.overline">@SourceLabel(handicap)</MudText>
+                    <MudText Typo="Typo.h3">@handicap.HandicapIndex.ToString("0.0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Effective @handicap.EffectiveDate.ToString("d MMM yyyy")
+                        @if (handicap.ExpiryDate is DateTime expiry)
+                        {
+                            <text> · expires @expiry.ToString("d MMM yyyy")</text>
+                        }
+                    </MudText>
+                    @if (_player.PrimaryHandicapSource == handicap.Source)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mt-2">Primary</MudChip>
+                    }
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <!-- Personal index history -->
+    @if (_xAxisLabels.Length > 1)
+    {
+        <div class="gp-card report-chart-section mb-4">
+            <div class="report-chart-header">
+                <MudText Typo="Typo.h6">Personal Index History</MudText>
+            </div>
+            <div class="golf-chart-container report-chart-tall">
+                <MudChart ChartType="ChartType.Line"
+                          ChartSeries="@_series"
+                          XAxisLabels="@_xAxisLabels"
+                          ChartOptions="@_chartOptions"
+                          Width="100%"
+                          Height="100%"></MudChart>
+            </div>
+        </div>
+    }
+
+    <!-- Last-20 differentials -->
+    <MudPaper Class="pa-4" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Scoring Differentials (last @_differentials.Count rounds)</MudText>
+        @if (!_differentials.Any())
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                No qualifying rounds yet — differentials are calculated for completed 18-hole
+                rounds played from tees with a course rating and slope.
+            </MudText>
+        }
+        else
+        {
+            <MudTable Items="@_differentials" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Date</MudTh>
+                    <MudTh>Course</MudTh>
+                    <MudTh>Tees</MudTh>
+                    <MudTh Style="text-align:right">Adj. Gross</MudTh>
+                    <MudTh Style="text-align:right">Rating / Slope</MudTh>
+                    <MudTh Style="text-align:right">Differential</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Date">@context.Round?.DatePlayed.ToString("d MMM yyyy")</MudTd>
+                    <MudTd DataLabel="Course">@context.Round?.GolfCourse?.Name</MudTd>
+                    <MudTd DataLabel="Tees">@context.TeeSet?.Name</MudTd>
+                    <MudTd DataLabel="Adj. Gross" Style="text-align:right">@context.AdjustedGrossScore</MudTd>
+                    <MudTd DataLabel="Rating / Slope" Style="text-align:right">
+                        @context.CourseRating.ToString("0.0") / @context.SlopeRating
+                    </MudTd>
+                    <MudTd DataLabel="Differential" Style="text-align:right">@context.Differential.ToString("0.0")</MudTd>
+                    <MudTd>
+                        @if (context.IsUsedInCalculation)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">Counting</MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+                Your index averages the lowest @WhsCalculator.CountingDifferentialsCount(_differentials.Count)
+                of these @_differentials.Count differentials.
+            </MudText>
+        }
+    </MudPaper>
+}
+
+@code {
+    private bool _loading = true;
+    private Player? _player;
+    private List<HandicapRecord> _activeHandicaps = new();
+    private List<ScoringDifferential> _differentials = new();
+    private List<ChartSeries> _series = new();
+    private string[] _xAxisLabels = Array.Empty<string>();
+    private readonly ChartOptions _chartOptions = new() { YAxisTicks = 5, InterpolationOption = InterpolationOption.Straight };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is not null)
+        {
+            _player = await PlayerService.GetPlayerByApplicationUserIdAsync(userId);
+            if (_player is not null)
+            {
+                var activeTask = HandicapService.GetActiveHandicapsAsync(_player.PlayerId);
+                var historyTask = HandicapService.GetHandicapRecordsAsync(_player.PlayerId, HandicapSource.Personal);
+                var differentialsTask = HandicapService.GetRecentDifferentialsAsync(_player.PlayerId);
+                await Task.WhenAll(activeTask, historyTask, differentialsTask);
+
+                _activeHandicaps = activeTask.Result;
+                _differentials = differentialsTask.Result;
+                PrepareHistoryChart(historyTask.Result);
+            }
+        }
+        _loading = false;
+    }
+
+    private void PrepareHistoryChart(List<HandicapRecord> personalHistory)
+    {
+        var ordered = personalHistory.OrderBy(h => h.EffectiveDate).ThenBy(h => h.HandicapRecordId).ToList();
+        _series = new List<ChartSeries>
+        {
+            new() { Name = "Personal index", Data = ordered.Select(h => (double)h.HandicapIndex).ToArray() },
+        };
+        _xAxisLabels = ordered.Select(h => h.EffectiveDate.ToString("d MMM")).ToArray();
+    }
+
+    private static string SourceLabel(HandicapRecord handicap) => handicap.Source switch
+    {
+        HandicapSource.Personal => "Personal (WHS)",
+        HandicapSource.ClubRegional => handicap.GolfClub?.Name ?? "Club / Regional",
+        HandicapSource.Society => handicap.GolfSociety?.Name ?? "Society",
+        _ => handicap.Source.ToString(),
+    };
+}

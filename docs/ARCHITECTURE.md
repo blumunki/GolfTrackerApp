@@ -147,6 +147,7 @@ GolfTrackerApp.Web/
 │   │   ├── AiChat.razor              # AI coach chat with persistent sessions
 │   │   ├── GolfClubs/                # Club list, add, edit, details
 │   │   ├── GolfCourses/              # Course list, add, edit, details
+│   │   ├── Handicaps/                # Handicap dashboard (active handicaps, history, differentials)
 │   │   ├── Players/                  # Player list, add, edit, report
 │   │   ├── Rounds/                   # Round list, record, details
 │   │   └── Admin/                    # Dashboard, Users, Players, Content Health,
@@ -1000,6 +1001,8 @@ Steps 1–2 are implemented as pure functions in `GolfTrackerApp.Core/Services/W
 - Handicap history chart over time
 - Scoring differentials table (last 20 rounds)
 - Which differentials are "counting" in the calculation
+
+Web implemented at `/handicaps` (`Components/Pages/Handicaps/HandicapDashboard.razor`): active-handicap cards with primary badge, personal index history line chart, last-20 differentials table with counting indicators. Mobile is WORKLOG 2-7; manual club entry UI + primary selector is 2-9.
 
 **Round Completion Flow:**
 - After completing a round: auto-calculate scoring differential if tee set has rating/slope
