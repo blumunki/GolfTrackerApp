@@ -135,6 +135,164 @@ public class HandicapService : IHandicapService
         return result;
     }
 
+    public async Task<List<HandicapRecord>> GetHandicapRecordsAsync(int playerId, HandicapSource? source = null)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var query = context.HandicapRecords
+            .AsNoTracking()
+            .Include(h => h.GolfClub)
+            .Include(h => h.GolfSociety)
+            .Where(h => h.PlayerId == playerId);
+        if (source is not null)
+        {
+            query = query.Where(h => h.Source == source);
+        }
+        return await query
+            .OrderByDescending(h => h.EffectiveDate)
+                .ThenByDescending(h => h.HandicapRecordId)
+            .ToListAsync();
+    }
+
+    public async Task<List<HandicapRecord>> GetActiveHandicapsAsync(int playerId)
+    {
+        var records = await GetHandicapRecordsAsync(playerId);
+        return records
+            .GroupBy(h => (h.Source, h.GolfClubId, h.GolfSocietyId))
+            .Select(g => g.First()) // records are already newest first
+            .OrderBy(h => h.Source)
+            .ToList();
+    }
+
+    public async Task<List<ScoringDifferential>> GetRecentDifferentialsAsync(int playerId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.ScoringDifferentials
+            .AsNoTracking()
+            .Include(d => d.Round)
+                .ThenInclude(r => r!.GolfCourse)
+            .Include(d => d.TeeSet)
+            .Where(d => d.PlayerId == playerId)
+            .OrderByDescending(d => d.Round!.DatePlayed)
+                .ThenByDescending(d => d.RoundId)
+            .Take(WhsCalculator.DifferentialWindow)
+            .ToListAsync();
+    }
+
+    public async Task<HandicapRecord> AddManualClubHandicapAsync(HandicapRecord record)
+    {
+        ValidateManualEntry(record);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        if (!await context.Players.AnyAsync(p => p.PlayerId == record.PlayerId))
+        {
+            throw new ArgumentException($"Player with ID {record.PlayerId} does not exist.");
+        }
+        if (!await context.GolfClubs.AnyAsync(c => c.GolfClubId == record.GolfClubId))
+        {
+            throw new ArgumentException($"GolfClub with ID {record.GolfClubId} does not exist.");
+        }
+
+        record.Source = HandicapSource.ClubRegional;
+        record.IsManualEntry = true;
+        record.GolfSocietyId = null;
+        record.CreatedAt = DateTime.UtcNow;
+        context.HandicapRecords.Add(record);
+        await context.SaveChangesAsync();
+
+        await RefreshClubDisplayHandicapAsync(context, record.PlayerId);
+        return record;
+    }
+
+    public async Task<HandicapRecord?> UpdateManualClubHandicapAsync(HandicapRecord record)
+    {
+        ValidateManualEntry(record);
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var existing = await context.HandicapRecords.FindAsync(record.HandicapRecordId);
+        if (existing is null)
+        {
+            return null;
+        }
+        EnsureIsManualClubEntry(existing);
+
+        if (existing.GolfClubId != record.GolfClubId
+            && !await context.GolfClubs.AnyAsync(c => c.GolfClubId == record.GolfClubId))
+        {
+            throw new ArgumentException($"GolfClub with ID {record.GolfClubId} does not exist.");
+        }
+
+        existing.HandicapIndex = record.HandicapIndex;
+        existing.GolfClubId = record.GolfClubId;
+        existing.EffectiveDate = record.EffectiveDate;
+        existing.ExpiryDate = record.ExpiryDate;
+        await context.SaveChangesAsync();
+
+        await RefreshClubDisplayHandicapAsync(context, existing.PlayerId);
+        return existing;
+    }
+
+    public async Task<bool> DeleteManualClubHandicapAsync(int handicapRecordId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var existing = await context.HandicapRecords.FindAsync(handicapRecordId);
+        if (existing is null)
+        {
+            return false;
+        }
+        EnsureIsManualClubEntry(existing);
+
+        context.HandicapRecords.Remove(existing);
+        await context.SaveChangesAsync();
+
+        await RefreshClubDisplayHandicapAsync(context, existing.PlayerId);
+        return true;
+    }
+
+    private static void ValidateManualEntry(HandicapRecord record)
+    {
+        if (record.GolfClubId is null)
+        {
+            throw new ArgumentException("A club handicap requires a GolfClubId.");
+        }
+        if (record.HandicapIndex is < -10.0m or > WhsCalculator.MaxIndex)
+        {
+            throw new ArgumentException($"Handicap index must be between -10.0 and {WhsCalculator.MaxIndex}.");
+        }
+        if (record.EffectiveDate == default)
+        {
+            throw new ArgumentException("An effective date is required.");
+        }
+    }
+
+    private static void EnsureIsManualClubEntry(HandicapRecord record)
+    {
+        if (!record.IsManualEntry || record.Source != HandicapSource.ClubRegional)
+        {
+            throw new InvalidOperationException(
+                $"HandicapRecord {record.HandicapRecordId} is a calculated {record.Source} record and cannot be modified manually.");
+        }
+    }
+
+    /// <summary>Keeps Player.Handicap in sync when the player's primary source is ClubRegional.</summary>
+    private static async Task RefreshClubDisplayHandicapAsync(ApplicationDbContext context, int playerId)
+    {
+        var player = await context.Players.FindAsync(playerId);
+        if (player is not { PrimaryHandicapSource: HandicapSource.ClubRegional })
+        {
+            return;
+        }
+
+        var latest = await context.HandicapRecords
+            .Where(h => h.PlayerId == playerId && h.Source == HandicapSource.ClubRegional)
+            .OrderByDescending(h => h.EffectiveDate)
+                .ThenByDescending(h => h.HandicapRecordId)
+            .FirstOrDefaultAsync();
+
+        player.Handicap = latest is null ? null : (double)latest.HandicapIndex;
+        await context.SaveChangesAsync();
+    }
+
     private async Task RecalculatePersonalIndexAsync(ApplicationDbContext context, int playerId, DateTime effectiveDate)
     {
         var window = await context.ScoringDifferentials
