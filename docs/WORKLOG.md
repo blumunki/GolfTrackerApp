@@ -23,7 +23,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 0-11 | Fix SaveScorecardAsync dropping TeeSetId from HoleScoreEntryModel | 0 | Available | | | Pinned by ScoreServiceTests.SaveScorecard_CurrentlyDropsTeeSetId — update that test when fixing. Tee info is a WHS input |
 | 0-5 | CI workflow (ci.yml build+test on PR/push; test gate in azure-deploy.yml) | 0 | Done | Claude | 2026-06-11 | No MAUI build in CI |
 | 0-6 | Agent docs (CLAUDE/AGENTS/GEMINI.md, CONTRIBUTING-AGENTS.md, this board) | 0 | Done | Claude | 2026-06-11 | |
-| 0-7 | Provider-split migration folders (Sqlite/SqlServer) + design-time factory | 0 | Done | Claude | 2026-06-11 | Derived contexts in Data/ProviderContexts.cs; InitialSqlServer baseline generated; scratch-DB migrate verified |
+| 0-7 | Provider-split migration folders (Sqlite/SqlServer) + design-time factory | 0 | In Progress | Codex | 2026-06-11 | Recovered after early session end; implementation committed, architecture docs and final verification remain |
 | 0-8 | SQL Server drift-check + baseline scripts in docs/ (human runs against prod) | 0 | Available | | | Baseline migration ID: 20260611161345_InitialSqlServer |
 | 0-9 | Program.cs: replace EnsureCreated/EnsureNewTablesExistAsync with Migrate() for both providers | 0 | Blocked | | | Blocked by 0-8 baseline being applied to prod |
 | 0-10 | ARCHITECTURE.md §12 status table + Phase 4 handicap restructure | 0 | Done | Claude | 2026-06-11 | Added §12.0, 4a/4b/4c increments, full WHS table, fixed dependency chain |
@@ -43,3 +43,10 @@ Phases 3–6 items are seeded when their phase starts — see the development pl
 ## Handoff Notes
 
 (One `### <ID>` subsection per handed-off item: what's done, what remains, exact next step, gotchas.)
+
+### 0-7
+
+- Done: provider-split migrations, derived contexts, design-time factory, and scoped forwarding context factory are committed.
+- Remaining: finish and commit the recovered `docs/ARCHITECTURE.md` update, rerun tests and scratch-DB migration verification, then mark Done.
+- Exact next step: validate the architecture diff against the committed implementation.
+- Gotchas: the working tree already contained the uncommitted architecture diff when Codex resumed the item.
