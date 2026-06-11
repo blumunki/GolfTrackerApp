@@ -22,6 +22,12 @@ Mobile development environment setup:
 - `generate-dev-config.sh` usage
 - Troubleshooting common issues
 
+### [sql-server-baseline-runbook.md](sql-server-baseline-runbook.md)
+Human-run production SQL Server migration transition:
+- Read-only schema drift check against the EF baseline
+- Guarded `__EFMigrationsHistory` baseline marker
+- Required backup, reconciliation, and verification procedure
+
 ## Contributing to Documentation
 
 When adding features or making significant architectural changes:

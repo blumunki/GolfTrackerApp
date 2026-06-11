@@ -332,6 +332,8 @@ Development and production use **different database providers** with different c
 
 Migrations are split per provider via derived context types in `Data/ProviderContexts.cs` (EF Core discovers all migrations attributed to a context type in the migrations assembly, so each provider's set is attached to its own derived context). Application code is unaffected — DI forwards `ApplicationDbContext` / `IDbContextFactory<ApplicationDbContext>` to the active provider's context (`Program.cs`).
 
+Production must be reconciled and marked with the SQL Server baseline before runtime migration application is enabled. Follow `docs/sql-server-baseline-runbook.md`: its drift check is read-only and compares the model's tables, columns, defaults, primary keys, indexes, and foreign keys to `20260611161345_InitialSqlServer`; its guarded marker writes only the matching `__EFMigrationsHistory` row after a human confirms a clean check and verified backup. WORKLOG item `0-9` stays blocked until that human-run production step is recorded.
+
 **When making any database schema change, you MUST:**
 
 1. **Create BOTH migrations** (from `GolfTrackerApp.Web/`):
