@@ -1,0 +1,79 @@
+@page "/admin/handicap-backfill"
+@attribute [Authorize(Roles = "Admin")]
+@inject IHandicapService HandicapService
+@inject ILogger<HandicapBackfill> Logger
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>Handicap Backfill</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Handicap Backfill</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">
+    Recalculates WHS scoring differentials and personal handicap indexes from all completed
+    rounds, oldest first. Rounds qualify when they cover 18 holes with a full scorecard and a
+    tee set that has a course rating and slope. Safe to run repeatedly — differentials are
+    recalculated in place and a new handicap record is only stored when an index changes.
+</MudText>
+
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+               OnClick="RunBackfillAsync" Disabled="@_running"
+               StartIcon="@Icons.Material.Filled.Calculate">
+        @(_running ? "Backfilling..." : "Run Backfill")
+    </MudButton>
+    @if (_running)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2" />
+    }
+</MudPaper>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+@if (_result is not null)
+{
+    <MudAlert Severity="Severity.Success" Class="mb-4">
+        @_result.RoundsQualified of @_result.RoundsProcessed completed rounds qualified for a scoring differential.
+    </MudAlert>
+    <MudSimpleTable Dense="true" Outlined="true">
+        <tbody>
+            <tr><td>Completed rounds processed</td><td>@_result.RoundsProcessed</td></tr>
+            <tr><td>Rounds qualified</td><td>@_result.RoundsQualified</td></tr>
+            <tr><td>Differentials written</td><td>@_result.DifferentialsWritten</td></tr>
+            <tr><td>New handicap records</td><td>@_result.HandicapRecordsCreated</td></tr>
+            <tr><td>Players with a personal index</td><td>@_result.PlayersWithIndex</td></tr>
+        </tbody>
+    </MudSimpleTable>
+}
+
+@code {
+    private bool _running;
+    private HandicapBackfillResult? _result;
+    private string? _error;
+
+    private async Task RunBackfillAsync()
+    {
+        _running = true;
+        _error = null;
+        _result = null;
+        try
+        {
+            _result = await HandicapService.BackfillPersonalHandicapsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Handicap backfill failed.");
+            _error = "The backfill failed — see the application log for details.";
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+}

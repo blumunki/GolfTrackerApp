@@ -519,6 +519,7 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 - **System Notifications** (`/admin/notifications`): View all user notifications, type breakdown, read/unread stats, filterable by type and status
 - **Audit Trail** (`/admin/audit`): AI audit logs with filters (type, provider, status, time range), expandable prompt/response detail, token summaries
 - **Data Migration** (`/admin/datamigration`): Quick sync from CSV, manual file upload for reference data and rounds/scores
+- **Handicap Backfill** (`/admin/handicap-backfill`): Idempotent recalculation of WHS differentials and personal handicap history from all completed rounds, with an n-of-m qualification report
 - **AI Providers** (`/admin/ai-providers`): Enable/disable providers, set priority order, view API key status
 - **AI Usage** (`/admin/ai-usage`): Usage statistics, token consumption, provider breakdown, audit log viewer
 
@@ -550,7 +551,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
 | 3 | Competitions & Scoring Formats | ❌ Not started | Specced in §12.5 only |
-| 4a | Personal WHS handicap (differentials + index + backfill) | 🚧 In progress | WHS math, models + migrations, and round-completion hook (both paths) done; admin backfill (2-4) pending. Does **not** require Phase 3 |
+| 4a | Personal WHS handicap (differentials + index + backfill) | ✅ Done | WHS math, models + migrations, round-completion hook (both paths), and idempotent admin backfill (`/admin/handicap-backfill`). UI dashboards are 4b |
 | 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
 | 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | ✅ Done | Production SQL Server baseline verified; both providers apply migrations at startup |
