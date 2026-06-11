@@ -31,11 +31,11 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 1-1 | Create GolfTrackerApp.Core project + move Models/Services/Data (no rename) | 1 | Done | Codex | 2026-06-11 | Core owns Models/Services/Data + both migration chains; namespaces preserved; 49 tests and both provider models verified |
 | 1-2 | Namespace rename GolfTrackerApp.Web.* → GolfTrackerApp.Core.* + fix usings | 1 | Done | Claude | 2026-06-11 | 222-file mechanical rename incl. migration snapshot strings; has-pending-model-changes clean both providers; 49 tests green |
 | 1-3 | Retarget test project to Core + update CI/deploy path filters | 1 | Done | Claude | 2026-06-11 | Tests reference Core directly; azure-deploy also triggers on Core/**; 49 tests green. Phase 1 complete |
-| 2-1 | Handicap models (HandicapSource, ScoringDifferential, HandicapRecord) + dual migrations | 2 | In Progress | Claude | 2026-06-11 | Unblocked by completed dual-provider runtime migration pipeline |
+| 2-1 | Handicap models (HandicapSource, ScoringDifferential, HandicapRecord) + dual migrations | 2 | Done | Claude | 2026-06-11 | Models + Player.PrimaryHandicapSource; dual migrations verified; SD→Player is Restrict (SQL Server cascade paths); 86 tests green |
 | 2-2 | WHS math: pure ComputeDifferential/ComputeIndex + full unit tests (TDD) | 2 | Done | Claude | 2026-06-11 | WhsCalculator (+ ComputeAdjustedGrossScore, par+5 cap); 34 tests, every WHS table row covered; 83 total green |
-| 2-3 | HandicapService.OnRoundCompletedAsync + RoundService completion hook + integration test | 2 | Blocked | | | Blocked by 2-1, 2-2, 0-3. NOTE: ScoreService.SaveScorecardAsync also completes rounds directly — the hook must cover both paths |
+| 2-3 | HandicapService.OnRoundCompletedAsync + RoundService completion hook + integration test | 2 | Available | | 2026-06-11 | Unblocked by 2-1/2-2/0-3. NOTE: ScoreService.SaveScorecardAsync also completes rounds directly — the hook must cover both paths |
 | 2-4 | Handicap backfill admin action (idempotent, reports n-of-m qualified) | 2 | Blocked | | | Blocked by 2-3 |
-| 2-5 | Manual club handicap CRUD + HandicapsController | 2 | Blocked | | | Blocked by 2-1 |
+| 2-5 | Manual club handicap CRUD + HandicapsController | 2 | Available | | 2026-06-11 | Unblocked by 2-1 |
 | 2-6 | Web handicap dashboard (active handicaps, history chart, last-20 differentials) | 2 | Blocked | | | Blocked by 2-3, 2-5 |
 | 2-7 | Mobile handicap page (DTOs + API service + dashboard) | 2 | Blocked | | | Blocked by 2-5 |
 
