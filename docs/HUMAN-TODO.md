@@ -5,8 +5,8 @@ automatically by an AI agent.
 
 ## Production SQL Server Migration Baseline
 
-**Status:** Not started  
-**Blocks:** WORKLOG item `0-9`  
+**Status:** In progress
+**Blocks:** WORKLOG item `0-9`
 **Runbook:** [`sql-server-baseline-runbook.md`](sql-server-baseline-runbook.md)
 
 Production currently uses `EnsureCreated()` plus hand-written schema patches.
@@ -15,10 +15,16 @@ authorized production database access must verify and record the existing
 schema as migration `20260611161345_InitialSqlServer`.
 
 - [ ] Take and verify a production SQL Server database backup.
-- [ ] Run [`sql-server-drift-check.sql`](sql-server-drift-check.sql) against the
+- [x] Run [`sql-server-drift-check.sql`](sql-server-drift-check.sql) against the
   production application database.
 - [ ] Save the drift-check results with the deployment record.
-- [ ] Review and reconcile every reported difference.
+- [x] Review the initial 64-row drift report.
+- [x] Confirm orphan counts for `AspNetUsers.LinkedPlayerId` and
+  `Scores.TeeSetId` are both zero.
+- [ ] Take and verify a fresh production SQL Server database backup immediately
+  before reconciliation.
+- [ ] Configure and run
+  [`sql-server-reconcile-baseline.sql`](sql-server-reconcile-baseline.sql).
 - [ ] Rerun the drift check until it reports `READY TO BASELINE` with zero
   errors.
 - [ ] Configure and run
@@ -29,4 +35,3 @@ schema as migration `20260611161345_InitialSqlServer`.
   unblock item `0-9`.
 
 Do not deploy `0-9` before every checkbox above is complete.
-

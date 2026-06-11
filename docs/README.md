@@ -25,6 +25,7 @@ Mobile development environment setup:
 ### [sql-server-baseline-runbook.md](sql-server-baseline-runbook.md)
 Human-run production SQL Server migration transition:
 - Read-only schema drift check against the EF baseline
+- Guarded reconciliation of the reviewed legacy production schema
 - Guarded `__EFMigrationsHistory` baseline marker
 - Required backup, reconciliation, and verification procedure
 

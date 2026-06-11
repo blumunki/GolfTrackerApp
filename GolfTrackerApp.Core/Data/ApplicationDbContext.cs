@@ -57,6 +57,9 @@ namespace GolfTrackerApp.Core.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder); // Important: Call base method first for Identity models
+            var optionalRelationshipDeleteBehavior = Database.IsSqlServer()
+                ? DeleteBehavior.NoAction
+                : DeleteBehavior.SetNull;
 
             // Configure composite key for RoundPlayer join table
             builder.Entity<RoundPlayer>()
@@ -164,7 +167,7 @@ namespace GolfTrackerApp.Core.Data
                 .HasOne(u => u.LinkedPlayer)
                 .WithMany()
                 .HasForeignKey(u => u.LinkedPlayerId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(optionalRelationshipDeleteBehavior);
 
             // AI Audit Log
             builder.Entity<AiAuditLog>(entity =>
@@ -177,7 +180,7 @@ namespace GolfTrackerApp.Core.Data
                 entity.HasOne(a => a.AiChatSession)
                     .WithMany(s => s.AuditLogs)
                     .HasForeignKey(a => a.AiChatSessionId)
-                    .OnDelete(DeleteBehavior.SetNull);
+                    .OnDelete(optionalRelationshipDeleteBehavior);
 
                 entity.HasIndex(a => new { a.ApplicationUserId, a.RequestedAt });
                 entity.HasIndex(a => a.RequestedAt);

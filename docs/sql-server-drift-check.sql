@@ -362,14 +362,14 @@ VALUES
     (N'Scores', N'FK_Scores_Players_PlayerId', N'PlayerId', N'Players', N'PlayerId', N'NO ACTION'),
     (N'Scores', N'FK_Scores_Rounds_RoundId', N'RoundId', N'Rounds', N'RoundId', N'CASCADE'),
     (N'Scores', N'FK_Scores_TeeSets_TeeSetId', N'TeeSetId', N'TeeSets', N'TeeSetId', N'NO ACTION'),
-    (N'AiAuditLogs', N'FK_AiAuditLogs_AiChatSessions_AiChatSessionId', N'AiChatSessionId', N'AiChatSessions', N'AiChatSessionId', N'SET NULL'),
+    (N'AiAuditLogs', N'FK_AiAuditLogs_AiChatSessions_AiChatSessionId', N'AiChatSessionId', N'AiChatSessions', N'AiChatSessionId', N'NO ACTION'),
     (N'AiAuditLogs', N'FK_AiAuditLogs_AspNetUsers_ApplicationUserId', N'ApplicationUserId', N'AspNetUsers', N'Id', N'CASCADE'),
     (N'AiChatSessionMessages', N'FK_AiChatSessionMessages_AiChatSessions_AiChatSessionId', N'AiChatSessionId', N'AiChatSessions', N'AiChatSessionId', N'CASCADE'),
     (N'AiChatSessions', N'FK_AiChatSessions_AspNetUsers_ApplicationUserId', N'ApplicationUserId', N'AspNetUsers', N'Id', N'CASCADE'),
     (N'AspNetUserClaims', N'FK_AspNetUserClaims_AspNetUsers_UserId', N'UserId', N'AspNetUsers', N'Id', N'CASCADE'),
     (N'AspNetUserLogins', N'FK_AspNetUserLogins_AspNetUsers_UserId', N'UserId', N'AspNetUsers', N'Id', N'CASCADE'),
     (N'AspNetUserRoles', N'FK_AspNetUserRoles_AspNetUsers_UserId', N'UserId', N'AspNetUsers', N'Id', N'CASCADE'),
-    (N'AspNetUsers', N'FK_AspNetUsers_Players_LinkedPlayerId', N'LinkedPlayerId', N'Players', N'PlayerId', N'SET NULL');
+    (N'AspNetUsers', N'FK_AspNetUsers_Players_LinkedPlayerId', N'LinkedPlayerId', N'Players', N'PlayerId', N'NO ACTION');
 
 ALTER TABLE #ExpectedIndexes ADD HasFilter bit NOT NULL DEFAULT 0;
 UPDATE #ExpectedIndexes
@@ -733,10 +733,6 @@ BEGIN
     END;
 END;
 
-SELECT Category, ObjectName, Expected, Actual
-FROM #Drift
-ORDER BY Category, ObjectName;
-
 DECLARE @ErrorCount int = (SELECT COUNT(*) FROM #Drift);
 DECLARE @BaselineRecorded bit = 0;
 
@@ -758,10 +754,37 @@ BEGIN
         N'@Recorded bit OUTPUT', @BaselineRecorded OUTPUT;
 END;
 
-SELECT
-    DB_NAME() AS DatabaseName,
-    N'20260611161345_InitialSqlServer' AS BaselineMigrationId,
-    @BaselineRecorded AS BaselineRecorded,
-    @ErrorCount AS ErrorCount,
-    CASE WHEN @ErrorCount = 0 THEN N'READY TO BASELINE'
-         ELSE N'STOP - RECONCILE DRIFT BEFORE BASELINING' END AS Result;
+-- Emit one result set so lightweight SQL clients cannot hide the actionable
+-- drift rows behind the summary (or vice versa).
+SELECT RowType, DatabaseName, BaselineMigrationId, BaselineRecorded, ErrorCount,
+    Result, Category, ObjectName, Expected, Actual
+FROM (
+    SELECT
+        0 AS SortOrder,
+        N'SUMMARY' AS RowType,
+        DB_NAME() AS DatabaseName,
+        N'20260611161345_InitialSqlServer' AS BaselineMigrationId,
+        @BaselineRecorded AS BaselineRecorded,
+        @ErrorCount AS ErrorCount,
+        CASE WHEN @ErrorCount = 0 THEN N'READY TO BASELINE'
+             ELSE N'STOP - RECONCILE DRIFT BEFORE BASELINING' END AS Result,
+        CAST(NULL AS nvarchar(40)) AS Category,
+        CAST(NULL AS nvarchar(512)) AS ObjectName,
+        CAST(NULL AS nvarchar(max)) AS Expected,
+        CAST(NULL AS nvarchar(max)) AS Actual
+    UNION ALL
+    SELECT
+        1,
+        N'DRIFT',
+        DB_NAME(),
+        N'20260611161345_InitialSqlServer',
+        @BaselineRecorded,
+        @ErrorCount,
+        N'STOP - RECONCILE DRIFT BEFORE BASELINING',
+        Category,
+        ObjectName,
+        Expected,
+        Actual
+    FROM #Drift
+) output
+ORDER BY SortOrder, Category, ObjectName;

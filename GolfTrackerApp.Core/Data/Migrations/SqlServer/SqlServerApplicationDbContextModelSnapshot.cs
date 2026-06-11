@@ -997,7 +997,7 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                     b.HasOne("GolfTrackerApp.Core.Models.Player", "LinkedPlayer")
                         .WithMany()
                         .HasForeignKey("LinkedPlayerId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("LinkedPlayer");
                 });
@@ -1007,7 +1007,7 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                     b.HasOne("GolfTrackerApp.Core.Models.AiChatSession", "AiChatSession")
                         .WithMany("AuditLogs")
                         .HasForeignKey("AiChatSessionId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("GolfTrackerApp.Core.Data.ApplicationUser", "ApplicationUser")
                         .WithMany()

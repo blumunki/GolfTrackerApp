@@ -894,7 +894,7 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                 column: "AiChatSessionId",
                 principalTable: "AiChatSessions",
                 principalColumn: "AiChatSessionId",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_AiAuditLogs_AspNetUsers_ApplicationUserId",
@@ -950,7 +950,7 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                 column: "LinkedPlayerId",
                 principalTable: "Players",
                 principalColumn: "PlayerId",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
         }
 
         /// <inheritdoc />
