@@ -28,6 +28,9 @@ Human-run production SQL Server migration transition:
 - Guarded `__EFMigrationsHistory` baseline marker
 - Required backup, reconciliation, and verification procedure
 
+### [HUMAN-TODO.md](HUMAN-TODO.md)
+Checklist for work requiring human access, judgment, or approval.
+
 ## Contributing to Documentation
 
 When adding features or making significant architectural changes:
