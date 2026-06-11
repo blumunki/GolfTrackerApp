@@ -161,9 +161,12 @@ GolfTrackerApp.Web/
 │   └── [Various DTOs]                # Report view models, chart data, etc.
 ├── Data/
 │   ├── ApplicationDbContext.cs        # EF Core context (Identity + domain entities)
+│   ├── ProviderContexts.cs             # Provider-specific contexts + design-time factories
 │   ├── ApplicationUser.cs            # Identity user (extends IdentityUser with LinkedPlayerId, AiInsightsOptOut)
 │   ├── SeedData.cs                   # Initial data seeding
-│   └── Migrations/                   # EF Core migrations (SQLite dev)
+│   └── Migrations/                   # Provider-split EF Core migrations
+│       ├── Sqlite/                   # Development migration chain
+│       └── SqlServer/                # Production migration chain
 ├── Components/
 │   ├── Pages/                        # Blazor Server page components
 │   │   ├── Home.razor                # Dashboard with AI insights widget
@@ -321,20 +324,23 @@ Development and production use **different database providers** with different c
 | Aspect | Development (SQLite) | Production (SQL Server) |
 |--------|---------------------|------------------------|
 | **Provider** | `Microsoft.EntityFrameworkCore.Sqlite` | `Microsoft.EntityFrameworkCore.SqlServer` |
-| **Schema management** | EF Core Migrations (`context.Database.Migrate()`) | `EnsureCreated()` + manual SQL in `EnsureNewTablesExistAsync()` |
+| **Migration context** | `SqliteApplicationDbContext` → `Data/Migrations/Sqlite/` | `SqlServerApplicationDbContext` → `Data/Migrations/SqlServer/` |
+| **Runtime schema management** | EF Core Migrations (`context.Database.Migrate()`) | `EnsureCreated()` + manual SQL in `EnsureNewTablesExistAsync()` — **until WORKLOG 0-9 lands**, then `Migrate()` |
 | **Column types** | `INTEGER`, `TEXT`, `REAL` | `INT`, `NVARCHAR(n)`, `DATETIME2`, `BIT`, etc. |
 | **Cascade deletes** | Generally permissive | Strict — rejects `ON DELETE SET NULL` / `CASCADE` if it creates multiple cascade paths |
 | **Config key** | `"DatabaseProvider": "Sqlite"` (in `appsettings.Development.json`) | `"DatabaseProvider": "SqlServer"` (in `appsettings.Production.json`) |
 
+Migrations are split per provider via derived context types in `Data/ProviderContexts.cs` (EF Core discovers all migrations attributed to a context type in the migrations assembly, so each provider's set is attached to its own derived context). Application code is unaffected — DI forwards `ApplicationDbContext` / `IDbContextFactory<ApplicationDbContext>` to the active provider's context (`Program.cs`).
+
 **When making any database schema change, you MUST:**
 
-1. **Create an EF Core migration** for SQLite/development:
+1. **Create BOTH migrations** (from `GolfTrackerApp.Web/`):
    ```bash
-   cd GolfTrackerApp.Web
-   dotnet ef migrations add <MigrationName>
+   dotnet ef migrations add <Name> --context SqliteApplicationDbContext --output-dir Data/Migrations/Sqlite
+   dotnet ef migrations add <Name> --context SqlServerApplicationDbContext --output-dir Data/Migrations/SqlServer
    ```
 
-2. **Update `EnsureNewTablesExistAsync()` in `Program.cs`** for SQL Server/production:
+2. **Transition state (until WORKLOG 0-9 lands):** also update `EnsureNewTablesExistAsync()` in `Program.cs` for SQL Server production:
    - New tables: Add a `TableExistsAsync` check and `CREATE TABLE` with SQL Server types
    - New columns on existing tables: Add a `ColumnExistsAsync` check and `ALTER TABLE ... ADD`
    - Use `NVARCHAR(n)` not `TEXT`, `INT` not `INTEGER`, `DATETIME2` not `TEXT`, `BIT` not `INTEGER`
@@ -344,7 +350,7 @@ Development and production use **different database providers** with different c
    - `ON DELETE CASCADE` is only safe when there's a single path from parent to dependent
    - `ON DELETE SET NULL` also triggers the cascade-path check on SQL Server
 
-4. **Test both providers** before deploying schema changes.
+4. **Test both providers** before deploying schema changes. For SQLite, apply the chain to a scratch DB: set `GOLFTRACKER_DESIGNTIME_CONNECTION` and run `dotnet ef database update --context SqliteApplicationDbContext`. Never point it at production.
 
 ## 6. Service Layer Design
 
