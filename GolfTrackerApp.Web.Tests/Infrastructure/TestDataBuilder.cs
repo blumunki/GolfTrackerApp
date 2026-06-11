@@ -178,7 +178,8 @@ public static class TestDataBuilder
         IReadOnlyDictionary<int, int[]> strokesByPlayer,
         DateTime? datePlayed = null,
         RoundCompletionStatus status = RoundCompletionStatus.Completed,
-        string createdByUserId = DefaultUserId)
+        string createdByUserId = DefaultUserId,
+        int? teeSetId = null)
     {
         await using var context = await factory.CreateDbContextAsync();
 
@@ -207,7 +208,7 @@ public static class TestDataBuilder
                     nameof(strokesByPlayer));
             }
 
-            round.RoundPlayers.Add(new RoundPlayer { PlayerId = playerId });
+            round.RoundPlayers.Add(new RoundPlayer { PlayerId = playerId, TeeSetId = teeSetId });
             for (var i = 0; i < holes.Count; i++)
             {
                 round.Scores.Add(new Score
@@ -215,6 +216,7 @@ public static class TestDataBuilder
                     PlayerId = playerId,
                     HoleId = holes[i].HoleId,
                     Strokes = strokes[i],
+                    TeeSetId = teeSetId,
                 });
             }
         }

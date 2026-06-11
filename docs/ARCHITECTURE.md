@@ -550,7 +550,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
 | 3 | Competitions & Scoring Formats | ❌ Not started | Specced in §12.5 only |
-| 4a | Personal WHS handicap (differentials + index + backfill) | 🚧 In progress | WHS math (`WhsCalculator`) and handicap models + dual migrations done; completion hook and backfill pending. Does **not** require Phase 3 |
+| 4a | Personal WHS handicap (differentials + index + backfill) | 🚧 In progress | WHS math, models + migrations, and round-completion hook (both paths) done; admin backfill (2-4) pending. Does **not** require Phase 3 |
 | 4b | Manual club/regional handicaps + handicap UI | ❌ Not started | |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
 | 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | ✅ Done | Production SQL Server baseline verified; both providers apply migrations at startup |
@@ -985,7 +985,7 @@ The 4.1 models and 4.2 Player changes are implemented in `GolfTrackerApp.Core/Mo
 3. Recalculate after every qualifying round (trigger: status transition to `Completed` inside `RoundService`)
 4. Store new `HandicapRecord` with source=Personal (only when the index changed)
 
-Steps 1–2 are implemented as pure functions in `GolfTrackerApp.Core/Services/WhsCalculator.cs` (`ComputeAdjustedGrossScore`, `ComputeDifferential`, `ComputeIndex` — index capped at 54.0, plus handicaps negative, half-away-from-zero rounding). Steps 3–4 (persistence + trigger) are WORKLOG 2-1/2-3.
+Steps 1–2 are implemented as pure functions in `GolfTrackerApp.Core/Services/WhsCalculator.cs` (`ComputeAdjustedGrossScore`, `ComputeDifferential`, `ComputeIndex` — index capped at 54.0, plus handicaps negative, half-away-from-zero rounding). Steps 3–4 are implemented by `HandicapService.OnRoundCompletedAsync` (idempotent: differentials upserted per player+round, `HandicapRecord` stored only on index change, `IsUsedInCalculation` flags maintained, `Player.Handicap` refreshed when `PrimaryHandicapSource` is Personal). It is invoked from **both** completion paths — `RoundService.UpdateRoundAsync` (status transition to Completed) and `ScoreService.SaveScorecardAsync` (completes directly) — wrapped so a handicap failure never fails the round save. The mobile `UpdateRoundScores` score-edit endpoint does not yet recalculate (WORKLOG 2-8).
 
 **Society Handicap**: Same calculation but only using rounds linked to that society's competitions.
 

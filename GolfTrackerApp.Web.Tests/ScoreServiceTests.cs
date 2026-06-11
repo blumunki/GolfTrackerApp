@@ -13,7 +13,7 @@ public sealed class ScoreServiceTests : IDisposable
 
     public ScoreServiceTests()
     {
-        _service = new ScoreService(_factory, NullLogger<ScoreService>.Instance);
+        _service = new ScoreService(_factory, NullLogger<ScoreService>.Instance, new HandicapService(_factory, NullLogger<HandicapService>.Instance));
     }
 
     public void Dispose() => _factory.Dispose();

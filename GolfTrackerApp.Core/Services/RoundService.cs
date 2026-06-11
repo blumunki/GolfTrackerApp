@@ -13,11 +13,16 @@ namespace GolfTrackerApp.Core.Services
 
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILogger<RoundService> _logger;
+        private readonly IHandicapService _handicapService;
 
-        public RoundService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<RoundService> logger)
+        public RoundService(
+            IDbContextFactory<ApplicationDbContext> contextFactory,
+            ILogger<RoundService> logger,
+            IHandicapService handicapService)
         {
             _contextFactory = contextFactory;
             _logger = logger;
+            _handicapService = handicapService;
         }
 
         /// <summary>
@@ -231,6 +236,8 @@ namespace GolfTrackerApp.Core.Services
                                               .FirstOrDefaultAsync(r => r.RoundId == round.RoundId);
             if (existingRound == null) return null;
 
+            var wasCompleted = existingRound.Status == RoundCompletionStatus.Completed;
+
             if (existingRound.GolfCourseId != round.GolfCourseId)
             {
                 if (!await _context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == round.GolfCourseId))
@@ -259,6 +266,20 @@ namespace GolfTrackerApp.Core.Services
             }
 
             await _context.SaveChangesAsync();
+
+            if (!wasCompleted && existingRound.Status == RoundCompletionStatus.Completed)
+            {
+                // Handicaps are derived data — a failure must not fail the round update.
+                try
+                {
+                    await _handicapService.OnRoundCompletedAsync(existingRound.RoundId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Handicap recalculation failed for Round {RoundId}.", existingRound.RoundId);
+                }
+            }
+
             return existingRound;
         }
         public async Task<Round> CreateRoundWithPlayersAsync(Round round, List<int> playerIds)

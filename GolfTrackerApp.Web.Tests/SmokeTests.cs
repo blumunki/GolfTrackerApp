@@ -62,7 +62,7 @@ public sealed class SmokeTests : IDisposable
         {
             var teeSetId = await context.TeeSets.Select(t => t.TeeSetId).SingleAsync();
 
-            var service = new RoundService(_factory, NullLogger<RoundService>.Instance);
+            var service = new RoundService(_factory, NullLogger<RoundService>.Instance, new HandicapService(_factory, NullLogger<HandicapService>.Instance));
             var round = await service.AddRoundAsync(
                 new Round
                 {

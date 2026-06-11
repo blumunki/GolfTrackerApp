@@ -12,11 +12,16 @@ namespace GolfTrackerApp.Core.Services
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ILogger<ScoreService> _logger;
+        private readonly IHandicapService _handicapService;
 
-        public ScoreService(IDbContextFactory<ApplicationDbContext> contextFactory, ILogger<ScoreService> logger)
+        public ScoreService(
+            IDbContextFactory<ApplicationDbContext> contextFactory,
+            ILogger<ScoreService> logger,
+            IHandicapService handicapService)
         {
             _contextFactory = contextFactory;
             _logger = logger;
+            _handicapService = handicapService;
         }
 
         public async Task<Score> AddScoreAsync(Score score)
@@ -135,6 +140,18 @@ namespace GolfTrackerApp.Core.Services
             }
 
             await _context.SaveChangesAsync();
+
+            // This path completes rounds directly (and re-saves edited scorecards), so
+            // recalculate handicaps here too. The recalculation is idempotent; a failure
+            // must not fail the scorecard save.
+            try
+            {
+                await _handicapService.OnRoundCompletedAsync(roundId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Handicap recalculation failed for Round {RoundId}.", roundId);
+            }
         }
         // Additional methods can be implemented as needed
     }

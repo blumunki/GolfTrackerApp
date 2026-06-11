@@ -19,7 +19,7 @@ public sealed class RoundServiceTests : IDisposable
 
     public RoundServiceTests()
     {
-        _service = new RoundService(_factory, NullLogger<RoundService>.Instance);
+        _service = new RoundService(_factory, NullLogger<RoundService>.Instance, new HandicapService(_factory, NullLogger<HandicapService>.Instance));
     }
 
     public void Dispose() => _factory.Dispose();
