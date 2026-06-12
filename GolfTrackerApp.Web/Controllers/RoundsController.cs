@@ -11,12 +11,18 @@ namespace GolfTrackerApp.Web.Controllers;
 public class RoundsController : BaseApiController
 {
     private readonly IRoundService _roundService;
+    private readonly IScoreService _scoreService;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<RoundsController> _logger;
 
-    public RoundsController(IRoundService roundService, ApplicationDbContext context, ILogger<RoundsController> logger)
+    public RoundsController(
+        IRoundService roundService,
+        IScoreService scoreService,
+        ApplicationDbContext context,
+        ILogger<RoundsController> logger)
     {
         _roundService = roundService;
+        _scoreService = scoreService;
         _context = context;
         _logger = logger;
     }
@@ -192,19 +198,7 @@ public class RoundsController : BaseApiController
             if (round.CreatedByApplicationUserId != GetCurrentUserId())
                 return Forbid();
 
-            var existingScores = await _context.Scores.Where(s => s.RoundId == id).ToListAsync();
-            foreach (var update in scoreUpdates)
-            {
-                var score = existingScores.FirstOrDefault(s => s.ScoreId == update.ScoreId);
-                if (score != null)
-                {
-                    score.Strokes = update.Strokes;
-                    score.Putts = update.Putts;
-                    score.FairwayHit = update.FairwayHit;
-                }
-            }
-
-            await _context.SaveChangesAsync();
+            await _scoreService.UpdateRoundScoresAsync(id, scoreUpdates);
             return Ok();
         }
         catch (Exception ex)

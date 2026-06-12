@@ -15,5 +15,12 @@ namespace GolfTrackerApp.Core.Services
         Task<Score?> UpdateScoreAsync(Score score);
         Task<bool> DeleteScoreAsync(int id);
         Task SaveScorecardAsync(int roundId, Dictionary<int, List<HoleScoreEntryModel>> scorecard);
+
+        /// <summary>
+        /// Applies stroke/putt/fairway edits to existing scores of one round (updates whose
+        /// ScoreId does not belong to the round are ignored), then recalculates handicaps.
+        /// Returns the number of scores updated.
+        /// </summary>
+        Task<int> UpdateRoundScoresAsync(int roundId, IEnumerable<ScoreUpdateDto> updates);
     }
 }

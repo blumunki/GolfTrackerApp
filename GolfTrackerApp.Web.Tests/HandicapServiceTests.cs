@@ -191,6 +191,87 @@ public sealed class HandicapServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateRoundScores_RecalculatesDifferential()
+    {
+        var (player, course, teeSetId) = await SeedBaseAsync();
+        var roundId = await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, strokesPerHole: 5, daysAgo: 1);
+        Assert.Equal(18.8m, (await SingleDifferentialAsync()).Differential); // bogey golf
+
+        // Edit every score down to level par via the mobile score-edit path.
+        List<ScoreUpdateDto> updates;
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            updates = await context.Scores
+                .Where(s => s.RoundId == roundId)
+                .Select(s => new ScoreUpdateDto { ScoreId = s.ScoreId, Strokes = 4 })
+                .ToListAsync();
+        }
+
+        var updated = await _scoreService.UpdateRoundScoresAsync(roundId, updates);
+
+        Assert.Equal(18, updated);
+        var differential = await SingleDifferentialAsync();
+        Assert.Equal(72, differential.AdjustedGrossScore);
+        Assert.Equal(1.9m, differential.Differential); // recalculated, not stale
+    }
+
+    [Fact]
+    public async Task UpdateRoundScores_IgnoresScoreIdsFromOtherRounds()
+    {
+        var (player, course, teeSetId) = await SeedBaseAsync();
+        var targetRoundId = await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, 5, daysAgo: 2);
+        var otherRoundId = await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, 6, daysAgo: 1);
+
+        int foreignScoreId;
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            foreignScoreId = await context.Scores
+                .Where(s => s.RoundId == otherRoundId)
+                .Select(s => s.ScoreId)
+                .FirstAsync();
+        }
+
+        var updated = await _scoreService.UpdateRoundScoresAsync(
+            targetRoundId, new[] { new ScoreUpdateDto { ScoreId = foreignScoreId, Strokes = 1 } });
+
+        Assert.Equal(0, updated);
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            var foreignScore = await context.Scores.SingleAsync(s => s.ScoreId == foreignScoreId);
+            Assert.Equal(6, foreignScore.Strokes); // untouched
+        }
+    }
+
+    [Fact]
+    public async Task UpdateRoundScores_OnInProgressRound_DoesNotCreateDifferential()
+    {
+        var (player, course, teeSetId) = await SeedBaseAsync();
+        var round = await TestDataBuilder.SeedRoundAsync(
+            _factory, course.GolfCourseId,
+            new Dictionary<int, int[]> { [player.PlayerId] = Strokes(5) },
+            status: RoundCompletionStatus.InProgress,
+            teeSetId: teeSetId);
+
+        List<ScoreUpdateDto> updates;
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            updates = await context.Scores
+                .Where(s => s.RoundId == round.RoundId)
+                .Select(s => new ScoreUpdateDto { ScoreId = s.ScoreId, Strokes = 4 })
+                .ToListAsync();
+        }
+        var updated = await _scoreService.UpdateRoundScoresAsync(round.RoundId, updates);
+
+        Assert.Equal(18, updated);
+        await using (var verify = await _factory.CreateDbContextAsync())
+        {
+            Assert.Equal(0, await verify.ScoringDifferentials.CountAsync()); // edit must not complete the round
+            var persisted = await verify.Rounds.SingleAsync(r => r.RoundId == round.RoundId);
+            Assert.Equal(RoundCompletionStatus.InProgress, persisted.Status);
+        }
+    }
+
+    [Fact]
     public async Task Backfill_ReportsQualifiedOfProcessedAndBuildsHistory()
     {
         var (player, course, teeSetId) = await SeedBaseAsync();

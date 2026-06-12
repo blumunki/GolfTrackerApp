@@ -144,6 +144,41 @@ namespace GolfTrackerApp.Core.Services
             // This path completes rounds directly (and re-saves edited scorecards), so
             // recalculate handicaps here too. The recalculation is idempotent; a failure
             // must not fail the scorecard save.
+            await RecalculateHandicapsAsync(roundId);
+        }
+
+        public async Task<int> UpdateRoundScoresAsync(int roundId, IEnumerable<ScoreUpdateDto> updates)
+        {
+            await using var _context = await _contextFactory.CreateDbContextAsync();
+
+            var existingScores = await _context.Scores
+                .Where(s => s.RoundId == roundId)
+                .ToListAsync();
+
+            var updated = 0;
+            foreach (var update in updates)
+            {
+                var score = existingScores.FirstOrDefault(s => s.ScoreId == update.ScoreId);
+                if (score is null) continue; // not part of this round — ignore
+
+                score.Strokes = update.Strokes;
+                score.Putts = update.Putts;
+                score.FairwayHit = update.FairwayHit;
+                updated++;
+            }
+
+            await _context.SaveChangesAsync();
+
+            if (updated > 0)
+            {
+                await RecalculateHandicapsAsync(roundId);
+            }
+            return updated;
+        }
+
+        /// <summary>Idempotent handicap recalc; a failure must not fail the score save.</summary>
+        private async Task RecalculateHandicapsAsync(int roundId)
+        {
             try
             {
                 await _handicapService.OnRoundCompletedAsync(roundId);
