@@ -39,7 +39,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 2-6 | Web handicap dashboard (active handicaps, history chart, last-20 differentials) | 2 | Done | Claude | 2026-06-11 | /handicaps page + nav link; counting indicators per WHS table; 121 tests green |
 | 2-7 | Mobile handicap page (DTOs + API service + dashboard) | 2 | Done | Claude | 2026-06-12 | HandicapApiService + HandicapPage (cards/chart/differentials); android build verified — NOT device-tested, needs run-android.sh/run-ios.sh pass by human |
 | 2-8 | Recalculate differentials when scores are edited via RoundsController.UpdateRoundScores (move edit into a service + fire OnRoundCompletedAsync) | 2 | Done | Claude | 2026-06-12 | ScoreService.UpdateRoundScoresAsync + controller now thin; in-progress rounds unaffected; 124 tests green |
-| 2-9 | Manual club handicap entry UI (web) + primary-handicap selector | 2 | In Progress | Claude | 2026-06-12 | Remaining 4b web UI; service CRUD + API exist (2-5). Selector updates Player.PrimaryHandicapSource and refreshes Player.Handicap |
+| 2-9 | Manual club handicap entry UI (web) + primary-handicap selector | 2 | Done | Claude | 2026-06-12 | ClubHandicapDialog + selector on /handicaps; SetPrimaryHandicapSourceAsync added; 126 tests green. Phase 4b complete — Phase 2 board work done |
 
 Phases 3–6 items are seeded when their phase starts — see the development plan summary in `docs/ARCHITECTURE.md` §12.
 
