@@ -124,4 +124,122 @@ public sealed class TeeSetServiceTests : IDisposable
         var coveredTeeSets = await _service.GetTeeSetsForCourseAsync(covered.GolfCourseId);
         Assert.Single(coveredTeeSets); // untouched
     }
+
+    [Fact]
+    public async Task UpsertTeeSetRatings_UpdatesExistingTeeCaseInsensitively_WithoutTouchingColour()
+    {
+        var course = await TestDataBuilder.SeedCourseAsync(_factory); // seeds "Yellow", colour #FFD700
+        var originalColour = (await _service.GetTeeSetsForCourseAsync(course.GolfCourseId)).Single().Colour;
+
+        var updated = await _service.UpsertTeeSetRatingsAsync(course.GolfCourseId, "yellow", 67.3m, 113);
+
+        Assert.Equal(67.3m, updated.CourseRating);
+        Assert.Equal(113, updated.SlopeRating);
+        Assert.Equal(originalColour, updated.Colour);
+        Assert.Single(await _service.GetTeeSetsForCourseAsync(course.GolfCourseId)); // no duplicate
+    }
+
+    [Fact]
+    public async Task UpsertTeeSetRatings_BlankValuesNeverClearExistingRatings()
+    {
+        var course = await TestDataBuilder.SeedCourseAsync(_factory); // Yellow: CR 70.0, slope 120
+        var result = await _service.UpsertTeeSetRatingsAsync(course.GolfCourseId, "Yellow", null, null);
+
+        Assert.Equal(70.0m, result.CourseRating);
+        Assert.Equal(120, result.SlopeRating);
+    }
+
+    [Fact]
+    public async Task UpsertTeeSetRatings_CreatesMissingTeeWithStandardDefaults()
+    {
+        var course = await TestDataBuilder.SeedCourseAsync(_factory); // only Yellow exists
+
+        var created = await _service.UpsertTeeSetRatingsAsync(course.GolfCourseId, "Red", 71.8m, 121);
+
+        Assert.Equal("#DC2626", created.Colour); // standard Red colour derived from name
+        Assert.Equal(TeeGender.Female, created.Gender);
+        Assert.Equal(3, created.SortOrder);
+        Assert.Equal(71.8m, created.CourseRating);
+    }
+
+    [Fact]
+    public async Task UpsertTeeSetRatings_NonStandardTeeName_GetsNeutralDefaults()
+    {
+        var course = await TestDataBuilder.SeedCourseAsync(_factory); // Yellow has SortOrder 1
+
+        var created = await _service.UpsertTeeSetRatingsAsync(course.GolfCourseId, "Championship", 73.0m, 135);
+
+        Assert.Equal("#CCCCCC", created.Colour);
+        Assert.Equal(TeeGender.Unisex, created.Gender);
+        Assert.Equal(2, created.SortOrder); // max existing + 1
+    }
+
+    [Fact]
+    public async Task UpsertTeeSetRatings_ExplicitValuesOverrideDefaults()
+    {
+        var course = await TestDataBuilder.SeedCourseAsync(_factory);
+
+        var created = await _service.UpsertTeeSetRatingsAsync(
+            course.GolfCourseId, "Red", 71.8m, 121, colour: "#FF0000", gender: TeeGender.Unisex, sortOrder: 9);
+
+        Assert.Equal("#FF0000", created.Colour);
+        Assert.Equal(TeeGender.Unisex, created.Gender);
+        Assert.Equal(9, created.SortOrder);
+    }
+
+    [Fact]
+    public async Task UpsertTeeSetRatings_UnknownCourse_Throws()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _service.UpsertTeeSetRatingsAsync(9999, "Yellow", 67.3m, 113));
+    }
+
+    [Fact]
+    public async Task AddOrUpdateHoleTee_WithoutPar_InheritsParAndStrokeIndexFromHole()
+    {
+        var course = await TestDataBuilder.SeedCourseAsync(_factory, holePars: new[] { 5, 4, 4, 3, 4, 4, 5, 3, 4, 4, 4, 3, 5, 4, 4, 3, 4, 5 });
+        await using var context = await _factory.CreateDbContextAsync();
+        var hole1 = await context.Holes.SingleAsync(h => h.GolfCourseId == course.GolfCourseId && h.HoleNumber == 1);
+        var white = await _service.UpsertTeeSetRatingsAsync(course.GolfCourseId, "White", 68.1m, 116);
+
+        var holeTee = await _service.AddOrUpdateHoleTeeAsync(new HoleTee
+        {
+            HoleId = hole1.HoleId,
+            TeeSetId = white.TeeSetId,
+            LengthYards = 410, // yardage-only, like the CSV import
+        });
+
+        Assert.Equal(5, holeTee.Par); // inherited from hole, not 0
+        Assert.Equal(hole1.StrokeIndex, holeTee.StrokeIndex);
+    }
+
+    [Fact]
+    public async Task RepairHoleTeePars_FixesZeroParRowsAndReportsCount()
+    {
+        var course = await TestDataBuilder.SeedCourseAsync(_factory);
+        var white = await _service.UpsertTeeSetRatingsAsync(course.GolfCourseId, "White", 68.1m, 116);
+
+        // Simulate historical import damage: par-0 hole tees written directly.
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            var holeIds = await context.Holes
+                .Where(h => h.GolfCourseId == course.GolfCourseId)
+                .Select(h => h.HoleId)
+                .Take(3)
+                .ToListAsync();
+            foreach (var holeId in holeIds)
+            {
+                context.HoleTees.Add(new HoleTee { HoleId = holeId, TeeSetId = white.TeeSetId, LengthYards = 300 });
+            }
+            await context.SaveChangesAsync();
+        }
+
+        var repaired = await _service.RepairHoleTeeParsAsync();
+
+        Assert.Equal(3, repaired);
+        await using (var verify = await _factory.CreateDbContextAsync())
+        {
+            Assert.Equal(0, await verify.HoleTees.CountAsync(ht => ht.Par <= 0));
+        }
+    }
 }

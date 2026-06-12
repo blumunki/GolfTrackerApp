@@ -73,11 +73,104 @@ public class TeeSetService : ITeeSetService
         }
         else
         {
+            // Callers that only know yardages (e.g. CSV import) leave Par unset —
+            // a par-0 hole tee is never valid, so inherit from the hole.
+            if (holeTee.Par <= 0)
+            {
+                var hole = await context.Holes.FindAsync(holeTee.HoleId);
+                if (hole is not null)
+                {
+                    holeTee.Par = hole.Par;
+                    holeTee.StrokeIndex ??= hole.StrokeIndex;
+                }
+            }
             context.HoleTees.Add(holeTee);
         }
 
         await context.SaveChangesAsync();
         return existing ?? holeTee;
+    }
+
+    public async Task<TeeSet> UpsertTeeSetRatingsAsync(
+        int golfCourseId, string teeName, decimal? courseRating, int? slopeRating,
+        string? colour = null, TeeGender? gender = null, int? sortOrder = null)
+    {
+        if (string.IsNullOrWhiteSpace(teeName))
+        {
+            throw new ArgumentException("A tee name is required.", nameof(teeName));
+        }
+
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        if (!await context.GolfCourses.AnyAsync(gc => gc.GolfCourseId == golfCourseId))
+        {
+            throw new ArgumentException($"GolfCourse with ID {golfCourseId} does not exist.");
+        }
+
+        var name = teeName.Trim();
+        var teeSet = await context.TeeSets.FirstOrDefaultAsync(
+            ts => ts.GolfCourseId == golfCourseId && ts.Name.ToLower() == name.ToLower());
+
+        if (teeSet is null)
+        {
+            var defaults = GetStandardTeeDefaults(name);
+            var maxSortOrder = await context.TeeSets
+                .Where(ts => ts.GolfCourseId == golfCourseId)
+                .MaxAsync(ts => (int?)ts.SortOrder) ?? 0;
+
+            teeSet = new TeeSet
+            {
+                GolfCourseId = golfCourseId,
+                Name = name,
+                Colour = colour ?? defaults?.Colour ?? "#CCCCCC",
+                Gender = gender ?? defaults?.Gender ?? TeeGender.Unisex,
+                SortOrder = sortOrder ?? defaults?.SortOrder ?? maxSortOrder + 1,
+            };
+            context.TeeSets.Add(teeSet);
+        }
+        else
+        {
+            if (colour is not null) teeSet.Colour = colour;
+            if (gender is not null) teeSet.Gender = gender.Value;
+            if (sortOrder is not null) teeSet.SortOrder = sortOrder.Value;
+        }
+
+        // Only provided values are written — a blank never clears an existing rating.
+        if (courseRating is not null) teeSet.CourseRating = courseRating;
+        if (slopeRating is not null) teeSet.SlopeRating = slopeRating;
+
+        await context.SaveChangesAsync();
+        return teeSet;
+    }
+
+    public async Task<int> RepairHoleTeeParsAsync()
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var broken = await context.HoleTees
+            .Where(ht => ht.Par <= 0)
+            .Include(ht => ht.Hole)
+            .ToListAsync();
+
+        foreach (var holeTee in broken.Where(ht => ht.Hole is not null))
+        {
+            holeTee.Par = holeTee.Hole!.Par;
+            holeTee.StrokeIndex ??= holeTee.Hole.StrokeIndex;
+        }
+
+        await context.SaveChangesAsync();
+        return broken.Count(ht => ht.Hole is not null);
+    }
+
+    /// <summary>Standard colour/gender/sort defaults for well-known tee names.</summary>
+    public static (string Colour, TeeGender Gender, int SortOrder)? GetStandardTeeDefaults(string teeName)
+    {
+        foreach (var (name, teeColour, teeGender, teeSortOrder) in StandardTees)
+        {
+            if (name.Equals(teeName.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return (teeColour, teeGender, teeSortOrder);
+            }
+        }
+        return null;
     }
 
     public async Task<List<HoleTee>> GetHoleTeesForTeeSetAsync(int teeSetId)
