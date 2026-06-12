@@ -192,6 +192,7 @@ GolfTrackerApp.Mobile/
 │       ├── PlayersPage.razor          # Player management + connections
 │       ├── NotificationsPage.razor    # In-app notifications
 │       ├── PlayerReportPage.razor     # Player stats report
+│       ├── HandicapPage.razor         # WHS index, history chart, differentials
 │       └── AiChatPage.razor           # AI coach chat with sessions
 ├── Models/                            # Mobile DTOs
 │   ├── Round.cs, Player.cs
@@ -209,6 +210,7 @@ GolfTrackerApp.Mobile/
 │       ├── PlayerReportApiService.cs
 │       ├── ConnectionApiService.cs
 │       ├── NotificationApiService.cs  # Notification API client
+│       ├── HandicapApiService.cs      # Handicap records/differentials API client
 │       └── InsightsApiService.cs      # AI insights + chat API client
 └── Resources/                         # App icon, splash screen, fonts
 ```
@@ -1002,7 +1004,7 @@ Steps 1–2 are implemented as pure functions in `GolfTrackerApp.Core/Services/W
 - Scoring differentials table (last 20 rounds)
 - Which differentials are "counting" in the calculation
 
-Web implemented at `/handicaps` (`Components/Pages/Handicaps/HandicapDashboard.razor`): active-handicap cards with primary badge, personal index history line chart, last-20 differentials table with counting indicators. Mobile is WORKLOG 2-7; manual club entry UI + primary selector is 2-9.
+Web implemented at `/handicaps` (`Components/Pages/Handicaps/HandicapDashboard.razor`): active-handicap cards with primary badge, personal index history line chart, last-20 differentials table with counting indicators. Mobile implemented as `HandicapPage.razor` (`handicaps` switcher case, home quick-access card) backed by `HandicapApiService` over `/api/handicaps`. Manual club entry UI + primary selector is WORKLOG 2-9.
 
 **Round Completion Flow:**
 - After completing a round: auto-calculate scoring differential if tee set has rating/slope
