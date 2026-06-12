@@ -202,6 +202,37 @@ public sealed class ManualClubHandicapTests : IDisposable
         Assert.All(differentials, d => Assert.NotNull(d.Round?.GolfCourse));
     }
 
+    [Fact]
+    public async Task SetPrimarySource_RefreshesDisplayHandicapFromThatSource()
+    {
+        var (player, clubId) = await SeedPlayerAndClubAsync();
+        await _service.AddManualClubHandicapAsync(NewEntry(player.PlayerId, clubId, index: 12.3m));
+
+        var updated = await _service.SetPrimaryHandicapSourceAsync(player.PlayerId, HandicapSource.ClubRegional);
+
+        Assert.NotNull(updated);
+        Assert.Equal(HandicapSource.ClubRegional, updated!.PrimaryHandicapSource);
+        Assert.Equal(12.3, updated.Handicap);
+
+        // A source with no records clears the display value.
+        updated = await _service.SetPrimaryHandicapSourceAsync(player.PlayerId, HandicapSource.Personal);
+        Assert.Null(updated!.Handicap);
+    }
+
+    [Fact]
+    public async Task SetPrimarySource_Null_KeepsLegacyManualHandicap()
+    {
+        await TestDataBuilder.SeedUserAsync(_factory);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, handicap: 18.0);
+
+        var updated = await _service.SetPrimaryHandicapSourceAsync(player.PlayerId, null);
+
+        Assert.Null(updated!.PrimaryHandicapSource);
+        Assert.Equal(18.0, updated.Handicap); // untouched
+
+        Assert.Null(await _service.SetPrimaryHandicapSourceAsync(9999, HandicapSource.Personal));
+    }
+
     private async Task<(Player Player, int ClubId)> SeedPlayerAndClubAsync()
     {
         await TestDataBuilder.SeedUserAsync(_factory);

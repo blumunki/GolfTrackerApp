@@ -249,6 +249,32 @@ public class HandicapService : IHandicapService
         return true;
     }
 
+    public async Task<Player?> SetPrimaryHandicapSourceAsync(int playerId, HandicapSource? source)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var player = await context.Players.FindAsync(playerId);
+        if (player is null)
+        {
+            return null;
+        }
+
+        player.PrimaryHandicapSource = source;
+        if (source is HandicapSource newSource)
+        {
+            var latest = await context.HandicapRecords
+                .Where(h => h.PlayerId == playerId && h.Source == newSource)
+                .OrderByDescending(h => h.EffectiveDate)
+                    .ThenByDescending(h => h.HandicapRecordId)
+                .FirstOrDefaultAsync();
+            player.Handicap = latest is null ? null : (double)latest.HandicapIndex;
+        }
+        // source == null: legacy manual mode — Player.Handicap stays as entered.
+
+        await context.SaveChangesAsync();
+        return player;
+    }
+
     private static void ValidateManualEntry(HandicapRecord record)
     {
         if (record.GolfClubId is null)

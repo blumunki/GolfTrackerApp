@@ -52,4 +52,12 @@ public interface IHandicapService
     /// exist; throws when the record is calculated rather than manual.
     /// </summary>
     Task<bool> DeleteManualClubHandicapAsync(int handicapRecordId);
+
+    /// <summary>
+    /// Sets which handicap source is shown as "my handicap". A non-null source refreshes
+    /// Player.Handicap from the latest record of that source (null when none exist);
+    /// passing null keeps the legacy manually-entered Player.Handicap value untouched.
+    /// Returns the updated player, or null when the player does not exist.
+    /// </summary>
+    Task<Player?> SetPrimaryHandicapSourceAsync(int playerId, HandicapSource? source);
 }
