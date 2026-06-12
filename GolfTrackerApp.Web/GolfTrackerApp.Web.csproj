@@ -15,6 +15,7 @@
     <Content Include="Data/Holes.csv" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Data/Rounds.csv" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Data/Scores.csv" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Data/TeeSets.csv" CopyToOutputDirectory="PreserveNewest" />
     <None Update="web.config" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -72,6 +72,32 @@
     }
 </MudPaper>
 
+<MudPaper Class="pa-4 mb-6" Outlined="true" Style="border-color: var(--mud-palette-info); border-width: 2px;">
+    <MudText Typo="Typo.h5" Class="mb-2">
+        <MudIcon Icon="@Icons.Material.Filled.Speed" Class="mr-1" /> Sync Tee Ratings
+    </MudText>
+    <MudText Typo="Typo.body2" Class="mb-3">
+        Reads <strong>TeeSets.csv</strong> (ClubName, CourseName, TeeName, CourseRating, SlopeRating
+        — Colour/Gender/SortOrder optional, defaulted from the tee name) from the Data folder.
+        Creates or updates tee sets by club + course + tee name; blank cells never clear existing
+        values — safe to run repeatedly. Also repairs hole tees imported without a par.
+        Required for handicap calculation: rounds only qualify when their tee has a rating and slope.
+    </MudText>
+    <MudButton Variant="Variant.Filled" Color="Color.Info" Size="Size.Large"
+               OnClick="SyncTeeRatings" Disabled="@isSyncingTeeRatings"
+               StartIcon="@Icons.Material.Filled.CloudSync">
+        @(isSyncingTeeRatings ? "Syncing..." : "Sync Tee Ratings")
+    </MudButton>
+    @if (isSyncingTeeRatings)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Info" Class="mt-2" />
+    }
+    @if (!string.IsNullOrEmpty(syncTeeRatingsLog))
+    {
+        <pre class="log-output" style="max-height: 400px; overflow-y: auto;">@syncTeeRatingsLog</pre>
+    }
+</MudPaper>
+
 <MudDivider Class="mb-4" />
 <MudText Typo="Typo.h5" Class="mb-4">Manual CSV Upload (One-Time Migration)</MudText>
 
@@ -168,6 +194,114 @@
     // Rounds & Scores Sync fields
     private bool isSyncingRoundsAndScores = false;
     private string syncRoundsAndScoresLog = string.Empty;
+
+    private bool isSyncingTeeRatings = false;
+    private string syncTeeRatingsLog = string.Empty;
+
+    private async Task SyncTeeRatings()
+    {
+        isSyncingTeeRatings = true;
+        syncTeeRatingsLog = string.Empty;
+        var log = new System.Text.StringBuilder();
+        StateHasChanged();
+
+        try
+        {
+            var dataPath = Path.Combine(WebHostEnvironment.ContentRootPath, "Data");
+            // Tolerate either casing — the user-maintained file may be lowercase.
+            var teeSetsFile = new[] { "TeeSets.csv", "teesets.csv" }
+                .Select(name => Path.Combine(dataPath, name))
+                .FirstOrDefault(File.Exists);
+
+            if (teeSetsFile is null)
+            {
+                log.AppendLine($"⚠ TeeSets.csv not found in: {dataPath}");
+                return;
+            }
+
+            log.AppendLine($"=== Syncing Tee Ratings from {Path.GetFileName(teeSetsFile)} ===");
+
+            await using var scope = ServiceScopeFactory.CreateAsyncScope();
+            var courseService = scope.ServiceProvider.GetRequiredService<IGolfCourseService>();
+            var teeSetService = scope.ServiceProvider.GetRequiredService<ITeeSetService>();
+
+            var courses = await courseService.GetAllGolfCoursesAsync();
+            var courseLookup = courses.ToDictionary(
+                c => $"{(c.GolfClub?.Name ?? "").ToLowerInvariant()}_{c.Name.ToLowerInvariant()}",
+                c => c.GolfCourseId
+            );
+
+            int upserted = 0, skipped = 0;
+
+            using var stream = File.OpenRead(teeSetsFile);
+            using var reader = new StreamReader(stream);
+            using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                MissingFieldFound = null,
+                HeaderValidated = null,
+            });
+
+            await foreach (var record in csv.GetRecordsAsync<TeeSetCsvRecord>())
+            {
+                if (string.IsNullOrWhiteSpace(record.ClubName)
+                    || string.IsNullOrWhiteSpace(record.CourseName)
+                    || string.IsNullOrWhiteSpace(record.TeeName))
+                {
+                    log.AppendLine($"  Skipped row: missing club/course/tee name — Club: '{record.ClubName}', Course: '{record.CourseName}', Tee: '{record.TeeName}'");
+                    skipped++;
+                    continue;
+                }
+
+                var courseKey = $"{record.ClubName.ToLowerInvariant()}_{record.CourseName.ToLowerInvariant()}";
+                if (!courseLookup.TryGetValue(courseKey, out var courseId))
+                {
+                    log.AppendLine($"  ⚠ Course '{record.CourseName}' (Club: {record.ClubName}) not found — sync courses first.");
+                    skipped++;
+                    continue;
+                }
+
+                TeeGender? gender = null;
+                if (!string.IsNullOrWhiteSpace(record.Gender))
+                {
+                    if (Enum.TryParse<TeeGender>(record.Gender, ignoreCase: true, out var parsedGender))
+                    {
+                        gender = parsedGender;
+                    }
+                    else
+                    {
+                        log.AppendLine($"  ⚠ '{record.TeeName}' ({record.CourseName}): unknown gender '{record.Gender}' ignored.");
+                    }
+                }
+
+                var teeSet = await teeSetService.UpsertTeeSetRatingsAsync(
+                    courseId, record.TeeName, record.CourseRating, record.SlopeRating,
+                    string.IsNullOrWhiteSpace(record.Colour) ? null : record.Colour,
+                    gender, record.SortOrder);
+                upserted++;
+                log.AppendLine($"  ✔ {record.CourseName} — {teeSet.Name}: rating {teeSet.CourseRating?.ToString("0.0") ?? "—"}, slope {teeSet.SlopeRating?.ToString() ?? "—"}");
+            }
+
+            log.AppendLine($"  Tee sets: {upserted} created/updated, {skipped} skipped");
+
+            var repaired = await teeSetService.RepairHoleTeeParsAsync();
+            log.AppendLine(repaired > 0
+                ? $"  🔧 Repaired {repaired} hole tee(s) that had no par"
+                : "  Hole tee pars all valid");
+
+            log.AppendLine("\n✅ Tee ratings sync complete.");
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine($"\n❌ FATAL ERROR: {ex.Message}");
+        }
+        finally
+        {
+            syncTeeRatingsLog = log.ToString();
+            isSyncingTeeRatings = false;
+            StateHasChanged();
+        }
+    }
 
     private async Task SyncReferenceData()
     {
@@ -844,6 +978,18 @@
         public int? YellowYards { get; set; }
         public int? RedYards { get; set; }
         public int? LengthYards { get; set; } // Legacy fallback — mapped to Yellow if YellowYards is empty
+    }
+
+    public class TeeSetCsvRecord
+    {
+        public string? ClubName { get; set; }
+        public string? CourseName { get; set; }
+        public string? TeeName { get; set; }
+        public string? Colour { get; set; }       // optional — defaulted from TeeName
+        public decimal? CourseRating { get; set; }
+        public int? SlopeRating { get; set; }
+        public string? Gender { get; set; }       // optional — defaulted from TeeName
+        public int? SortOrder { get; set; }       // optional — defaulted from TeeName
     }
 
     private IBrowserFile? holesFile;

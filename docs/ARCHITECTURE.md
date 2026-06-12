@@ -522,7 +522,7 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 - **Connections & Merges** (`/admin/connections`): All connections/merge requests with status filters, pending counts, tabbed view
 - **System Notifications** (`/admin/notifications`): View all user notifications, type breakdown, read/unread stats, filterable by type and status
 - **Audit Trail** (`/admin/audit`): AI audit logs with filters (type, provider, status, time range), expandable prompt/response detail, token summaries
-- **Data Migration** (`/admin/datamigration`): Quick sync from CSV, manual file upload for reference data and rounds/scores
+- **Data Migration** (`/admin/datamigration`): Quick sync from CSV (clubs/courses/holes, rounds/scores, tee ratings), manual file upload for reference data and rounds/scores
 - **Handicap Backfill** (`/admin/handicap-backfill`): Idempotent recalculation of WHS differentials and personal handicap history from all completed rounds, with an n-of-m qualification report
 - **AI Providers** (`/admin/ai-providers`): Enable/disable providers, set priority order, view API key status
 - **AI Usage** (`/admin/ai-usage`): Usage statistics, token consumption, provider breakdown, audit log viewer
@@ -689,12 +689,13 @@ Stockwood Park Golf Centre,Academy,1,3,3,82,White
 - If `TeeName` is present → create TeeSet if needed, create HoleTee row
 - DataMigration.razor updated to handle both formats
 
-**New optional CSV: TeeSets.csv**
+**New optional CSV: TeeSets.csv** — implemented (WORKLOG 2-10), synced via the "Sync Tee Ratings" quick-sync on `/admin/datamigration`:
 ```
 ClubName,CourseName,TeeName,Colour,CourseRating,SlopeRating,Gender,SortOrder
 Stockwood Park Golf Centre,Main Course,Yellow,#FFD700,68.5,121,Male,1
 Stockwood Park Golf Centre,Main Course,Red,#FF0000,70.2,125,Female,2
 ```
+Colour, Gender and SortOrder are optional — defaulted from the tee name for the standard tees (White/Yellow/Red). Upserts are keyed by club + course + tee name (case-insensitive); blank rating cells never clear existing values. The sync also repairs hole tees previously imported without a par.
 
 ##### 1.5 UI Changes
 
