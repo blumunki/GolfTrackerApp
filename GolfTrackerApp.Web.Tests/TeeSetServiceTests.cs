@@ -214,6 +214,34 @@ public sealed class TeeSetServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteTeeSet_RemovesItsHoleTees_ButIsBlockedWhenRoundsReferenceIt()
+    {
+        await TestDataBuilder.SeedUserAsync(_factory);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory);
+        var course = await TestDataBuilder.SeedCourseAsync(_factory); // Yellow + 18 hole tees
+
+        int yellowId;
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            yellowId = (await context.TeeSets.SingleAsync()).TeeSetId;
+        }
+
+        // Unreferenced tee set deletes cleanly, taking its hole tees with it.
+        Assert.True(await _service.DeleteTeeSetAsync(yellowId));
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            Assert.Equal(0, await context.HoleTees.CountAsync());
+        }
+
+        // A tee set referenced by round data must not be deletable.
+        var white = await _service.UpsertTeeSetRatingsAsync(course.GolfCourseId, "White", 68.1m, 116);
+        await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, teeSetId: white.TeeSetId);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => _service.DeleteTeeSetAsync(white.TeeSetId));
+    }
+
+    [Fact]
     public async Task RepairHoleTeePars_FixesZeroParRowsAndReportsCount()
     {
         var course = await TestDataBuilder.SeedCourseAsync(_factory);

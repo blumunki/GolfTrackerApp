@@ -718,6 +718,8 @@ Colour, Gender and SortOrder are optional — defaulted from the tee name for th
 - Show tee set tabs/selector
 - Display hole table with per-tee data columns
 
+Implemented (WORKLOG 2-11): a Tee Sets section on course details lists each tee with colour, course rating, slope (missing values flagged), gender and total yardage; admins can add/edit/delete tee sets (`AddEditTeeSetDialog`) and edit per-hole tee data (`EditHoleTeesDialog`). Deleting a tee set removes its hole tees but is blocked while rounds reference it. The hole table shows per-tee yardage columns.
+
 **Admin Content Health:**
 - Flag courses with no tee sets
 - Flag tee sets with missing hole data

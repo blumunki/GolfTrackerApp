@@ -170,6 +170,101 @@ else
         </MudExpansionPanels>
     }
 
+    @* ── Tee Sets ── *@
+    <div class="gp-list-header" style="margin-top:8px;">
+        <h4>Tee Sets</h4>
+        <AuthorizeView Roles="Admin">
+            <Authorized>
+                <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="OpenAddTeeSetDialog">Tee Set</MudButton>
+            </Authorized>
+        </AuthorizeView>
+    </div>
+
+    @if (!_teeSets.Any())
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-3" Dense="true">
+            No tee sets recorded for this course yet. Tee sets carry the course rating and slope
+            needed for handicap calculation.
+        </MudAlert>
+    }
+    else
+    {
+        <div class="holes-table-wrapper">
+            <MudTable Items="@_teeSets" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Tee</MudTh>
+                    <MudTh Class="golf-text-right">Course Rating</MudTh>
+                    <MudTh Class="golf-text-right">Slope</MudTh>
+                    <MudTh>Gender</MudTh>
+                    <MudTh Class="golf-text-right">Total Yards</MudTh>
+                    <AuthorizeView Roles="Admin">
+                        <Authorized Context="authContext">
+                            <MudTh Class="golf-text-right">Actions</MudTh>
+                        </Authorized>
+                    </AuthorizeView>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Tee">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="width:12px;height:12px;border-radius:50%;background:@context.Colour;border:1px solid #ccc;display:inline-block;"></span>
+                            @context.Name
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Course Rating" Class="golf-text-right">
+                        @if (context.CourseRating is decimal rating)
+                        {
+                            @rating.ToString("0.0")
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">missing</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Slope" Class="golf-text-right">
+                        @if (context.SlopeRating is int slope)
+                        {
+                            @slope
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Text">missing</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Gender">@context.Gender</MudTd>
+                    <MudTd DataLabel="Total Yards" Class="golf-text-right">
+                        @(GetTeeTotalYards(context.TeeSetId) is var yards && yards > 0 ? yards.ToString() : "-")
+                    </MudTd>
+                    <AuthorizeView Roles="Admin">
+                        <Authorized Context="authContext">
+                            <MudTd Class="golf-text-right">
+                                <MudTooltip Text="Edit tee set (rating/slope)">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                   OnClick="@(() => OpenEditTeeSetDialog(context))" />
+                                </MudTooltip>
+                                <MudTooltip Text="Edit per-hole data">
+                                    <MudIconButton Icon="@Icons.Material.Filled.GridOn" Size="Size.Small"
+                                                   OnClick="@(() => OpenEditHoleTeesDialog(context))" />
+                                </MudTooltip>
+                                <MudTooltip Text="Delete tee set">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                   OnClick="@(() => PrepareDeleteTeeSet(context))" />
+                                </MudTooltip>
+                            </MudTd>
+                        </Authorized>
+                    </AuthorizeView>
+                </RowTemplate>
+            </MudTable>
+        </div>
+        @if (_teeSets.Any(ts => ts.CourseRating is null || ts.SlopeRating is null))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-3">
+                Rounds played from tees without a course rating and slope do not qualify for handicap calculation.
+            </MudText>
+        }
+    }
+
     @* ── Hole Table ── *@
     <div class="gp-list-header" style="margin-top:8px;">
         <h4>Hole Details</h4>
@@ -706,6 +801,107 @@ else
             catch (Exception ex)
             {
                 Snackbar.Add($"Error deleting hole: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    // ── Tee Set Management ──
+
+    private async Task ReloadTeeSetsAsync()
+    {
+        if (course is null) return;
+        _teeSets = await TeeSetService.GetTeeSetsForCourseAsync(course.GolfCourseId);
+        _holeTeeMap = _teeSets
+            .SelectMany(ts => ts.HoleTees ?? Enumerable.Empty<HoleTee>())
+            .ToDictionary(ht => (ht.HoleId, ht.TeeSetId));
+        StateHasChanged();
+    }
+
+    private async Task OpenAddTeeSetDialog()
+    {
+        var parameters = new DialogParameters<AddEditTeeSetDialog>
+        {
+            { x => x.TeeSetModel, new TeeSet
+                {
+                    GolfCourseId = course!.GolfCourseId,
+                    SortOrder = (_teeSets.Count == 0 ? 0 : _teeSets.Max(ts => ts.SortOrder)) + 1,
+                } },
+            { x => x.Title, "Add Tee Set" },
+        };
+        var dialog = await DialogService.ShowAsync<AddEditTeeSetDialog>("Add Tee Set", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadTeeSetsAsync();
+        }
+    }
+
+    private async Task OpenEditTeeSetDialog(TeeSet teeSet)
+    {
+        var parameters = new DialogParameters<AddEditTeeSetDialog>
+        {
+            // Edit a copy so a cancelled dialog leaves the table untouched.
+            { x => x.TeeSetModel, new TeeSet
+                {
+                    TeeSetId = teeSet.TeeSetId,
+                    GolfCourseId = teeSet.GolfCourseId,
+                    Name = teeSet.Name,
+                    Colour = teeSet.Colour,
+                    CourseRating = teeSet.CourseRating,
+                    SlopeRating = teeSet.SlopeRating,
+                    Gender = teeSet.Gender,
+                    SortOrder = teeSet.SortOrder,
+                } },
+            { x => x.Title, $"Edit {teeSet.Name} Tees" },
+        };
+        var dialog = await DialogService.ShowAsync<AddEditTeeSetDialog>("Edit Tee Set", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadTeeSetsAsync();
+        }
+    }
+
+    private async Task OpenEditHoleTeesDialog(TeeSet teeSet)
+    {
+        var parameters = new DialogParameters<EditHoleTeesDialog>
+        {
+            { x => x.TeeSetId, teeSet.TeeSetId },
+            { x => x.CourseId, course!.GolfCourseId },
+            { x => x.TeeSetName, teeSet.Name },
+            { x => x.TeeColour, teeSet.Colour },
+        };
+        var dialog = await DialogService.ShowAsync<EditHoleTeesDialog>($"{teeSet.Name} — Hole Data", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadTeeSetsAsync();
+        }
+    }
+
+    private async Task PrepareDeleteTeeSet(TeeSet teeSet)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { nameof(ConfirmDialog.ContentText), $"Delete the {teeSet.Name} tee set and its per-hole data? Rounds recorded from these tees will block the delete." },
+            { nameof(ConfirmDialog.ButtonText), "Delete" },
+            { nameof(ConfirmDialog.Color), Color.Error }
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled && result.Data is true)
+        {
+            try
+            {
+                await TeeSetService.DeleteTeeSetAsync(teeSet.TeeSetId);
+                Snackbar.Add($"{teeSet.Name} tee set deleted.", Severity.Success);
+                await ReloadTeeSetsAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error deleting tee set {TeeSetId}", teeSet.TeeSetId);
+                Snackbar.Add($"Cannot delete the {teeSet.Name} tees — rounds or handicap data reference them.", Severity.Warning);
             }
         }
     }

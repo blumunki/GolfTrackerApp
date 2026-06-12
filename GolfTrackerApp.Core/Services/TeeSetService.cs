@@ -54,6 +54,10 @@ public class TeeSetService : ITeeSetService
         await using var context = await _contextFactory.CreateDbContextAsync();
         var teeSet = await context.TeeSets.FindAsync(teeSetId);
         if (teeSet == null) return false;
+
+        // Hole tees are owned by the tee set — remove them with it. References from
+        // rounds/scores/differentials still block the delete (FK), by design.
+        context.HoleTees.RemoveRange(context.HoleTees.Where(ht => ht.TeeSetId == teeSetId));
         context.TeeSets.Remove(teeSet);
         await context.SaveChangesAsync();
         return true;
