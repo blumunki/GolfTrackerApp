@@ -3,9 +3,12 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IPlayerService PlayerService
 @inject IHandicapService HandicapService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
 
 @using GolfTrackerApp.Core.Models
 @using GolfTrackerApp.Core.Services
+@using GolfTrackerApp.Web.Components.Shared
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
 
@@ -59,6 +62,52 @@ else
             </MudItem>
         }
     </MudGrid>
+
+    <!-- Primary source + club handicap management -->
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="HandicapSource?" Value="@_player.PrimaryHandicapSource"
+                           ValueChanged="OnPrimarySourceChanged" Label="Primary handicap (shown on your profile)"
+                           Clearable="true" Placeholder="Manual value">
+                    <MudSelectItem T="HandicapSource?" Value="@((HandicapSource?)HandicapSource.Personal)">Personal (WHS)</MudSelectItem>
+                    <MudSelectItem T="HandicapSource?" Value="@((HandicapSource?)HandicapSource.ClubRegional)">Club / Regional</MudSelectItem>
+                    <MudSelectItem T="HandicapSource?" Value="@((HandicapSource?)HandicapSource.Society)">Society</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" Class="d-flex align-center justify-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="AddClubHandicapAsync">
+                    Add Club Handicap
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_manualClubRecords.Any())
+        {
+            <MudTable Items="@_manualClubRecords" Dense="true" Class="mt-3">
+                <HeaderContent>
+                    <MudTh>Club</MudTh>
+                    <MudTh Style="text-align:right">Index</MudTh>
+                    <MudTh>Effective</MudTh>
+                    <MudTh>Expires</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Club">@context.GolfClub?.Name</MudTd>
+                    <MudTd DataLabel="Index" Style="text-align:right">@context.HandicapIndex.ToString("0.0")</MudTd>
+                    <MudTd DataLabel="Effective">@context.EffectiveDate.ToString("d MMM yyyy")</MudTd>
+                    <MudTd DataLabel="Expires">@(context.ExpiryDate?.ToString("d MMM yyyy") ?? "—")</MudTd>
+                    <MudTd Style="text-align:right">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => EditClubHandicapAsync(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => DeleteClubHandicapAsync(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
 
     <!-- Personal index history -->
     @if (_xAxisLabels.Length > 1)
@@ -129,6 +178,7 @@ else
     private bool _loading = true;
     private Player? _player;
     private List<HandicapRecord> _activeHandicaps = new();
+    private List<HandicapRecord> _manualClubRecords = new();
     private List<ScoringDifferential> _differentials = new();
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
@@ -141,19 +191,107 @@ else
         if (userId is not null)
         {
             _player = await PlayerService.GetPlayerByApplicationUserIdAsync(userId);
-            if (_player is not null)
-            {
-                var activeTask = HandicapService.GetActiveHandicapsAsync(_player.PlayerId);
-                var historyTask = HandicapService.GetHandicapRecordsAsync(_player.PlayerId, HandicapSource.Personal);
-                var differentialsTask = HandicapService.GetRecentDifferentialsAsync(_player.PlayerId);
-                await Task.WhenAll(activeTask, historyTask, differentialsTask);
-
-                _activeHandicaps = activeTask.Result;
-                _differentials = differentialsTask.Result;
-                PrepareHistoryChart(historyTask.Result);
-            }
+            await LoadDataAsync();
         }
         _loading = false;
+    }
+
+    private async Task LoadDataAsync()
+    {
+        if (_player is null) return;
+
+        var activeTask = HandicapService.GetActiveHandicapsAsync(_player.PlayerId);
+        var historyTask = HandicapService.GetHandicapRecordsAsync(_player.PlayerId, HandicapSource.Personal);
+        var clubTask = HandicapService.GetHandicapRecordsAsync(_player.PlayerId, HandicapSource.ClubRegional);
+        var differentialsTask = HandicapService.GetRecentDifferentialsAsync(_player.PlayerId);
+        await Task.WhenAll(activeTask, historyTask, clubTask, differentialsTask);
+
+        _activeHandicaps = activeTask.Result;
+        _differentials = differentialsTask.Result;
+        _manualClubRecords = clubTask.Result.Where(r => r.IsManualEntry).ToList();
+        PrepareHistoryChart(historyTask.Result);
+    }
+
+    private async Task OnPrimarySourceChanged(HandicapSource? source)
+    {
+        if (_player is null) return;
+
+        var updated = await HandicapService.SetPrimaryHandicapSourceAsync(_player.PlayerId, source);
+        if (updated is not null)
+        {
+            _player = updated;
+            Snackbar.Add("Primary handicap updated.", Severity.Success);
+        }
+        await LoadDataAsync();
+    }
+
+    private async Task AddClubHandicapAsync()
+    {
+        if (_player is null) return;
+
+        var parameters = new DialogParameters<ClubHandicapDialog>
+        {
+            { x => x.Record, new HandicapRecord { PlayerId = _player.PlayerId } },
+            { x => x.Title, "Add Club Handicap" },
+        };
+        var dialog = await DialogService.ShowAsync<ClubHandicapDialog>("Add Club Handicap", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadPlayerAndDataAsync();
+        }
+    }
+
+    private async Task EditClubHandicapAsync(HandicapRecord record)
+    {
+        var parameters = new DialogParameters<ClubHandicapDialog>
+        {
+            // Edit a copy so a cancelled dialog leaves the table untouched.
+            { x => x.Record, new HandicapRecord
+                {
+                    HandicapRecordId = record.HandicapRecordId,
+                    PlayerId = record.PlayerId,
+                    GolfClubId = record.GolfClubId,
+                    HandicapIndex = record.HandicapIndex,
+                    EffectiveDate = record.EffectiveDate,
+                    ExpiryDate = record.ExpiryDate,
+                } },
+            { x => x.Title, "Edit Club Handicap" },
+        };
+        var dialog = await DialogService.ShowAsync<ClubHandicapDialog>("Edit Club Handicap", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadPlayerAndDataAsync();
+        }
+    }
+
+    private async Task DeleteClubHandicapAsync(HandicapRecord record)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Delete the {record.GolfClub?.Name} handicap of {record.HandicapIndex:0.0}?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await HandicapService.DeleteManualClubHandicapAsync(record.HandicapRecordId);
+            Snackbar.Add("Club handicap deleted.", Severity.Success);
+            await ReloadPlayerAndDataAsync();
+        }
+    }
+
+    /// <summary>CRUD can change Player.Handicap/primary display — refresh the player too.</summary>
+    private async Task ReloadPlayerAndDataAsync()
+    {
+        if (_player is not null)
+        {
+            _player = await PlayerService.GetPlayerByIdAsync(_player.PlayerId) ?? _player;
+        }
+        await LoadDataAsync();
     }
 
     private void PrepareHistoryChart(List<HandicapRecord> personalHistory)

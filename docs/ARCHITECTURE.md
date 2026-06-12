@@ -556,7 +556,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
 | 3 | Competitions & Scoring Formats | ❌ Not started | Specced in §12.5 only |
 | 4a | Personal WHS handicap (differentials + index + backfill) | ✅ Done | WHS math, models + migrations, round-completion hook (both paths), and idempotent admin backfill (`/admin/handicap-backfill`). UI dashboards are 4b |
-| 4b | Manual club/regional handicaps + handicap UI | 🚧 In progress | Manual club handicap CRUD + `/api/handicaps` endpoints done (2-5); web/mobile dashboards pending (2-6, 2-7) |
+| 4b | Manual club/regional handicaps + handicap UI | ✅ Done | CRUD + API (2-5), web dashboard (2-6), mobile dashboard (2-7), entry UI + primary selector (2-9). Mobile is read-only; entry/selector are web-only |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
 | 0 | Engineering foundations (tests, real migrations both providers, CI test gate, agent docs) | ✅ Done | Production SQL Server baseline verified; both providers apply migrations at startup |
 | — | Core project extraction | ✅ Done | Models, services, data, and migrations live in `GolfTrackerApp.Core` (`GolfTrackerApp.Core.*` namespaces); tests reference Core directly; deploy triggers on Web + Core paths |
@@ -1004,7 +1004,7 @@ Steps 1–2 are implemented as pure functions in `GolfTrackerApp.Core/Services/W
 - Scoring differentials table (last 20 rounds)
 - Which differentials are "counting" in the calculation
 
-Web implemented at `/handicaps` (`Components/Pages/Handicaps/HandicapDashboard.razor`): active-handicap cards with primary badge, personal index history line chart, last-20 differentials table with counting indicators. Mobile implemented as `HandicapPage.razor` (`handicaps` switcher case, home quick-access card) backed by `HandicapApiService` over `/api/handicaps`. Manual club entry UI + primary selector is WORKLOG 2-9.
+Web implemented at `/handicaps` (`Components/Pages/Handicaps/HandicapDashboard.razor`): active-handicap cards with primary badge, personal index history line chart, last-20 differentials table with counting indicators, manual club handicap management (`ClubHandicapDialog`, add/edit/delete), and the primary-handicap selector (`SetPrimaryHandicapSourceAsync` — refreshes `Player.Handicap`; clearing it keeps the legacy manual value). Mobile implemented as `HandicapPage.razor` (`handicaps` switcher case, home quick-access card) backed by `HandicapApiService` over `/api/handicaps`; mobile is read-only — club handicap entry and the primary selector are web-only.
 
 **Round Completion Flow:**
 - After completing a round: auto-calculate scoring differential if tee set has rating/slope

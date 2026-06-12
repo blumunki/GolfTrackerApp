@@ -1,0 +1,87 @@
+@inject IHandicapService HandicapService
+@inject IGolfClubService GolfClubService
+@inject ISnackbar Snackbar
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+@using MudBlazor
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">@Title</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudSelect T="int?" @bind-Value="_golfClubId" Label="Club" Required="true" Class="mt-2">
+            @foreach (var club in _clubs)
+            {
+                <MudSelectItem T="int?" Value="@((int?)club.GolfClubId)">@club.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudNumericField T="decimal" @bind-Value="Record.HandicapIndex" Label="Handicap Index"
+                         Format="F1" Min="-10.0m" Max="54.0m" Step="0.1m" Class="mt-3" />
+        <MudDatePicker @bind-Date="_effectiveDate" Label="Effective Date" Required="true" Class="mt-3" />
+        <MudDatePicker @bind-Date="_expiryDate" Label="Expiry Date (optional)" Clearable="true" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Save</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public HandicapRecord Record { get; set; } = new();
+    [Parameter] public string Title { get; set; } = "Add Club Handicap";
+
+    private List<GolfClub> _clubs = new();
+    private int? _golfClubId;
+    private DateTime? _effectiveDate;
+    private DateTime? _expiryDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _clubs = await GolfClubService.GetAllGolfClubsAsync();
+        _golfClubId = Record.GolfClubId;
+        _effectiveDate = Record.EffectiveDate == default ? DateTime.Today : Record.EffectiveDate;
+        _expiryDate = Record.ExpiryDate;
+    }
+
+    private async Task Submit()
+    {
+        if (_golfClubId is null)
+        {
+            Snackbar.Add("Please choose a club.", Severity.Warning);
+            return;
+        }
+        if (_effectiveDate is null)
+        {
+            Snackbar.Add("An effective date is required.", Severity.Warning);
+            return;
+        }
+
+        Record.GolfClubId = _golfClubId;
+        Record.EffectiveDate = _effectiveDate.Value;
+        Record.ExpiryDate = _expiryDate;
+
+        try
+        {
+            if (Record.HandicapRecordId == 0)
+            {
+                await HandicapService.AddManualClubHandicapAsync(Record);
+                Snackbar.Add("Club handicap added.", Severity.Success);
+            }
+            else
+            {
+                await HandicapService.UpdateManualClubHandicapAsync(Record);
+                Snackbar.Add("Club handicap updated.", Severity.Success);
+            }
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}
