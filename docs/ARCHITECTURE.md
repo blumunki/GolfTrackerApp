@@ -705,7 +705,7 @@ ClubName,CourseName,TeeName,Colour,CourseRating,SlopeRating,Gender,SortOrder
 Stockwood Park Golf Centre,Main Course,Yellow,#FFD700,68.5,121,Male,1
 Stockwood Park Golf Centre,Main Course,Red,#FF0000,70.2,125,Female,2
 ```
-Colour, Gender and SortOrder are optional — defaulted from the tee name for the standard tees (White/Yellow/Red). Upserts are keyed by club + course + tee name (case-insensitive); blank rating cells never clear existing values. The sync also repairs hole tees previously imported without a par.
+Colour, Gender and SortOrder are optional — defaulted from the tee name for the standard tees (White/Yellow/Red). Upserts are keyed by club + course + tee name (case-insensitive); blank rating cells never clear existing values. CourseRating/SlopeRating cells parse leniently (`NumericParsing`): blank, "N/A" and other no-value sentinels become null rather than aborting the import (a tee with no slope simply can't produce a handicap differential). The sync also repairs hole tees previously imported without a par.
 
 ##### 1.5 UI Changes
 

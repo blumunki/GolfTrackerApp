@@ -10,6 +10,7 @@
 @using CsvHelper
 @using CsvHelper.Configuration
 @using GolfTrackerApp.Core.Data
+@using GolfTrackerApp.Core.Helpers
 @using GolfTrackerApp.Core.Models
 @using GolfTrackerApp.Core.Services
 @using Microsoft.AspNetCore.Components.Forms
@@ -274,8 +275,15 @@
                     }
                 }
 
+                var courseRating = NumericParsing.ParseNullableDecimal(record.CourseRating);
+                var slopeRating = NumericParsing.ParseNullableInt(record.SlopeRating);
+                if (!NumericParsing.IsNullSentinel(record.SlopeRating) && slopeRating is null)
+                {
+                    log.AppendLine($"  ⚠ '{record.TeeName}' ({record.CourseName}): unrecognised slope '{record.SlopeRating}' — stored as blank.");
+                }
+
                 var teeSet = await teeSetService.UpsertTeeSetRatingsAsync(
-                    courseId, record.TeeName, record.CourseRating, record.SlopeRating,
+                    courseId, record.TeeName, courseRating, slopeRating,
                     string.IsNullOrWhiteSpace(record.Colour) ? null : record.Colour,
                     gender, record.SortOrder);
                 upserted++;
@@ -986,8 +994,10 @@
         public string? CourseName { get; set; }
         public string? TeeName { get; set; }
         public string? Colour { get; set; }       // optional — defaulted from TeeName
-        public decimal? CourseRating { get; set; }
-        public int? SlopeRating { get; set; }
+        // Read as strings and parsed leniently (NumericParsing) so "N/A"/blank become null
+        // instead of throwing and aborting the whole import.
+        public string? CourseRating { get; set; }
+        public string? SlopeRating { get; set; }
         public string? Gender { get; set; }       // optional — defaulted from TeeName
         public int? SortOrder { get; set; }       // optional — defaulted from TeeName
     }
