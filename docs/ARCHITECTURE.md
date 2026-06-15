@@ -533,6 +533,7 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 - **Audit Trail** (`/admin/audit`): AI audit logs with filters (type, provider, status, time range), expandable prompt/response detail, token summaries
 - **Data Migration** (`/admin/datamigration`): Quick sync from CSV (clubs/courses/holes, rounds/scores, tee ratings), manual file upload for reference data and rounds/scores
 - **Handicap Backfill** (`/admin/handicap-backfill`): Idempotent recalculation of WHS differentials and personal handicap history from all completed rounds, with an n-of-m qualification report
+- **Database Migrations** (`/admin/database-migrations`): View applied vs pending migrations for the active provider and apply pending ones on demand — the manual "apply when the database is available" lever complementing `Database:MigrateOnStartup` (§5.1)
 - **AI Providers** (`/admin/ai-providers`): Enable/disable providers, set priority order, view API key status
 - **AI Usage** (`/admin/ai-usage`): Usage statistics, token consumption, provider breakdown, audit log viewer
 

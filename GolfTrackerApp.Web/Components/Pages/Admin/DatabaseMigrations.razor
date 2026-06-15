@@ -1,0 +1,145 @@
+@page "/admin/database-migrations"
+@attribute [Authorize(Roles = "Admin")]
+@inject IDatabaseMigrationService MigrationService
+@inject ISnackbar Snackbar
+@inject ILogger<DatabaseMigrations> Logger
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+@using Microsoft.AspNetCore.Authorization
+
+@rendermode InteractiveServer
+
+<PageTitle>Database Migrations</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-2">Database Migrations</MudText>
+<MudText Typo="Typo.body2" Class="mb-4">
+    The schema is normally applied automatically at startup. Use this page to apply pending
+    migrations on demand — for example after a deploy that came up while the database was
+    unavailable, once the database is reachable again. Applying is safe to repeat: migrations
+    already applied are skipped.
+</MudText>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_status is null)
+{
+    <MudAlert Severity="Severity.Error">Could not read migration status — see the application log.</MudAlert>
+}
+else
+{
+    @if (!_status.CanConnect)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4">
+            The database is not reachable right now. Pending migrations will apply when it is available.
+        </MudAlert>
+    }
+    else if (_status.HasPending)
+    {
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            @_status.Pending.Count pending migration(s) to apply.
+        </MudAlert>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Success" Class="mb-4">Database is up to date.</MudAlert>
+    }
+
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                   OnClick="ApplyAsync"
+                   Disabled="@(_applying || !_status.CanConnect || !_status.HasPending)"
+                   StartIcon="@Icons.Material.Filled.PlayArrow">
+            @(_applying ? "Applying..." : "Apply Pending Migrations")
+        </MudButton>
+        @if (_applying)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mt-2" />
+        }
+    </MudPaper>
+
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudText Typo="Typo.h6" Class="mb-2">Pending (@_status.Pending.Count)</MudText>
+            @if (!_status.Pending.Any())
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">None.</MudText>
+            }
+            else
+            {
+                <MudList T="string" Dense="true">
+                    @foreach (var migration in _status.Pending)
+                    {
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.Schedule">@migration</MudListItem>
+                    }
+                </MudList>
+            }
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudText Typo="Typo.h6" Class="mb-2">Applied (@_status.Applied.Count)</MudText>
+            @if (!_status.Applied.Any())
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    @(_status.CanConnect ? "None." : "Unknown — database unreachable.")
+                </MudText>
+            }
+            else
+            {
+                <MudList T="string" Dense="true">
+                    @foreach (var migration in _status.Applied)
+                    {
+                        <MudListItem T="string" Icon="@Icons.Material.Filled.CheckCircle" IconColor="Color.Success">@migration</MudListItem>
+                    }
+                </MudList>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _applying;
+    private DatabaseMigrationStatus? _status;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _status = await MigrationService.GetStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to read migration status.");
+            _status = null;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ApplyAsync()
+    {
+        _applying = true;
+        try
+        {
+            var applied = await MigrationService.ApplyPendingMigrationsAsync();
+            Snackbar.Add(applied > 0 ? $"Applied {applied} migration(s)." : "Already up to date.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to apply pending migrations.");
+            Snackbar.Add("Could not apply migrations — see the application log.", Severity.Error);
+        }
+        finally
+        {
+            _applying = false;
+        }
+    }
+}

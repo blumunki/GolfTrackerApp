@@ -161,6 +161,7 @@ builder.Services.AddScoped<IConnectionService, ConnectionService>();
 builder.Services.AddScoped<IMergeService, MergeService>();
 builder.Services.AddScoped<ITeeSetService, TeeSetService>();
 builder.Services.AddScoped<IHandicapService, HandicapService>();
+builder.Services.AddScoped<IDatabaseMigrationService, DatabaseMigrationService>();
 builder.Services.AddScoped<IGolfSocietyService, GolfSocietyService>();
 builder.Services.AddScoped<IClubMembershipService, ClubMembershipService>();
 
