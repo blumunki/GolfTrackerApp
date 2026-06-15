@@ -184,57 +184,98 @@ builder.Services.AddMudServices();
 
 var app = builder.Build();
 
-// Initialize database (migrations and seeding)
+// Initialize database (migrations and seeding).
+//
+// Resilience: a web app that crash-loops when its database is briefly unavailable is
+// worse than one that starts degraded and recovers. Two switches control startup:
+//   Database:MigrateOnStartup   (default true)  — attempt EF migrations at startup.
+//                                                  Set false to skip the (compute-costing)
+//                                                  attempt when the DB is known-unavailable;
+//                                                  apply later via restart or the admin page.
+//   Database:ContinueOnInitFailure (default true) — start the app even if DB init fails,
+//                                                  logging CRITICAL instead of crash-looping.
+//                                                  Set false to fail fast (old behaviour).
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var logger = services.GetRequiredService<ILogger<Program>>();
     var dbProvider = builder.Configuration["DatabaseProvider"] ?? "Sqlite";
-    
-    try
+    var migrateOnStartup = builder.Configuration.GetValue("Database:MigrateOnStartup", true);
+    var continueOnInitFailure = builder.Configuration.GetValue("Database:ContinueOnInitFailure", true);
+
+    var context = services.GetRequiredService<ApplicationDbContext>();
+    var schemaReady = false;
+
+    if (migrateOnStartup)
     {
-        var context = services.GetRequiredService<ApplicationDbContext>();
-        
-        logger.LogInformation("Applying {DatabaseProvider} database migrations...", dbProvider);
-        await context.Database.MigrateAsync();
-        logger.LogInformation("{DatabaseProvider} database migrations applied successfully.", dbProvider);
-
-        // Seed roles and admin user
-        logger.LogInformation("Seeding database...");
-        await SeedData.InitializeAsync(services);
-        logger.LogInformation("Database seeding completed.");
-
-        // Auto-sync clubs and courses from CSV files
-        await SyncClubsAndCoursesFromCsvAsync(services, app.Environment.ContentRootPath, logger);
-
-        // Seed AI provider settings from config if table is empty
-        var providerSettingsService = services.GetRequiredService<IAiProviderSettingsService>();
-        await providerSettingsService.SeedFromConfigAsync();
-
-        // Seed application settings with defaults
-        var appSettingsService = services.GetRequiredService<IApplicationSettingsService>();
-        await appSettingsService.SeedDefaultsAsync();
-
-        // Seed default tee sets for courses that have holes but no tee sets
-        var teeSetService = services.GetRequiredService<ITeeSetService>();
-        await teeSetService.SeedDefaultTeeSetsAsync();
-
-        // Cleanup old AI audit logs based on retention policy
-        var retentionDays = app.Configuration.GetValue<int>("AiInsights:AuditLogging:RetentionDays");
-        if (retentionDays > 0)
+        try
         {
-            var auditService = services.GetRequiredService<IAiAuditService>();
-            await auditService.CleanupOldLogsAsync(retentionDays);
+            logger.LogInformation("Applying {DatabaseProvider} database migrations...", dbProvider);
+            await context.Database.MigrateAsync();
+            logger.LogInformation("{DatabaseProvider} database migrations applied successfully.", dbProvider);
+            schemaReady = true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex,
+                "Database migration failed for {DatabaseProvider}. The app is starting in a DEGRADED state — "
+                + "database-backed features will error until migrations are applied. Apply them when the "
+                + "database is available (restart with a reachable DB, or the admin Database Migrations page).",
+                dbProvider);
+            if (!continueOnInitFailure) throw;
         }
     }
-    catch (Exception ex)
+    else
     {
-        logger.LogError(ex, "An error occurred during database initialization.");
-        // In production, you may want to throw to prevent app from starting with bad DB state
-        if (!app.Environment.IsDevelopment())
+        logger.LogWarning(
+            "Database:MigrateOnStartup is false — skipping startup migrations for {DatabaseProvider}. "
+            + "Apply pending migrations manually when the database is available.", dbProvider);
+        // Schema may already be in place from a prior deploy; only seed if we can connect.
+        try { schemaReady = await context.Database.CanConnectAsync(); }
+        catch (Exception ex) { logger.LogWarning(ex, "Database is unreachable; skipping seeding."); }
+    }
+
+    if (schemaReady)
+    {
+        try
         {
-            throw;
+            // Seed roles and admin user
+            logger.LogInformation("Seeding database...");
+            await SeedData.InitializeAsync(services);
+            logger.LogInformation("Database seeding completed.");
+
+            // Auto-sync clubs and courses from CSV files
+            await SyncClubsAndCoursesFromCsvAsync(services, app.Environment.ContentRootPath, logger);
+
+            // Seed AI provider settings from config if table is empty
+            var providerSettingsService = services.GetRequiredService<IAiProviderSettingsService>();
+            await providerSettingsService.SeedFromConfigAsync();
+
+            // Seed application settings with defaults
+            var appSettingsService = services.GetRequiredService<IApplicationSettingsService>();
+            await appSettingsService.SeedDefaultsAsync();
+
+            // Seed default tee sets for courses that have holes but no tee sets
+            var teeSetService = services.GetRequiredService<ITeeSetService>();
+            await teeSetService.SeedDefaultTeeSetsAsync();
+
+            // Cleanup old AI audit logs based on retention policy
+            var retentionDays = app.Configuration.GetValue<int>("AiInsights:AuditLogging:RetentionDays");
+            if (retentionDays > 0)
+            {
+                var auditService = services.GetRequiredService<IAiAuditService>();
+                await auditService.CleanupOldLogsAsync(retentionDays);
+            }
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred during database seeding.");
+            if (!continueOnInitFailure) throw;
+        }
+    }
+    else
+    {
+        logger.LogWarning("Skipping database seeding — schema is not ready / database is unreachable.");
     }
 }
 
