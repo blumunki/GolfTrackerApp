@@ -2,3 +2,45 @@ ClubName,CourseName,TeeName,Colour,CourseRating,SlopeRating,Gender,SortOrder
 Stockwood Park Golf Centre,Main Course,White,#FFFFFF,68.1,116,Male,1
 Stockwood Park Golf Centre,Main Course,Yellow,#FFD700,67.3,113,Male,2
 Stockwood Park Golf Centre,Main Course,Red,#FF0000,71.8,121,Female,3
+Cainhoe Wood Golf Club,The Manor,White,#FFFFFF,69.9,122,Male,1
+Cainhoe Wood Golf Club,The Manor,Yellow,#FFD700,68.3,118,Male,2
+Cainhoe Wood Golf Club,The Manor,Red,#FF0000,71.6,124,Female,3
+Chalgrave Manor Golf Club,Chalgrave Manor Golf Club,White,#FFFFFF,70,N/A,Male,1
+Chalgrave Manor Golf Club,Chalgrave Manor Golf Club,Yellow,#FFD700,69,N/A,Male,2
+Chalgrave Manor Golf Club,Chalgrave Manor Golf Club,Red,#FF0000,72.2,121,Female,3
+Mowsbury Golf Club,Mowsbury Golf Club,White,#FFFFFF,71,133,Male,1
+Mowsbury Golf Club,Mowsbury Golf Club,Yellow,#FFD700,69.1,127,Male,2
+Mowsbury Golf Club,Mowsbury Golf Club,Red,#FF0000,73.1,132,Female,3
+South Beds Golf Club,Galley Hill,White,#FFFFFF,70.6,126,Male,1
+South Beds Golf Club,Galley Hill,Yellow,#FFD700,68.9,124,Male,2
+South Beds Golf Club,Galley Hill,Red,#FF0000,72.4,124,Female,3
+Belton Woods Golf Club,Lakes,White,#FFFFFF,73.8,132,Male,1
+Belton Woods Golf Club,Lakes,Yellow,#FFD700,71.2,131,Male,2
+Belton Woods Golf Club,Lakes,Red,#FF0000,73.6,137,Female,3
+Belton Woods Golf Club,Woodside,White,#FFFFFF,72,N/A,Male,1
+Belton Woods Golf Club,Woodside,Yellow,#FFD700,73,N/A,Male,2
+Belton Woods Golf Club,Woodside,Red,#FF0000,72,N/A,Female,3
+Mount Pleasant Golf Club,Mount Pleasant Golf Club,White,#FFFFFF,67.6,123,Male,1
+Mount Pleasant Golf Club,Mount Pleasant Golf Club,Yellow,#FFD700,66.5,119,Male,2
+Mount Pleasant Golf Club,Mount Pleasant Golf Club,Red,#FF0000,69.9,124,Female,3
+Tilsworth Golf Centre,Tilsworth,White,#FFFFFF,67,N/A,Male,1
+Tilsworth Golf Centre,Tilsworth,Yellow,#FFD700,66,N/A,Male,2
+Tilsworth Golf Centre,Tilsworth,Red,#FF0000,68.8,120,Female,3
+Abbey Hill Golf Centre,Abbey Hill Golf Centre,White,#FFFFFF,69.1,124,Male,1
+Abbey Hill Golf Centre,Abbey Hill Golf Centre,Yellow,#FFD700,67.7,115,Male,2
+Abbey Hill Golf Centre,Abbey Hill Golf Centre,Red,#FF0000,70.6,121,Female,3
+Bedford & County Golf Club,Bedford & County Golf Club,White,#FFFFFF,71,128,Male,1
+Bedford & County Golf Club,Bedford & County Golf Club,Yellow,#FFD700,69.3,124,Male,2
+Bedford & County Golf Club,Bedford & County Golf Club,Red,#FF0000,72.9,129,Female,3
+Colmworth Golf Club,Colmworth Golf Club,White,#FFFFFF,71.2,130,Male,1
+Colmworth Golf Club,Colmworth Golf Club,Yellow,#FFD700,69.4,124,Male,2
+Colmworth Golf Club,Colmworth Golf Club,Red,#FF0000,72.3,126,Female,3
+The Warwickshire Golf Club,Earls,White,#FFFFFF,74.3,132,Male,1
+The Warwickshire Golf Club,Earls,Yellow,#FFD700,72.7,129,Male,2
+The Warwickshire Golf Club,Earls,Red,#FF0000,73.9,133,Female,3
+The Warwickshire Golf Club,Kings,White,#FFFFFF,73.2,130,Male,1
+The Warwickshire Golf Club,Kings,Yellow,#FFD700,71.5,130,Male,2
+The Warwickshire Golf Club,Kings,Red,#FF0000,73.4,127,Female,3
+Aylesbury Vale Golf Club,Aylesbury Vale Golf Club,White,#FFFFFF,70.8,119,Male,1
+Aylesbury Vale Golf Club,Aylesbury Vale Golf Club,Yellow,#FFD700,70.2,118,Male,2
+Aylesbury Vale Golf Club,Aylesbury Vale Golf Club,Red,#FF0000,71.4,121,Female,3
