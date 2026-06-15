@@ -272,6 +272,83 @@ public sealed class HandicapServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task HistoricalRound_WithNullTee_QualifiesViaCourseDefault()
+    {
+        await TestDataBuilder.SeedUserAsync(_factory);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory);
+        var course = await TestDataBuilder.SeedCourseAsync(_factory); // single "Yellow" tee, CR 70.0 / slope 120
+
+        // Historical round: no tee selection at all (the realistic backfill case).
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, strokesPerHole: 5, teeSetId: null);
+        await _handicapService.OnRoundCompletedAsync(round.RoundId);
+
+        var differential = await SingleDifferentialAsync();
+        Assert.Equal(18.8m, differential.Differential); // bogey golf via the default Yellow tee
+    }
+
+    [Fact]
+    public async Task NullTee_PrefersYellowOverOtherTees()
+    {
+        await TestDataBuilder.SeedUserAsync(_factory);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory);
+        var course = await TestDataBuilder.SeedCourseAsync(_factory); // Yellow: CR 70.0 / slope 120
+
+        // Add a White tee with a very different rating; the null-tee default must still be Yellow.
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            context.TeeSets.Add(new TeeSet
+            {
+                GolfCourseId = course.GolfCourseId,
+                Name = "White",
+                CourseRating = 60.0m,
+                SlopeRating = 100,
+                SortOrder = 0, // lower sort order than Yellow — name preference must win
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, strokesPerHole: 5, teeSetId: null);
+        await _handicapService.OnRoundCompletedAsync(round.RoundId);
+
+        var differential = await SingleDifferentialAsync();
+        Assert.Equal(70.0m, differential.CourseRating); // Yellow, not White's 60.0
+        Assert.Equal(18.8m, differential.Differential);
+    }
+
+    [Fact]
+    public async Task NullTee_NoYellow_UsesLowestSortOrderTee()
+    {
+        await TestDataBuilder.SeedUserAsync(_factory);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory);
+        // Course's only/seeded tee is "White" (sort order 1) — no Yellow exists.
+        var course = await TestDataBuilder.SeedCourseAsync(_factory, teeName: "White");
+
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, strokesPerHole: 5, teeSetId: null);
+        await _handicapService.OnRoundCompletedAsync(round.RoundId);
+
+        var differential = await SingleDifferentialAsync();
+        Assert.Equal(18.8m, differential.Differential); // qualifies via White as the lowest-sort default
+    }
+
+    [Fact]
+    public async Task NullTee_DefaultTeeHasNoRating_DoesNotQualify()
+    {
+        await TestDataBuilder.SeedUserAsync(_factory);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory);
+        var course = await TestDataBuilder.SeedCourseAsync(_factory, courseRating: null, slopeRating: null);
+
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, strokesPerHole: 5, teeSetId: null);
+        await _handicapService.OnRoundCompletedAsync(round.RoundId);
+
+        await using var context = await _factory.CreateDbContextAsync();
+        Assert.Equal(0, await context.ScoringDifferentials.CountAsync());
+    }
+
+    [Fact]
     public async Task Backfill_ReportsQualifiedOfProcessedAndBuildsHistory()
     {
         var (player, course, teeSetId) = await SeedBaseAsync();

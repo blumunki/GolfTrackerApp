@@ -37,6 +37,12 @@ public class HandicapService : IHandicapService
             return 0;
         }
 
+        // Load the course's tee sets once so a round with no explicit tee selection
+        // (every historical round — TeeSetId is null) can fall back to the course default.
+        var courseTeeSets = await context.TeeSets
+            .Where(ts => ts.GolfCourseId == round.GolfCourseId)
+            .ToListAsync();
+
         var differentialsWritten = 0;
         foreach (var roundPlayer in round.RoundPlayers)
         {
@@ -48,18 +54,18 @@ public class HandicapService : IHandicapService
                 continue; // incomplete scorecard — not qualifying
             }
 
-            // Tee selection lives on RoundPlayer; scores carry a denormalised copy.
-            var teeSetId = roundPlayer.TeeSetId
+            // Tee selection lives on RoundPlayer; scores carry a denormalised copy. When
+            // neither is set (historical rounds), use the course default — "null tee means
+            // default tees" (ARCHITECTURE §12.5). No round data is mutated.
+            var explicitTeeId = roundPlayer.TeeSetId
                 ?? scores.Select(s => s.TeeSetId).FirstOrDefault(t => t.HasValue);
-            if (teeSetId is null)
-            {
-                continue;
-            }
+            var teeSet = explicitTeeId is not null
+                ? courseTeeSets.FirstOrDefault(ts => ts.TeeSetId == explicitTeeId.Value)
+                : ResolveDefaultTeeSet(courseTeeSets);
 
-            var teeSet = await context.TeeSets.FindAsync(teeSetId.Value);
             if (teeSet is not { CourseRating: decimal rating, SlopeRating: int slope })
             {
-                continue; // no rating/slope — not qualifying
+                continue; // no tee, or default tee has no rating/slope — not qualifying
             }
 
             // v1 uses Hole.Par (not tee-specific par), matching the rest of the app.
@@ -79,7 +85,7 @@ public class HandicapService : IHandicapService
                 context.ScoringDifferentials.Add(existing);
             }
 
-            existing.TeeSetId = teeSetId.Value;
+            existing.TeeSetId = teeSet.TeeSetId;
             existing.AdjustedGrossScore = adjustedGross;
             existing.CourseRating = rating;
             existing.SlopeRating = slope;
@@ -93,6 +99,14 @@ public class HandicapService : IHandicapService
 
         return differentialsWritten;
     }
+
+    /// <summary>
+    /// The course's default tee for rounds with no explicit tee selection: "Yellow" (the
+    /// documented default that historical rounds map to), else the lowest-sort-order tee.
+    /// </summary>
+    private static TeeSet? ResolveDefaultTeeSet(IReadOnlyList<TeeSet> courseTeeSets) =>
+        courseTeeSets.FirstOrDefault(ts => ts.Name.Equals("Yellow", StringComparison.OrdinalIgnoreCase))
+        ?? courseTeeSets.OrderBy(ts => ts.SortOrder).ThenBy(ts => ts.TeeSetId).FirstOrDefault();
 
     public async Task<HandicapBackfillResult> BackfillPersonalHandicapsAsync()
     {
