@@ -311,6 +311,15 @@ Migrations are split per provider via derived context types in `GolfTrackerApp.C
 
 Production was reconciled and marked with SQL Server baseline `20260611161345_InitialSqlServer` on 2026-06-11. Both providers now apply migrations at startup. The SQL Server baseline uses `NO ACTION` for the optional `AspNetUsers.LinkedPlayerId` and `AiAuditLogs.AiChatSessionId` relationships to avoid cascade cycles while SQLite retains `SET NULL`. The completed human procedure remains documented in `docs/sql-server-baseline-runbook.md`.
 
+**Startup resilience (WORKLOG 0-13).** Startup migration is governed by two config switches (both default `true`), so an unavailable database degrades instead of crash-looping:
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `Database:MigrateOnStartup` | `true` | Attempt `MigrateAsync()` at startup. Set **false** (e.g. App Service app setting `Database__MigrateOnStartup=false`) to skip the compute-costing attempt when the DB is known-unavailable; apply later by restart with the flag back on, or the admin Database Migrations page (0-14). |
+| `Database:ContinueOnInitFailure` | `true` | On any DB init failure, log CRITICAL and start **degraded** (DB-backed features error until migrations apply) rather than failing startup. Set false to fail fast. |
+
+Seeding only runs once the schema is reachable. Because applying migrations itself consumes DB compute, the intended flow when production compute is exhausted is: deploy with `MigrateOnStartup=false` (comes up degraded, no wasted attempts) → when compute is available, apply migrations deliberately (restart with the flag on, or the admin page).
+
 **When making any database schema change, you MUST:**
 
 1. **Create BOTH migrations** (from the repository root):
@@ -533,6 +542,7 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 - Standard ASP.NET Core deployment (IIS, Azure App Service, Docker)
 - `web.config` included for IIS hosting
 - `appsettings.Production.json` for production connection strings
+- Startup applies EF migrations by default; when the production DB is unavailable the app starts degraded rather than crash-looping (see §5.1 startup resilience). Set `Database__MigrateOnStartup=false` to deploy without attempting migrations.
 
 ### Mobile
 - **Android**: `dotnet build -f net10.0-android` → APK/AAB
