@@ -226,6 +226,91 @@ public class HandicapService : IHandicapService
             .ToListAsync();
     }
 
+    public async Task<List<HandicapRoundQualification>> GetRoundQualificationsAsync(int playerId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var rounds = await context.Rounds
+            .AsNoTracking()
+            .Where(r => r.Status == RoundCompletionStatus.Completed
+                        && r.RoundPlayers.Any(rp => rp.PlayerId == playerId))
+            .Include(r => r.GolfCourse)
+            .Include(r => r.RoundPlayers)
+            .OrderByDescending(r => r.DatePlayed)
+                .ThenByDescending(r => r.RoundId)
+            .ToListAsync();
+
+        if (rounds.Count == 0)
+        {
+            return new List<HandicapRoundQualification>();
+        }
+
+        var roundIds = rounds.Select(r => r.RoundId).ToList();
+        var courseIds = rounds.Select(r => r.GolfCourseId).Distinct().ToList();
+
+        // Source of truth for "qualified" is the differential itself — so this view can never
+        // disagree with the computed index. Reasons are only derived for the excluded rounds.
+        var qualifiedRoundIds = (await context.ScoringDifferentials
+            .Where(d => d.PlayerId == playerId && roundIds.Contains(d.RoundId))
+            .Select(d => d.RoundId)
+            .ToListAsync()).ToHashSet();
+
+        var teeSetsByCourse = (await context.TeeSets
+            .Where(ts => courseIds.Contains(ts.GolfCourseId))
+            .ToListAsync())
+            .GroupBy(ts => ts.GolfCourseId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<TeeSet>)g.ToList());
+
+        var scoreCounts = (await context.Scores
+            .Where(s => s.PlayerId == playerId && roundIds.Contains(s.RoundId))
+            .GroupBy(s => s.RoundId)
+            .Select(g => new { RoundId = g.Key, Count = g.Count() })
+            .ToListAsync())
+            .ToDictionary(x => x.RoundId, x => x.Count);
+
+        return rounds.Select(r => new HandicapRoundQualification
+        {
+            RoundId = r.RoundId,
+            DatePlayed = r.DatePlayed,
+            CourseName = r.GolfCourse?.Name ?? "Unknown course",
+            Status = ClassifyRound(r, playerId, qualifiedRoundIds, teeSetsByCourse, scoreCounts),
+        }).ToList();
+    }
+
+    private static HandicapRoundStatus ClassifyRound(
+        Round round, int playerId, HashSet<int> qualifiedRoundIds,
+        IReadOnlyDictionary<int, IReadOnlyList<TeeSet>> teeSetsByCourse,
+        IReadOnlyDictionary<int, int> scoreCounts)
+    {
+        if (qualifiedRoundIds.Contains(round.RoundId))
+        {
+            return HandicapRoundStatus.Qualified;
+        }
+
+        if (round.HolesPlayed != QualifyingHoles)
+        {
+            return HandicapRoundStatus.NotEighteenHoles;
+        }
+
+        var teeSets = teeSetsByCourse.GetValueOrDefault(round.GolfCourseId) ?? Array.Empty<TeeSet>();
+        var roundPlayer = round.RoundPlayers.FirstOrDefault(rp => rp.PlayerId == playerId);
+        var teeSet = roundPlayer?.TeeSetId is int teeId
+            ? teeSets.FirstOrDefault(ts => ts.TeeSetId == teeId)
+            : ResolveDefaultTeeSet(teeSets);
+        if (teeSet is not { CourseRating: not null, SlopeRating: not null })
+        {
+            return HandicapRoundStatus.NoCourseRatingSlope;
+        }
+
+        if (scoreCounts.GetValueOrDefault(round.RoundId) != QualifyingHoles)
+        {
+            return HandicapRoundStatus.IncompleteScorecard;
+        }
+
+        // 18 holes, rated tee, full card, but no differential — treat as incomplete data.
+        return HandicapRoundStatus.IncompleteScorecard;
+    }
+
     public async Task<HandicapRecord> AddManualClubHandicapAsync(HandicapRecord record)
     {
         ValidateManualEntry(record);

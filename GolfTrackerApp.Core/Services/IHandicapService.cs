@@ -35,6 +35,14 @@ public interface IHandicapService
     Task<List<ScoringDifferential>> GetRecentDifferentialsAsync(int playerId);
 
     /// <summary>
+    /// Every completed round for the player, newest first, classified as qualifying or
+    /// excluded-with-reason — for transparency ("13 of your 20 rounds count, here's why").
+    /// A round counts iff it produced a scoring differential, so this never disagrees with
+    /// the computed index.
+    /// </summary>
+    Task<List<HandicapRoundQualification>> GetRoundQualificationsAsync(int playerId);
+
+    /// <summary>
     /// Records a manually entered club/regional handicap. Source and IsManualEntry are
     /// forced to ClubRegional/true; the player and club must exist and the index must be
     /// a plausible WHS value.

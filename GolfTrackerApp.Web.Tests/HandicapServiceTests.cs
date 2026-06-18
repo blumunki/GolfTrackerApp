@@ -434,6 +434,39 @@ public sealed class HandicapServiceTests : IDisposable
         Assert.True(diff.AdjustedGrossScore < parPlus5Ags);
     }
 
+    [Fact]
+    public async Task GetRoundQualifications_ClassifiesQualifyingAndExcludedRounds()
+    {
+        var (player, course, teeSetId) = await SeedBaseAsync(); // rated course (CR 70.0 / slope 120)
+
+        // Qualifying 18-hole round on a rated tee.
+        var qualifyingId = await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, strokesPerHole: 5, daysAgo: 1);
+
+        // 18-hole round on a course whose tee has no rating/slope.
+        var unratedCourse = await TestDataBuilder.SeedCourseAsync(
+            _factory, clubName: "Unrated GC", courseName: "Unrated", courseRating: null, slopeRating: null);
+        var unratedRound = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, unratedCourse.GolfCourseId, player.PlayerId, datePlayed: DateTime.UtcNow.Date.AddDays(-2));
+        await _handicapService.OnRoundCompletedAsync(unratedRound.RoundId);
+
+        // 9-hole round.
+        var nineCourse = await TestDataBuilder.SeedCourseAsync(
+            _factory, clubName: "Nine GC", courseName: "Nine", holes: 9);
+        var nineRound = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, nineCourse.GolfCourseId, player.PlayerId, datePlayed: DateTime.UtcNow.Date.AddDays(-3));
+        await _handicapService.OnRoundCompletedAsync(nineRound.RoundId);
+
+        var quals = await _handicapService.GetRoundQualificationsAsync(player.PlayerId);
+
+        Assert.Equal(3, quals.Count);
+        Assert.Equal(new[] { qualifyingId, unratedRound.RoundId, nineRound.RoundId },
+            quals.Select(q => q.RoundId)); // newest first
+        Assert.Equal(HandicapRoundStatus.Qualified, quals.Single(q => q.RoundId == qualifyingId).Status);
+        Assert.Equal(HandicapRoundStatus.NoCourseRatingSlope, quals.Single(q => q.RoundId == unratedRound.RoundId).Status);
+        Assert.Equal(HandicapRoundStatus.NotEighteenHoles, quals.Single(q => q.RoundId == nineRound.RoundId).Status);
+        Assert.Single(quals.Where(q => q.Qualifies));
+    }
+
     private async Task<(Player Player, GolfCourse Course, int TeeSetId)> SeedBaseAsync()
     {
         await TestDataBuilder.SeedUserAsync(_factory);
