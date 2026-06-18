@@ -53,7 +53,7 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | P-1b | Player-facing nav: frequency-first — Record Round as primary CTA (top + app bar), flat everyday links, single collapsible Directory group | polish | Blocked | | 2026-06-15 | Revised per feedback (Record Round must not be nested). Awaiting user confirmation of the revision. docs/NAVIGATION-IA.md §2 |
 | P-1c | Admin dashboard grouping into sections (People / Golf Data / System / AI) | polish | Available | | 2026-06-15 | Signed off. Independent of player nav. docs/NAVIGATION-IA.md §6 |
 | 2-16 | Handicap transparency: qualifying vs excluded rounds (with reason), best-N-of-window explainer, expectation-setting vs official handicaps | 2 | Blocked | | 2026-06-15 | Signed off (priority). Lives in the profile hub (P-1a) → build with it; ship alongside 2-17. Supersedes 2-15. docs/NAVIGATION-IA.md §4 |
-| 2-17 | WHS v2 adjusted gross = net double bogey (proper club/association WHS), replacing v1 par+5 | 2 | Available | | 2026-06-15 | Signed off. Independent. Oldest-first running index; par+5 fallback before an index exists; recompute via Handicap Backfill re-run (no schema change). Ship with 2-16 so the change is explained. docs/NAVIGATION-IA.md §5 |
+| 2-17 | WHS v2 adjusted gross = net double bogey (proper club/association WHS), replacing v1 par+5 | 2 | In Progress | Claude | 2026-06-15 | Signed off. Independent. Oldest-first running index; par+5 fallback before an index exists; recompute via Handicap Backfill re-run (no schema change). Ship with 2-16 so the change is explained. docs/NAVIGATION-IA.md §5 |
 
 Phases 3–6 items are seeded when their phase starts — see the development plan summary in `docs/ARCHITECTURE.md` §12.
 
