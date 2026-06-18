@@ -136,6 +136,72 @@ public sealed class WhsCalculatorTests
         Assert.Equal(8, WhsCalculator.ComputeAdjustedGrossScore(holes));
     }
 
+    // --- ComputeCourseHandicap: Index × (Slope/113) + (CR − Par), rounded ---
+
+    [Fact]
+    public void ComputeCourseHandicap_StandardSlope_AddsRatingMinusPar()
+    {
+        // 20.0 × (113/113) + (72.0 − 72) = 20
+        Assert.Equal(20, WhsCalculator.ComputeCourseHandicap(20.0m, 113, 72.0m, 72));
+    }
+
+    [Fact]
+    public void ComputeCourseHandicap_HigherSlopeAndRating_RaisesIt()
+    {
+        // 27.0 × (130/113) + (71.5 − 72) = 31.06… − 0.5 = 30.56 → 31
+        Assert.Equal(31, WhsCalculator.ComputeCourseHandicap(27.0m, 130, 71.5m, 72));
+    }
+
+    // --- StrokesReceivedOnHole: distribute the course handicap by stroke index ---
+
+    [Theory]
+    [InlineData(18, 1, 1)]   // CH 18 → exactly 1 per hole
+    [InlineData(18, 18, 1)]
+    [InlineData(20, 1, 2)]   // CH 20 → 1 each, +1 on SI 1 and 2
+    [InlineData(20, 2, 2)]
+    [InlineData(20, 3, 1)]
+    [InlineData(7, 7, 1)]    // CH 7 → +1 on SI 1..7 only
+    [InlineData(7, 8, 0)]
+    [InlineData(0, 1, 0)]    // scratch
+    [InlineData(-3, 1, 0)]   // plus handicap (v1: no stroke removal)
+    public void StrokesReceivedOnHole_DistributesByStrokeIndex(int courseHandicap, int strokeIndex, int expected)
+    {
+        Assert.Equal(expected, WhsCalculator.StrokesReceivedOnHole(courseHandicap, strokeIndex));
+    }
+
+    // --- Net double bogey adjusted gross: cap each hole at par + 2 + strokes received ---
+
+    [Fact]
+    public void ComputeAdjustedGrossScore_NetDoubleBogey_CapsBlowUpHoles()
+    {
+        // CH 18 → 1 stroke/hole → net double bogey = par + 3. A 9 on a par-4 SI-1 caps to 7.
+        var holes = new[] { (Par: 4, Strokes: 9, StrokeIndex: 1), (Par: 4, Strokes: 5, StrokeIndex: 2) };
+
+        Assert.Equal(7 + 5, WhsCalculator.ComputeAdjustedGrossScore(holes, courseHandicap: 18));
+    }
+
+    [Fact]
+    public void ComputeAdjustedGrossScore_NetDoubleBogey_IsLowerThanParPlus5_ForLowerHandicaps()
+    {
+        // CH 9 → SI 1..9 get +1. On a par-4 SI-3 hole, net double bogey = 4+2+1 = 7 (vs par+5 = 9).
+        var holes = Enumerable.Range(1, 18).Select(si => (Par: 4, Strokes: 10, StrokeIndex: si)).ToArray();
+
+        var ndb = WhsCalculator.ComputeAdjustedGrossScore(holes, courseHandicap: 9);
+        var parPlus5 = WhsCalculator.ComputeAdjustedGrossScore(holes.Select(h => (h.Par, h.Strokes)));
+
+        Assert.True(ndb < parPlus5);
+        // SI 1..9: cap 7 each = 63; SI 10..18: cap 6 each = 54 → 117
+        Assert.Equal(9 * 7 + 9 * 6, ndb);
+    }
+
+    [Fact]
+    public void ComputeAdjustedGrossScore_NetDoubleBogey_LeavesGoodHolesUntouched()
+    {
+        var holes = new[] { (Par: 4, Strokes: 4, StrokeIndex: 1), (Par: 3, Strokes: 2, StrokeIndex: 18) };
+
+        Assert.Equal(4 + 2, WhsCalculator.ComputeAdjustedGrossScore(holes, courseHandicap: 18));
+    }
+
     // --- CountingDifferentialsCount: the "lowest k" column of the WHS table ---
 
     [Theory]

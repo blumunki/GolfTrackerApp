@@ -984,7 +984,7 @@ The 4.1 models and 4.2 Player changes are implemented in `GolfTrackerApp.Core/Mo
 
 1. After each qualifying round (completed, 18 holes, course has tee set with rating/slope):
    - Calculate Score Differential: `(113 / SlopeRating) × (AdjustedGrossScore - CourseRating)`, rounded to 1 decimal
-   - **Adjusted Gross Score, v1 simplification**: cap each hole at `par + 5` (the WHS rule for players without an established index). v2 (WORKLOG `2-17`, see `docs/NAVIGATION-IA.md` §5): net double bogey using the player's index at round date and `Hole.StrokeIndex` — materially lowers the index for established higher handicaps.
+   - **Adjusted Gross Score**: each hole is capped at **net double bogey** (`par + 2 + strokes received`, where strokes received come from the player's Course Handicap distributed by `Hole.StrokeIndex`) — the proper WHS cap. The Course Handicap uses the player's index established by their *earlier* rounds (computed oldest-first, so a backfill stays correct); before an index exists, the cap falls back to `par + 5` (the WHS newcomer rule). Implemented in `WhsCalculator.ComputeAdjustedGrossScore`/`ComputeCourseHandicap`/`StrokesReceivedOnHole` and applied in `HandicapService` (WORKLOG `2-17`).
    - Store as `ScoringDifferential` record
 2. Handicap Index from the last 20 differentials — full WHS table:
 

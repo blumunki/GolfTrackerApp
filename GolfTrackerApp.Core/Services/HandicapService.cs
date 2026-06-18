@@ -68,9 +68,25 @@ public class HandicapService : IHandicapService
                 continue; // no tee, or default tee has no rating/slope — not qualifying
             }
 
-            // v1 uses Hole.Par (not tee-specific par), matching the rest of the app.
-            var adjustedGross = WhsCalculator.ComputeAdjustedGrossScore(
-                scores.Select(s => (s.Hole!.Par, s.Strokes)));
+            // Adjusted gross uses Hole.Par (not tee-specific par), matching the rest of the app.
+            // Proper WHS caps each hole at net double bogey, which needs the player's course
+            // handicap, which needs an index — so use the index established by this player's
+            // EARLIER rounds. Before an index exists, fall back to the par+5 newcomer cap.
+            var priorIndex = await GetPriorIndexAsync(context, roundPlayer.PlayerId, round.DatePlayed);
+            int adjustedGross;
+            if (priorIndex is decimal index)
+            {
+                var coursePar = scores.Sum(s => s.Hole!.Par);
+                var courseHandicap = WhsCalculator.ComputeCourseHandicap(index, slope, rating, coursePar);
+                adjustedGross = WhsCalculator.ComputeAdjustedGrossScore(
+                    scores.Select(s => (s.Hole!.Par, s.Strokes, s.Hole!.StrokeIndex ?? WhsCalculator.RoundHoles)),
+                    courseHandicap);
+            }
+            else
+            {
+                adjustedGross = WhsCalculator.ComputeAdjustedGrossScore(
+                    scores.Select(s => (s.Hole!.Par, s.Strokes)));
+            }
             var differential = WhsCalculator.ComputeDifferential(adjustedGross, rating, slope);
 
             var existing = await context.ScoringDifferentials
@@ -98,6 +114,24 @@ public class HandicapService : IHandicapService
         }
 
         return differentialsWritten;
+    }
+
+    /// <summary>
+    /// The player's personal index established by rounds played strictly before
+    /// <paramref name="beforeDate"/> (the index "going into" this round, used for net double
+    /// bogey). Null until three earlier differentials exist. Processing oldest-first keeps
+    /// this correct during a backfill.
+    /// </summary>
+    private async Task<decimal?> GetPriorIndexAsync(ApplicationDbContext context, int playerId, DateTime beforeDate)
+    {
+        var priorDifferentials = await context.ScoringDifferentials
+            .Where(d => d.PlayerId == playerId && d.Round!.DatePlayed < beforeDate)
+            .OrderByDescending(d => d.Round!.DatePlayed)
+                .ThenByDescending(d => d.RoundId)
+            .Select(d => d.Differential)
+            .Take(WhsCalculator.DifferentialWindow)
+            .ToListAsync();
+        return WhsCalculator.ComputeIndex(priorDifferentials);
     }
 
     /// <summary>

@@ -411,6 +411,29 @@ public sealed class HandicapServiceTests : IDisposable
         Assert.Equal(1, await context.HandicapRecords.CountAsync());
     }
 
+    [Fact]
+    public async Task NetDoubleBogey_AppliesOnceIndexEstablished_LoweringBlowUpRounds()
+    {
+        var (player, course, teeSetId) = await SeedBaseAsync(); // par 4×18, CR 70.0, slope 120
+
+        // Four steady bogey-golf rounds establish an index (each AGS 90, differential 18.8).
+        await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, strokesPerHole: 5, daysAgo: 5);
+        await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, strokesPerHole: 5, daysAgo: 4);
+        await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, strokesPerHole: 5, daysAgo: 3);
+        await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, strokesPerHole: 5, daysAgo: 2);
+
+        // A blow-up round (10 on every hole) must be capped at net double bogey, not par+5.
+        var blowUpRoundId = await CompleteRoundAsync(course.GolfCourseId, player.PlayerId, teeSetId, strokesPerHole: 10, daysAgo: 1);
+
+        await using var context = await _factory.CreateDbContextAsync();
+        var diff = await context.ScoringDifferentials.SingleAsync(d => d.RoundId == blowUpRoundId);
+
+        var parPlus5Ags = WhsCalculator.ComputeAdjustedGrossScore(Enumerable.Repeat((Par: 4, Strokes: 10), 18));
+        Assert.Equal(162, parPlus5Ags);             // par+5 cap would give 9×18
+        Assert.Equal(125, diff.AdjustedGrossScore); // net double bogey (course handicap 17): 17×7 + 1×6
+        Assert.True(diff.AdjustedGrossScore < parPlus5Ags);
+    }
+
     private async Task<(Player Player, GolfCourse Course, int TeeSetId)> SeedBaseAsync()
     {
         await TestDataBuilder.SeedUserAsync(_factory);

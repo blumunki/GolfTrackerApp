@@ -80,9 +80,50 @@ public static class WhsCalculator
             _ => (8, 0m),
         };
 
+    /// <summary>Holes in a standard round, used to distribute the course handicap.</summary>
+    public const int RoundHoles = 18;
+
     /// <summary>
-    /// Adjusted gross score: each hole capped at par + <see cref="MaxStrokesOverPar"/>.
+    /// Adjusted gross score, v1 fallback: each hole capped at par + <see cref="MaxStrokesOverPar"/>.
+    /// Used for players without an established index (and as a safety net).
     /// </summary>
     public static int ComputeAdjustedGrossScore(IEnumerable<(int Par, int Strokes)> holes) =>
         holes.Sum(h => Math.Min(h.Strokes, h.Par + MaxStrokesOverPar));
+
+    /// <summary>
+    /// Course Handicap = Index × (Slope / 113) + (Course Rating − Par), rounded to the
+    /// nearest whole stroke. The strokes a player receives on this course/tee.
+    /// </summary>
+    public static int ComputeCourseHandicap(decimal handicapIndex, int slopeRating, decimal courseRating, int par)
+    {
+        var courseHandicap = handicapIndex * slopeRating / StandardSlope + (courseRating - par);
+        return (int)Math.Round(courseHandicap, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// Strokes a player receives on one hole: the course handicap spread evenly across the
+    /// <see cref="RoundHoles"/> holes, with the remainder given to the lowest stroke-index
+    /// holes. Plus/zero handicaps receive none (v1 does not remove strokes).
+    /// </summary>
+    public static int StrokesReceivedOnHole(int courseHandicap, int strokeIndex, int holeCount = RoundHoles)
+    {
+        if (courseHandicap <= 0)
+        {
+            return 0;
+        }
+
+        var baseStrokes = courseHandicap / holeCount;
+        var remainder = courseHandicap % holeCount;
+        return baseStrokes + (strokeIndex <= remainder ? 1 : 0);
+    }
+
+    /// <summary>
+    /// Adjusted gross score, v2 (proper WHS): each hole capped at net double bogey —
+    /// par + 2 + strokes received on that hole, given the player's course handicap.
+    /// </summary>
+    public static int ComputeAdjustedGrossScore(
+        IEnumerable<(int Par, int Strokes, int StrokeIndex)> holes, int courseHandicap) =>
+        holes.Sum(h => Math.Min(
+            h.Strokes,
+            h.Par + 2 + StrokesReceivedOnHole(courseHandicap, h.StrokeIndex)));
 }
