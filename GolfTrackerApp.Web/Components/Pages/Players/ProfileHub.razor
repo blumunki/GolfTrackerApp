@@ -46,24 +46,59 @@ else
 
     <MudTabs Elevation="0" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pt-4">
         <MudTabPanel Text="Overview" Icon="@Icons.Material.Filled.Person">
-            <MudGrid>
-                <MudItem xs="12" md="6">
+            <MudGrid Class="mb-2">
+                <MudItem xs="6" md="3">
                     <MudPaper Class="pa-4" Outlined="true">
-                        <MudText Typo="Typo.h6" Class="mb-2">At a glance</MudText>
-                        <MudText Typo="Typo.body2">
-                            @_player.FirstName plays off
-                            @(_player.Handicap is double h ? h.ToString("0.0") : "no recorded handicap")@(_player.Handicap is null ? "" : ".")
-                        </MudText>
-                        <MudText Typo="Typo.body2" Class="mt-2">
-                            @_roundCount round@(_roundCount == 1 ? "" : "s") recorded.
+                        <MudText Typo="Typo.overline">Handicap</MudText>
+                        <MudText Typo="Typo.h4">@(_player.Handicap is double h ? h.ToString("0.0") : "—")</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.overline">Rounds</MudText>
+                        <MudText Typo="Typo.h4">@_roundCount</MudText>
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="6" md="3">
+                    <MudPaper Class="pa-4" Outlined="true">
+                        <MudText Typo="Typo.overline">Last played</MudText>
+                        <MudText Typo="Typo.h6" Class="mt-1">
+                            @(_rounds.FirstOrDefault()?.DatePlayed.ToString("d MMM yyyy") ?? "—")
                         </MudText>
                     </MudPaper>
                 </MudItem>
             </MudGrid>
+
+            <MudText Typo="Typo.h6" Class="mb-2">Recent rounds</MudText>
+            @if (!_rounds.Any())
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    No rounds yet. Record your first round to start tracking your game.
+                </MudText>
+            }
+            else
+            {
+                <MudTable Items="@_recentRounds" Dense="true" Hover="true">
+                    <HeaderContent>
+                        <MudTh>Date</MudTh>
+                        <MudTh>Course</MudTh>
+                        <MudTh Style="text-align:right">Holes</MudTh>
+                        <MudTh></MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd DataLabel="Date">@context.DatePlayed.ToString("d MMM yyyy")</MudTd>
+                        <MudTd DataLabel="Course">@CourseLabel(context.GolfCourse)</MudTd>
+                        <MudTd DataLabel="Holes" Style="text-align:right">@context.HolesPlayed</MudTd>
+                        <MudTd Style="text-align:right">
+                            <MudButton Size="Size.Small" Variant="Variant.Text" Href="@($"rounds/{context.RoundId}")">View</MudButton>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
         </MudTabPanel>
 
         <MudTabPanel Text="Stats" Icon="@Icons.Material.Filled.BarChart">
-            <PlayerReport PlayerId="_resolvedPlayerId.Value" />
+            <PlayerReport PlayerId="_resolvedPlayerId.Value" Embedded="true" />
         </MudTabPanel>
 
         <MudTabPanel Text="Handicap" Icon="@Icons.Material.Filled.TrendingDown">
@@ -86,7 +121,7 @@ else
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Date">@context.DatePlayed.ToString("d MMM yyyy")</MudTd>
-                        <MudTd DataLabel="Course">@context.GolfCourse?.Name</MudTd>
+                        <MudTd DataLabel="Course">@CourseLabel(context.GolfCourse)</MudTd>
                         <MudTd DataLabel="Holes" Style="text-align:right">@context.HolesPlayed</MudTd>
                         <MudTd Style="text-align:right">
                             <MudButton Size="Size.Small" Variant="Variant.Text"
@@ -106,7 +141,12 @@ else
     private int? _resolvedPlayerId;
     private Player? _player;
     private List<Round> _rounds = new();
+    private List<Round> _recentRounds = new();
     private int _roundCount;
+
+    private static string CourseLabel(GolfCourse? course) =>
+        course is null ? "" :
+        string.IsNullOrWhiteSpace(course.GolfClub?.Name) ? course.Name : $"{course.GolfClub!.Name} - {course.Name}";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -126,6 +166,7 @@ else
             _player = await PlayerService.GetPlayerByIdAsync(playerId);
             _rounds = await RoundService.GetRoundsForPlayerAsync(playerId, userId, isAdmin);
             _roundCount = _rounds.Count;
+            _recentRounds = _rounds.Take(5).ToList();
         }
 
         _loading = false;
