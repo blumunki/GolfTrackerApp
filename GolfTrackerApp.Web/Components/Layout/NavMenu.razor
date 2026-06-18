@@ -8,30 +8,30 @@
 
 @* Remove old nav structure, replace with MudNavMenu *@
 <MudNavMenu>
-    <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
-
-    @* Example: Golf Clubs link accessible to all *@
-    <MudNavLink Href="golfclubs" Icon="@Icons.Material.Filled.LocationCity">Golf Clubs</MudNavLink>
-
     <AuthorizeView>
         <Authorized>
-            <MudNavLink Href="players" Icon="@Icons.Material.Filled.People">Players</MudNavLink>
-            <MudNavLink Href="rounds" Icon="@Icons.Material.Filled.GolfCourse">Rounds</MudNavLink> @* Using GolfCourse icon for rounds *@
-            <MudNavLink Href="rounds/record" Icon="@Icons.Material.Filled.AddCircleOutline" IconColor="Color.Success">Record New Round</MudNavLink>
-            <MudNavLink Href="@GetMyStatsUrl()" Icon="@Icons.Material.Filled.BarChart" IconColor="Color.Info">My Stats</MudNavLink>
-            <MudNavLink Href="handicaps" Icon="@Icons.Material.Filled.TrendingDown" IconColor="Color.Primary">My Handicap</MudNavLink>
-            <MudNavLink Href="chat" Icon="@Icons.Material.Filled.AutoAwesome" IconColor="Color.Warning">AI Coach Chat</MudNavLink>
-            <MudNavLink Href="societies" Icon="@Icons.Material.Filled.Groups" IconColor="Color.Tertiary">Societies</MudNavLink>
+            @* Recording a round is the primary, most-frequent action — keep it prominent. *@
+            <div class="px-3 py-2">
+                <MudButton Href="rounds/record" Variant="Variant.Filled" Color="Color.Success" FullWidth="true"
+                           StartIcon="@Icons.Material.Filled.AddCircle" Class="py-3">Record Round</MudButton>
+            </div>
+
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+            <MudNavLink Href="rounds" Icon="@Icons.Material.Filled.GolfCourse">Rounds</MudNavLink>
+            <MudNavLink Href="@GetProfileUrl()" Icon="@Icons.Material.Filled.Person" IconColor="Color.Primary">My Profile</MudNavLink>
+            <MudNavLink Href="chat" Icon="@Icons.Material.Filled.AutoAwesome" IconColor="Color.Warning">AI Coach</MudNavLink>
+
+            @* Reference data, visited less often. *@
+            <MudNavGroup Title="Directory" Icon="@Icons.Material.Filled.MenuBook" Expanded="false">
+                <MudNavLink Href="golfclubs" Icon="@Icons.Material.Filled.LocationCity">Clubs &amp; Courses</MudNavLink>
+                <MudNavLink Href="players" Icon="@Icons.Material.Filled.People">Players</MudNavLink>
+                <MudNavLink Href="societies" Icon="@Icons.Material.Filled.Groups">Societies</MudNavLink>
+            </MudNavGroup>
 
             @* Player Account Links *@
             <MudListSubheader>My Account</MudListSubheader>
             <MudNavLink Href="Account/Manage" Icon="@Icons.Material.Filled.Person">@context.User.Identity?.Name</MudNavLink>
-            @* Logout still needs a form, so it's a bit different.
-               You might keep your existing form-based logout or adapt it.
-               For a MudNavLink style, you might need a component that wraps the form.
-               Alternatively, a button in the AppBar (MainLayout) is common for logout.
-            *@
-            <div class="px-4 mt-2"> @* Simple form for logout, styled as best as possible within nav *@
+            <div class="px-4 mt-2"> @* Simple form for logout *@
                  <form action="Account/Logout" method="post">
                     <AntiforgeryToken />
                     <input type="hidden" name="ReturnUrl" value="@currentUrl" />
@@ -40,6 +40,8 @@
             </div>
         </Authorized>
         <NotAuthorized>
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Dashboard</MudNavLink>
+            <MudNavLink Href="golfclubs" Icon="@Icons.Material.Filled.LocationCity">Golf Clubs</MudNavLink>
             <MudNavLink Href="Account/Register" Icon="@Icons.Material.Filled.PersonAdd">Register</MudNavLink>
             <MudNavLink Href="Account/Login" Icon="@Icons.Material.Filled.Login">Login</MudNavLink>
         </NotAuthorized>
@@ -107,9 +109,9 @@
         }
     }
 
-    private string GetMyStatsUrl()
+    private string GetProfileUrl()
     {
-        return _currentPlayerId.HasValue ? $"/players/{_currentPlayerId.Value}/report" : "/players";
+        return _currentPlayerId.HasValue ? $"/players/{_currentPlayerId.Value}/profile" : "/profile";
     }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
