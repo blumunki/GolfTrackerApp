@@ -1,0 +1,358 @@
+@inject IPlayerService PlayerService
+@inject IHandicapService HandicapService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+@using GolfTrackerApp.Web.Components.Shared
+
+@* Reusable per-player handicap view: active handicaps, primary selector + club handicap
+   management, personal index history, a plain-English "how this is calculated" panel
+   (WORKLOG 2-16), and the last-20 differentials. Hosted by /handicaps and the profile hub. *@
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_player is null)
+{
+    <MudAlert Severity="Severity.Info">No player profile to show handicaps for.</MudAlert>
+}
+else
+{
+    <!-- Active handicaps -->
+    <MudGrid Class="mb-4">
+        @if (!_activeHandicaps.Any())
+        {
+            <MudItem xs="12">
+                <MudAlert Severity="Severity.Info">
+                    No handicaps yet. A personal WHS index appears automatically once three
+                    qualifying 18-hole rounds (on tees with a course rating and slope) are recorded.
+                </MudAlert>
+            </MudItem>
+        }
+        @foreach (var handicap in _activeHandicaps)
+        {
+            <MudItem xs="12" sm="6" md="4">
+                <MudPaper Class="pa-4" Outlined="true">
+                    <MudText Typo="Typo.overline">@SourceLabel(handicap)</MudText>
+                    <MudText Typo="Typo.h3">@handicap.HandicapIndex.ToString("0.0")</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Effective @handicap.EffectiveDate.ToString("d MMM yyyy")
+                        @if (handicap.ExpiryDate is DateTime expiry)
+                        {
+                            <text> · expires @expiry.ToString("d MMM yyyy")</text>
+                        }
+                    </MudText>
+                    @if (_player.PrimaryHandicapSource == handicap.Source)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mt-2">Primary</MudChip>
+                    }
+                </MudPaper>
+            </MudItem>
+        }
+    </MudGrid>
+
+    <!-- Primary source + club handicap management -->
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudSelect T="HandicapSource?" Value="@_player.PrimaryHandicapSource"
+                           ValueChanged="OnPrimarySourceChanged" Label="Primary handicap (shown on the profile)"
+                           Clearable="true" Placeholder="Manual value">
+                    <MudSelectItem T="HandicapSource?" Value="@((HandicapSource?)HandicapSource.Personal)">Personal (WHS)</MudSelectItem>
+                    <MudSelectItem T="HandicapSource?" Value="@((HandicapSource?)HandicapSource.ClubRegional)">Club / Regional</MudSelectItem>
+                    <MudSelectItem T="HandicapSource?" Value="@((HandicapSource?)HandicapSource.Society)">Society</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" sm="6" Class="d-flex align-center justify-end">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" OnClick="AddClubHandicapAsync">
+                    Add Club Handicap
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+
+        @if (_manualClubRecords.Any())
+        {
+            <MudTable Items="@_manualClubRecords" Dense="true" Class="mt-3">
+                <HeaderContent>
+                    <MudTh>Club</MudTh>
+                    <MudTh Style="text-align:right">Index</MudTh>
+                    <MudTh>Effective</MudTh>
+                    <MudTh>Expires</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Club">@context.GolfClub?.Name</MudTd>
+                    <MudTd DataLabel="Index" Style="text-align:right">@context.HandicapIndex.ToString("0.0")</MudTd>
+                    <MudTd DataLabel="Effective">@context.EffectiveDate.ToString("d MMM yyyy")</MudTd>
+                    <MudTd DataLabel="Expires">@(context.ExpiryDate?.ToString("d MMM yyyy") ?? "—")</MudTd>
+                    <MudTd Style="text-align:right">
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                       OnClick="@(() => EditClubHandicapAsync(context))" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => DeleteClubHandicapAsync(context))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+
+    <!-- Personal index history -->
+    @if (_xAxisLabels.Length > 1)
+    {
+        <div class="gp-card report-chart-section mb-4">
+            <div class="report-chart-header">
+                <MudText Typo="Typo.h6">Personal Index History</MudText>
+            </div>
+            <div class="golf-chart-container report-chart-tall">
+                <MudChart ChartType="ChartType.Line"
+                          ChartSeries="@_series"
+                          XAxisLabels="@_xAxisLabels"
+                          ChartOptions="@_chartOptions"
+                          Width="100%"
+                          Height="100%"></MudChart>
+            </div>
+        </div>
+    }
+
+    <!-- How your index is calculated (transparency, WORKLOG 2-16) -->
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">How this is calculated</MudText>
+        <MudText Typo="Typo.body2" Class="mb-2">
+            <strong>@_qualifyingCount of your @_qualifications.Count completed 18-hole rounds</strong>
+            count toward your Personal (WHS) index.
+            @if (_differentials.Any())
+            {
+                <text>
+                    Each counting round becomes a <em>Score Differential</em>
+                    — roughly how many shots over the course's difficulty you played
+                    (113 ÷ Slope × (adjusted score − Course Rating)). Your index is the average of your
+                    <strong>lowest @WhsCalculator.CountingDifferentialsCount(_differentials.Count)</strong>
+                    differentials from your last @_differentials.Count, so only your better rounds count.
+                </text>
+            }
+        </MudText>
+
+        @if (_excluded.Any())
+        {
+            <MudExpansionPanels Elevation="0">
+                <MudExpansionPanel Text="@($"{_excluded.Count} round(s) don't count — see why")">
+                    <MudTable Items="@_excluded" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Date</MudTh>
+                            <MudTh>Course</MudTh>
+                            <MudTh>Reason</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Date">@context.DatePlayed.ToString("d MMM yyyy")</MudTd>
+                            <MudTd DataLabel="Course">@context.CourseName</MudTd>
+                            <MudTd DataLabel="Reason">@ReasonText(context.Status)</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+        }
+
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+            This is a WHS-style estimate from the rounds recorded here. It can differ from an official
+            club or county handicap, which may use a different set of rounds.
+        </MudText>
+    </MudPaper>
+
+    <!-- Last-20 differentials -->
+    <MudPaper Class="pa-4" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Scoring Differentials (last @_differentials.Count rounds)</MudText>
+        @if (!_differentials.Any())
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                No qualifying rounds yet — differentials are calculated for completed 18-hole
+                rounds played from tees with a course rating and slope.
+            </MudText>
+        }
+        else
+        {
+            <MudTable Items="@_differentials" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Date</MudTh>
+                    <MudTh>Course</MudTh>
+                    <MudTh>Tees</MudTh>
+                    <MudTh Style="text-align:right">Adj. Gross</MudTh>
+                    <MudTh Style="text-align:right">Rating / Slope</MudTh>
+                    <MudTh Style="text-align:right">Differential</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Date">@context.Round?.DatePlayed.ToString("d MMM yyyy")</MudTd>
+                    <MudTd DataLabel="Course">@context.Round?.GolfCourse?.Name</MudTd>
+                    <MudTd DataLabel="Tees">@context.TeeSet?.Name</MudTd>
+                    <MudTd DataLabel="Adj. Gross" Style="text-align:right">@context.AdjustedGrossScore</MudTd>
+                    <MudTd DataLabel="Rating / Slope" Style="text-align:right">
+                        @context.CourseRating.ToString("0.0") / @context.SlopeRating
+                    </MudTd>
+                    <MudTd DataLabel="Differential" Style="text-align:right">@context.Differential.ToString("0.0")</MudTd>
+                    <MudTd>
+                        @if (context.IsUsedInCalculation)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Text">Counting</MudChip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public int PlayerId { get; set; }
+
+    private bool _loading = true;
+    private Player? _player;
+    private List<HandicapRecord> _activeHandicaps = new();
+    private List<HandicapRecord> _manualClubRecords = new();
+    private List<ScoringDifferential> _differentials = new();
+    private List<HandicapRoundQualification> _qualifications = new();
+    private List<HandicapRoundQualification> _excluded = new();
+    private int _qualifyingCount;
+    private List<ChartSeries> _series = new();
+    private string[] _xAxisLabels = Array.Empty<string>();
+    private readonly ChartOptions _chartOptions = new() { YAxisTicks = 5, InterpolationOption = InterpolationOption.Straight };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _player = await PlayerService.GetPlayerByIdAsync(PlayerId);
+        await LoadDataAsync();
+        _loading = false;
+    }
+
+    private async Task LoadDataAsync()
+    {
+        if (_player is null) return;
+
+        var activeTask = HandicapService.GetActiveHandicapsAsync(_player.PlayerId);
+        var historyTask = HandicapService.GetHandicapRecordsAsync(_player.PlayerId, HandicapSource.Personal);
+        var clubTask = HandicapService.GetHandicapRecordsAsync(_player.PlayerId, HandicapSource.ClubRegional);
+        var differentialsTask = HandicapService.GetRecentDifferentialsAsync(_player.PlayerId);
+        var qualificationsTask = HandicapService.GetRoundQualificationsAsync(_player.PlayerId);
+        await Task.WhenAll(activeTask, historyTask, clubTask, differentialsTask, qualificationsTask);
+
+        _activeHandicaps = activeTask.Result;
+        _differentials = differentialsTask.Result;
+        _manualClubRecords = clubTask.Result.Where(r => r.IsManualEntry).ToList();
+        _qualifications = qualificationsTask.Result;
+        _excluded = _qualifications.Where(q => !q.Qualifies).ToList();
+        _qualifyingCount = _qualifications.Count(q => q.Qualifies);
+        PrepareHistoryChart(historyTask.Result);
+    }
+
+    private async Task OnPrimarySourceChanged(HandicapSource? source)
+    {
+        if (_player is null) return;
+
+        var updated = await HandicapService.SetPrimaryHandicapSourceAsync(_player.PlayerId, source);
+        if (updated is not null)
+        {
+            _player = updated;
+            Snackbar.Add("Primary handicap updated.", Severity.Success);
+        }
+        await LoadDataAsync();
+    }
+
+    private async Task AddClubHandicapAsync()
+    {
+        if (_player is null) return;
+
+        var parameters = new DialogParameters<ClubHandicapDialog>
+        {
+            { x => x.Record, new HandicapRecord { PlayerId = _player.PlayerId } },
+            { x => x.Title, "Add Club Handicap" },
+        };
+        var dialog = await DialogService.ShowAsync<ClubHandicapDialog>("Add Club Handicap", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadPlayerAndDataAsync();
+        }
+    }
+
+    private async Task EditClubHandicapAsync(HandicapRecord record)
+    {
+        var parameters = new DialogParameters<ClubHandicapDialog>
+        {
+            // Edit a copy so a cancelled dialog leaves the table untouched.
+            { x => x.Record, new HandicapRecord
+                {
+                    HandicapRecordId = record.HandicapRecordId,
+                    PlayerId = record.PlayerId,
+                    GolfClubId = record.GolfClubId,
+                    HandicapIndex = record.HandicapIndex,
+                    EffectiveDate = record.EffectiveDate,
+                    ExpiryDate = record.ExpiryDate,
+                } },
+            { x => x.Title, "Edit Club Handicap" },
+        };
+        var dialog = await DialogService.ShowAsync<ClubHandicapDialog>("Edit Club Handicap", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await ReloadPlayerAndDataAsync();
+        }
+    }
+
+    private async Task DeleteClubHandicapAsync(HandicapRecord record)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Delete the {record.GolfClub?.Name} handicap of {record.HandicapIndex:0.0}?" },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Confirm Delete", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled)
+        {
+            await HandicapService.DeleteManualClubHandicapAsync(record.HandicapRecordId);
+            Snackbar.Add("Club handicap deleted.", Severity.Success);
+            await ReloadPlayerAndDataAsync();
+        }
+    }
+
+    /// <summary>CRUD can change Player.Handicap/primary display — refresh the player too.</summary>
+    private async Task ReloadPlayerAndDataAsync()
+    {
+        if (_player is not null)
+        {
+            _player = await PlayerService.GetPlayerByIdAsync(_player.PlayerId) ?? _player;
+        }
+        await LoadDataAsync();
+    }
+
+    private void PrepareHistoryChart(List<HandicapRecord> personalHistory)
+    {
+        var ordered = personalHistory.OrderBy(h => h.EffectiveDate).ThenBy(h => h.HandicapRecordId).ToList();
+        _series = new List<ChartSeries>
+        {
+            new() { Name = "Personal index", Data = ordered.Select(h => (double)h.HandicapIndex).ToArray() },
+        };
+        _xAxisLabels = ordered.Select(h => h.EffectiveDate.ToString("d MMM")).ToArray();
+    }
+
+    private static string SourceLabel(HandicapRecord handicap) => handicap.Source switch
+    {
+        HandicapSource.Personal => "Personal (WHS)",
+        HandicapSource.ClubRegional => handicap.GolfClub?.Name ?? "Club / Regional",
+        HandicapSource.Society => handicap.GolfSociety?.Name ?? "Society",
+        _ => handicap.Source.ToString(),
+    };
+
+    private static string ReasonText(HandicapRoundStatus status) => status switch
+    {
+        HandicapRoundStatus.NotEighteenHoles => "Not an 18-hole round",
+        HandicapRoundStatus.NoCourseRatingSlope => "Tee has no course rating / slope",
+        HandicapRoundStatus.IncompleteScorecard => "Incomplete scorecard",
+        _ => "Counts",
+    };
+}
