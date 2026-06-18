@@ -146,13 +146,13 @@ GolfTrackerApp.Web/
 │   │   ├── Home.razor                # Dashboard with AI insights widget
 │   │   ├── AiChat.razor              # AI coach chat with persistent sessions
 │   │   ├── GolfClubs/                # Club list, add, edit, details
-│   │   ├── GolfCourses/              # Course list, add, edit, details
-│   │   ├── Handicaps/                # Handicap dashboard (active handicaps, history, differentials)
-│   │   ├── Players/                  # Player list, add, edit, report
+│   │   ├── GolfCourses/              # Course list, add, edit, details (incl. tee-set rating/slope editing)
+│   │   ├── Handicaps/                # HandicapPanel (reusable, parameterised) + transparency; /handicaps wrapper
+│   │   ├── Players/                  # Player list, add, edit, report (PlayerReport), profile hub (ProfileHub)
 │   │   ├── Rounds/                   # Round list, record, details
-│   │   └── Admin/                    # Dashboard, Users, Players, Content Health,
-│   │                                 # Connections, Notifications, Audit, Data Migration,
-│   │                                 # AI Providers, AI Usage
+│   │   └── Admin/                    # Dashboard, Users, Players, Content Health, Connections,
+│   │                                 # Notifications, Audit, Data Migration, Handicap Backfill,
+│   │                                 # Database Migrations, System Health, Settings, AI Providers, AI Usage
 │   ├── Layout/                       # MainLayout + NavMenu
 │   ├── Shared/                       # Dialogs, reusable components
 │   └── Account/                      # Identity UI pages (scaffolded)

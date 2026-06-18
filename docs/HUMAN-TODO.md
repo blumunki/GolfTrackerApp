@@ -35,3 +35,25 @@ switch safely to EF Core migrations.
   unblock item `0-9`.
 
 Completed against production on 2026-06-11.
+
+## Production deploy of Phase-2 handicaps (pending — DB compute exhausted)
+
+**Status:** Pending human action. **Context:** see `docs/ARCHITECTURE.md` §5.1 (startup resilience).
+
+A large batch of commits (Phase-2 handicaps, navigation/IA, WHS v2) is built and tested
+locally but **not yet deployed**. Production Azure SQL ran out of its monthly compute
+allowance (resets at the start of the month), and applying the pending `AddHandicapTables`
+migration itself consumes compute, so the deploy is deliberately deferred.
+
+The app is now resilient to this (it starts degraded instead of crash-looping — WORKLOG 0-13).
+When ready to release:
+
+- [ ] Push `main` (this triggers CI + the Azure deploy).
+- [ ] Set Azure App Service application setting `Database__MigrateOnStartup=false` **after** the
+  deploy lands, so the app doesn't attempt the migration on a compute-starved DB. (Do not set
+  it before the new code is deployed — the old code ignores the flag and would crash on restart.)
+- [ ] When production compute is available (month reset): apply the schema via
+  **Admin → Database Migrations → Apply Pending Migrations** (or set `MigrateOnStartup=true` and
+  restart). Back up the DB first.
+- [ ] Run **Admin → Handicap Backfill** to compute everyone's WHS index with the v2 method.
+- [ ] (Optional) Re-run `docs/sql-server-drift-check.sql` to confirm a clean schema.

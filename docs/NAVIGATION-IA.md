@@ -1,9 +1,11 @@
 # Navigation & Information-Architecture Proposal
 
-> **Status: PROPOSED — awaiting user sign-off.** This is a design proposal, not built
-> functionality. `docs/ARCHITECTURE.md` remains the source of truth for what exists.
-> Once signed off, the build items below (WORKLOG `P-1a/b/c`, `2-16`, `2-17`) move from
-> `Blocked` to `Available`. Agents: do not build from this doc until the board says so.
+> **Status: APPROVED & BUILT (2026-06-15).** `P-1a/b/c`, `2-16`, `2-17` are Done, plus the
+> `P-3` review fixes (Overview home, embedded Stats, 18-hole transparency denominator,
+> Club-Course labels, grouped admin side-nav, player tiles → profiles, connected-tile
+> handicaps). `docs/ARCHITECTURE.md` is the source of truth for what now exists; this doc is
+> kept as the design rationale. **Remaining:** `P-2` — Record Round in the top app bar +
+> mobile bottom-nav parity (§2). This doc no longer gates work; follow the WORKLOG board.
 
 ## 1. Why
 
@@ -150,15 +152,16 @@ AI           AI Providers · AI Usage
 
 Supersedes the "discoverability" half of P-1.
 
-## 7. Build decomposition (seeded on the board, Blocked pending sign-off)
+## 7. Build decomposition (all Done — see WORKLOG)
 
-| Item | Scope |
-|------|-------|
-| `P-1a` | Player Profile hub (§3) — consolidate stats + handicap + recent rounds; per-player incl. managed; replaces My Stats + My Handicap nav |
-| `P-1b` | Player nav grouping (§2) — MudNavGroup clusters |
-| `P-1c` | Admin dashboard grouping (§6) |
-| `2-16` | Handicap transparency (§4) — qualifying/excluded rounds + explainer + expectation note (supersedes 2-15) |
-| `2-17` | WHS v2 adjusted gross = net double bogey (§5) — independent; not gated on sign-off |
+| Item | Scope | Status |
+|------|-------|--------|
+| `P-1a` | Player Profile hub (§3) — `/players/{id}/profile` + `/profile`, tabs reuse PlayerReport + HandicapPanel | ✅ Done |
+| `P-1b` | Player nav (§2) — frequency-first, Record Round primary CTA, Directory group | ✅ Done |
+| `P-1c` | Admin grouping (§6) — dashboard + side-nav (`P-3`) | ✅ Done |
+| `2-16` | Handicap transparency (§4) — qualifying/excluded rounds + explainer + expectation note | ✅ Done |
+| `2-17` | WHS v2 adjusted gross = net double bogey (§5) | ✅ Done |
+| `P-2` | Record Round in the top app bar + mobile bottom-nav parity (§2) | ⏳ Available |
 
 ## 8. Sign-off status
 
