@@ -573,6 +573,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | — | Core project extraction | ✅ Done | Models, services, data, and migrations live in `GolfTrackerApp.Core` (`GolfTrackerApp.Core.*` namespaces); tests reference Core directly; deploy triggers on Web + Core paths |
 | — | Proactive AI coaching (background jobs) | ❌ Not started | AI layer is user-triggered only today |
 | — | Course data expansion (OSM geometry, AI-assisted entry) + hole visuals | ❌ Not started | |
+| — | Navigation & IA consolidation (player profile hub, grouped nav/admin, handicap transparency, WHS v2 adjusted gross) | 📋 Proposed | See `docs/NAVIGATION-IA.md`; build items `P-1a/b/c`, `2-16`, `2-17` (Blocked pending sign-off) |
 
 ### 12.1 Mobile Feature Parity — Critical
 
@@ -983,7 +984,7 @@ The 4.1 models and 4.2 Player changes are implemented in `GolfTrackerApp.Core/Mo
 
 1. After each qualifying round (completed, 18 holes, course has tee set with rating/slope):
    - Calculate Score Differential: `(113 / SlopeRating) × (AdjustedGrossScore - CourseRating)`, rounded to 1 decimal
-   - **Adjusted Gross Score, v1 simplification**: cap each hole at `par + 5` (the WHS rule for players without an established index). v2 (later): net double bogey using the player's index at round date and `Hole.StrokeIndex`.
+   - **Adjusted Gross Score, v1 simplification**: cap each hole at `par + 5` (the WHS rule for players without an established index). v2 (WORKLOG `2-17`, see `docs/NAVIGATION-IA.md` §5): net double bogey using the player's index at round date and `Hole.StrokeIndex` — materially lowers the index for established higher handicaps.
    - Store as `ScoringDifferential` record
 2. Handicap Index from the last 20 differentials — full WHS table:
 
