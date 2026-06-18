@@ -22,25 +22,42 @@ Two related problems have emerged as the app has grown:
 
 ## 2. Player-facing navigation
 
-Group the flat links into purpose clusters (MudNavGroup), and introduce a **Player Profile
-hub** that consolidates the per-player views.
+**Recording a round is the app's primary, most-frequent action (~90%+ of visits — it's why
+users return).** So the IA is organised by **frequency, not by symmetric categories**: Record
+Round is a standout primary action that is never nested, the everyday views sit flat beneath
+it, and only the lower-frequency reference data is grouped.
 
 ```
-Dashboard                     (landing — unchanged)
-Play
-  ├── Record Round
-  └── Rounds                  (history; Live Round resumes from here)
-My Golf
-  ├── My Profile              (NEW hub — see §3)
-  └── AI Coach
-Directory
-  ├── Clubs & Courses
-  ├── Players
-  └── Societies
+┌────────────────────────────┐
+│  ➕  Record Round          │   primary CTA — highlighted, pinned to the top of the nav AND
+└────────────────────────────┘   present in the top app bar, so it's one tap from every page
+  Dashboard
+  Rounds                        your history; resume an in-progress live round from here
+  My Profile                    stats + handicap, tabbed (§3)
+  AI Coach
+  ── Directory ──               collapsible group — reference data, visited less often
+    Clubs & Courses
+    Players
+    Societies
 ```
 
-`My Stats` and `My Handicap` stop being separate top-level links — they become tabs/sections
-inside **My Profile**.
+Why this shape (addressing the earlier Play / My Golf / Directory objection):
+
+- **Record Round stays top-level and prominent** — never buried under a group. A persistent
+  Record Round action in the top app bar keeps the #1 feature one tap away everywhere. When a
+  round is already in progress it reads **"Resume Live Round"** and the Dashboard surfaces it,
+  so getting back to live scoring is immediate. (Live vs after-the-fact entry are two ways into
+  the *same* recording workflow, not separate nav items.)
+- **Everyday views are flat** (Dashboard, Rounds, My Profile, AI Coach) — no extra clicks for
+  things people use often.
+- **Only one group** (Directory) for the reference data a user touches rarely. We deliberately
+  do *not* force every link into a category — the symmetric three-group scheme demoted Record
+  Round and was tidy at the expense of the core journey.
+- `My Stats` and `My Handicap` stop being separate top-level links — they fold into **My
+  Profile** (§3).
+- **Mobile parallel**: the MAUI bottom nav mirrors this — Record Round as the prominent centre
+  action with Dashboard / Rounds / Profile around it. Mobile nav is a separate follow-up, noted
+  here so web and mobile stay consistent.
 
 ## 3. Player Profile hub
 
@@ -92,16 +109,32 @@ a ~27-handicap is roughly par + 3 on most holes — materially lower than par + 
 systematically inflates adjusted gross, differentials, and the index for established higher
 handicaps.
 
-**v2**: compute net double bogey using the player's Course Handicap and `Hole.StrokeIndex`.
-Complications to handle (documented for whoever picks it up):
-- Course Handicap needs an index, but the index is what we're computing → process rounds
-  **oldest-first using the running index**, and fall back to the v1 par+5 cap for the earliest
-  rounds before an index is established.
-- Needs per-hole `StrokeIndex` (already on `Hole`) and the tee's rating/slope (already stored).
-- This is a behaviour change to everyone's computed index (generally lowering higher handicaps),
-  so it should ship with a backfill re-run and a clear changelog note.
+**v2 (signed off): compute the handicap "properly", the way a club/association would** — net
+double bogey using the player's Course Handicap and `Hole.StrokeIndex`, so the result is
+comparable to an official WHS handicap. Details for whoever builds it:
 
-Tracked as WORKLOG `2-17`. Independent of the IA decision — can proceed on its own.
+- Net double bogey per hole = `par + 2 + handicap strokes received on that hole`, where strokes
+  received come from the player's Course Handicap distributed by `Hole.StrokeIndex`.
+- Course Handicap needs an index, but the index is what we're computing → process rounds
+  **oldest-first using the running index** (the backfill already runs oldest-first). For the
+  earliest rounds before any index exists, fall back to the `par + 5` cap — this matches how WHS
+  treats a player with no established index, so it stays "proper".
+- Inputs already exist: per-hole `StrokeIndex` on `Hole`, and tee rating/slope on `TeeSet`.
+
+### Recalculating after v2 ships (no data reset, no migration)
+
+v2 is a **calculation change only** — no schema change. To recompute everyone's handicaps with
+the proper method:
+
+1. Make sure tees have rating + slope (sync `TeeSets.csv`; fill any remaining `N/A` slopes for
+   courses you want to count).
+2. Deploy the v2 build.
+3. Run **Admin → Handicap Backfill**. It re-derives every Score Differential per round
+   (oldest-first, now via net double bogey) and rebuilds index history. It's idempotent and
+   upserts per `(player, round)`, so it simply overwrites the old v1 values — safe to re-run.
+4. Spot-check a profile (e.g. the worked 31.5 example should drop toward the ~27 mark).
+
+Tracked as WORKLOG `2-17`. Independent of the nav decision — can proceed on its own.
 
 ## 6. Admin information architecture
 
@@ -127,13 +160,13 @@ Supersedes the "discoverability" half of P-1.
 | `2-16` | Handicap transparency (§4) — qualifying/excluded rounds + explainer + expectation note (supersedes 2-15) |
 | `2-17` | WHS v2 adjusted gross = net double bogey (§5) — independent; not gated on sign-off |
 
-## 8. Open questions for sign-off
+## 8. Sign-off status
 
-1. **Profile hub URL/shape** — one page with tabs (Overview/Stats/Handicap/Rounds), or sections
-   on a single scroll? Tabs proposed.
-2. **Managed players** — reach a managed player's profile via the Players list → their row →
-   Profile? (Proposed.)
-3. **Nav cluster names** — "Play / My Golf / Directory" working titles; happy to rename.
-4. **v2 adjusted gross (2-17)** — proceed now (more accurate, lowers your index toward 27), or
-   hold until the transparency UI lands so the change is visible/explained? Recommend doing 2-17
-   *with* 2-16 so the more-accurate number ships alongside its explanation.
+| Decision | Outcome |
+|----------|---------|
+| Profile hub shape | ✅ **Tabs** (Overview / Stats / Handicap / Rounds). Revisit long-scroll if disliked. |
+| Managed players | ✅ Reached via Players list → row → Profile. |
+| Admin grouping (§6) | ✅ Approved. |
+| v2 adjusted gross (§5) | ✅ Approved — "done properly", comparable to a club/association WHS. Ship **with** the transparency UI (`2-16`) so the more-accurate number lands with its explanation. |
+| Transparency (§4) | ✅ Approved (the priority). |
+| **Player nav (§2)** | ⏳ **Revised to frequency-first (Record Round as primary CTA, single Directory group) — awaiting confirmation of this revision before building `P-1b`.** |
