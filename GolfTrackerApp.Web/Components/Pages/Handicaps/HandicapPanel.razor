@@ -122,7 +122,7 @@ else
     <MudPaper Class="pa-4 mb-4" Outlined="true">
         <MudText Typo="Typo.h6" Class="mb-2">How this is calculated</MudText>
         <MudText Typo="Typo.body2" Class="mb-2">
-            <strong>@_qualifyingCount of your @_qualifications.Count completed 18-hole rounds</strong>
+            <strong>@_qualifyingCount of your @_eighteenHoleCount eighteen-hole rounds</strong>
             count toward your Personal (WHS) index.
             @if (_differentials.Any())
             {
@@ -133,6 +133,10 @@ else
                     <strong>lowest @WhsCalculator.CountingDifferentialsCount(_differentials.Count)</strong>
                     differentials from your last @_differentials.Count, so only your better rounds count.
                 </text>
+            }
+            @if (_nineHoleCount > 0)
+            {
+                <text> (@_nineHoleCount nine-hole round@(_nineHoleCount == 1 ? "" : "s") aren't eligible for an 18-hole handicap.)</text>
             }
         </MudText>
 
@@ -148,7 +152,7 @@ else
                         </HeaderContent>
                         <RowTemplate>
                             <MudTd DataLabel="Date">@context.DatePlayed.ToString("d MMM yyyy")</MudTd>
-                            <MudTd DataLabel="Course">@context.CourseName</MudTd>
+                            <MudTd DataLabel="Course">@context.CourseDisplayName</MudTd>
                             <MudTd DataLabel="Reason">@ReasonText(context.Status)</MudTd>
                         </RowTemplate>
                     </MudTable>
@@ -186,7 +190,7 @@ else
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Date">@context.Round?.DatePlayed.ToString("d MMM yyyy")</MudTd>
-                    <MudTd DataLabel="Course">@context.Round?.GolfCourse?.Name</MudTd>
+                    <MudTd DataLabel="Course">@CourseLabel(context.Round?.GolfCourse)</MudTd>
                     <MudTd DataLabel="Tees">@context.TeeSet?.Name</MudTd>
                     <MudTd DataLabel="Adj. Gross" Style="text-align:right">@context.AdjustedGrossScore</MudTd>
                     <MudTd DataLabel="Rating / Slope" Style="text-align:right">
@@ -216,6 +220,8 @@ else
     private List<HandicapRoundQualification> _qualifications = new();
     private List<HandicapRoundQualification> _excluded = new();
     private int _qualifyingCount;
+    private int _eighteenHoleCount;
+    private int _nineHoleCount;
     private List<ChartSeries> _series = new();
     private string[] _xAxisLabels = Array.Empty<string>();
     private readonly ChartOptions _chartOptions = new() { YAxisTicks = 5, InterpolationOption = InterpolationOption.Straight };
@@ -243,8 +249,13 @@ else
         _differentials = differentialsTask.Result;
         _manualClubRecords = clubTask.Result.Where(r => r.IsManualEntry).ToList();
         _qualifications = qualificationsTask.Result;
-        _excluded = _qualifications.Where(q => !q.Qualifies).ToList();
-        _qualifyingCount = _qualifications.Count(q => q.Qualifies);
+        // The handicap is an 18-hole concept, so the denominator is 18-hole rounds only;
+        // 9-hole rounds are reported separately rather than cluttering the excluded list.
+        var eighteenHole = _qualifications.Where(q => q.Status != HandicapRoundStatus.NotEighteenHoles).ToList();
+        _eighteenHoleCount = eighteenHole.Count;
+        _qualifyingCount = eighteenHole.Count(q => q.Qualifies);
+        _excluded = eighteenHole.Where(q => !q.Qualifies).ToList();
+        _nineHoleCount = _qualifications.Count(q => q.Status == HandicapRoundStatus.NotEighteenHoles);
         PrepareHistoryChart(historyTask.Result);
     }
 
@@ -347,6 +358,10 @@ else
         HandicapSource.Society => handicap.GolfSociety?.Name ?? "Society",
         _ => handicap.Source.ToString(),
     };
+
+    private static string CourseLabel(GolfCourse? course) =>
+        course is null ? "" :
+        string.IsNullOrWhiteSpace(course.GolfClub?.Name) ? course.Name : $"{course.GolfClub!.Name} - {course.Name}";
 
     private static string ReasonText(HandicapRoundStatus status) => status switch
     {

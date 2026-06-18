@@ -218,6 +218,7 @@ public class HandicapService : IHandicapService
             .AsNoTracking()
             .Include(d => d.Round)
                 .ThenInclude(r => r!.GolfCourse)
+                    .ThenInclude(gc => gc!.GolfClub)
             .Include(d => d.TeeSet)
             .Where(d => d.PlayerId == playerId)
             .OrderByDescending(d => d.Round!.DatePlayed)
@@ -235,6 +236,7 @@ public class HandicapService : IHandicapService
             .Where(r => r.Status == RoundCompletionStatus.Completed
                         && r.RoundPlayers.Any(rp => rp.PlayerId == playerId))
             .Include(r => r.GolfCourse)
+                .ThenInclude(gc => gc!.GolfClub)
             .Include(r => r.RoundPlayers)
             .OrderByDescending(r => r.DatePlayed)
                 .ThenByDescending(r => r.RoundId)
@@ -272,7 +274,9 @@ public class HandicapService : IHandicapService
         {
             RoundId = r.RoundId,
             DatePlayed = r.DatePlayed,
+            ClubName = r.GolfCourse?.GolfClub?.Name ?? string.Empty,
             CourseName = r.GolfCourse?.Name ?? "Unknown course",
+            HolesPlayed = r.HolesPlayed,
             Status = ClassifyRound(r, playerId, qualifiedRoundIds, teeSetsByCourse, scoreCounts),
         }).ToList();
     }

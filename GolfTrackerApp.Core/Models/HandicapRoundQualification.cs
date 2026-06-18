@@ -21,7 +21,13 @@ public class HandicapRoundQualification
 {
     public int RoundId { get; set; }
     public DateTime DatePlayed { get; set; }
+    public string ClubName { get; set; } = string.Empty;
     public string CourseName { get; set; } = string.Empty;
+    public int HolesPlayed { get; set; }
     public HandicapRoundStatus Status { get; set; }
     public bool Qualifies => Status == HandicapRoundStatus.Qualified;
+
+    /// <summary>App-standard "[Club] - [Course]" label (course names like "Main Course" need the club).</summary>
+    public string CourseDisplayName =>
+        string.IsNullOrWhiteSpace(ClubName) ? CourseName : $"{ClubName} - {CourseName}";
 }
