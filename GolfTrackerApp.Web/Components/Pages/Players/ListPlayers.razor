@@ -265,12 +265,17 @@ else
                     ? _playerStats[connectedPlayer.PlayerId]
                     : null;
 
-                <div class="connection-card">
+                <div class="connection-card" style="@(connectedPlayer != null ? "cursor:pointer;" : "")"
+                     @onclick="@(() => { if (connectedPlayer != null) NavigationManager.NavigateTo($"/players/{connectedPlayer.PlayerId}/profile"); })">
                     <div class="connection-card-header">
                         <div class="connection-avatar">@GetInitials(displayName)</div>
                         <div>
                             <div class="connection-name">@displayName</div>
                             <div class="connection-email">@(connectedUser?.Email ?? "")</div>
+                            @if (connectedPlayer != null)
+                            {
+                                <div class="connection-since">Handicap: @(connectedPlayer.Handicap.HasValue ? connectedPlayer.Handicap.Value.ToString("N1") : "N/A")</div>
+                            }
                             <div class="connection-since">Connected @(connection.RespondedAt?.ToString("d MMM yyyy") ?? "")</div>
                         </div>
                     </div>
@@ -293,7 +298,7 @@ else
                         </div>
                     }
 
-                    <div class="connection-card-actions">
+                    <div class="connection-card-actions" @onclick:stopPropagation="true">
                         <MudButton Variant="Variant.Text" Color="Color.Info" Size="Size.Small"
                                    StartIcon="@Icons.Material.Filled.Timeline"
                                    Disabled="@(string.IsNullOrEmpty(connectedUserId))"
@@ -380,7 +385,7 @@ else
             {
                 var stats = _playerStats.ContainsKey(player.PlayerId) ? _playerStats[player.PlayerId] : null;
 
-                <div class="player-card" @onclick="@(() => NavigationManager.NavigateTo($"/players/{player.PlayerId}/report"))">
+                <div class="player-card" style="cursor:pointer;" @onclick="@(() => NavigationManager.NavigateTo($"/players/{player.PlayerId}/profile"))">
                     <div class="player-card-top">
                         <div class="player-card-avatar">
                             @($"{(player.FirstName?.Length > 0 ? player.FirstName[..1] : "")}{(player.LastName?.Length > 0 ? player.LastName[..1] : "")}")
