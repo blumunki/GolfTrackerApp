@@ -573,7 +573,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | — | Core project extraction | ✅ Done | Models, services, data, and migrations live in `GolfTrackerApp.Core` (`GolfTrackerApp.Core.*` namespaces); tests reference Core directly; deploy triggers on Web + Core paths |
 | — | Proactive AI coaching (background jobs) | ❌ Not started | AI layer is user-triggered only today |
 | — | Course data expansion (OSM geometry, AI-assisted entry) + hole visuals | ❌ Not started | |
-| — | Navigation & IA consolidation (player profile hub, grouped nav/admin, handicap transparency, WHS v2 adjusted gross) | 📋 Proposed | See `docs/NAVIGATION-IA.md`; build items `P-1a/b/c`, `2-16`, `2-17` (Blocked pending sign-off) |
+| — | Navigation & IA consolidation (player profile hub, grouped nav/admin, handicap transparency, WHS v2 adjusted gross) | 🚧 Mostly done | `docs/NAVIGATION-IA.md`. Done: profile hub (`/players/{id}/profile`, `/profile`), frequency-first nav, grouped admin, handicap transparency, WHS v2. Remaining polish: Record Round in the top app bar, mobile bottom-nav parity |
 
 ### 12.1 Mobile Feature Parity — Critical
 
@@ -1021,7 +1021,7 @@ When a round has no explicit tee selection (`RoundPlayer.TeeSetId` and the score
 - Scoring differentials table (last 20 rounds)
 - Which differentials are "counting" in the calculation
 
-Web implemented at `/handicaps` (`Components/Pages/Handicaps/HandicapDashboard.razor`): active-handicap cards with primary badge, personal index history line chart, last-20 differentials table with counting indicators, manual club handicap management (`ClubHandicapDialog`, add/edit/delete), and the primary-handicap selector (`SetPrimaryHandicapSourceAsync` — refreshes `Player.Handicap`; clearing it keeps the legacy manual value). Mobile implemented as `HandicapPage.razor` (`handicaps` switcher case, home quick-access card) backed by `HandicapApiService` over `/api/handicaps`; mobile is read-only — club handicap entry and the primary selector are web-only.
+Web: the handicap view is the reusable `HandicapPanel` component (`Components/Pages/Handicaps/HandicapPanel.razor`, parameterised by `PlayerId`) — active-handicap cards with primary badge, personal index history chart, last-20 differentials with counting indicators, manual club handicap management (`ClubHandicapDialog`), the primary-handicap selector (`SetPrimaryHandicapSourceAsync`), and a **transparency panel** (`GetRoundQualificationsAsync`): "X of Y rounds count", a plain-English "lowest N of last 20" explainer, an expandable excluded-rounds list with reasons, and an expectation note vs official handicaps. It is hosted by `/handicaps` (current user) and the **player profile hub** `/players/{id}/profile` (Overview / Stats / Handicap / Rounds tabs, also at `/profile`; works for managed players). Mobile implemented as `HandicapPage.razor` backed by `HandicapApiService` over `/api/handicaps`; mobile is read-only.
 
 **Round Completion Flow:**
 - After completing a round: auto-calculate scoring differential if tee set has rating/slope
