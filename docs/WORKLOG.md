@@ -49,10 +49,10 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 2-14 | TeeSets.csv importer: tolerate "N/A"/non-numeric CourseRating & SlopeRating cells (map to null) | 2 | Done | Claude | 2026-06-15 | NumericParsing helper (tested); record reads ratings as strings, "N/A"/blank → null, unrecognised slope logged. Full TeeSets.csv now syncs; 161 tests green |
 | 2-15 | Handicap dashboard: explain where the index comes from (value clarity) | 2 | Blocked | | 2026-06-15 | Superseded by 2-16 (see docs/NAVIGATION-IA.md §4) |
 | P-1 | Navigation & information-architecture proposal | polish | Done | Claude | 2026-06-15 | Proposal written: docs/NAVIGATION-IA.md (confirmed 13-of-20 + 31.5-vs-27 against live data). Decomposed into P-1a/b/c, 2-16, 2-17 below — all Blocked pending user sign-off of the proposal |
-| P-1a | Player Profile hub (tabs: Overview/Stats/Handicap/Rounds): consolidate stats + handicap + recent rounds per-player (self + managed); replaces My Stats + My Handicap nav | polish | Blocked | | 2026-06-15 | Tabs confirmed. Blocked only on confirming revised nav (P-1b); then build with 2-16. docs/NAVIGATION-IA.md §3 |
-| P-1b | Player-facing nav: frequency-first — Record Round as primary CTA (top + app bar), flat everyday links, single collapsible Directory group | polish | Blocked | | 2026-06-15 | Revised per feedback (Record Round must not be nested). Awaiting user confirmation of the revision. docs/NAVIGATION-IA.md §2 |
+| P-1a | Player Profile hub (tabs: Overview/Stats/Handicap/Rounds): consolidate stats + handicap + recent rounds per-player (self + managed); replaces My Stats + My Handicap nav | polish | Available | | 2026-06-15 | Nav confirmed (frequency-first). Build the hub + fold in 2-16 transparency UI. Reuse PlayerReport + HandicapDashboard content; note user recently edited HandicapDashboard.razor (club mgmt). docs/NAVIGATION-IA.md §3 |
+| P-1b | Player-facing nav: frequency-first — Record Round as primary CTA (top + app bar), flat everyday links, single collapsible Directory group | polish | Available | | 2026-06-15 | Confirmed by user. Build alongside P-1a (My Profile link points at the hub). docs/NAVIGATION-IA.md §2 |
 | P-1c | Admin dashboard grouping into sections (People / Golf Data / System / AI) | polish | Done | Claude | 2026-06-15 | 12 tiles regrouped into 4 labelled sections; backfill + migrations now under headed groups. Build green |
-| 2-16 | Handicap transparency: qualifying vs excluded rounds (with reason), best-N-of-window explainer, expectation-setting vs official handicaps | 2 | Blocked | | 2026-06-15 | Signed off (priority). Lives in the profile hub (P-1a) → build with it; ship alongside 2-17. Supersedes 2-15. docs/NAVIGATION-IA.md §4 |
+| 2-16 | Handicap transparency: qualifying vs excluded rounds (with reason), best-N-of-window explainer, expectation-setting vs official handicaps | 2 | Handoff | Claude | 2026-06-15 | Service layer done (GetRoundQualificationsAsync + tests). UI remaining — build into profile hub (P-1a). See Handoff Notes |
 | 2-17 | WHS v2 adjusted gross = net double bogey (proper club/association WHS), replacing v1 par+5 | 2 | Done | Claude | 2026-06-15 | ComputeCourseHandicap/StrokesReceivedOnHole/net-double-bogey AGS; HandicapService uses prior-index oldest-first, par+5 fallback. 179 tests. Recompute via Handicap Backfill re-run. NEEDS the backfill re-run on real data to see indices drop |
 
 Phases 3–6 items are seeded when their phase starts — see the development plan summary in `docs/ARCHITECTURE.md` §12.
@@ -60,3 +60,24 @@ Phases 3–6 items are seeded when their phase starts — see the development pl
 ## Handoff Notes
 
 (One `### <ID>` subsection per handed-off item: what's done, what remains, exact next step, gotchas.)
+
+### 2-16 (handicap transparency)
+
+**Done:** `IHandicapService.GetRoundQualificationsAsync(playerId)` returns every completed round
+newest-first as `HandicapRoundQualification` (Qualified / NotEighteenHoles / NoCourseRatingSlope /
+IncompleteScorecard), with "Qualified" tied to an actual `ScoringDifferential` so it can't
+disagree with the index. Tested in `HandicapServiceTests`.
+
+**Remaining (UI):** build into the profile hub (P-1a) handicap tab —
+1. A "X of your Y completed 18-hole rounds count" line + expandable excluded-rounds list (date,
+   course, reason) from `GetRoundQualificationsAsync`.
+2. Plain-English explainer: "your index is the average of your lowest N of the last 20
+   differentials; with 13 counting we use your lowest 4" — use `WhsCalculator.CountingDifferentialsCount`.
+3. One-line "what's a differential" + an expectation note that it's a WHS-style estimate that may
+   differ from an official club/society handicap.
+
+**Gotcha:** the user recently hand-edited `HandicapDashboard.razor` (added club-handicap
+management + primary selector) — preserve that content when moving it into the hub.
+
+**Sequence:** the user should run **Admin → Handicap Backfill** first to confirm the v2 (2-17)
+numbers look right on real data before the explanatory copy is finalised.
