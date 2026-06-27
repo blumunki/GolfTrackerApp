@@ -906,6 +906,8 @@ CompetitionEntry
 - **Stableford**: Points per hole based on par and handicap strokes received
 - **Match Play**: Hole-by-hole win/loss/halve tracking
 
+Implemented (WORKLOG 3-3) as pure static math in `GolfTrackerApp.Core/Services/ScoringCalculator.cs` (the `WhsCalculator` precedent — the spec's "IScoringService" is realised as a pure calculator; DB orchestration to compute/persist `CompetitionEntry` results belongs to the competition service/results step): `ComputeNetScore` (Medal), `StablefordPointsForHole`/`ComputeStablefordPoints` (`max(0, par − net + 2)`), and `ComputeMatchPlay` → `MatchPlayResult` (holes won/halved, margin, outcome). Strokes received reuse `WhsCalculator.StrokesReceivedOnHole`, so handicap allocation is consistent with the WHS engine.
+
 **Results & Leaderboards:**
 - Competition results table (position, player, gross, net, points)
 - History of competitions per club/society
