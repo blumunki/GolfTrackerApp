@@ -58,6 +58,10 @@ namespace GolfTrackerApp.Core.Data
         public DbSet<HandicapRecord> HandicapRecords { get; set; }
         public DbSet<ScoringDifferential> ScoringDifferentials { get; set; }
 
+        // Competitions (Phase 3)
+        public DbSet<Competition> Competitions { get; set; }
+        public DbSet<CompetitionEntry> CompetitionEntries { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder); // Important: Call base method first for Identity models
@@ -353,6 +357,67 @@ namespace GolfTrackerApp.Core.Data
                 // One differential per player per round (keeps the backfill idempotent).
                 entity.HasIndex(sd => new { sd.PlayerId, sd.RoundId }).IsUnique();
                 entity.HasIndex(sd => new { sd.PlayerId, sd.CalculatedAt });
+            });
+
+            // Competition configuration (Phase 3)
+            builder.Entity<Competition>(entity =>
+            {
+                // Optional hosts/venue — NoAction on SQL Server (SetNull on SQLite) so a
+                // club/society/course delete doesn't multi-path cascade into competitions.
+                entity.HasOne(c => c.GolfClub)
+                    .WithMany()
+                    .HasForeignKey(c => c.GolfClubId)
+                    .OnDelete(optionalRelationshipDeleteBehavior);
+
+                entity.HasOne(c => c.GolfSociety)
+                    .WithMany()
+                    .HasForeignKey(c => c.GolfSocietyId)
+                    .OnDelete(optionalRelationshipDeleteBehavior);
+
+                entity.HasOne(c => c.GolfCourse)
+                    .WithMany()
+                    .HasForeignKey(c => c.GolfCourseId)
+                    .OnDelete(optionalRelationshipDeleteBehavior);
+
+                entity.HasOne(c => c.CreatedByUser)
+                    .WithMany()
+                    .HasForeignKey(c => c.CreatedByUserId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(c => new { c.GolfClubId, c.Date });
+                entity.HasIndex(c => new { c.GolfSocietyId, c.Date });
+                entity.HasIndex(c => new { c.Status, c.Date });
+            });
+
+            // Round → Competition (optional). NoAction on SQL Server: a round already has a
+            // cascade path from AspNetUsers, so this stays NoAction to avoid multiple paths.
+            builder.Entity<Round>()
+                .HasOne(r => r.Competition)
+                .WithMany(c => c.Rounds)
+                .HasForeignKey(r => r.CompetitionId)
+                .OnDelete(optionalRelationshipDeleteBehavior);
+
+            // CompetitionEntry configuration (Phase 3)
+            builder.Entity<CompetitionEntry>(entity =>
+            {
+                entity.HasOne(e => e.Competition)
+                    .WithMany(c => c.Entries)
+                    .HasForeignKey(e => e.CompetitionId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Restrict like Score/ScoringDifferential → Player (AspNetUsers cascade paths).
+                entity.HasOne(e => e.Player)
+                    .WithMany()
+                    .HasForeignKey(e => e.PlayerId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.TeeSet)
+                    .WithMany()
+                    .HasForeignKey(e => e.TeeSetId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasIndex(e => new { e.CompetitionId, e.PlayerId }).IsUnique();
+                entity.HasIndex(e => e.PlayerId);
             });
         }
     }

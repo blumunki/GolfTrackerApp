@@ -50,6 +50,11 @@ namespace GolfTrackerApp.Core.Models
         [Required]
         public RoundCompletionStatus Status { get; set; } = RoundCompletionStatus.InProgress; // Default to InProgress
 
+        // Optional link to a competition (Phase 3). Null for casual rounds.
+        public int? CompetitionId { get; set; }
+        [ForeignKey("CompetitionId")]
+        public virtual Competition? Competition { get; set; }
+
         // Navigation property for Scores in this round
         public virtual ICollection<Score> Scores { get; set; } = new List<Score>();
         // Navigation property for Players in this round (through a join table)

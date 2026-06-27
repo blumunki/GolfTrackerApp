@@ -340,6 +340,109 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                     b.ToTable("ClubMemberships");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Core.Models.Competition", b =>
+                {
+                    b.Property<int>("CompetitionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CompetitionId"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByUserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("GolfClubId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("GolfCourseId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("GolfSocietyId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsOpen")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
+
+                    b.Property<int>("ScoringFormat")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.HasKey("CompetitionId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("GolfCourseId");
+
+                    b.HasIndex("GolfClubId", "Date");
+
+                    b.HasIndex("GolfSocietyId", "Date");
+
+                    b.HasIndex("Status", "Date");
+
+                    b.ToTable("Competitions");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Core.Models.CompetitionEntry", b =>
+                {
+                    b.Property<int>("CompetitionEntryId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CompetitionEntryId"));
+
+                    b.Property<int>("CompetitionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("GrossScore")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("HandicapAtEntry")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int?>("NetScore")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PlayerId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Position")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StablefordPoints")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("TeeSetId")
+                        .HasColumnType("int");
+
+                    b.HasKey("CompetitionEntryId");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("TeeSetId");
+
+                    b.HasIndex("CompetitionId", "PlayerId")
+                        .IsUnique();
+
+                    b.ToTable("CompetitionEntries");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Core.Models.GolfClub", b =>
                 {
                     b.Property<int>("GolfClubId")
@@ -743,6 +846,9 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RoundId"));
 
+                    b.Property<int?>("CompetitionId")
+                        .HasColumnType("int");
+
                     b.Property<string>("CreatedByApplicationUserId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
@@ -769,6 +875,8 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                         .HasColumnType("int");
 
                     b.HasKey("RoundId");
+
+                    b.HasIndex("CompetitionId");
 
                     b.HasIndex("CreatedByApplicationUserId");
 
@@ -1162,6 +1270,64 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("GolfTrackerApp.Core.Models.Competition", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Core.Data.ApplicationUser", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Core.Models.GolfClub", "GolfClub")
+                        .WithMany()
+                        .HasForeignKey("GolfClubId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GolfTrackerApp.Core.Models.GolfCourse", "GolfCourse")
+                        .WithMany()
+                        .HasForeignKey("GolfCourseId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("GolfTrackerApp.Core.Models.GolfSociety", "GolfSociety")
+                        .WithMany()
+                        .HasForeignKey("GolfSocietyId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("GolfClub");
+
+                    b.Navigation("GolfCourse");
+
+                    b.Navigation("GolfSociety");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Core.Models.CompetitionEntry", b =>
+                {
+                    b.HasOne("GolfTrackerApp.Core.Models.Competition", "Competition")
+                        .WithMany("Entries")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Core.Models.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("GolfTrackerApp.Core.Models.TeeSet", "TeeSet")
+                        .WithMany()
+                        .HasForeignKey("TeeSetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Competition");
+
+                    b.Navigation("Player");
+
+                    b.Navigation("TeeSet");
+                });
+
             modelBuilder.Entity("GolfTrackerApp.Core.Models.GolfCourse", b =>
                 {
                     b.HasOne("GolfTrackerApp.Core.Models.GolfClub", "GolfClub")
@@ -1323,6 +1489,11 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
 
             modelBuilder.Entity("GolfTrackerApp.Core.Models.Round", b =>
                 {
+                    b.HasOne("GolfTrackerApp.Core.Models.Competition", "Competition")
+                        .WithMany("Rounds")
+                        .HasForeignKey("CompetitionId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("GolfTrackerApp.Core.Data.ApplicationUser", "CreatedByApplicationUser")
                         .WithMany()
                         .HasForeignKey("CreatedByApplicationUserId")
@@ -1334,6 +1505,8 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                         .HasForeignKey("GolfCourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Competition");
 
                     b.Navigation("CreatedByApplicationUser");
 
@@ -1520,6 +1693,13 @@ namespace GolfTrackerApp.Core.Data.Migrations.SqlServer
                     b.Navigation("AuditLogs");
 
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("GolfTrackerApp.Core.Models.Competition", b =>
+                {
+                    b.Navigation("Entries");
+
+                    b.Navigation("Rounds");
                 });
 
             modelBuilder.Entity("GolfTrackerApp.Core.Models.GolfClub", b =>

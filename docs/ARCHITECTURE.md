@@ -565,7 +565,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | — | Live Round Mode | ✅ Done | Single-device scorecard entry; no real-time multi-player sync, no hole maps |
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
-| 3 | Competitions & Scoring Formats | ❌ Not started | Specced in §12.5 only |
+| 3 | Competitions & Scoring Formats | 🚧 In progress | Models + schema done (Competition, CompetitionEntry, ScoringFormat, Round.CompetitionId — WORKLOG 3-1). Service, scoring logic, controller, UI pending (3-2…3-7) |
 | 4a | Personal WHS handicap (differentials + index + backfill) | ✅ Done | WHS math, models + migrations, round-completion hook (both paths), and idempotent admin backfill (`/admin/handicap-backfill`). UI dashboards are 4b |
 | 4b | Manual club/regional handicaps + handicap UI | ✅ Done | CRUD + API (2-5), web dashboard (2-6), mobile dashboard (2-7), entry UI + primary selector (2-9). Mobile is read-only; entry/selector are web-only |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
@@ -889,6 +889,8 @@ CompetitionEntry
 |-------|--------|--------|
 | `Round` | Add `CompetitionId (int?, FK → Competition)` | Link round to competition |
 | `RoundTypeOption` | Expand: `Casual, ClubCompetition, SocietyEvent, OpenCompetition, FriendlyMatch` | Richer round context (backwards-compatible: map existing Friendly→Casual, Competitive→ClubCompetition) |
+
+**Implemented (WORKLOG 3-1):** `Competition`, `CompetitionEntry`, `ScoringFormat` + `CompetitionStatus` enums, and `Round.CompetitionId` (nullable) with DbSets/relationships in `ApplicationDbContext` and dual migrations (`AddCompetitions`). `CompetitionEntry` is unique per (CompetitionId, PlayerId); Entry→Player/TeeSet and Competition→CreatedByUser are `Restrict`, optional hosts/venue + Round→Competition are NoAction on SQL Server (avoiding multiple cascade paths). The **`RoundTypeOption` expansion is deferred** — kept additive (`Friendly`/`Competitive` unchanged); rounds link to competitions via `CompetitionId` instead.
 
 ##### 3.3 Features
 
