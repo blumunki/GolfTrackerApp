@@ -20,7 +20,13 @@
         <MudSpacer />
         <AuthorizeView>
             <Authorized>
-                <MudText Typo="Typo.body1" Class="mr-2">Hello, @context.User.Identity?.Name!</MudText>
+                @* Primary action — recording a round is the #1 task, so keep it one tap from every page. *@
+                <MudButton Href="rounds/record" Variant="Variant.Filled" Color="Color.Success"
+                           StartIcon="@Icons.Material.Filled.AddCircle" Class="mr-3 d-none d-sm-flex">Record Round</MudButton>
+                <MudTooltip Text="Record Round">
+                    <MudIconButton Href="rounds/record" Icon="@Icons.Material.Filled.AddCircle" Color="Color.Inherit" Class="d-flex d-sm-none" />
+                </MudTooltip>
+                <MudText Typo="Typo.body1" Class="mr-2 d-none d-md-flex">Hello, @context.User.Identity?.Name!</MudText>
                 <GolfTrackerApp.Web.Components.Shared.NotificationBadge />
                 <MudTooltip Text="Manage Account">
                     <MudIconButton Icon="@Icons.Material.Filled.AccountCircle" Href="Account/Manage" Color="Color.Inherit" />
