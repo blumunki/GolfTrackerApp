@@ -59,12 +59,15 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 2-17 | WHS v2 adjusted gross = net double bogey (proper club/association WHS), replacing v1 par+5 | 2 | Done | Claude | 2026-06-15 | ComputeCourseHandicap/StrokesReceivedOnHole/net-double-bogey AGS; HandicapService uses prior-index oldest-first, par+5 fallback. 179 tests. Recompute via Handicap Backfill re-run. NEEDS the backfill re-run on real data to see indices drop |
 
 | 3-1 | Competition models (ScoringFormat enum, Competition, CompetitionEntry) + Round.CompetitionId + dual migrations | 3 | Done | Claude | 2026-06-15 | Models + DbContext config + dual AddCompetitions migrations (verified, snapshots clean); 182 tests. RoundTypeOption left additive. Migration stacks behind unapplied AddHandicapTables for prod |
-| 3-2 | CompetitionService (create from club/society, list, get, status, link round, entry CRUD) + tests | 3 | Available | | 2026-06-15 | Unblocked by 3-1 |
+| 3-2 | CompetitionService (create, list, get, status, link round, entry CRUD) + tests | 3 | Available | | 2026-06-15 | Unblocked by 3-1. Service persists CreatedByUserId; authorization enforced at controller/page (interim: global admin + society Owner/Admin — see ARCHITECTURE §12.5 3.5). Round assignment validates the round belongs to the assigning player |
 | 3-3 | ScoringService — pure scoring formats (Medal net, Stableford points, Match Play result) + TDD tests | 3 | Available | | 2026-06-15 | Pure calc, no DB — can start anytime. ARCHITECTURE §12.5 Phase 3.3 |
-| 3-4 | CompetitionsController (/api/competitions, JWT, owner-or-member auth) | 3 | Blocked | | 2026-06-15 | Blocked by 3-2, 3-3 |
-| 3-5 | Web Competitions pages (List/Detail/Create/Results) + links from Club & Society pages + nav | 3 | Blocked | | 2026-06-15 | Blocked by 3-2, 3-3 |
-| 3-6 | Round recording: competition selector in setup; link round to competition on save (web) | 3 | Blocked | | 2026-06-15 | Blocked by 3-2 |
+| 3-4 | CompetitionsController (/api/competitions, JWT) — create/manage gated to global admin + society Owner/Admin (interim) | 3 | Blocked | | 2026-06-15 | Blocked by 3-2, 3-3. ARCHITECTURE §12.5 3.5 |
+| 3-5 | Web Competitions pages (List/Detail/Create/Results) + links from Society pages + nav | 3 | Blocked | | 2026-06-15 | Blocked by 3-2, 3-3. Create gated to global admin + society Owner/Admin (interim); club competitions = global admin only until 3-8 |
+| 3-6 | Round recording: competition selector in setup; assign one of the player's own rounds to a competition they've entered (web) | 3 | Blocked | | 2026-06-15 | Blocked by 3-2. RoundType unchanged — CompetitionId is independent of Friendly/Competitive |
 | 3-7 | Mobile competition models + API service + pages | 3 | Blocked | | 2026-06-15 | Blocked by 3-4; on-device test needed |
+| 3-8 | Club-admin model: global admin grants ClubMembership.Admin; club admins create club competitions | 3 | Blocked | | 2026-06-15 | Rollout stage 3 (ARCHITECTURE §12.5 3.5). Deferred — do after core 3-2…3-7. Clubs are shared/real-world; no self-claim |
+| 3-9 | Public competition registration: users register for open competitions (and assign rounds) | 3 | Blocked | | 2026-06-15 | Rollout stage 4 (ARCHITECTURE §12.5 3.5). Deferred — do after core 3-2…3-7 |
+| 3-10 | Competitions data sync (admin Data Migration) + retro-link historical Competitive rounds | 3 | Blocked | | 2026-06-15 | Rollout stage 5 (ARCHITECTURE §12.5 3.5). Deferred. Additive links only; no rewrite of historical RoundType |
 
 Phases 4c, 5–6 items are seeded when their phase starts — see the development plan summary in `docs/ARCHITECTURE.md` §12.
 

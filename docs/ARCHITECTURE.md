@@ -922,6 +922,32 @@ CompetitionEntry
 | Mobile | Competition models, API services, pages |
 | Round Recording | Add competition selector in setup, link round on save |
 
+##### 3.5 Ownership, Authorisation & Rollout (direction change)
+
+Competitions shift the app from a **personal tracker** (users record their own rounds and connect with friends) toward **shared, multi-user entities with roles**. That needs a deliberate authorisation model and a staged rollout — more so because the app is still pre-production (beta/demo data). This subsection is the agreed direction; the build is sequenced in the WORKLOG (`3-2`…`3-10`).
+
+**Entity ownership — societies vs clubs (the key distinction):**
+- **Societies are user-created**, so the creator is the Owner (`SocietyMembership.Role` = Owner/Admin/Member already exists). A society Owner/Admin may create and manage that society's competitions. No verification needed.
+- **Clubs are real-world shared entities** (pre-loaded from reference data; many members). A user must **not** self-claim ownership of a club. Club-admin rights are **granted by a global admin** (a lightweight "claim + verify" flow may come later). Until that exists, club competitions are created by global admins only.
+
+**Who may create/edit a competition:**
+- **Global admin** (existing `Admin` role): always — this is the **interim path for beta** so the feature works before the per-entity role flows exist.
+- **Society Owner/Admin**: their society's competitions.
+- **Club Admin**: their club's competitions (granted by a global admin).
+
+**Round ↔ competition — `RoundType` is retained:**
+- `Round.RoundType` (`Friendly`/`Competitive`) is **kept unchanged**. It is how all historical rounds are classified, pre-dates competitions, and must be preserved. It is **independent** of `Round.CompetitionId`: a round can be `Competitive` with no competition link (every historical competitive round is exactly this), or be linked to a competition (new flow). Linking a round to a competition does **not** change its `RoundType`.
+- A player assigns one of *their own* rounds to a competition they have entered.
+
+**Staged rollout (beta → production), each step additive and reversible:**
+1. **Beta (now):** schema in place (`3-1`). Competition creation + round assignment restricted to **global admin**. No public registration/verification machinery yet — exercises the feature safely on demo data. Friendly/Competitive untouched.
+2. **Society competitions:** society Owner/Admin create + manage their society's competitions (uses existing membership roles).
+3. **Club competitions:** global admin grants club-admin; club admins create club competitions. Optional club claim+verify flow.
+4. **Player participation:** users register for open competitions and assign rounds; results computed per scoring format.
+5. **Data sync:** a Competitions import in admin Data Migration to bring in historical competitions and **retro-link** existing `Competitive` rounds — mirroring the TeeSets/Rounds CSV sync. Links are additive; no historical data is rewritten.
+
+**Migration safety:** all of the above is additive — new tables + a nullable `Round.CompetitionId`; no historical data is rewritten. The `AddCompetitions` migration stacks behind the still-unapplied handicap migration for the next production deploy (see `docs/HUMAN-TODO.md`).
+
 ---
 
 #### Phase 4: Multi-Source Handicap Tracking
