@@ -58,7 +58,15 @@ Statuses: `Available` · `In Progress` · `Handoff` · `Done` · `Blocked`
 | 2-16 | Handicap transparency: qualifying vs excluded rounds (with reason), best-N-of-window explainer, expectation-setting vs official handicaps | 2 | Done | Claude | 2026-06-15 | Service classifier + transparency UI in HandicapPanel (X-of-Y, explainer, excluded list w/ reasons, expectation note). On /handicaps + profile hub. NEEDS manual review of copy |
 | 2-17 | WHS v2 adjusted gross = net double bogey (proper club/association WHS), replacing v1 par+5 | 2 | Done | Claude | 2026-06-15 | ComputeCourseHandicap/StrokesReceivedOnHole/net-double-bogey AGS; HandicapService uses prior-index oldest-first, par+5 fallback. 179 tests. Recompute via Handicap Backfill re-run. NEEDS the backfill re-run on real data to see indices drop |
 
-Phases 3–6 items are seeded when their phase starts — see the development plan summary in `docs/ARCHITECTURE.md` §12.
+| 3-1 | Competition models (ScoringFormat enum, Competition, CompetitionEntry) + Round.CompetitionId + dual migrations | 3 | In Progress | Claude | 2026-06-15 | Seeds Phase 3. New tables + nullable Round.CompetitionId; RoundTypeOption left additive (link via CompetitionId). ARCHITECTURE §12.5 Phase 3.1/3.2. Migration stacks behind unapplied AddHandicapTables for prod |
+| 3-2 | CompetitionService (create from club/society, list, get, status, link round, entry CRUD) + tests | 3 | Blocked | | 2026-06-15 | Blocked by 3-1 |
+| 3-3 | ScoringService — pure scoring formats (Medal net, Stableford points, Match Play result) + TDD tests | 3 | Available | | 2026-06-15 | Pure calc, no DB — can start anytime. ARCHITECTURE §12.5 Phase 3.3 |
+| 3-4 | CompetitionsController (/api/competitions, JWT, owner-or-member auth) | 3 | Blocked | | 2026-06-15 | Blocked by 3-2, 3-3 |
+| 3-5 | Web Competitions pages (List/Detail/Create/Results) + links from Club & Society pages + nav | 3 | Blocked | | 2026-06-15 | Blocked by 3-2, 3-3 |
+| 3-6 | Round recording: competition selector in setup; link round to competition on save (web) | 3 | Blocked | | 2026-06-15 | Blocked by 3-2 |
+| 3-7 | Mobile competition models + API service + pages | 3 | Blocked | | 2026-06-15 | Blocked by 3-4; on-device test needed |
+
+Phases 4c, 5–6 items are seeded when their phase starts — see the development plan summary in `docs/ARCHITECTURE.md` §12.
 
 ## Handoff Notes
 
