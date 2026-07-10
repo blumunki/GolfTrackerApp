@@ -201,9 +201,9 @@ public class AuthController : ControllerBase
         }
     }
 
-    private Task<string> GenerateJwtToken(ApplicationUser user)
+    private async Task<string> GenerateJwtToken(ApplicationUser user)
     {
-        var jwtKey = _configuration["Jwt:Key"] 
+        var jwtKey = _configuration["Jwt:Key"]
             ?? throw new InvalidOperationException("JWT signing key must be configured via 'Jwt:Key'.");
         var jwtIssuer = _configuration["Jwt:Issuer"] ?? "GolfTrackerApp";
         var jwtAudience = _configuration["Jwt:Audience"] ?? "GolfTrackerApp";
@@ -218,6 +218,14 @@ public class AuthController : ControllerBase
             new Claim(ClaimTypes.Name, user.UserName!)
         };
 
+        // Role claims let API controllers gate admin-only endpoints via User.IsInRole.
+        // Additive — clients ignore unknown claims; tokens issued before this simply
+        // lack roles until the user signs in again.
+        foreach (var role in await _userManager.GetRolesAsync(user))
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
@@ -228,7 +236,7 @@ public class AuthController : ControllerBase
         };
 
         var token = tokenHandler.CreateToken(tokenDescriptor);
-        return Task.FromResult(tokenHandler.WriteToken(token));
+        return tokenHandler.WriteToken(token);
     }
 }
 
