@@ -39,6 +39,9 @@
                 <MudText Typo="Typo.caption" Color="Color.Secondary">Created @_society.CreatedAt.ToString("d MMMM yyyy") by @(_society.CreatedByUser?.UserName ?? "Unknown")</MudText>
             </div>
             <div class="d-flex gap-2">
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.EmojiEvents"
+                           Href="@($"/competitions?societyId={SocietyId}")">Competitions</MudButton>
                 @if (!_isMember)
                 {
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="JoinSociety">Join Society</MudButton>

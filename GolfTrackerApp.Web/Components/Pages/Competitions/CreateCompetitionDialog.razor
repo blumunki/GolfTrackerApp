@@ -1,0 +1,134 @@
+@inject ICompetitionService CompetitionService
+@inject IGolfClubService GolfClubService
+@inject IGolfCourseService GolfCourseService
+@inject ISnackbar Snackbar
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+
+<MudDialog>
+    <TitleContent>
+        <MudText Typo="Typo.h6">New Competition</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_name" Label="Name" Required="true" Class="mt-2"
+                      Placeholder="e.g. Monthly Medal July 2026" />
+
+        <MudSelect T="string" @bind-Value="_hostKey" Label="Host" Class="mt-3" Required="true">
+            @foreach (var society in ManagedSocieties)
+            {
+                <MudSelectItem T="string" Value="@($"society:{society.GolfSocietyId}")">@society.Name (society)</MudSelectItem>
+            }
+            @if (IsAdmin)
+            {
+                @foreach (var club in _clubs)
+                {
+                    <MudSelectItem T="string" Value="@($"club:{club.GolfClubId}")">@club.Name (club)</MudSelectItem>
+                }
+                <MudSelectItem T="string" Value="@("adhoc")">No host (ad-hoc)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="int?" @bind-Value="_golfCourseId" Label="Course (optional)" Clearable="true" Class="mt-3">
+            @foreach (var course in _courses)
+            {
+                <MudSelectItem T="int?" Value="@((int?)course.GolfCourseId)">
+                    @($"{course.GolfClub?.Name} - {course.Name}")
+                </MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="ScoringFormat" @bind-Value="_format" Label="Scoring format" Class="mt-3">
+            <MudSelectItem T="ScoringFormat" Value="ScoringFormat.Medal">Medal (stroke play)</MudSelectItem>
+            <MudSelectItem T="ScoringFormat" Value="ScoringFormat.Stableford">Stableford</MudSelectItem>
+            <MudSelectItem T="ScoringFormat" Value="ScoringFormat.MatchPlay">Match Play</MudSelectItem>
+        </MudSelect>
+
+        <MudDatePicker @bind-Date="_date" Label="Date" Required="true" Class="mt-3" />
+        <MudTextField @bind-Value="_description" Label="Description (optional)" Lines="2" Class="mt-3" />
+        <MudSwitch T="bool" @bind-Value="_isOpen" Label="Open to anyone (not just members)" Color="Color.Primary" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Submit">Create</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public bool IsAdmin { get; set; }
+    [Parameter] public List<GolfSociety> ManagedSocieties { get; set; } = new();
+    [Parameter] public string CreatedByUserId { get; set; } = "";
+
+    private string _name = "";
+    private string? _hostKey;
+    private int? _golfCourseId;
+    private ScoringFormat _format = ScoringFormat.Medal;
+    private DateTime? _date = DateTime.Today.AddDays(7);
+    private string? _description;
+    private bool _isOpen;
+    private List<GolfClub> _clubs = new();
+    private List<GolfCourse> _courses = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsAdmin)
+        {
+            _clubs = await GolfClubService.GetAllGolfClubsAsync();
+        }
+        _courses = await GolfCourseService.GetAllGolfCoursesAsync();
+
+        // Sensible default host: the only managed society, if there is exactly one.
+        if (ManagedSocieties.Count == 1 && !IsAdmin)
+        {
+            _hostKey = $"society:{ManagedSocieties[0].GolfSocietyId}";
+        }
+    }
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrWhiteSpace(_name))
+        {
+            Snackbar.Add("A name is required.", Severity.Warning);
+            return;
+        }
+        if (_hostKey is null)
+        {
+            Snackbar.Add("Please choose a host.", Severity.Warning);
+            return;
+        }
+        if (_date is null)
+        {
+            Snackbar.Add("A date is required.", Severity.Warning);
+            return;
+        }
+
+        int? clubId = null, societyId = null;
+        if (_hostKey.StartsWith("society:")) societyId = int.Parse(_hostKey["society:".Length..]);
+        else if (_hostKey.StartsWith("club:")) clubId = int.Parse(_hostKey["club:".Length..]);
+
+        try
+        {
+            var created = await CompetitionService.CreateCompetitionAsync(new Competition
+            {
+                Name = _name.Trim(),
+                GolfClubId = clubId,
+                GolfSocietyId = societyId,
+                GolfCourseId = _golfCourseId,
+                ScoringFormat = _format,
+                Date = _date.Value,
+                Description = _description,
+                IsOpen = _isOpen,
+                CreatedByUserId = CreatedByUserId,
+            });
+            Snackbar.Add("Competition created.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(created));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+    }
+
+    void Cancel() => MudDialog.Cancel();
+}

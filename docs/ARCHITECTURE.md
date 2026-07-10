@@ -147,6 +147,7 @@ GolfTrackerApp.Web/
 │   │   ├── AiChat.razor              # AI coach chat with persistent sessions
 │   │   ├── GolfClubs/                # Club list, add, edit, details
 │   │   ├── GolfCourses/              # Course list, add, edit, details (incl. tee-set rating/slope editing)
+│   │   ├── Competitions/             # Competition list, create dialog, detail (entries, results, status)
 │   │   ├── Handicaps/                # HandicapPanel (reusable, parameterised) + transparency; /handicaps wrapper
 │   │   ├── Players/                  # Player list, add, edit, report (PlayerReport), profile hub (ProfileHub)
 │   │   ├── Rounds/                   # Round list, record, details
@@ -908,6 +909,8 @@ CompetitionEntry
 Service layer implemented (WORKLOG 3-2): `ICompetitionService`/`CompetitionService` — create (name/date/creator required; club **xor** society host; referenced entities validated), list with host/status filters, get with entries+rounds, status transitions (Completed/Cancelled are terminal), entry add/withdraw (snapshots `HandicapAtEntry` from the player's display handicap; unique per player; no withdrawal after completion), and round assign/unassign (owner-or-admin; cancelled competitions accept no rounds; `RoundType` untouched). WHO may call create/manage is enforced at controller/page per §12.5 3.5 (interim: global admin + society Owner/Admin).
 
 API implemented (WORKLOG 3-4): `CompetitionsController` (`/api/competitions`) — list (club/society/status filters), detail with entries + linked round ids, create/update/status (gated by the interim model; club-hosted and ad-hoc = Admin-only until 3-8), entries add/withdraw (self or managed players; admin any), round assign/unassign (`POST|DELETE …/rounds/{roundId}`; ownership in the service). API JWTs now carry role claims so `User.IsInRole("Admin")` works under ApiAuth — tokens issued before this lack roles until next sign-in. DTOs in `Core/Models/Api/CompetitionDtos.cs` (enums serialised as strings per mobile conventions).
+
+Results implemented (WORKLOG 3-5): `CompetitionService.ComputeResultsAsync` persists per-entry gross/net/Stableford and competition-style positions (ties share, e.g. 1,2,2,4; Stableford ranks by points, other formats by net) from each player's linked round — course handicap from `HandicapAtEntry` + the tee's rating/slope (entry tee → round tee → course default), scratch when data is missing; unlinked entries stay unranked; idempotent. Web UI (WORKLOG 3-5): `/competitions` list (status filter, society query filter, create dialog gated to global admin + society Owner/Admin — hosts they manage only), `/competitions/{id}` detail (entries/results table with medals, enter own/managed players, withdraw, manager status actions — Complete auto-calculates results), Competitions in the nav Directory group and a Competitions button on society detail. Match Play v1 ranks by net like Medal (bracket play is future work).
 
 **Scoring Format Logic:**
 - **Medal**: Gross strokes, net = gross - handicap

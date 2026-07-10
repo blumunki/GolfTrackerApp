@@ -1,0 +1,148 @@
+@page "/competitions"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject ICompetitionService CompetitionService
+@inject IGolfSocietyService SocietyService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDialogService DialogService
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
+<PageTitle>Competitions</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <div class="d-flex justify-space-between align-center mb-4">
+        <MudText Typo="Typo.h4">Competitions</MudText>
+        @if (_canCreate)
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add" OnClick="OpenCreateDialog">
+                New Competition
+            </MudButton>
+        }
+    </div>
+
+    <MudChipSet T="CompetitionStatus?" SelectedValue="_statusFilter" SelectedValueChanged="OnStatusFilterChanged"
+                SelectionMode="SelectionMode.ToggleSelection" Class="mb-3">
+        <MudChip T="CompetitionStatus?" Value="@((CompetitionStatus?)CompetitionStatus.Upcoming)">Upcoming</MudChip>
+        <MudChip T="CompetitionStatus?" Value="@((CompetitionStatus?)CompetitionStatus.InProgress)">In Progress</MudChip>
+        <MudChip T="CompetitionStatus?" Value="@((CompetitionStatus?)CompetitionStatus.Completed)">Completed</MudChip>
+    </MudChipSet>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!_competitions.Any())
+    {
+        <MudAlert Severity="Severity.Info">
+            No competitions@(_statusFilter is not null ? " with this status" : "") yet.
+            @if (_canCreate)
+            {
+                <text> Create one to get started.</text>
+            }
+        </MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@_competitions" Hover="true" Dense="true"
+                  OnRowClick="@((TableRowClickEventArgs<Competition> args) => NavigationManager.NavigateTo($"/competitions/{args.Item!.CompetitionId}"))"
+                  Style="cursor:pointer;">
+            <HeaderContent>
+                <MudTh>Name</MudTh>
+                <MudTh>Host</MudTh>
+                <MudTh>Course</MudTh>
+                <MudTh>Date</MudTh>
+                <MudTh>Format</MudTh>
+                <MudTh>Status</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Name">@context.Name</MudTd>
+                <MudTd DataLabel="Host">@(context.GolfSociety?.Name ?? context.GolfClub?.Name ?? "—")</MudTd>
+                <MudTd DataLabel="Course">@(context.GolfCourse?.Name ?? "—")</MudTd>
+                <MudTd DataLabel="Date">@context.Date.ToString("d MMM yyyy")</MudTd>
+                <MudTd DataLabel="Format">@context.ScoringFormat</MudTd>
+                <MudTd DataLabel="Status">
+                    <MudChip T="string" Size="Size.Small" Color="@StatusColour(context.Status)" Variant="Variant.Text">
+                        @context.Status
+                    </MudChip>
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery(Name = "societyId")]
+    public int? SocietyId { get; set; }
+
+    private bool _loading = true;
+    private bool _isAdmin;
+    private bool _canCreate;
+    private string? _userId;
+    private List<Competition> _competitions = new();
+    private List<GolfSociety> _managedSocieties = new();
+    private CompetitionStatus? _statusFilter;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        _isAdmin = authState.User.IsInRole("Admin");
+
+        if (_userId is not null)
+        {
+            var mySocieties = await SocietyService.GetSocietiesForUserAsync(_userId);
+            _managedSocieties = mySocieties
+                .Where(s => s.Memberships.Any(m => m.UserId == _userId
+                    && (m.Role == MembershipRole.Admin || m.Role == MembershipRole.Owner)))
+                .ToList();
+        }
+        _canCreate = _isAdmin || _managedSocieties.Any();
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _competitions = await CompetitionService.GetCompetitionsAsync(
+            golfSocietyId: SocietyId, status: _statusFilter);
+        _loading = false;
+    }
+
+    private async Task OnStatusFilterChanged(CompetitionStatus? status)
+    {
+        _statusFilter = status;
+        await LoadAsync();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<CreateCompetitionDialog>
+        {
+            { x => x.IsAdmin, _isAdmin },
+            { x => x.ManagedSocieties, _managedSocieties },
+            { x => x.CreatedByUserId, _userId ?? "" },
+        };
+        var dialog = await DialogService.ShowAsync<CreateCompetitionDialog>("New Competition", parameters);
+        var result = await dialog.Result;
+        if (result is not null && !result.Canceled && result.Data is Competition created)
+        {
+            NavigationManager.NavigateTo($"/competitions/{created.CompetitionId}");
+        }
+    }
+
+    private static Color StatusColour(CompetitionStatus status) => status switch
+    {
+        CompetitionStatus.Upcoming => Color.Info,
+        CompetitionStatus.InProgress => Color.Success,
+        CompetitionStatus.Completed => Color.Default,
+        _ => Color.Warning,
+    };
+}

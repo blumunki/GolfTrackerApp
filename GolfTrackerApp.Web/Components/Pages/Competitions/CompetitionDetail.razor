@@ -1,0 +1,296 @@
+@page "/competitions/{CompetitionId:int}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+@inject ICompetitionService CompetitionService
+@inject IPlayerService PlayerService
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISnackbar Snackbar
+
+@using GolfTrackerApp.Core.Models
+@using GolfTrackerApp.Core.Services
+@using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
+
+<PageTitle>@(_competition?.Name ?? "Competition")</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large">
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_competition is null)
+{
+    <MudAlert Severity="Severity.Error">Competition not found.</MudAlert>
+}
+else
+{
+    <MudBreadcrumbs Items="_breadcrumbs" Class="mb-2 pa-0"></MudBreadcrumbs>
+
+    <div class="d-flex justify-space-between align-center flex-wrap gap-2 mb-1">
+        <MudText Typo="Typo.h4">@_competition.Name</MudText>
+        <MudChip T="string" Color="@StatusColour(_competition.Status)" Variant="Variant.Filled">@_competition.Status</MudChip>
+    </div>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+        @(_competition.GolfSociety?.Name ?? _competition.GolfClub?.Name ?? "Ad-hoc")
+        · @_competition.ScoringFormat
+        · @_competition.Date.ToString("d MMM yyyy")
+        @if (_competition.GolfCourse is not null)
+        {
+            <text> · @($"{_competition.GolfCourse.GolfClub?.Name} - {_competition.GolfCourse.Name}")</text>
+        }
+    </MudText>
+    @if (!string.IsNullOrWhiteSpace(_competition.Description))
+    {
+        <MudText Typo="Typo.body1" Class="mb-3">@_competition.Description</MudText>
+    }
+
+    @if (_canManage && _competition.Status is CompetitionStatus.Upcoming or CompetitionStatus.InProgress)
+    {
+        <MudPaper Class="pa-3 mb-4 d-flex gap-2 flex-wrap" Outlined="true">
+            @if (_competition.Status == CompetitionStatus.Upcoming)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Success" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.PlayArrow" OnClick="@(() => SetStatusAsync(CompetitionStatus.InProgress))">
+                    Start
+                </MudButton>
+            }
+            @if (_competition.Status == CompetitionStatus.InProgress)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Flag" OnClick="@(() => SetStatusAsync(CompetitionStatus.Completed))">
+                    Complete (locks in results)
+                </MudButton>
+            }
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Cancel" OnClick="@(() => SetStatusAsync(CompetitionStatus.Cancelled))">
+                Cancel Competition
+            </MudButton>
+        </MudPaper>
+    }
+
+    <div class="d-flex justify-space-between align-center mb-2">
+        <MudText Typo="Typo.h6">
+            @(_hasResults ? "Results" : $"Entries ({_competition.Entries.Count})")
+        </MudText>
+        <div class="d-flex gap-2">
+            @if (_canManage && _competition.Entries.Any() && _competition.Status != CompetitionStatus.Cancelled)
+            {
+                <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Calculate" OnClick="ComputeResultsAsync">
+                    @(_hasResults ? "Recalculate Results" : "Calculate Results")
+                </MudButton>
+            }
+            @if (_competition.Status == CompetitionStatus.Upcoming || _competition.Status == CompetitionStatus.InProgress)
+            {
+                <MudMenu Label="Enter Player" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                         StartIcon="@Icons.Material.Filled.PersonAdd" Disabled="@(!_enterablePlayers.Any())">
+                    @foreach (var player in _enterablePlayers)
+                    {
+                        <MudMenuItem OnClick="@(() => EnterPlayerAsync(player))">
+                            @player.FirstName @player.LastName
+                        </MudMenuItem>
+                    }
+                </MudMenu>
+            }
+        </div>
+    </div>
+
+    @if (!_competition.Entries.Any())
+    {
+        <MudAlert Severity="Severity.Info">No entries yet.</MudAlert>
+    }
+    else
+    {
+        <MudTable Items="@OrderedEntries" Dense="true" Hover="true">
+            <HeaderContent>
+                @if (_hasResults)
+                {
+                    <MudTh>Pos</MudTh>
+                }
+                <MudTh>Player</MudTh>
+                <MudTh Style="text-align:right">Handicap</MudTh>
+                <MudTh>Tees</MudTh>
+                @if (_hasResults)
+                {
+                    <MudTh Style="text-align:right">Gross</MudTh>
+                    <MudTh Style="text-align:right">Net</MudTh>
+                    @if (_competition.ScoringFormat == ScoringFormat.Stableford)
+                    {
+                        <MudTh Style="text-align:right">Points</MudTh>
+                    }
+                }
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                @if (_hasResults)
+                {
+                    <MudTd DataLabel="Pos">
+                        @(context.Position is int pos ? PositionLabel(pos) : "—")
+                    </MudTd>
+                }
+                <MudTd DataLabel="Player">@context.Player?.FirstName @context.Player?.LastName</MudTd>
+                <MudTd DataLabel="Handicap" Style="text-align:right">
+                    @(context.HandicapAtEntry?.ToString("0.0") ?? "—")
+                </MudTd>
+                <MudTd DataLabel="Tees">@(context.TeeSet?.Name ?? "—")</MudTd>
+                @if (_hasResults)
+                {
+                    <MudTd DataLabel="Gross" Style="text-align:right">@(context.GrossScore?.ToString() ?? "—")</MudTd>
+                    <MudTd DataLabel="Net" Style="text-align:right">@(context.NetScore?.ToString() ?? "—")</MudTd>
+                    @if (_competition.ScoringFormat == ScoringFormat.Stableford)
+                    {
+                        <MudTd DataLabel="Points" Style="text-align:right">@(context.StablefordPoints?.ToString() ?? "—")</MudTd>
+                    }
+                }
+                <MudTd Style="text-align:right">
+                    @if (CanWithdraw(context) && _competition.Status != CompetitionStatus.Completed && _competition.Status != CompetitionStatus.Cancelled)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Size="Size.Small" Color="Color.Error"
+                                       OnClick="@(() => WithdrawAsync(context))" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+        @if (_hasResults && _competition.Entries.Any(e => e.GrossScore is null))
+        {
+            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1 d-block">
+                Entries without a linked round are unranked. Players link a round to the
+                competition when recording it.
+            </MudText>
+        }
+    }
+}
+</MudContainer>
+
+@code {
+    [Parameter] public int CompetitionId { get; set; }
+
+    private bool _loading = true;
+    private bool _isAdmin;
+    private bool _canManage;
+    private string? _userId;
+    private Competition? _competition;
+    private List<Player> _enterablePlayers = new();
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    private bool _hasResults => _competition?.Entries.Any(e => e.GrossScore is not null) == true;
+
+    private IEnumerable<CompetitionEntry> OrderedEntries =>
+        _competition!.Entries
+            .OrderBy(e => e.Position ?? int.MaxValue)
+            .ThenBy(e => e.Player?.LastName);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        _userId = authState.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        _isAdmin = authState.User.IsInRole("Admin");
+
+        await LoadAsync();
+
+        if (_competition is not null && _userId is not null)
+        {
+            _canManage = _isAdmin || await CompetitionService.IsHostManagerAsync(
+                _competition.GolfClubId, _competition.GolfSocietyId, _userId);
+            // Own + managed players not yet entered.
+            var mine = await PlayerService.GetAllPlayersAsync(_userId, isUserAdmin: _isAdmin);
+            var enteredIds = _competition.Entries.Select(e => e.PlayerId).ToHashSet();
+            _enterablePlayers = mine.Where(p => !enteredIds.Contains(p.PlayerId)).ToList();
+        }
+
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new("Competitions", href: "/competitions"),
+            new(_competition?.Name ?? "Detail", href: null, disabled: true),
+        };
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _competition = await CompetitionService.GetCompetitionByIdAsync(CompetitionId);
+    }
+
+    private async Task SetStatusAsync(CompetitionStatus status)
+    {
+        try
+        {
+            await CompetitionService.SetStatusAsync(CompetitionId, status);
+            if (status == CompetitionStatus.Completed)
+            {
+                await CompetitionService.ComputeResultsAsync(CompetitionId);
+                Snackbar.Add("Competition completed — results calculated.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Competition {status.ToString().ToLower()}.", Severity.Success);
+            }
+            await LoadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private async Task ComputeResultsAsync()
+    {
+        await CompetitionService.ComputeResultsAsync(CompetitionId);
+        Snackbar.Add("Results calculated.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task EnterPlayerAsync(Player player)
+    {
+        try
+        {
+            await CompetitionService.AddEntryAsync(CompetitionId, player.PlayerId);
+            Snackbar.Add($"{player.FirstName} entered.", Severity.Success);
+            await OnParametersSetAsync();
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private bool CanWithdraw(CompetitionEntry entry) =>
+        _canManage
+        || _enterablePlayersOwnerCheck(entry);
+
+    private bool _enterablePlayersOwnerCheck(CompetitionEntry entry) =>
+        entry.Player is not null && _userId is not null
+        && (entry.Player.ApplicationUserId == _userId || entry.Player.CreatedByApplicationUserId == _userId);
+
+    private async Task WithdrawAsync(CompetitionEntry entry)
+    {
+        try
+        {
+            await CompetitionService.RemoveEntryAsync(CompetitionId, entry.PlayerId);
+            Snackbar.Add("Entry withdrawn.", Severity.Success);
+            await OnParametersSetAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+        }
+    }
+
+    private static string PositionLabel(int position) => position switch
+    {
+        1 => "🥇 1",
+        2 => "🥈 2",
+        3 => "🥉 3",
+        _ => position.ToString(),
+    };
+
+    private static Color StatusColour(CompetitionStatus status) => status switch
+    {
+        CompetitionStatus.Upcoming => Color.Info,
+        CompetitionStatus.InProgress => Color.Success,
+        CompetitionStatus.Completed => Color.Default,
+        _ => Color.Warning,
+    };
+}
