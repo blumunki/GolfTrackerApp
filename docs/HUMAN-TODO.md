@@ -36,24 +36,34 @@ switch safely to EF Core migrations.
 
 Completed against production on 2026-06-11.
 
-## Production deploy of Phase-2 handicaps (pending — DB compute exhausted)
+## Production deploy — Phase-2 handicaps + Phase-3 competition schema
 
-**Status:** Pending human action. **Context:** see `docs/ARCHITECTURE.md` §5.1 (startup resilience).
+**Status:** Ready to deploy (Azure SQL compute has reset). **Context:** `docs/ARCHITECTURE.md` §5.1.
 
-A large batch of commits (Phase-2 handicaps, navigation/IA, WHS v2) is built and tested
-locally but **not yet deployed**. Production Azure SQL ran out of its monthly compute
-allowance (resets at the start of the month), and applying the pending `AddHandicapTables`
-migration itself consumes compute, so the deploy is deliberately deferred.
+Local `main` is ahead of `origin` by a batch of built-and-tested commits (Phase-2 handicaps,
+navigation/IA, WHS v2, and the Phase-3 competition schema). All tests green. Production is still
+running the pre-handicaps code at baseline `20260611161345_InitialSqlServer`.
 
-The app is now resilient to this (it starts degraded instead of crash-looping — WORKLOG 0-13).
-When ready to release:
+**Two migrations are pending on production** (both additive — new tables + nullable columns, so
+no historical data is rewritten):
+- `20260611202637_AddHandicapTables`
+- `20260627171926_AddCompetitions`
 
-- [ ] Push `main` (this triggers CI + the Azure deploy).
-- [ ] Set Azure App Service application setting `Database__MigrateOnStartup=false` **after** the
-  deploy lands, so the app doesn't attempt the migration on a compute-starved DB. (Do not set
-  it before the new code is deployed — the old code ignores the flag and would crash on restart.)
-- [ ] When production compute is available (month reset): apply the schema via
-  **Admin → Database Migrations → Apply Pending Migrations** (or set `MigrateOnStartup=true` and
-  restart). Back up the DB first.
-- [ ] Run **Admin → Handicap Backfill** to compute everyone's WHS index with the v2 method.
-- [ ] (Optional) Re-run `docs/sql-server-drift-check.sql` to confirm a clean schema.
+Now that compute is available, migrations apply normally at startup — the `MigrateOnStartup=false`
+workaround from the compute-exhausted period is **no longer needed** (it only existed to avoid
+wasting scarce compute on a doomed attempt).
+
+Deploy steps:
+
+- [ ] **Back up** the production SQL Server database first (standard before any schema change).
+- [ ] Decide whether to commit the locally-modified `Data/Rounds.csv` / `Data/Scores.csv`
+  (currently uncommitted local changes).
+- [ ] **Push `main`** → CI build+test gate → Azure deploys Web + Core.
+- [ ] On first startup the new (resilient) code **applies both pending migrations** (compute is
+  available; `MigrateOnStartup` defaults true). Watch the App Service log for
+  `…migrations applied successfully`. Alternatively, deploy and apply on demand via
+  **Admin → Database Migrations → Apply Pending Migrations**.
+- [ ] Run **Admin → Handicap Backfill** to compute everyone's WHS index (v2 net double bogey) on
+  real data.
+- [ ] Verify: re-run `docs/sql-server-drift-check.sql` (clean schema), spot-check a handicap, and
+  click through the app.
