@@ -379,6 +379,7 @@ Key services and their responsibilities:
 - Auth endpoints (`/api/auth/*`): Unauthenticated, issue JWT tokens
 - Reference data (`/api/golfclubs`, `/api/golfcourses` GET): Publicly accessible
 - User data (`/api/rounds`, `/api/players`, `/api/dashboard`, `/api/reports`): JWT-protected
+- Competitions (`/api/competitions`): JWT-protected reads; create/manage gated per §12.5 3.5 (global Admin + society Owner/Admin — requires the role claims now embedded in API JWTs); entries owner-or-managed; round assign/unassign owner-or-admin
 - AI endpoints (`/api/insights/*`): JWT-protected, rate-limited per user
 
 ### 7.3 Serialisation
@@ -905,6 +906,8 @@ CompetitionEntry
 - Auto-calculate results based on scoring format
 
 Service layer implemented (WORKLOG 3-2): `ICompetitionService`/`CompetitionService` — create (name/date/creator required; club **xor** society host; referenced entities validated), list with host/status filters, get with entries+rounds, status transitions (Completed/Cancelled are terminal), entry add/withdraw (snapshots `HandicapAtEntry` from the player's display handicap; unique per player; no withdrawal after completion), and round assign/unassign (owner-or-admin; cancelled competitions accept no rounds; `RoundType` untouched). WHO may call create/manage is enforced at controller/page per §12.5 3.5 (interim: global admin + society Owner/Admin).
+
+API implemented (WORKLOG 3-4): `CompetitionsController` (`/api/competitions`) — list (club/society/status filters), detail with entries + linked round ids, create/update/status (gated by the interim model; club-hosted and ad-hoc = Admin-only until 3-8), entries add/withdraw (self or managed players; admin any), round assign/unassign (`POST|DELETE …/rounds/{roundId}`; ownership in the service). API JWTs now carry role claims so `User.IsInRole("Admin")` works under ApiAuth — tokens issued before this lack roles until next sign-in. DTOs in `Core/Models/Api/CompetitionDtos.cs` (enums serialised as strings per mobile conventions).
 
 **Scoring Format Logic:**
 - **Medal**: Gross strokes, net = gross - handicap
