@@ -22,6 +22,18 @@ namespace GolfTrackerApp.Core.Data
         {
         }
 
+        protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+        {
+            base.ConfigureConventions(configurationBuilder);
+
+            // All domain decimals are small golf numbers (course ratings ~55–80, handicap
+            // indexes ≤54, differentials) at 1–2 dp. decimal(5,2) silences SQL Server's
+            // "no store type specified" warning for every current and future decimal;
+            // scale 2 matches the previous decimal(18,2) default, so narrowing the columns
+            // changes no stored values.
+            configurationBuilder.Properties<decimal>().HavePrecision(5, 2);
+        }
+
         // Add DbSet properties for your application models
         public DbSet<Player> Players { get; set; }
         public DbSet<GolfClub> GolfClubs { get; set; }

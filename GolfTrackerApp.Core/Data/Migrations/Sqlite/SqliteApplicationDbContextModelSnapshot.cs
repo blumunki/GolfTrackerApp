@@ -392,6 +392,7 @@ namespace GolfTrackerApp.Core.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("HandicapAtEntry")
+                        .HasPrecision(5, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("NetScore")
@@ -549,6 +550,7 @@ namespace GolfTrackerApp.Core.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("HandicapIndex")
+                        .HasPrecision(5, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsManualEntry")
@@ -914,9 +916,11 @@ namespace GolfTrackerApp.Core.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("CourseRating")
+                        .HasPrecision(5, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Differential")
+                        .HasPrecision(5, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsUsedInCalculation")
@@ -989,6 +993,7 @@ namespace GolfTrackerApp.Core.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal?>("CourseRating")
+                        .HasPrecision(5, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Gender")
