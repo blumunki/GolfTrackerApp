@@ -137,8 +137,9 @@ public class HandicapService : IHandicapService
     /// <summary>
     /// The course's default tee for rounds with no explicit tee selection: "Yellow" (the
     /// documented default that historical rounds map to), else the lowest-sort-order tee.
+    /// Shared semantic — also used by competition results (CompetitionService).
     /// </summary>
-    private static TeeSet? ResolveDefaultTeeSet(IReadOnlyList<TeeSet> courseTeeSets) =>
+    public static TeeSet? ResolveDefaultTeeSet(IReadOnlyList<TeeSet> courseTeeSets) =>
         courseTeeSets.FirstOrDefault(ts => ts.Name.Equals("Yellow", StringComparison.OrdinalIgnoreCase))
         ?? courseTeeSets.OrderBy(ts => ts.SortOrder).ThenBy(ts => ts.TeeSetId).FirstOrDefault();
 

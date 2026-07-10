@@ -201,6 +201,143 @@ public sealed class CompetitionServiceTests : IDisposable
         Assert.Null(await _service.AssignRoundAsync(9999, comp.CompetitionId, user.Id, false));
     }
 
+    // --- Host-manager check ---
+
+    [Fact]
+    public async Task IsHostManager_TrueOnlyForSocietyOwnerOrAdmin()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var society = await SeedSocietyAsync(user.Id);
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            context.SocietyMemberships.Add(new SocietyMembership
+            {
+                GolfSocietyId = society.GolfSocietyId, UserId = user.Id, Role = MembershipRole.Owner,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        Assert.True(await _service.IsHostManagerAsync(null, society.GolfSocietyId, user.Id));
+        Assert.False(await _service.IsHostManagerAsync(null, society.GolfSocietyId, "someone-else"));
+        // Club-hosted and ad-hoc: never (global admin only until 3-8).
+        Assert.False(await _service.IsHostManagerAsync(course.GolfClubId, null, user.Id));
+        Assert.False(await _service.IsHostManagerAsync(null, null, user.Id));
+    }
+
+    // --- Results ---
+
+    [Fact]
+    public async Task ComputeResults_MedalRanksByNet_UsingHandicapAtEntry()
+    {
+        var (user, course) = await SeedUserAndCourseAsync(); // par 4x18, CR 70.0, slope 120
+        var teeSetId = await TeeSetIdAsync(course.GolfCourseId);
+        var scratch = await TestDataBuilder.SeedPlayerAsync(_factory, firstName: "Scratch", handicap: 0.0);
+        var highHcp = await TestDataBuilder.SeedPlayerAsync(_factory, firstName: "High", handicap: 20.0);
+        var comp = await _service.CreateCompetitionAsync(NewCompetition(user.Id, courseId: course.GolfCourseId));
+        await _service.AddEntryAsync(comp.CompetitionId, scratch.PlayerId, teeSetId);
+        await _service.AddEntryAsync(comp.CompetitionId, highHcp.PlayerId, teeSetId);
+
+        // Scratch shoots 80 (net 79 off CH −1... CR 70 par 72 slope 120: CH(0)= −2 → net 82? compute below);
+        // High shoots 90 with CH 19 → net 71: high handicapper wins on net.
+        var scratchRound = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, scratch.PlayerId, strokesPerHole: 5, teeSetId: teeSetId,
+            datePlayed: DateTime.UtcNow.Date.AddDays(-1)); // gross 90
+        var highRound = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, highHcp.PlayerId, strokesPerHole: 5, teeSetId: teeSetId,
+            datePlayed: DateTime.UtcNow.Date.AddDays(-1)); // gross 90
+        await _service.AssignRoundAsync(scratchRound.RoundId, comp.CompetitionId, user.Id, true);
+        await _service.AssignRoundAsync(highRound.RoundId, comp.CompetitionId, user.Id, true);
+
+        var results = await _service.ComputeResultsAsync(comp.CompetitionId);
+
+        // Same gross; the higher handicap gives the lower net → High is 1st.
+        var first = results.First();
+        Assert.Equal(highHcp.PlayerId, first.PlayerId);
+        Assert.Equal(1, first.Position);
+        Assert.Equal(90, first.GrossScore);
+        // CH(20.0) = 20 × 120/113 + (70.0 − 72) = 21.24 − 2 = 19.24 → 19; net 71.
+        Assert.Equal(71, first.NetScore);
+        var second = results[1];
+        Assert.Equal(scratch.PlayerId, second.PlayerId);
+        Assert.Equal(2, second.Position);
+        // CH(0.0) = 0 × … + (70 − 72) = −2; net 92.
+        Assert.Equal(92, second.NetScore);
+    }
+
+    [Fact]
+    public async Task ComputeResults_StablefordRanksByPointsDesc_TiesSharePosition()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var teeSetId = await TeeSetIdAsync(course.GolfCourseId);
+        var comp = await _service.CreateCompetitionAsync(new Competition
+        {
+            Name = "Stableford Open", GolfCourseId = course.GolfCourseId,
+            ScoringFormat = ScoringFormat.Stableford, Date = new DateTime(2026, 7, 1),
+            CreatedByUserId = user.Id,
+        });
+
+        var players = new List<Player>();
+        foreach (var (name, strokes) in new[] { ("A", 4), ("B", 5), ("C", 5) })
+        {
+            var player = await TestDataBuilder.SeedPlayerAsync(_factory, firstName: name, handicap: 0.0);
+            players.Add(player);
+            await _service.AddEntryAsync(comp.CompetitionId, player.PlayerId, teeSetId);
+            var round = await TestDataBuilder.SeedCompletedRoundAsync(
+                _factory, course.GolfCourseId, player.PlayerId, strokesPerHole: strokes, teeSetId: teeSetId,
+                datePlayed: DateTime.UtcNow.Date.AddDays(-1));
+            await _service.AssignRoundAsync(round.RoundId, comp.CompetitionId, user.Id, true);
+        }
+
+        var results = await _service.ComputeResultsAsync(comp.CompetitionId);
+
+        // CH(0) = −2 → one stroke LOST on SI 17+18... v1 StrokesReceivedOnHole gives 0 for CH ≤ 0,
+        // so all play net = gross. A: par golf → 2 pts/hole = 36. B, C: bogey → 1 pt/hole = 18.
+        Assert.Equal(players[0].PlayerId, results[0].PlayerId);
+        Assert.Equal(36, results[0].StablefordPoints);
+        Assert.Equal(1, results[0].Position);
+        Assert.Equal(2, results[1].Position);
+        Assert.Equal(2, results[2].Position); // tie shares 2nd
+    }
+
+    [Fact]
+    public async Task ComputeResults_EntryWithoutLinkedRound_IsUnranked_AndRecomputeIsIdempotent()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var teeSetId = await TeeSetIdAsync(course.GolfCourseId);
+        var playing = await TestDataBuilder.SeedPlayerAsync(_factory, firstName: "Playing", handicap: 10.0);
+        var noShow = await TestDataBuilder.SeedPlayerAsync(_factory, firstName: "NoShow", handicap: 12.0);
+        var comp = await _service.CreateCompetitionAsync(NewCompetition(user.Id, courseId: course.GolfCourseId));
+        await _service.AddEntryAsync(comp.CompetitionId, playing.PlayerId, teeSetId);
+        await _service.AddEntryAsync(comp.CompetitionId, noShow.PlayerId, teeSetId);
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, playing.PlayerId, strokesPerHole: 5, teeSetId: teeSetId,
+            datePlayed: DateTime.UtcNow.Date.AddDays(-1));
+        await _service.AssignRoundAsync(round.RoundId, comp.CompetitionId, user.Id, true);
+
+        var first = await _service.ComputeResultsAsync(comp.CompetitionId);
+        var second = await _service.ComputeResultsAsync(comp.CompetitionId);
+
+        foreach (var results in new[] { first, second })
+        {
+            Assert.Equal(2, results.Count);
+            Assert.Equal(playing.PlayerId, results[0].PlayerId);
+            Assert.Equal(1, results[0].Position);
+            var unranked = results[1];
+            Assert.Equal(noShow.PlayerId, unranked.PlayerId);
+            Assert.Null(unranked.GrossScore);
+            Assert.Null(unranked.Position);
+        }
+    }
+
+    private async Task<int> TeeSetIdAsync(int courseId)
+    {
+        await using var context = await _factory.CreateDbContextAsync();
+        return await context.TeeSets
+            .Where(ts => ts.GolfCourseId == courseId)
+            .Select(ts => ts.TeeSetId)
+            .SingleAsync();
+    }
+
     // --- helpers ---
 
     private async Task<(Core.Data.ApplicationUser User, GolfCourse Course)> SeedUserAndCourseAsync()

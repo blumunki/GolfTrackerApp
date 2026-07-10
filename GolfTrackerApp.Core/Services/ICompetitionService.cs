@@ -54,4 +54,22 @@ public interface ICompetitionService
 
     /// <summary>Removes a round's competition link, with the same ownership rule as assignment.</summary>
     Task<Round?> UnassignRoundAsync(int roundId, string requestingUserId, bool isUserAdmin);
+
+    /// <summary>
+    /// Whether the user manages the given host under the interim model (§12.5 3.5):
+    /// society Owner/Admin for society-hosted competitions; club-hosted and ad-hoc return
+    /// false (global-admin only — the caller ORs in the Admin role check).
+    /// </summary>
+    Task<bool> IsHostManagerAsync(int? golfClubId, int? golfSocietyId, string userId);
+
+    /// <summary>
+    /// Computes and persists results for every entry from the players' linked rounds:
+    /// gross (sum of strokes), Medal net and Stableford points via ScoringCalculator
+    /// (course handicap from HandicapAtEntry and the tee's rating/slope; scratch when
+    /// either is missing), and competition-style positions (ties share, e.g. 1,2,2,4 —
+    /// Stableford ranks by points descending, other formats by net ascending). Entries
+    /// whose player has no linked round get null results and no position. Idempotent —
+    /// safe to recompute at any time. Returns entries in ranked order.
+    /// </summary>
+    Task<List<CompetitionEntry>> ComputeResultsAsync(int competitionId);
 }

@@ -229,6 +229,105 @@ public class CompetitionService : ICompetitionService
         return round;
     }
 
+    public async Task<bool> IsHostManagerAsync(int? golfClubId, int? golfSocietyId, string userId)
+    {
+        if (golfSocietyId is not int societyId)
+        {
+            return false; // club-hosted (until 3-8) and ad-hoc: global admin only
+        }
+
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.SocietyMemberships.AnyAsync(m =>
+            m.GolfSocietyId == societyId
+            && m.UserId == userId
+            && (m.Role == MembershipRole.Admin || m.Role == MembershipRole.Owner));
+    }
+
+    public async Task<List<CompetitionEntry>> ComputeResultsAsync(int competitionId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        var competition = await context.Competitions
+            .Include(c => c.Entries)
+            .Include(c => c.Rounds)
+                .ThenInclude(r => r.Scores)
+                    .ThenInclude(s => s.Hole)
+            .Include(c => c.Rounds)
+                .ThenInclude(r => r.RoundPlayers)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(c => c.CompetitionId == competitionId)
+            ?? throw new ArgumentException($"Competition with ID {competitionId} does not exist.");
+
+        var courseIds = competition.Rounds.Select(r => r.GolfCourseId).Distinct().ToList();
+        var teeSetsByCourse = (await context.TeeSets
+            .Where(ts => courseIds.Contains(ts.GolfCourseId))
+            .ToListAsync())
+            .GroupBy(ts => ts.GolfCourseId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<TeeSet>)g.ToList());
+        var allTeeSets = teeSetsByCourse.Values.SelectMany(t => t).ToList();
+
+        foreach (var entry in competition.Entries)
+        {
+            var round = competition.Rounds.FirstOrDefault(r =>
+                r.Scores.Any(s => s.PlayerId == entry.PlayerId));
+            if (round is null)
+            {
+                entry.GrossScore = null;
+                entry.NetScore = null;
+                entry.StablefordPoints = null;
+                entry.Position = null;
+                continue;
+            }
+
+            var scores = round.Scores
+                .Where(s => s.PlayerId == entry.PlayerId && s.Hole != null)
+                .ToList();
+            entry.GrossScore = scores.Sum(s => s.Strokes);
+
+            // Course handicap from the entry's snapshot and the tee played (entry tee →
+            // round tee → course default). Scratch when handicap or rating/slope missing.
+            var roundPlayer = round.RoundPlayers.FirstOrDefault(rp => rp.PlayerId == entry.PlayerId);
+            var teeSetId = entry.TeeSetId ?? roundPlayer?.TeeSetId;
+            var teeSet = teeSetId is int tee
+                ? allTeeSets.FirstOrDefault(ts => ts.TeeSetId == tee)
+                : HandicapService.ResolveDefaultTeeSet(
+                    teeSetsByCourse.GetValueOrDefault(round.GolfCourseId) ?? Array.Empty<TeeSet>());
+
+            var courseHandicap = 0;
+            if (entry.HandicapAtEntry is decimal index
+                && teeSet is { CourseRating: decimal rating, SlopeRating: int slope })
+            {
+                var par = scores.Sum(s => s.Hole!.Par);
+                courseHandicap = WhsCalculator.ComputeCourseHandicap(index, slope, rating, par);
+            }
+
+            entry.NetScore = ScoringCalculator.ComputeNetScore(entry.GrossScore.Value, courseHandicap);
+            entry.StablefordPoints = ScoringCalculator.ComputeStablefordPoints(
+                scores.Select(s => (s.Hole!.Par, s.Strokes, s.Hole!.StrokeIndex ?? WhsCalculator.RoundHoles)),
+                courseHandicap);
+        }
+
+        // Competition-style ranking with shared positions (1, 2, 2, 4).
+        var scored = competition.Entries.Where(e => e.GrossScore is not null);
+        var ranked = (competition.ScoringFormat == ScoringFormat.Stableford
+                ? scored.OrderByDescending(e => e.StablefordPoints)
+                : scored.OrderBy(e => e.NetScore))
+            .ToList();
+        for (var i = 0; i < ranked.Count; i++)
+        {
+            var tiedWithPrevious = i > 0 && (competition.ScoringFormat == ScoringFormat.Stableford
+                ? ranked[i].StablefordPoints == ranked[i - 1].StablefordPoints
+                : ranked[i].NetScore == ranked[i - 1].NetScore);
+            ranked[i].Position = tiedWithPrevious ? ranked[i - 1].Position : i + 1;
+        }
+
+        await context.SaveChangesAsync();
+        _logger.LogInformation("Computed results for Competition {CompetitionId}: {Ranked} ranked of {Total} entries.",
+            competitionId, ranked.Count, competition.Entries.Count);
+
+        return ranked.Concat(competition.Entries.Where(e => e.GrossScore is null)).ToList();
+    }
+
     private static void EnsureNotTerminal(Competition competition)
     {
         if (competition.Status is CompetitionStatus.Completed or CompetitionStatus.Cancelled)

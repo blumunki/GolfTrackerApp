@@ -286,19 +286,11 @@ public class CompetitionsController : BaseApiController
         }
     }
 
-    /// <summary>Interim gate (§12.5 3.5): Admin always; society Owner/Admin for their society; club/ad-hoc = Admin only.</summary>
+    /// <summary>Interim gate (§12.5 3.5): Admin always; else defer to the service's host-manager check.</summary>
     private async Task<bool> CanManageHostAsync(int? golfClubId, int? golfSocietyId)
     {
-        if (User.IsInRole("Admin")) return true;
-        if (golfSocietyId is int societyId)
-        {
-            var userId = GetCurrentUserId();
-            return await _context.SocietyMemberships.AnyAsync(m =>
-                m.GolfSocietyId == societyId
-                && m.UserId == userId
-                && (m.Role == MembershipRole.Admin || m.Role == MembershipRole.Owner));
-        }
-        return false; // club-hosted (until 3-8) and ad-hoc competitions: global admin only
+        return User.IsInRole("Admin")
+            || await _competitionService.IsHostManagerAsync(golfClubId, golfSocietyId, GetCurrentUserId());
     }
 
     /// <summary>Entries: a user acts for their own player or players they manage; admins for anyone.</summary>
