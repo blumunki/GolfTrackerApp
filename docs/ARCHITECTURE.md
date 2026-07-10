@@ -363,6 +363,9 @@ Key services and their responsibilities:
 | `IAiAuditService` | Audit logging, rate limiting, usage counts, retention cleanup |
 | `IAiChatService` | Persistent chat session CRUD (create, resume, archive) |
 | `IAiProviderSettingsService` | Admin-managed provider on/off + priority (DB-backed) |
+| `IHandicapService` | WHS differentials/index engine, round-completion recalc, backfill, manual club handicaps, transparency reads |
+| `IDatabaseMigrationService` | Applied/pending migration status + apply-on-demand (admin page) |
+| `ICompetitionService` | Competition lifecycle (create/list/get/status), entries (handicap snapshot), round linking with ownership checks |
 
 ## 7. API Design
 
@@ -565,7 +568,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | — | Live Round Mode | ✅ Done | Single-device scorecard entry; no real-time multi-player sync, no hole maps |
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
-| 3 | Competitions & Scoring Formats | 🚧 In progress | Models + schema done (Competition, CompetitionEntry, ScoringFormat, Round.CompetitionId — WORKLOG 3-1). Service, scoring logic, controller, UI pending (3-2…3-7) |
+| 3 | Competitions & Scoring Formats | 🚧 In progress | Schema (3-1), scoring math (3-3) and CompetitionService (3-2) done. Controller + web/mobile UI pending (3-4…3-7); deferred rollout stages 3-8…3-10 |
 | 4a | Personal WHS handicap (differentials + index + backfill) | ✅ Done | WHS math, models + migrations, round-completion hook (both paths), and idempotent admin backfill (`/admin/handicap-backfill`). UI dashboards are 4b |
 | 4b | Manual club/regional handicaps + handicap UI | ✅ Done | CRUD + API (2-5), web dashboard (2-6), mobile dashboard (2-7), entry UI + primary selector (2-9). Mobile is read-only; entry/selector are web-only |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
@@ -900,6 +903,8 @@ CompetitionEntry
 - Enter/register for competition
 - Link a recorded round to a competition
 - Auto-calculate results based on scoring format
+
+Service layer implemented (WORKLOG 3-2): `ICompetitionService`/`CompetitionService` — create (name/date/creator required; club **xor** society host; referenced entities validated), list with host/status filters, get with entries+rounds, status transitions (Completed/Cancelled are terminal), entry add/withdraw (snapshots `HandicapAtEntry` from the player's display handicap; unique per player; no withdrawal after completion), and round assign/unassign (owner-or-admin; cancelled competitions accept no rounds; `RoundType` untouched). WHO may call create/manage is enforced at controller/page per §12.5 3.5 (interim: global admin + society Owner/Admin).
 
 **Scoring Format Logic:**
 - **Medal**: Gross strokes, net = gross - handicap
