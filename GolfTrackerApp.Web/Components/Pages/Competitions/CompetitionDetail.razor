@@ -7,9 +7,11 @@
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 
 @using GolfTrackerApp.Core.Models
 @using GolfTrackerApp.Core.Services
+@using GolfTrackerApp.Web.Components.Shared
 @using Microsoft.AspNetCore.Authorization
 @using System.Security.Claims
 
@@ -46,7 +48,7 @@ else
         <MudText Typo="Typo.body1" Class="mb-3">@_competition.Description</MudText>
     }
 
-    @if (_canManage && _competition.Status is CompetitionStatus.Upcoming or CompetitionStatus.InProgress)
+    @if (_canManage)
     {
         <MudPaper Class="pa-3 mb-4 d-flex gap-2 flex-wrap" Outlined="true">
             @if (_competition.Status == CompetitionStatus.Upcoming)
@@ -63,9 +65,17 @@ else
                     Complete (locks in results)
                 </MudButton>
             }
-            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
-                       StartIcon="@Icons.Material.Filled.Cancel" OnClick="@(() => SetStatusAsync(CompetitionStatus.Cancelled))">
-                Cancel Competition
+            @if (_competition.Status is CompetitionStatus.Upcoming or CompetitionStatus.InProgress)
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                           StartIcon="@Icons.Material.Filled.Cancel" OnClick="@(() => SetStatusAsync(CompetitionStatus.Cancelled))">
+                    Cancel Competition
+                </MudButton>
+            }
+            <MudSpacer />
+            <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.DeleteForever" OnClick="DeleteCompetitionAsync">
+                Delete
             </MudButton>
         </MudPaper>
     }
@@ -233,6 +243,23 @@ else
         {
             Snackbar.Add(ex.Message, Severity.Warning);
         }
+    }
+
+    private async Task DeleteCompetitionAsync()
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.ContentText, $"Delete '{_competition!.Name}'? Linked rounds are kept — only their competition link is removed. Entries are deleted. This cannot be undone." },
+            { x => x.ButtonText, "Delete" },
+            { x => x.Color, Color.Error },
+        };
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Competition", parameters);
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not true) return;
+
+        await CompetitionService.DeleteCompetitionAsync(CompetitionId);
+        Snackbar.Add("Competition deleted. Rounds were kept.", Severity.Success);
+        NavigationManager.NavigateTo("/competitions");
     }
 
     private async Task ComputeResultsAsync()

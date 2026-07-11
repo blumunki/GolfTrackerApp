@@ -65,24 +65,36 @@ else
     </div>
 
     @* Competition link management (round creator or admin) *@
-    @if (_canManageLink && (round.CompetitionId is not null || _myCompetitions.Any()))
+    @if (_canManageLink)
     {
         <MudPaper Class="pa-3 mb-4 d-flex align-center gap-3 flex-wrap" Outlined="true">
             @if (round.CompetitionId is null)
             {
-                <MudSelect T="int?" @bind-Value="_selectedCompetitionId" Label="Link to competition"
-                           Style="max-width:340px;" Margin="Margin.Dense" Dense="true">
-                    @foreach (var competition in _myCompetitions)
-                    {
-                        <MudSelectItem T="int?" Value="@((int?)competition.CompetitionId)">
-                            @competition.Name (@competition.Date.ToString("d MMM"))
-                        </MudSelectItem>
-                    }
-                </MudSelect>
-                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
-                           Disabled="@(_selectedCompetitionId is null)" OnClick="LinkCompetitionAsync">
-                    Link
-                </MudButton>
+                @if (_myCompetitions.Any())
+                {
+                    <MudSelect T="int?" @bind-Value="_selectedCompetitionId" Label="Link to competition"
+                               Style="max-width:340px;" Margin="Margin.Dense" Dense="true"
+                               HelperText="Players on this round are entered automatically">
+                        @foreach (var competition in _myCompetitions)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)competition.CompetitionId)">
+                                @competition.Name (@competition.Date.ToString("d MMM"))
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                               Disabled="@(_selectedCompetitionId is null)" OnClick="LinkCompetitionAsync">
+                        Link
+                    </MudButton>
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" Color="Color.Secondary" />
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        No open competitions to link this round to —
+                        <MudLink Href="/competitions">create or enter one</MudLink> first.
+                    </MudText>
+                }
             }
             else
             {
@@ -321,10 +333,21 @@ else
         }
         else if (_canManageLink && _userId is not null)
         {
-            var myPlayer = await PlayerService.GetPlayerByApplicationUserIdAsync(_userId);
-            _myCompetitions = myPlayer is not null
-                ? await CompetitionService.GetCompetitionsForPlayerAsync(myPlayer.PlayerId)
-                : new List<Competition>();
+            if (isAdmin)
+            {
+                // Admins may link any round to any open competition (interim beta flow).
+                var all = await CompetitionService.GetCompetitionsAsync();
+                _myCompetitions = all
+                    .Where(c => c.Status is CompetitionStatus.Upcoming or CompetitionStatus.InProgress)
+                    .ToList();
+            }
+            else
+            {
+                var myPlayer = await PlayerService.GetPlayerByApplicationUserIdAsync(_userId);
+                _myCompetitions = myPlayer is not null
+                    ? await CompetitionService.GetCompetitionsForPlayerAsync(myPlayer.PlayerId)
+                    : new List<Competition>();
+            }
         }
     }
 

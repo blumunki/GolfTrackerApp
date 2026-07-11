@@ -200,7 +200,10 @@ public class CompetitionService : ICompetitionService
     {
         await using var context = await _contextFactory.CreateDbContextAsync();
 
-        var round = await context.Rounds.FindAsync(roundId);
+        var round = await context.Rounds
+            .Include(r => r.RoundPlayers)
+                .ThenInclude(rp => rp.Player)
+            .FirstOrDefaultAsync(r => r.RoundId == roundId);
         if (round is null) return null;
         var competition = await context.Competitions.FindAsync(competitionId);
         if (competition is null) return null;
@@ -213,8 +216,49 @@ public class CompetitionService : ICompetitionService
         // RoundType (Friendly/Competitive) is deliberately untouched — the competition link
         // is independent of the historical classification (ARCHITECTURE §12.5 3.5).
         round.CompetitionId = competitionId;
+
+        // Playing a linked round IS participating: ensure an entry per round player so
+        // results include them. Direct insert (not AddEntryAsync) on purpose — a backfill
+        // assigns rounds to already-Completed competitions, which AddEntryAsync forbids.
+        var enteredPlayerIds = await context.CompetitionEntries
+            .Where(e => e.CompetitionId == competitionId)
+            .Select(e => e.PlayerId)
+            .ToListAsync();
+        foreach (var roundPlayer in round.RoundPlayers.Where(rp => !enteredPlayerIds.Contains(rp.PlayerId)))
+        {
+            context.CompetitionEntries.Add(new CompetitionEntry
+            {
+                CompetitionId = competitionId,
+                PlayerId = roundPlayer.PlayerId,
+                TeeSetId = roundPlayer.TeeSetId,
+                HandicapAtEntry = roundPlayer.Player?.Handicap is double handicap ? (decimal)handicap : null,
+            });
+        }
+
         await context.SaveChangesAsync();
         return round;
+    }
+
+    public async Task<bool> DeleteCompetitionAsync(int competitionId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var competition = await context.Competitions.FindAsync(competitionId);
+        if (competition is null) return false;
+
+        // Rounds survive a competition delete — only the link is cleared.
+        var linkedRounds = await context.Rounds
+            .Where(r => r.CompetitionId == competitionId)
+            .ToListAsync();
+        foreach (var round in linkedRounds)
+        {
+            round.CompetitionId = null;
+        }
+
+        context.Competitions.Remove(competition); // entries cascade
+        await context.SaveChangesAsync();
+        _logger.LogInformation("Deleted Competition {CompetitionId} '{Name}'; unlinked {Rounds} round(s).",
+            competitionId, competition.Name, linkedRounds.Count);
+        return true;
     }
 
     public async Task<Round?> UnassignRoundAsync(int roundId, string requestingUserId, bool isUserAdmin)

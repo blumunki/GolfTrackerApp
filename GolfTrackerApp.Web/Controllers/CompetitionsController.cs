@@ -193,6 +193,26 @@ public class CompetitionsController : BaseApiController
         }
     }
 
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        try
+        {
+            var existing = await _competitionService.GetCompetitionByIdAsync(id);
+            if (existing is null) return NotFound($"Competition with ID {id} not found");
+            if (!await CanManageHostAsync(existing.GolfClubId, existing.GolfSocietyId))
+                return Forbid();
+
+            await _competitionService.DeleteCompetitionAsync(id);
+            return NoContent(); // rounds are unlinked, never deleted
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting competition {CompetitionId}", id);
+            return StatusCode(500, "An error occurred while deleting the competition");
+        }
+    }
+
     [HttpPost("{id}/entries")]
     public async Task<ActionResult> AddEntry(int id, [FromBody] CompetitionEntryRequest request)
     {

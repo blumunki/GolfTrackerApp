@@ -47,10 +47,20 @@ public interface ICompetitionService
 
     /// <summary>
     /// Links one of the requesting user's own rounds (admins may link any round) to a
-    /// non-cancelled competition. Returns the updated round; null when round or competition
-    /// is missing; throws UnauthorizedAccessException when the round isn't theirs.
+    /// non-cancelled competition, and ensures every player on the round has an entry
+    /// (handicap snapshotted; existing entries untouched — playing a linked round IS
+    /// participation, and this also lets a backfill assign rounds to Completed
+    /// competitions). Returns the updated round; null when round or competition is
+    /// missing; throws UnauthorizedAccessException when the round isn't theirs.
     /// </summary>
     Task<Round?> AssignRoundAsync(int roundId, int competitionId, string requestingUserId, bool isUserAdmin);
+
+    /// <summary>
+    /// Deletes a competition outright (beta/test cleanup — Cancel is the normal path).
+    /// Rounds are never touched beyond clearing their link; entries are removed with the
+    /// competition. Returns false when missing. Caller gates to admin/host-manager.
+    /// </summary>
+    Task<bool> DeleteCompetitionAsync(int competitionId);
 
     /// <summary>Removes a round's competition link, with the same ownership rule as assignment.</summary>
     Task<Round?> UnassignRoundAsync(int roundId, string requestingUserId, bool isUserAdmin);

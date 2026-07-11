@@ -245,6 +245,69 @@ public sealed class CompetitionServiceTests : IDisposable
         Assert.Equal(entered.CompetitionId, only.CompetitionId);
     }
 
+    [Fact]
+    public async Task AssignRound_AutoEntersRoundPlayers_WithHandicapSnapshot()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var teeSetId = await TeeSetIdAsync(course.GolfCourseId);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, handicap: 18.4);
+        var comp = await _service.CreateCompetitionAsync(NewCompetition(user.Id));
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, teeSetId: teeSetId,
+            datePlayed: DateTime.UtcNow.Date.AddDays(-1));
+
+        // No prior entry — assigning the round must create one.
+        await _service.AssignRoundAsync(round.RoundId, comp.CompetitionId, user.Id, isUserAdmin: true);
+
+        await using var context = await _factory.CreateDbContextAsync();
+        var entry = await context.CompetitionEntries.SingleAsync(e => e.CompetitionId == comp.CompetitionId);
+        Assert.Equal(player.PlayerId, entry.PlayerId);
+        Assert.Equal(18.4m, entry.HandicapAtEntry);
+        Assert.Equal(teeSetId, entry.TeeSetId);
+
+        // Re-assigning is idempotent — still exactly one entry.
+        await _service.AssignRoundAsync(round.RoundId, comp.CompetitionId, user.Id, true);
+        Assert.Equal(1, await context.CompetitionEntries.CountAsync(e => e.CompetitionId == comp.CompetitionId));
+    }
+
+    [Fact]
+    public async Task AssignRound_ToCompletedCompetition_StillEnters_ForBackfill()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, handicap: 12.0);
+        var comp = await _service.CreateCompetitionAsync(NewCompetition(user.Id));
+        await _service.SetStatusAsync(comp.CompetitionId, CompetitionStatus.Completed);
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, datePlayed: DateTime.UtcNow.Date.AddDays(-1));
+
+        await _service.AssignRoundAsync(round.RoundId, comp.CompetitionId, user.Id, true);
+
+        await using var context = await _factory.CreateDbContextAsync();
+        Assert.Equal(1, await context.CompetitionEntries.CountAsync(e => e.CompetitionId == comp.CompetitionId));
+    }
+
+    [Fact]
+    public async Task DeleteCompetition_UnlinksRounds_RemovesEntries_KeepsRoundsIntact()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, handicap: 10.0);
+        var comp = await _service.CreateCompetitionAsync(NewCompetition(user.Id));
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId, datePlayed: DateTime.UtcNow.Date.AddDays(-1));
+        await _service.AssignRoundAsync(round.RoundId, comp.CompetitionId, user.Id, true);
+
+        Assert.True(await _service.DeleteCompetitionAsync(comp.CompetitionId));
+        Assert.False(await _service.DeleteCompetitionAsync(comp.CompetitionId)); // already gone
+
+        await using var context = await _factory.CreateDbContextAsync();
+        Assert.Equal(0, await context.Competitions.CountAsync());
+        Assert.Equal(0, await context.CompetitionEntries.CountAsync());
+        var survivingRound = await context.Rounds.SingleAsync(r => r.RoundId == round.RoundId);
+        Assert.Null(survivingRound.CompetitionId);
+        Assert.Equal(RoundCompletionStatus.Completed, survivingRound.Status);
+        Assert.Equal(18, await context.Scores.CountAsync(s => s.RoundId == round.RoundId)); // scores untouched
+    }
+
     // --- Results ---
 
     [Fact]

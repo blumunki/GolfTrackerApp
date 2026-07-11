@@ -376,11 +376,22 @@ else // This case means isInitialized is false (still loading initial data)
             _availablePlayers = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin);
             Logger.LogInformation("Loaded {PlayerCount} available players for selection.", _availablePlayers.Count);
 
-            // Competitions the user's own player has entered — offered as an optional link.
-            var myPlayer = await PlayerService.GetPlayerByApplicationUserIdAsync(_currentUserId);
-            if (myPlayer is not null)
+            // Competitions offered as an optional link: admins see every open competition
+            // (interim beta flow); everyone else sees the ones their player has entered.
+            if (_isCurrentUserAdmin)
             {
-                _myCompetitions = await CompetitionService.GetCompetitionsForPlayerAsync(myPlayer.PlayerId);
+                var all = await CompetitionService.GetCompetitionsAsync();
+                _myCompetitions = all
+                    .Where(c => c.Status is CompetitionStatus.Upcoming or CompetitionStatus.InProgress)
+                    .ToList();
+            }
+            else
+            {
+                var myPlayer = await PlayerService.GetPlayerByApplicationUserIdAsync(_currentUserId);
+                if (myPlayer is not null)
+                {
+                    _myCompetitions = await CompetitionService.GetCompetitionsForPlayerAsync(myPlayer.PlayerId);
+                }
             }
             
             // Load existing round data if in edit mode
