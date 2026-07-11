@@ -61,8 +61,8 @@ wasting scarce compute on a doomed attempt).
 Deploy steps:
 
 - [ ] **Back up** the production SQL Server database first (standard before any schema change).
-- [ ] Decide whether to commit the locally-modified `Data/Rounds.csv` / `Data/Scores.csv`
-  (currently uncommitted local changes).
+- [x] Commit the latest `Data/Rounds.csv` / `Data/Scores.csv` changes
+  (`f9674ac`).
 - [ ] **Push `main`** → CI build+test gate → Azure deploys Web + Core.
 - [ ] On first startup the new (resilient) code **applies both pending migrations** (compute is
   available; `MigrateOnStartup` defaults true). Watch the App Service log for
