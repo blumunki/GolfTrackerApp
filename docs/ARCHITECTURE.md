@@ -431,6 +431,10 @@ The mobile app uses a **custom page switcher** in `App.razor` rather than Blazor
 
 This pattern was chosen for full control over transitions and bottom navigation state in the MAUI hybrid context.
 
+The authenticated bottom navigation keeps all existing shortcuts and presents
+`Record Round` as a raised centre action. It routes directly to `record-round`,
+so the app's primary workflow remains one tap away from every mobile page.
+
 ## 10. AI Insights Architecture
 
 The AI Insights feature provides AI-generated golf performance analysis across the entire application.
@@ -565,7 +569,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 
 | Phase | Feature area | Status | Notes |
 |-------|-------------|--------|-------|
-| — | Mobile feature parity (§12.1–12.2) | ✅ Done | |
+| — | Mobile feature parity (§12.1–12.2) | ✅ Done | Persistent centre Record Round action added to the MAUI bottom nav (P-2m) |
 | — | Admin area (§12.3) | ✅ Done | |
 | — | Live Round Mode | ✅ Done | Single-device scorecard entry; no real-time multi-player sync, no hole maps |
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |

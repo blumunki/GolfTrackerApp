@@ -179,55 +179,72 @@
                 }
             </MudMainContent>
             
-            <!-- Bottom Navigation - DIRECTLY in App.razor -->
-            <div class="bottom-navigation">
-                <MudPaper Elevation="8" Style="position: fixed; bottom: 0; left: 0; right: 0; z-index: 1300; border-radius: 20px 20px 0 0; background: rgba(255, 255, 255, 0.95);">
-                    <div class="d-flex justify-space-evenly align-center pa-2" Style="width: 100%; height: 60px;">
+            <nav class="golf-mobile-bottom-nav" aria-label="Primary navigation">
+                <div class="golf-mobile-bottom-nav__items">
+                    <div class="golf-mobile-bottom-nav__group">
                         <MudIconButton Icon="@Icons.Material.Filled.Home" 
                                       Color="@(currentPage == "home" ? Color.Primary : Color.Secondary)"
-                                      Size="Size.Medium"
+                                      Size="Size.Small"
+                                      title="Dashboard"
                                       OnClick="@(() => NavigateToPage("home"))" />
                         
                         <MudIconButton Icon="@Icons.Material.Filled.SportsGolf" 
                                       Color="@(currentPage == "rounds" ? Color.Primary : Color.Secondary)"
-                                      Size="Size.Medium"
+                                      Size="Size.Small"
+                                      title="Rounds"
                                       OnClick="@(() => NavigateToPage("rounds"))" />
                         
                         <MudIconButton Icon="@Icons.Material.Filled.Assessment" 
                                       Color="@(currentPage == "player-report" ? Color.Primary : Color.Secondary)"
-                                      Size="Size.Medium"
+                                      Size="Size.Small"
                                       title="Your Stats"
                                       OnClick="@(() => NavigateToPage("player-report"))" />
                         
                         <MudIconButton Icon="@Icons.Material.Filled.People" 
                                       Color="@(currentPage == "players" ? Color.Primary : Color.Secondary)"
-                                      Size="Size.Medium"
+                                      Size="Size.Small"
+                                      title="Players"
                                       OnClick="@(() => NavigateToPage("players"))" />
-                        
+                    </div>
+
+                    <button type="button"
+                            class="golf-mobile-bottom-nav__record"
+                            aria-label="Record Round"
+                            aria-current="@(currentPage == "record-round" ? "page" : null)"
+                            @onclick="@(() => NavigateToPage("record-round"))">
+                        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Medium" />
+                        <span>Record</span>
+                    </button>
+
+                    <div class="golf-mobile-bottom-nav__group">
                         <MudIconButton Icon="@Icons.Material.Filled.GolfCourse" 
                                       Color="@(currentPage == "golfclubs" ? Color.Primary : Color.Secondary)"
-                                      Size="Size.Medium"
+                                      Size="Size.Small"
+                                      title="Clubs and Courses"
                                       OnClick="@(() => NavigateToPage("golfclubs"))" />
                         
                         <MudIconButton Icon="@Icons.Material.Filled.AutoAwesome" 
                                       Color="@(currentPage == "ai-chat" ? Color.Primary : Color.Secondary)"
-                                      Size="Size.Medium"
+                                      Size="Size.Small"
+                                      title="AI Coach"
                                       OnClick="@(() => NavigateToPage("ai-chat"))" />
                         
                         <MudBadge Content="@unreadNotificationCount" Visible="@(unreadNotificationCount > 0)" Color="Color.Error" Overlap="true">
                             <MudIconButton Icon="@Icons.Material.Filled.Notifications" 
                                           Color="@(currentPage == "notifications" ? Color.Primary : Color.Secondary)"
-                                          Size="Size.Medium"
+                                          Size="Size.Small"
+                                          title="Notifications"
                                           OnClick="@(() => NavigateToPage("notifications"))" />
                         </MudBadge>
                         
                         <MudIconButton Icon="@Icons.Material.Filled.Person" 
                                       Color="@(currentPage == "profile" ? Color.Primary : Color.Secondary)"
-                                      Size="Size.Medium"
+                                      Size="Size.Small"
+                                      title="Profile"
                                       OnClick="@(() => NavigateToPage("profile"))" />
                     </div>
-                </MudPaper>
-            </div>
+                </div>
+            </nav>
         </MudLayout>
     }
 </div>

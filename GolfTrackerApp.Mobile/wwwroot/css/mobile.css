@@ -163,6 +163,77 @@
     justify-content: space-around;
 }
 
+.golf-mobile-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1300;
+    min-height: 64px;
+    padding: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-bottom: 0;
+    border-radius: 20px 20px 0 0;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 -4px 18px rgba(26, 26, 46, 0.14);
+    backdrop-filter: blur(12px);
+}
+
+.golf-mobile-bottom-nav__items {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
+    height: 48px;
+}
+
+.golf-mobile-bottom-nav__group {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    min-width: 0;
+}
+
+.golf-mobile-bottom-nav__group .mud-icon-button {
+    width: 38px;
+    height: 38px;
+    margin: 0 auto;
+}
+
+.golf-mobile-bottom-nav__record {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    margin: -24px auto 0;
+    padding: 5px;
+    border: 4px solid #fff;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2e7d32, #3d7c3f);
+    box-shadow: 0 5px 14px rgba(46, 125, 50, 0.38);
+    color: #fff;
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.golf-mobile-bottom-nav__record span {
+    margin-top: 1px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.golf-mobile-bottom-nav__record:active,
+.golf-mobile-bottom-nav__record[aria-current="page"] {
+    background: linear-gradient(135deg, #1b5e20, #2e7d32);
+    box-shadow: 0 3px 9px rgba(27, 94, 32, 0.42);
+    transform: translateY(1px);
+}
+
 .nav-button, .nav-button-active {
     flex: 1;
     display: flex;
@@ -230,6 +301,10 @@
     .mobile-bottom-nav {
         padding-bottom: calc(8px + env(safe-area-inset-bottom));
     }
+
+    .golf-mobile-bottom-nav {
+        padding-bottom: calc(8px + env(safe-area-inset-bottom));
+    }
 }
 
 /* Responsive breakpoints */
@@ -246,6 +321,20 @@
     .mobile-bottom-nav {
         padding: 6px 12px;
     }
+
+    .golf-mobile-bottom-nav {
+        padding-right: 4px;
+        padding-left: 4px;
+    }
+
+    .golf-mobile-bottom-nav__items {
+        grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
+    }
+
+    .golf-mobile-bottom-nav__record {
+        width: 60px;
+        height: 60px;
+    }
 }
 
 /* Dark mode support */
@@ -257,6 +346,15 @@
     .mobile-bottom-nav {
         background: #1e1e1e;
         border-top-color: rgba(255,255,255,0.1);
+    }
+
+    .golf-mobile-bottom-nav {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(30, 30, 30, 0.96);
+    }
+
+    .golf-mobile-bottom-nav__record {
+        border-color: #1e1e1e;
     }
 }
 

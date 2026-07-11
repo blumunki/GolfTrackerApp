@@ -4,8 +4,9 @@
 > `P-3` review fixes (Overview home, embedded Stats, 18-hole transparency denominator,
 > Club-Course labels, grouped admin side-nav, player tiles → profiles, connected-tile
 > handicaps). `docs/ARCHITECTURE.md` is the source of truth for what now exists; this doc is
-> kept as the design rationale. **Remaining:** `P-2` — Record Round in the top app bar +
-> mobile bottom-nav parity (§2). This doc no longer gates work; follow the WORKLOG board.
+> kept as the design rationale. `P-2` added Record Round to the web app bar and `P-2m`
+> added the prominent centre action to the mobile bottom nav. This doc no longer gates
+> work; follow the WORKLOG board.
 
 ## 1. Why
 
