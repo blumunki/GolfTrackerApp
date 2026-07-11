@@ -13,6 +13,7 @@
 @inject IGolfCourseService GolfCourseService
 @inject IPlayerService PlayerService
 @inject IRoundService RoundService
+@inject ICompetitionService CompetitionService
 @inject IScoreService ScoreService
 @inject IHoleService HoleService
 @inject ITeeSetService TeeSetService
@@ -194,6 +195,21 @@
                                 }
                             </MudSelect>
                         </MudItem>
+                        @if (_myCompetitions.Any())
+                        {
+                            <MudItem xs="12" sm="8">
+                                <MudSelect T="int?" @bind-Value="_roundEntryModel.CompetitionId"
+                                           Label="Competition (optional)" Clearable="true" Disabled="@IsEditMode"
+                                           HelperText="Link this round to a competition you've entered">
+                                    @foreach (var competition in _myCompetitions)
+                                    {
+                                        <MudSelectItem T="int?" Value="@((int?)competition.CompetitionId)">
+                                            @competition.Name (@competition.Date.ToString("d MMM"))
+                                        </MudSelectItem>
+                                    }
+                                </MudSelect>
+                            </MudItem>
+                        }
                         <MudItem xs="12">
                             <MudTextField @bind-Value="_roundEntryModel.Notes" Label="Notes (Optional)" Lines="3" Variant="Variant.Outlined" Margin="Margin.Dense" />
                         </MudItem>
@@ -276,6 +292,8 @@ else // This case means isInitialized is false (still loading initial data)
         public int StartingHole { get; set; } = 1;
         public int HolesPlayed { get; set; } = 18;
         public RoundTypeOption RoundType { get; set; } = RoundTypeOption.Friendly;
+        // Independent of RoundType — links the round to an entered competition (§12.5 3.5).
+        public int? CompetitionId { get; set; }
         public string? Notes { get; set; }
         public List<Player> SelectedPlayers { get; set; } = new List<Player>();
         public Dictionary<int, List<HoleScoreEntryModel>> Scorecard { get; set; } = new Dictionary<int, List<HoleScoreEntryModel>>();
@@ -303,6 +321,7 @@ else // This case means isInitialized is false (still loading initial data)
     private bool _isNavigatingProgrammatically = false; // Flag to prevent infinite loops
 
     private string _currentUserId = string.Empty;
+    private List<Competition> _myCompetitions = new();
     private bool _isCurrentUserAdmin = false;
     private bool isInitialized = false; // Ensure this is used to conditionally render form
     private string? initializationError;
@@ -356,6 +375,13 @@ else // This case means isInitialized is false (still loading initial data)
             _golfClubs = await GolfClubService.GetAllGolfClubsAsync(); // Assuming this doesn't need admin context for now
             _availablePlayers = await PlayerService.GetAllPlayersAsync(_currentUserId, _isCurrentUserAdmin);
             Logger.LogInformation("Loaded {PlayerCount} available players for selection.", _availablePlayers.Count);
+
+            // Competitions the user's own player has entered — offered as an optional link.
+            var myPlayer = await PlayerService.GetPlayerByApplicationUserIdAsync(_currentUserId);
+            if (myPlayer is not null)
+            {
+                _myCompetitions = await CompetitionService.GetCompetitionsForPlayerAsync(myPlayer.PlayerId);
+            }
             
             // Load existing round data if in edit mode
             if (IsEditMode && RoundId.HasValue)
@@ -667,6 +693,7 @@ else // This case means isInitialized is false (still loading initial data)
             StartingHole = _roundEntryModel.StartingHole,
             HolesPlayed = _roundEntryModel.HolesPlayed,
             RoundType = _roundEntryModel.RoundType,
+            CompetitionId = _roundEntryModel.CompetitionId,
             Notes = _roundEntryModel.Notes,
             Status = RoundCompletionStatus.InProgress,
             CreatedByApplicationUserId = _currentUserId

@@ -56,6 +56,12 @@ public interface ICompetitionService
     Task<Round?> UnassignRoundAsync(int roundId, string requestingUserId, bool isUserAdmin);
 
     /// <summary>
+    /// Competitions the player is entered in that can still accept rounds (Upcoming or
+    /// InProgress), newest date first — the options for the round-recording selector.
+    /// </summary>
+    Task<List<Competition>> GetCompetitionsForPlayerAsync(int playerId);
+
+    /// <summary>
     /// Whether the user manages the given host under the interim model (§12.5 3.5):
     /// society Owner/Admin for society-hosted competitions; club-hosted and ad-hoc return
     /// false (global-admin only — the caller ORs in the Admin role check).

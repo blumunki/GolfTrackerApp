@@ -301,6 +301,7 @@ namespace GolfTrackerApp.Core.Services
                 StartingHole = session.StartingHole,
                 HolesPlayed = session.HolesPlayed,
                 RoundType = session.RoundType,
+                CompetitionId = session.CompetitionId,
                 Notes = session.Notes,
                 CreatedByApplicationUserId = session.UserId,
                 Status = session.Scorecard.Any() ? RoundCompletionStatus.Completed : RoundCompletionStatus.InProgress

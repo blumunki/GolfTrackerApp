@@ -35,6 +35,8 @@ namespace GolfTrackerApp.Core.Services
         public int StartingHole { get; set; } = 1;
         public int HolesPlayed { get; set; } = 18;
         public RoundTypeOption RoundType { get; set; } = RoundTypeOption.Friendly;
+        // Independent of RoundType — links the round to an entered competition (§12.5 3.5).
+        public int? CompetitionId { get; set; }
         public string? Notes { get; set; }
         
         // Players

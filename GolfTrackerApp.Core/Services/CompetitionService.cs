@@ -229,6 +229,19 @@ public class CompetitionService : ICompetitionService
         return round;
     }
 
+    public async Task<List<Competition>> GetCompetitionsForPlayerAsync(int playerId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        return await context.Competitions
+            .AsNoTracking()
+            .Include(c => c.GolfClub)
+            .Include(c => c.GolfSociety)
+            .Where(c => (c.Status == CompetitionStatus.Upcoming || c.Status == CompetitionStatus.InProgress)
+                        && c.Entries.Any(e => e.PlayerId == playerId))
+            .OrderByDescending(c => c.Date)
+            .ToListAsync();
+    }
+
     public async Task<bool> IsHostManagerAsync(int? golfClubId, int? golfSocietyId, string userId)
     {
         if (golfSocietyId is not int societyId)

@@ -224,6 +224,27 @@ public sealed class CompetitionServiceTests : IDisposable
         Assert.False(await _service.IsHostManagerAsync(null, null, user.Id));
     }
 
+    [Fact]
+    public async Task GetCompetitionsForPlayer_ReturnsEnteredNonTerminalOnly()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, handicap: 10.0);
+        var other = await TestDataBuilder.SeedPlayerAsync(_factory, firstName: "Other");
+
+        var entered = await _service.CreateCompetitionAsync(NewCompetition(user.Id));
+        var notEntered = await _service.CreateCompetitionAsync(NewCompetition(user.Id, name: "Not entered"));
+        var completed = await _service.CreateCompetitionAsync(NewCompetition(user.Id, name: "Done comp"));
+        await _service.AddEntryAsync(entered.CompetitionId, player.PlayerId);
+        await _service.AddEntryAsync(notEntered.CompetitionId, other.PlayerId);
+        await _service.AddEntryAsync(completed.CompetitionId, player.PlayerId);
+        await _service.SetStatusAsync(completed.CompetitionId, CompetitionStatus.Completed);
+
+        var forPlayer = await _service.GetCompetitionsForPlayerAsync(player.PlayerId);
+
+        var only = Assert.Single(forPlayer);
+        Assert.Equal(entered.CompetitionId, only.CompetitionId);
+    }
+
     // --- Results ---
 
     [Fact]
