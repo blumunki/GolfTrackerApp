@@ -173,15 +173,102 @@ public sealed class CompetitionServiceTests : IDisposable
             () => _service.RemoveEntryAsync(comp.CompetitionId, player.PlayerId));
     }
 
+    [Fact]
+    public async Task RegisterUser_OpenCompetition_UsesLinkedPlayerAndSnapshotsHandicap()
+    {
+        var (user, _) = await SeedUserAndCourseAsync();
+        var player = await TestDataBuilder.SeedPlayerAsync(
+            _factory, handicap: 14.2, linkedUserId: user.Id);
+        var competition = await _service.CreateCompetitionAsync(
+            NewCompetition(user.Id, isOpen: true));
+
+        var before = await _service.GetRegistrationStatusAsync(competition.CompetitionId, user.Id);
+        Assert.NotNull(before);
+        Assert.Equal(player.PlayerId, before!.PlayerId);
+        Assert.True(before.IsEligible);
+        Assert.True(before.CanRegister);
+
+        var entry = await _service.RegisterUserAsync(competition.CompetitionId, user.Id);
+        Assert.Equal(player.PlayerId, entry.PlayerId);
+        Assert.Equal(14.2m, entry.HandicapAtEntry);
+
+        var after = await _service.GetRegistrationStatusAsync(competition.CompetitionId, user.Id);
+        Assert.True(after!.IsRegistered);
+        Assert.True(after.CanWithdraw);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.RegisterUserAsync(competition.CompetitionId, user.Id));
+    }
+
+    [Fact]
+    public async Task RegisterUser_MembersOnlyCompetition_RequiresHostMembership()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        await TestDataBuilder.SeedPlayerAsync(_factory, linkedUserId: user.Id);
+        var society = await SeedSocietyAsync(user.Id);
+        var clubCompetition = await _service.CreateCompetitionAsync(
+            NewCompetition(user.Id, clubId: course.GolfClubId));
+        var societyCompetition = await _service.CreateCompetitionAsync(
+            NewCompetition(user.Id, name: "Society Medal", societyId: society.GolfSocietyId));
+
+        var closed = await _service.GetRegistrationStatusAsync(clubCompetition.CompetitionId, user.Id);
+        Assert.False(closed!.IsEligible);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(
+            () => _service.RegisterUserAsync(clubCompetition.CompetitionId, user.Id));
+
+        await using (var context = await _factory.CreateDbContextAsync())
+        {
+            context.ClubMemberships.Add(new ClubMembership
+            {
+                GolfClubId = course.GolfClubId,
+                UserId = user.Id,
+                Role = MembershipRole.Member,
+            });
+            context.SocietyMemberships.Add(new SocietyMembership
+            {
+                GolfSocietyId = society.GolfSocietyId,
+                UserId = user.Id,
+                Role = MembershipRole.Member,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        Assert.True((await _service.GetRegistrationStatusAsync(
+            clubCompetition.CompetitionId, user.Id))!.CanRegister);
+        Assert.True((await _service.GetRegistrationStatusAsync(
+            societyCompetition.CompetitionId, user.Id))!.CanRegister);
+    }
+
+    [Fact]
+    public async Task RegisterUser_RequiresLinkedPlayer_AndNonTerminalCompetition()
+    {
+        var (user, _) = await SeedUserAndCourseAsync();
+        var competition = await _service.CreateCompetitionAsync(
+            NewCompetition(user.Id, isOpen: true));
+
+        var noPlayer = await _service.GetRegistrationStatusAsync(competition.CompetitionId, user.Id);
+        Assert.Null(noPlayer!.PlayerId);
+        Assert.False(noPlayer.CanRegister);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.RegisterUserAsync(competition.CompetitionId, user.Id));
+
+        await TestDataBuilder.SeedPlayerAsync(_factory, linkedUserId: user.Id);
+        await _service.SetStatusAsync(competition.CompetitionId, CompetitionStatus.Completed);
+        var completed = await _service.GetRegistrationStatusAsync(competition.CompetitionId, user.Id);
+        Assert.False(completed!.CanRegister);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.RegisterUserAsync(competition.CompetitionId, user.Id));
+    }
+
     // --- Round linking ---
 
     [Fact]
     public async Task AssignRound_LinksOwnRound_AndPreservesRoundType()
     {
         var (user, course) = await SeedUserAndCourseAsync();
-        var player = await TestDataBuilder.SeedPlayerAsync(_factory);
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, linkedUserId: user.Id);
         var round = await TestDataBuilder.SeedCompletedRoundAsync(_factory, course.GolfCourseId, player.PlayerId);
         var comp = await _service.CreateCompetitionAsync(NewCompetition(user.Id));
+        await _service.AddEntryAsync(comp.CompetitionId, player.PlayerId);
 
         var linked = await _service.AssignRoundAsync(round.RoundId, comp.CompetitionId, user.Id, isUserAdmin: false);
 
@@ -190,6 +277,46 @@ public sealed class CompetitionServiceTests : IDisposable
 
         var unlinked = await _service.UnassignRoundAsync(round.RoundId, user.Id, isUserAdmin: false);
         Assert.Null(unlinked!.CompetitionId);
+    }
+
+    [Fact]
+    public async Task AssignRound_OwnRoundRequiresTheUsersCompetitionEntry()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, linkedUserId: user.Id);
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId);
+        var competition = await _service.CreateCompetitionAsync(NewCompetition(user.Id));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.AssignRoundAsync(
+                round.RoundId, competition.CompetitionId, user.Id, isUserAdmin: false));
+
+        Assert.Contains("Enter the competition", error.Message);
+    }
+
+    [Fact]
+    public async Task WithdrawUser_RequiresLinkedRoundToBeUnlinkedFirst()
+    {
+        var (user, course) = await SeedUserAndCourseAsync();
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory, linkedUserId: user.Id);
+        var competition = await _service.CreateCompetitionAsync(
+            NewCompetition(user.Id, isOpen: true));
+        await _service.RegisterUserAsync(competition.CompetitionId, user.Id);
+        var round = await TestDataBuilder.SeedCompletedRoundAsync(
+            _factory, course.GolfCourseId, player.PlayerId);
+        await _service.AssignRoundAsync(
+            round.RoundId, competition.CompetitionId, user.Id, isUserAdmin: false);
+
+        var linked = await _service.GetRegistrationStatusAsync(competition.CompetitionId, user.Id);
+        Assert.True(linked!.HasLinkedRound);
+        Assert.False(linked.CanWithdraw);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _service.WithdrawUserAsync(competition.CompetitionId, user.Id));
+
+        await _service.UnassignRoundAsync(round.RoundId, user.Id, isUserAdmin: false);
+        Assert.True(await _service.WithdrawUserAsync(competition.CompetitionId, user.Id));
+        Assert.False(await _service.WithdrawUserAsync(competition.CompetitionId, user.Id));
     }
 
     [Fact]
@@ -466,7 +593,8 @@ public sealed class CompetitionServiceTests : IDisposable
 
     private static Competition NewCompetition(
         string createdByUserId, string name = "Test Competition",
-        int? clubId = null, int? societyId = null, int? courseId = null) => new()
+        int? clubId = null, int? societyId = null, int? courseId = null,
+        bool isOpen = false) => new()
     {
         Name = name,
         GolfClubId = clubId,
@@ -474,6 +602,7 @@ public sealed class CompetitionServiceTests : IDisposable
         GolfCourseId = courseId,
         ScoringFormat = ScoringFormat.Medal,
         Date = new DateTime(2026, 7, 1),
+        IsOpen = isOpen,
         CreatedByUserId = createdByUserId,
     };
 }

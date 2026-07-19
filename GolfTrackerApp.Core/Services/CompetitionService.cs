@@ -191,10 +191,98 @@ public class CompetitionService : ICompetitionService
         {
             throw new InvalidOperationException("Entries cannot be withdrawn from a completed competition.");
         }
+        if (await context.Rounds.AnyAsync(r =>
+                r.CompetitionId == competitionId
+                && r.RoundPlayers.Any(rp => rp.PlayerId == playerId)))
+        {
+            throw new InvalidOperationException(
+                "The player's linked round must be unlinked before their entry can be withdrawn.");
+        }
 
         context.CompetitionEntries.Remove(entry);
         await context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<CompetitionRegistrationStatus?> GetRegistrationStatusAsync(
+        int competitionId,
+        string userId)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+        var competition = await context.Competitions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.CompetitionId == competitionId);
+        if (competition is null) return null;
+
+        var playerId = await ResolveLinkedPlayerIdAsync(context, userId);
+        var isRegistered = playerId is int registeredPlayerId
+            && await context.CompetitionEntries.AnyAsync(e =>
+                e.CompetitionId == competitionId && e.PlayerId == registeredPlayerId);
+        var hasLinkedRound = isRegistered
+            && playerId is int linkedPlayerId
+            && await context.Rounds.AnyAsync(r =>
+                r.CompetitionId == competitionId
+                && r.RoundPlayers.Any(rp => rp.PlayerId == linkedPlayerId));
+
+        var isEligible = competition.IsOpen;
+        if (!isEligible && competition.GolfClubId is int clubId)
+        {
+            isEligible = await context.ClubMemberships.AnyAsync(m =>
+                m.GolfClubId == clubId && m.UserId == userId);
+        }
+        else if (!isEligible && competition.GolfSocietyId is int societyId)
+        {
+            isEligible = await context.SocietyMemberships.AnyAsync(m =>
+                m.GolfSocietyId == societyId && m.UserId == userId);
+        }
+
+        var acceptsEntries = competition.Status is CompetitionStatus.Upcoming or CompetitionStatus.InProgress;
+        var status = new CompetitionRegistrationStatus
+        {
+            CompetitionId = competitionId,
+            PlayerId = playerId,
+            IsRegistered = isRegistered,
+            IsEligible = isEligible,
+            HasLinkedRound = hasLinkedRound,
+            CanRegister = playerId is not null && !isRegistered && isEligible && acceptsEntries,
+            CanWithdraw = isRegistered && acceptsEntries && !hasLinkedRound,
+        };
+        status.Message = RegistrationMessage(status, competition.Status);
+        return status;
+    }
+
+    public async Task<CompetitionEntry> RegisterUserAsync(
+        int competitionId,
+        string userId,
+        int? teeSetId = null)
+    {
+        var status = await GetRegistrationStatusAsync(competitionId, userId)
+            ?? throw new ArgumentException($"Competition with ID {competitionId} does not exist.");
+
+        if (status.PlayerId is null)
+            throw new InvalidOperationException(status.Message);
+        if (status.IsRegistered)
+            throw new InvalidOperationException("You are already entered in this competition.");
+        if (!status.IsEligible)
+            throw new UnauthorizedAccessException(status.Message);
+        if (!status.CanRegister)
+            throw new InvalidOperationException(status.Message);
+
+        return await AddEntryAsync(competitionId, status.PlayerId.Value, teeSetId);
+    }
+
+    public async Task<bool> WithdrawUserAsync(int competitionId, string userId)
+    {
+        var status = await GetRegistrationStatusAsync(competitionId, userId)
+            ?? throw new ArgumentException($"Competition with ID {competitionId} does not exist.");
+
+        if (status.PlayerId is null)
+            throw new InvalidOperationException(status.Message);
+        if (!status.IsRegistered) return false;
+        if (!status.CanWithdraw)
+            throw new InvalidOperationException(status.Message);
+
+        return await RemoveEntryAsync(competitionId, status.PlayerId.Value);
     }
 
     public async Task<Round?> AssignRoundAsync(int roundId, int competitionId, string requestingUserId, bool isUserAdmin)
@@ -213,6 +301,28 @@ public class CompetitionService : ICompetitionService
             throw new InvalidOperationException("Rounds cannot be assigned to a cancelled competition.");
         }
         EnsureRoundOwnership(round, requestingUserId, isUserAdmin);
+
+        if (!isUserAdmin)
+        {
+            if (competition.Status == CompetitionStatus.Completed)
+            {
+                throw new InvalidOperationException("Rounds cannot be assigned to a completed competition.");
+            }
+
+            var requestingPlayerId = await ResolveLinkedPlayerIdAsync(context, requestingUserId);
+            if (requestingPlayerId is null
+                || round.RoundPlayers.All(rp => rp.PlayerId != requestingPlayerId.Value))
+            {
+                throw new InvalidOperationException(
+                    "The round must include your linked player profile before it can be assigned.");
+            }
+            if (!await context.CompetitionEntries.AnyAsync(e =>
+                    e.CompetitionId == competitionId && e.PlayerId == requestingPlayerId.Value))
+            {
+                throw new InvalidOperationException(
+                    "Enter the competition before assigning one of your rounds to it.");
+            }
+        }
 
         // RoundType (Friendly/Competitive) is deliberately untouched — the competition link
         // is independent of the historical classification (ARCHITECTURE §12.5 3.5).
@@ -411,5 +521,42 @@ public class CompetitionService : ICompetitionService
             throw new UnauthorizedAccessException(
                 $"Round {round.RoundId} does not belong to the requesting user.");
         }
+    }
+
+    private static async Task<int?> ResolveLinkedPlayerIdAsync(
+        ApplicationDbContext context,
+        string userId)
+    {
+        var playerId = await context.Players
+            .Where(p => p.ApplicationUserId == userId)
+            .Select(p => (int?)p.PlayerId)
+            .FirstOrDefaultAsync();
+        if (playerId is not null) return playerId;
+
+        return await context.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.LinkedPlayerId)
+            .FirstOrDefaultAsync();
+    }
+
+    private static string RegistrationMessage(
+        CompetitionRegistrationStatus status,
+        CompetitionStatus competitionStatus)
+    {
+        if (status.PlayerId is null)
+            return "A linked player profile is required before you can enter competitions.";
+        if (status.IsRegistered)
+        {
+            if (competitionStatus is CompetitionStatus.Completed or CompetitionStatus.Cancelled)
+                return $"You are entered, but entries are locked because this competition is {competitionStatus}.";
+            if (status.HasLinkedRound)
+                return "Unlink your competition round before withdrawing your entry.";
+            return "You are entered in this competition.";
+        }
+        if (competitionStatus is CompetitionStatus.Completed or CompetitionStatus.Cancelled)
+            return $"Entries are closed because this competition is {competitionStatus}.";
+        if (!status.IsEligible)
+            return "This competition is not open to you; members-only events require membership of the host club or society.";
+        return "You can enter this competition with your linked player profile.";
     }
 }

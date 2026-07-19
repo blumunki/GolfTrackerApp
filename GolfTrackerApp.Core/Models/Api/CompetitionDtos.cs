@@ -69,3 +69,8 @@ public class CompetitionEntryRequest
     public int PlayerId { get; set; }
     public int? TeeSetId { get; set; }
 }
+
+public class CompetitionRegistrationRequest
+{
+    public int? TeeSetId { get; set; }
+}

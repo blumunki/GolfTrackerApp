@@ -42,12 +42,32 @@ public interface ICompetitionService
     /// </summary>
     Task<CompetitionEntry> AddEntryAsync(int competitionId, int playerId, int? teeSetId = null);
 
-    /// <summary>Withdraws a player's entry. False when no such entry; throws when the competition is Completed.</summary>
+    /// <summary>
+    /// Withdraws a player's entry. False when no such entry; throws when the competition
+    /// is Completed or the player still has a round linked to it.
+    /// </summary>
     Task<bool> RemoveEntryAsync(int competitionId, int playerId);
 
     /// <summary>
-    /// Links one of the requesting user's own rounds (admins may link any round) to a
-    /// non-cancelled competition, and ensures every player on the round has an entry
+    /// Resolves the user's linked player and whether they may self-register: open events
+    /// accept anyone, while members-only events require membership of the host club or
+    /// society. Returns null when the competition does not exist.
+    /// </summary>
+    Task<CompetitionRegistrationStatus?> GetRegistrationStatusAsync(int competitionId, string userId);
+
+    /// <summary>Self-registers the user's linked player when the registration status permits it.</summary>
+    Task<CompetitionEntry> RegisterUserAsync(int competitionId, string userId, int? teeSetId = null);
+
+    /// <summary>
+    /// Withdraws the user's linked player. A linked round must be unlinked first.
+    /// Returns false when the user has no entry.
+    /// </summary>
+    Task<bool> WithdrawUserAsync(int competitionId, string userId);
+
+    /// <summary>
+    /// Links one of the requesting user's own rounds to a non-terminal competition after
+    /// their linked player has entered (admins may link any round, including completed
+    /// competition backfills), and ensures every player on the round has an entry
     /// (handicap snapshotted; existing entries untouched — playing a linked round IS
     /// participation, and this also lets a backfill assign rounds to Completed
     /// competitions). Returns the updated round; null when round or competition is

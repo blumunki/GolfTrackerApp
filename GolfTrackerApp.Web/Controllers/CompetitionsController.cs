@@ -1,9 +1,7 @@
-using GolfTrackerApp.Core.Data;
 using GolfTrackerApp.Core.Models;
 using GolfTrackerApp.Core.Models.Api;
 using GolfTrackerApp.Core.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace GolfTrackerApp.Web.Controllers;
 
@@ -16,16 +14,13 @@ namespace GolfTrackerApp.Web.Controllers;
 public class CompetitionsController : BaseApiController
 {
     private readonly ICompetitionService _competitionService;
-    private readonly ApplicationDbContext _context;
     private readonly ILogger<CompetitionsController> _logger;
 
     public CompetitionsController(
         ICompetitionService competitionService,
-        ApplicationDbContext context,
         ILogger<CompetitionsController> logger)
     {
         _competitionService = competitionService;
-        _context = context;
         _logger = logger;
     }
 
@@ -224,11 +219,28 @@ public class CompetitionsController : BaseApiController
     {
         try
         {
-            if (!await CanActForPlayerAsync(request.PlayerId))
-                return Forbid();
+            var competition = await _competitionService.GetCompetitionByIdAsync(id);
+            if (competition is null) return NotFound($"Competition with ID {id} not found");
 
-            var entry = await _competitionService.AddEntryAsync(id, request.PlayerId, request.TeeSetId);
+            CompetitionEntry entry;
+            if (await CanManageHostAsync(competition.GolfClubId, competition.GolfSocietyId))
+            {
+                entry = await _competitionService.AddEntryAsync(id, request.PlayerId, request.TeeSetId);
+            }
+            else
+            {
+                var registration = await _competitionService.GetRegistrationStatusAsync(
+                    id, GetCurrentUserId());
+                if (registration?.PlayerId != request.PlayerId) return Forbid();
+                entry = await _competitionService.RegisterUserAsync(
+                    id, GetCurrentUserId(), request.TeeSetId);
+            }
+
             return Ok(new { entry.CompetitionEntryId, entry.CompetitionId, entry.PlayerId, entry.HandicapAtEntry });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
         }
         catch (ArgumentException ex)
         {
@@ -250,10 +262,22 @@ public class CompetitionsController : BaseApiController
     {
         try
         {
-            if (!await CanActForPlayerAsync(playerId))
-                return Forbid();
+            var competition = await _competitionService.GetCompetitionByIdAsync(id);
+            if (competition is null) return NotFound($"Competition with ID {id} not found");
 
-            var removed = await _competitionService.RemoveEntryAsync(id, playerId);
+            bool removed;
+            if (await CanManageHostAsync(competition.GolfClubId, competition.GolfSocietyId))
+            {
+                removed = await _competitionService.RemoveEntryAsync(id, playerId);
+            }
+            else
+            {
+                var registration = await _competitionService.GetRegistrationStatusAsync(
+                    id, GetCurrentUserId());
+                if (registration?.PlayerId != playerId) return Forbid();
+                removed = await _competitionService.WithdrawUserAsync(id, GetCurrentUserId());
+            }
+
             return removed ? NoContent() : NotFound("No such entry");
         }
         catch (InvalidOperationException ex)
@@ -264,6 +288,57 @@ public class CompetitionsController : BaseApiController
         {
             _logger.LogError(ex, "Error removing entry from competition {CompetitionId}", id);
             return StatusCode(500, "An error occurred while withdrawing from the competition");
+        }
+    }
+
+    [HttpGet("{id}/registration")]
+    public async Task<ActionResult<CompetitionRegistrationStatus>> GetRegistration(int id)
+    {
+        var status = await _competitionService.GetRegistrationStatusAsync(id, GetCurrentUserId());
+        return status is null
+            ? NotFound($"Competition with ID {id} not found")
+            : Ok(status);
+    }
+
+    [HttpPost("{id}/registration")]
+    public async Task<ActionResult<CompetitionRegistrationStatus>> Register(
+        int id,
+        [FromBody] CompetitionRegistrationRequest request)
+    {
+        try
+        {
+            await _competitionService.RegisterUserAsync(id, GetCurrentUserId(), request.TeeSetId);
+            return Ok(await _competitionService.GetRegistrationStatusAsync(id, GetCurrentUserId()));
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+    }
+
+    [HttpDelete("{id}/registration")]
+    public async Task<ActionResult> WithdrawRegistration(int id)
+    {
+        try
+        {
+            var removed = await _competitionService.WithdrawUserAsync(id, GetCurrentUserId());
+            return removed ? NoContent() : NotFound("No registration found");
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
         }
     }
 
@@ -317,16 +392,6 @@ public class CompetitionsController : BaseApiController
     {
         return User.IsInRole("Admin")
             || await _competitionService.IsHostManagerAsync(golfClubId, golfSocietyId, GetCurrentUserId());
-    }
-
-    /// <summary>Entries: a user acts for their own player or players they manage; admins for anyone.</summary>
-    private async Task<bool> CanActForPlayerAsync(int playerId)
-    {
-        if (User.IsInRole("Admin")) return true;
-        var userId = GetCurrentUserId();
-        return await _context.Players.AnyAsync(p =>
-            p.PlayerId == playerId
-            && (p.ApplicationUserId == userId || p.CreatedByApplicationUserId == userId));
     }
 
     private static CompetitionSummaryDto ToSummary(Competition competition)
