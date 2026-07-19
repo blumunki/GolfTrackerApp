@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace GolfTrackerApp.Mobile.Services;
@@ -12,6 +14,7 @@ public class AuthenticationStateService
     private string? _email;
     private string? _userName;
     private int? _playerId;
+    private HashSet<string> _roles = new(StringComparer.OrdinalIgnoreCase);
 
     public AuthenticationStateService(HttpClient httpClient, ILogger<AuthenticationStateService>? logger = null)
     {
@@ -26,6 +29,7 @@ public class AuthenticationStateService
     public string? UserName => _userName;
     public string? Token => _token;
     public int? PlayerId => _playerId;
+    public bool IsInRole(string role) => _roles.Contains(role);
 
     public event Action? AuthenticationStateChanged;
 
@@ -36,6 +40,7 @@ public class AuthenticationStateService
         _email = email;
         _userName = userName;
         _playerId = playerId;
+        _roles = ReadRoles(token);
 
         // Set the Authorization header for all HTTP requests
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -50,6 +55,7 @@ public class AuthenticationStateService
         _email = null;
         _userName = null;
         _playerId = null;
+        _roles.Clear();
 
         // Remove the Authorization header
         _httpClient.DefaultRequestHeaders.Authorization = null;
@@ -146,5 +152,48 @@ public class AuthenticationStateService
         _logger?.LogInformation("User logging out");
         await ClearStoredTokenAsync();
         // Additional logout logic could go here (e.g., calling logout API)
+    }
+
+    private static HashSet<string> ReadRoles(string token)
+    {
+        var roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            var parts = token.Split('.');
+            if (parts.Length < 2) return roles;
+
+            var payload = parts[1].Replace('-', '+').Replace('_', '/');
+            payload = payload.PadRight(payload.Length + ((4 - payload.Length % 4) % 4), '=');
+
+            using var document = JsonDocument.Parse(Convert.FromBase64String(payload));
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Name is not (ClaimTypes.Role or "role" or "roles")) continue;
+
+                if (property.Value.ValueKind == JsonValueKind.String)
+                {
+                    AddRole(roles, property.Value.GetString());
+                }
+                else if (property.Value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var value in property.Value.EnumerateArray())
+                    {
+                        if (value.ValueKind == JsonValueKind.String) AddRole(roles, value.GetString());
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // The token is still validated by the API; roles only control mobile UI hints.
+        }
+
+        return roles;
+    }
+
+    private static void AddRole(HashSet<string> roles, string? role)
+    {
+        if (!string.IsNullOrWhiteSpace(role)) roles.Add(role);
     }
 }

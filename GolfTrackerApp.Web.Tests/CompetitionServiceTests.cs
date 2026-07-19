@@ -86,6 +86,20 @@ public sealed class CompetitionServiceTests : IDisposable
         _ = clubComp;
     }
 
+    [Fact]
+    public async Task List_LoadsEntries_ForSummaryCounts()
+    {
+        var (user, _) = await SeedUserAndCourseAsync();
+        var player = await TestDataBuilder.SeedPlayerAsync(_factory);
+        var competition = await _service.CreateCompetitionAsync(NewCompetition(user.Id));
+        await _service.AddEntryAsync(competition.CompetitionId, player.PlayerId);
+
+        var listed = Assert.Single(await _service.GetCompetitionsAsync());
+
+        Assert.Single(listed.Entries);
+        Assert.Equal(player.PlayerId, listed.Entries.Single().PlayerId);
+    }
+
     // --- Status ---
 
     [Fact]

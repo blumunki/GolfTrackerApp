@@ -157,6 +157,12 @@ public static class MauiProgram
 #endif
 			;
 
+		builder.Services.AddHttpClient<ICompetitionApiService, CompetitionApiService>(httpClientBuilder)
+#if DEBUG
+			.ConfigurePrimaryHttpMessageHandler(httpMessageHandlerFactory)
+#endif
+			;
+
 		// Authentication services
 		builder.Services.AddSingleton<ConfigurationService>();
 		builder.Services.AddSingleton<AuthenticationStateService>();

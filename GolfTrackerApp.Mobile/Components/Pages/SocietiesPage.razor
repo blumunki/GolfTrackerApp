@@ -1,5 +1,5 @@
 @inject ISocietyApiService SocietyService
-@inject NavigationService NavService
+@inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
@@ -34,7 +34,7 @@
     {
         @foreach (var society in _societies)
         {
-            <MudCard Class="mb-3" Elevation="1" @onclick="@(() => NavService.NavigateTo($"society-detail/{society.GolfSocietyId}"))" Style="cursor:pointer;">
+            <MudCard Class="mb-3" Elevation="1" @onclick="@(() => Navigation.NavigateTo($"/society-detail/{society.GolfSocietyId}"))" Style="cursor:pointer;">
                 <MudCardContent>
                     <div class="d-flex justify-space-between align-center">
                         <MudText Typo="Typo.h6">@society.Name</MudText>

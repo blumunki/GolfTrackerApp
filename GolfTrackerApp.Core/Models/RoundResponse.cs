@@ -14,6 +14,7 @@ public class RoundResponse
     public string? Notes { get; set; }
     public string Status { get; set; } = string.Empty;
     public string CreatedByApplicationUserId { get; set; } = string.Empty;
+    public int? CompetitionId { get; set; }
     
     // Course information
     public string CourseName { get; set; } = string.Empty;

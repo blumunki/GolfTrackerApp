@@ -366,7 +366,7 @@ Key services and their responsibilities:
 | `IAiProviderSettingsService` | Admin-managed provider on/off + priority (DB-backed) |
 | `IHandicapService` | WHS differentials/index engine, round-completion recalc, backfill, manual club handicaps, transparency reads |
 | `IDatabaseMigrationService` | Applied/pending migration status + apply-on-demand (admin page) |
-| `ICompetitionService` | Competition lifecycle (create/list/get/status), entries (handicap snapshot), round linking with ownership checks |
+| `ICompetitionService` | Competition lifecycle, entries (handicap snapshot), results, safe deletion, and round linking with ownership checks |
 
 ## 7. API Design
 
@@ -434,6 +434,9 @@ This pattern was chosen for full control over transitions and bottom navigation 
 The authenticated bottom navigation keeps all existing shortcuts and presents
 `Record Round` as a raised centre action. It routes directly to `record-round`,
 so the app's primary workflow remains one tap away from every mobile page.
+Competition navigation follows the same switcher pattern: `/competitions`,
+`/competitions/society/{id}`, and `/competition-detail/{id}` render the mobile
+list/context and detail/results components without introducing a second router.
 
 ## 10. AI Insights Architecture
 
@@ -574,7 +577,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | — | Live Round Mode | ✅ Done | Single-device scorecard entry; no real-time multi-player sync, no hole maps |
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
-| 3 | Competitions & Scoring Formats | 🚧 In progress | Schema (3-1), scoring math (3-3) and CompetitionService (3-2) done. Controller + web/mobile UI pending (3-4…3-7); deferred rollout stages 3-8…3-10 |
+| 3 | Competitions & Scoring Formats | 🚧 In progress | Core loop complete: schema, service/scoring, API, and web + mobile UI (3-1…3-7, 3-11). Deferred ownership/registration/import rollout remains (3-8…3-10) |
 | 4a | Personal WHS handicap (differentials + index + backfill) | ✅ Done | WHS math, models + migrations, round-completion hook (both paths), and idempotent admin backfill (`/admin/handicap-backfill`). UI dashboards are 4b |
 | 4b | Manual club/regional handicaps + handicap UI | ✅ Done | CRUD + API (2-5), web dashboard (2-6), mobile dashboard (2-7), entry UI + primary selector (2-9). Mobile is read-only; entry/selector are web-only |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
@@ -918,6 +921,8 @@ Round linking implemented (WORKLOG 3-6, refined in 3-11): the round-recording se
 
 Results implemented (WORKLOG 3-5): `CompetitionService.ComputeResultsAsync` persists per-entry gross/net/Stableford and competition-style positions (ties share, e.g. 1,2,2,4; Stableford ranks by points, other formats by net) from each player's linked round — course handicap from `HandicapAtEntry` + the tee's rating/slope (entry tee → round tee → course default), scratch when data is missing; unlinked entries stay unranked; idempotent. Web UI (WORKLOG 3-5): `/competitions` list (status filter, society query filter, create dialog gated to global admin + society Owner/Admin — hosts they manage only), `/competitions/{id}` detail (entries/results table with medals, enter own/managed players, withdraw, manager status actions — Complete auto-calculates results), Competitions in the nav Directory group and a Competitions button on society detail. Match Play v1 ranks by net like Medal (bracket play is future work).
 
+Mobile UI implemented (WORKLOG 3-7): explicit `[JsonPropertyName]` DTO mirrors and `ICompetitionApiService` cover the additive competition API; custom routes provide the global/society-filtered list, role-gated create dialog, detail, entries/results, status/delete actions, and owned-round link/unlink flow. The Home and society pages link into those routes. Mobile JWT roles are decoded only to shape controls (the API remains the authority), and the current user's linked player is resolved through `/api/players/me` for entry actions. Round list responses add `CreatedByApplicationUserId` and `CompetitionId` so the client can distinguish owned/linkable rounds without changing existing fields. Completing through the API now computes results before the mobile detail reloads; list queries load entries so summary counts are accurate.
+
 **Scoring Format Logic:**
 - **Medal**: Gross strokes, net = gross - handicap
 - **Stableford**: Points per hole based on par and handicap strokes received
@@ -938,7 +943,7 @@ Implemented (WORKLOG 3-3) as pure static math in `GolfTrackerApp.Core/Services/S
 | Services | `ICompetitionService` (new), `IScoringService` (new — scoring format calculations) |
 | Controllers | `CompetitionsController` (new) |
 | Web Pages | `Competitions/` folder (new: List, Detail, Create, Results), link from Club & Society pages |
-| Mobile | Competition models, API services, pages |
+| Mobile | `Models/Competition.cs`, `CompetitionApiService`, list/create/detail/results pages, custom routes and Home/Society links |
 | Round Recording | Add competition selector in setup, link round on save |
 
 ##### 3.5 Ownership, Authorisation & Rollout (direction change)

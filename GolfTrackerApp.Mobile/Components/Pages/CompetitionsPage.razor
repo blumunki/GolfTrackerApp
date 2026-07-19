@@ -1,0 +1,356 @@
+@inject ICompetitionApiService CompetitionApi
+@inject ISocietyApiService SocietyApi
+@inject IGolfClubApiService GolfClubApi
+@inject IGolfCourseApiService GolfCourseApi
+@inject AuthenticationStateService AuthState
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    <div class="d-flex align-center gap-2 mb-3">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="NavigateBack" />
+        <div class="flex-grow-1">
+            <MudText Typo="Typo.h5" Style="font-weight: 700;">Competitions</MudText>
+            @if (!string.IsNullOrWhiteSpace(_contextName))
+            {
+                <MudText Typo="Typo.caption" Color="Color.Secondary">@_contextName</MudText>
+            }
+        </div>
+        @if (_canCreate)
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary"
+                           title="New competition" OnClick="OpenCreateDialog" />
+        }
+    </div>
+
+    <div class="d-flex align-center gap-2 mb-3">
+        <MudSelect T="string" Value="@_statusFilter" ValueChanged="OnStatusChanged"
+                   Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1">
+            <MudSelectItem T="string" Value="@("All")">All statuses</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Upcoming")">Upcoming</MudSelectItem>
+            <MudSelectItem T="string" Value="@("InProgress")">In progress</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Completed")">Completed</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Cancelled")">Cancelled</MudSelectItem>
+        </MudSelect>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" title="Refresh" OnClick="LoadCompetitionsAsync" />
+    </div>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <MudAlert Severity="Severity.Error">
+            @_error
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="LoadCompetitionsAsync">Try again</MudButton>
+        </MudAlert>
+    }
+    else if (_competitions.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">
+            No competitions@(_statusFilter != "All" ? " with this status" : string.Empty) yet.
+        </MudAlert>
+    }
+    else
+    {
+        @foreach (var competition in _competitions.OrderBy(c => c.Date))
+        {
+            <MudCard Class="mb-3" Elevation="1"
+                     Style="cursor: pointer;"
+                     @onclick="@(() => OpenCompetition(competition.CompetitionId))">
+                <MudCardContent>
+                    <div class="d-flex justify-space-between align-start gap-2">
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.h6">@competition.Name</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                @HostName(competition)
+                            </MudText>
+                        </div>
+                        <MudChip T="string" Size="Size.Small" Color="@StatusColor(competition.Status)">
+                            @StatusLabel(competition.Status)
+                        </MudChip>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-3 mt-3">
+                        <div class="d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Color="Color.Secondary" />
+                            <MudText Typo="Typo.caption">@competition.Date.ToString("d MMM yyyy")</MudText>
+                        </div>
+                        <div class="d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" Color="Color.Secondary" />
+                            <MudText Typo="Typo.caption">@competition.ScoringFormat</MudText>
+                        </div>
+                        <div class="d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
+                            <MudText Typo="Typo.caption">@competition.EntryCount entered</MudText>
+                        </div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(competition.GolfCourseName))
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+                            @competition.GolfCourseName
+                        </MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        }
+    }
+</MudContainer>
+
+<MudDialog @bind-Visible="_showCreateDialog" Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Small })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">New Competition</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_newName" Label="Name" Required="true" Class="mt-2"
+                      Placeholder="Monthly Medal July 2026" />
+
+        <MudSelect T="string" @bind-Value="_hostKey" Label="Host" Required="true" Class="mt-3">
+            @foreach (var society in _managedSocieties)
+            {
+                <MudSelectItem T="string" Value="@($"society:{society.GolfSocietyId}")">
+                    @society.Name (society)
+                </MudSelectItem>
+            }
+            @if (_isAdmin
+                && SocietyId.HasValue
+                && !string.IsNullOrWhiteSpace(_contextName)
+                && _managedSocieties.All(s => s.GolfSocietyId != SocietyId.Value))
+            {
+                <MudSelectItem T="string" Value="@($"society:{SocietyId.Value}")">
+                    @_contextName (society)
+                </MudSelectItem>
+            }
+            @if (_isAdmin)
+            {
+                @foreach (var club in _clubs)
+                {
+                    <MudSelectItem T="string" Value="@($"club:{club.GolfClubId}")">
+                        @club.Name (club)
+                    </MudSelectItem>
+                }
+                <MudSelectItem T="string" Value="@("adhoc")">No host (ad-hoc)</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="int?" @bind-Value="_newGolfCourseId" Label="Course (optional)"
+                   Clearable="true" Class="mt-3">
+            @foreach (var course in _courses.OrderBy(c => c.GolfClubName).ThenBy(c => c.Name))
+            {
+                <MudSelectItem T="int?" Value="@((int?)course.GolfCourseId)">
+                    @(string.IsNullOrWhiteSpace(course.GolfClubName)
+                        ? course.Name
+                        : $"{course.GolfClubName} - {course.Name}")
+                </MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect T="string" @bind-Value="_newFormat" Label="Scoring format" Class="mt-3">
+            <MudSelectItem T="string" Value="@("Medal")">Medal (stroke play)</MudSelectItem>
+            <MudSelectItem T="string" Value="@("Stableford")">Stableford</MudSelectItem>
+            <MudSelectItem T="string" Value="@("MatchPlay")">Match play</MudSelectItem>
+        </MudSelect>
+
+        <MudDatePicker @bind-Date="_newDate" Label="Date" Required="true" Class="mt-3" />
+        <MudTextField @bind-Value="_newDescription" Label="Description (optional)" Lines="2" Class="mt-3" />
+        <MudSwitch T="bool" @bind-Value="_newIsOpen" Label="Open to anyone (not just members)"
+                   Color="Color.Primary" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseCreateDialog" Disabled="@_saving">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateCompetitionAsync"
+                   Disabled="@_saving">
+            @(_saving ? "Creating..." : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public int? SocietyId { get; set; }
+
+    private bool _loading = true;
+    private bool _permissionsLoaded;
+    private bool _canCreate;
+    private bool _isAdmin;
+    private bool _showCreateDialog;
+    private bool _saving;
+    private string _statusFilter = "All";
+    private string? _contextName;
+    private string? _error;
+    private List<CompetitionSummaryDto> _competitions = new();
+    private List<GolfSocietyDto> _mySocieties = new();
+    private List<GolfSocietyDto> _managedSocieties = new();
+    private List<GolfClub> _clubs = new();
+    private List<GolfCourse> _courses = new();
+
+    private string _newName = string.Empty;
+    private string? _hostKey;
+    private int? _newGolfCourseId;
+    private string _newFormat = "Medal";
+    private DateTime? _newDate = DateTime.Today.AddDays(7);
+    private string? _newDescription;
+    private bool _newIsOpen;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!_permissionsLoaded) await LoadPermissionsAsync();
+        await LoadContextAsync();
+        await LoadCompetitionsAsync();
+    }
+
+    private async Task LoadPermissionsAsync()
+    {
+        _isAdmin = AuthState.IsInRole("Admin");
+        _mySocieties = await SocietyApi.GetMySocietiesAsync();
+        _managedSocieties = _mySocieties
+            .Where(s => s.MyRole is "Owner" or "Admin")
+            .OrderBy(s => s.Name)
+            .ToList();
+        _canCreate = _isAdmin || _managedSocieties.Count > 0;
+
+        if (_canCreate)
+        {
+            _courses = await GolfCourseApi.GetAllGolfCoursesAsync();
+            if (_isAdmin) _clubs = await GolfClubApi.GetAllGolfClubsAsync();
+        }
+
+        _permissionsLoaded = true;
+    }
+
+    private async Task LoadContextAsync()
+    {
+        _contextName = null;
+        if (!SocietyId.HasValue) return;
+
+        _contextName = _mySocieties
+            .FirstOrDefault(s => s.GolfSocietyId == SocietyId.Value)
+            ?.Name;
+        if (!string.IsNullOrWhiteSpace(_contextName)) return;
+
+        var society = await SocietyApi.GetSocietyByIdAsync(SocietyId.Value);
+        _contextName = society?.Name;
+    }
+
+    private async Task LoadCompetitionsAsync()
+    {
+        _loading = true;
+        _error = null;
+        _competitions = await CompetitionApi.GetCompetitionsAsync(
+            societyId: SocietyId,
+            status: _statusFilter == "All" ? null : _statusFilter);
+        _error = CompetitionApi.LastError;
+        _loading = false;
+    }
+
+    private async Task OnStatusChanged(string status)
+    {
+        _statusFilter = status;
+        await LoadCompetitionsAsync();
+    }
+
+    private void OpenCreateDialog()
+    {
+        ResetCreateForm();
+        if (SocietyId.HasValue
+            && (_isAdmin || _managedSocieties.Any(s => s.GolfSocietyId == SocietyId.Value)))
+        {
+            _hostKey = $"society:{SocietyId.Value}";
+        }
+        else if (_managedSocieties.Count == 1 && !_isAdmin)
+        {
+            _hostKey = $"society:{_managedSocieties[0].GolfSocietyId}";
+        }
+
+        _showCreateDialog = true;
+    }
+
+    private void CloseCreateDialog() => _showCreateDialog = false;
+
+    private async Task CreateCompetitionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newName))
+        {
+            Snackbar.Add("A competition name is required.", Severity.Warning);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_hostKey))
+        {
+            Snackbar.Add("Choose a host.", Severity.Warning);
+            return;
+        }
+        if (!_newDate.HasValue)
+        {
+            Snackbar.Add("Choose a date.", Severity.Warning);
+            return;
+        }
+
+        int? clubId = null;
+        int? societyId = null;
+        if (_hostKey.StartsWith("society:", StringComparison.Ordinal)
+            && int.TryParse(_hostKey["society:".Length..], out var parsedSocietyId))
+        {
+            societyId = parsedSocietyId;
+        }
+        else if (_hostKey.StartsWith("club:", StringComparison.Ordinal)
+                 && int.TryParse(_hostKey["club:".Length..], out var parsedClubId))
+        {
+            clubId = parsedClubId;
+        }
+
+        _saving = true;
+        var created = await CompetitionApi.CreateCompetitionAsync(new CreateCompetitionRequest
+        {
+            Name = _newName.Trim(),
+            GolfClubId = clubId,
+            GolfSocietyId = societyId,
+            GolfCourseId = _newGolfCourseId,
+            ScoringFormat = _newFormat,
+            Date = _newDate.Value,
+            Description = string.IsNullOrWhiteSpace(_newDescription) ? null : _newDescription.Trim(),
+            IsOpen = _newIsOpen,
+        });
+        _saving = false;
+
+        if (created is null)
+        {
+            Snackbar.Add(CompetitionApi.LastError ?? "Competition could not be created.", Severity.Error);
+            return;
+        }
+
+        _showCreateDialog = false;
+        Snackbar.Add("Competition created.", Severity.Success);
+        OpenCompetition(created.CompetitionId);
+    }
+
+    private void ResetCreateForm()
+    {
+        _newName = string.Empty;
+        _hostKey = null;
+        _newGolfCourseId = null;
+        _newFormat = "Medal";
+        _newDate = DateTime.Today.AddDays(7);
+        _newDescription = null;
+        _newIsOpen = false;
+    }
+
+    private void OpenCompetition(int competitionId) =>
+        Navigation.NavigateTo($"/competition-detail/{competitionId}");
+
+    private void NavigateBack() => Navigation.NavigateTo(
+        SocietyId.HasValue ? $"/society-detail/{SocietyId.Value}" : "/home");
+
+    private static string HostName(CompetitionSummaryDto competition) =>
+        competition.GolfSocietyName ?? competition.GolfClubName ?? "Ad-hoc";
+
+    private static string StatusLabel(string status) => status == "InProgress" ? "In progress" : status;
+
+    private static Color StatusColor(string status) => status switch
+    {
+        "Upcoming" => Color.Info,
+        "InProgress" => Color.Success,
+        "Completed" => Color.Default,
+        _ => Color.Warning,
+    };
+}

@@ -160,6 +160,35 @@
                     case "societies":
                         <SocietiesPage />
                         break;
+                    case "competitions":
+                        <CompetitionsPage />
+                        break;
+                    case var page when page.StartsWith("competitions/society/"):
+                        {
+                            var idStr = currentPage.Substring("competitions/society/".Length);
+                            if (int.TryParse(idStr, out var competitionSocietyId))
+                            {
+                                <CompetitionsPage SocietyId="@competitionSocietyId" />
+                            }
+                            else
+                            {
+                                <CompetitionsPage />
+                            }
+                        }
+                        break;
+                    case var page when page.StartsWith("competition-detail/"):
+                        {
+                            var idStr = currentPage.Substring("competition-detail/".Length);
+                            if (int.TryParse(idStr, out var competitionId))
+                            {
+                                <CompetitionDetailPage CompetitionId="@competitionId" />
+                            }
+                            else
+                            {
+                                <CompetitionsPage />
+                            }
+                        }
+                        break;
                     case var page when page.StartsWith("society-detail/"):
                         {
                             var idStr = currentPage.Substring("society-detail/".Length);

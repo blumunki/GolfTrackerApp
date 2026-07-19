@@ -87,6 +87,7 @@ public class CompetitionService : ICompetitionService
             .Include(c => c.GolfClub)
             .Include(c => c.GolfSociety)
             .Include(c => c.GolfCourse)
+            .Include(c => c.Entries)
             .AsQueryable();
 
         if (golfClubId is not null) query = query.Where(c => c.GolfClubId == golfClubId);

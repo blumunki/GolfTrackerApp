@@ -11,19 +11,35 @@ namespace GolfTrackerApp.Mobile.Services.Api;
 // Response models to match the Web API format
 public class RoundResponse
 {
+    [System.Text.Json.Serialization.JsonPropertyName("roundId")]
     public int RoundId { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("golfCourseId")]
     public int GolfCourseId { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("datePlayed")]
     public DateTime DatePlayed { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("courseName")]
     public string CourseName { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonPropertyName("clubName")]
     public string ClubName { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonPropertyName("totalScore")]
     public int TotalScore { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("totalPar")]
     public int TotalPar { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("holesPlayed")]
     public int HolesPlayed { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("notes")]
     public string? Notes { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("playerCount")]
     public int PlayerCount { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("roundType")]
     public string RoundType { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;
+    [System.Text.Json.Serialization.JsonPropertyName("createdByApplicationUserId")]
     public string? CreatedByApplicationUserId { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("competitionId")]
+    public int? CompetitionId { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("playingPartners")]
     public List<string> PlayingPartners { get; set; } = new();
 }
 

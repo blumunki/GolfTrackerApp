@@ -1,5 +1,5 @@
 @inject ISocietyApiService SocietyService
-@inject NavigationService NavService
+@inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
@@ -14,7 +14,7 @@
     else
     {
         <div class="d-flex align-center gap-2 mb-2">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => NavService.NavigateTo("societies"))" />
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => Navigation.NavigateTo("/societies"))" />
             <MudText Typo="Typo.h5" Style="font-weight: 700;">@_society.Name</MudText>
         </div>
 
@@ -32,6 +32,11 @@
             {
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" OnClick="JoinSociety">Join</MudButton>
             }
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.EmojiEvents"
+                       OnClick="@(() => Navigation.NavigateTo($"/competitions/society/{SocietyId}"))">
+                Competitions
+            </MudButton>
         </div>
 
         <MudText Typo="Typo.h6" Class="mb-2">Members (@_society.Members.Count)</MudText>
@@ -90,7 +95,7 @@
         if (ok)
         {
             Snackbar.Add("Left society.", Severity.Info);
-            NavService.NavigateTo("societies");
+            Navigation.NavigateTo("/societies");
         }
     }
 }

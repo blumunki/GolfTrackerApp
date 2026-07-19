@@ -71,6 +71,8 @@ public class RoundsController : BaseApiController
                     PlayerCount = r.RoundPlayers.Count,
                     RoundType = r.RoundType.ToString(),
                     Status = r.Status.ToString(),
+                    CreatedByApplicationUserId = r.CreatedByApplicationUserId,
+                    CompetitionId = r.CompetitionId,
                     PlayingPartners = r.RoundPlayers.Select(rp => rp.Player != null ? $"{rp.Player.FirstName} {rp.Player.LastName}" : "Unknown").ToList(),
                     Weather = "",
                     Notes = r.Notes ?? ""
@@ -125,6 +127,7 @@ public class RoundsController : BaseApiController
                 Notes = round.Notes,
                 Status = round.Status.ToString(),
                 CreatedByApplicationUserId = round.CreatedByApplicationUserId,
+                CompetitionId = round.CompetitionId,
                 CourseName = round.GolfCourse?.Name ?? "Unknown",
                 ClubName = round.GolfCourse?.GolfClub?.Name ?? "Unknown",
                 TotalScore = currentPlayerId.HasValue
@@ -253,6 +256,7 @@ public class RoundsController : BaseApiController
                 Notes = savedRound.Notes,
                 Status = savedRound.Status.ToString(),
                 CreatedByApplicationUserId = savedRound.CreatedByApplicationUserId,
+                CompetitionId = savedRound.CompetitionId,
                 CourseName = savedRound.GolfCourse?.Name ?? "Unknown",
                 ClubName = savedRound.GolfCourse?.GolfClub?.Name ?? "Unknown",
                 TotalScore = savedRound.Scores.Sum(s => s.Strokes),

@@ -1,0 +1,520 @@
+@inject ICompetitionApiService CompetitionApi
+@inject IPlayerApiService PlayerApi
+@inject IRoundApiService RoundApi
+@inject ISocietyApiService SocietyApi
+@inject AuthenticationStateService AuthState
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_competition is null)
+    {
+        <div class="d-flex align-center gap-2 mb-3">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="NavigateBack" />
+            <MudText Typo="Typo.h5">Competition</MudText>
+        </div>
+        <MudAlert Severity="Severity.Error">@(_error ?? "Competition not found.")</MudAlert>
+    }
+    else
+    {
+        <div class="d-flex align-start gap-2 mb-3">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="NavigateBack" />
+            <div class="flex-grow-1">
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">@_competition.Name</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">@HostName(_competition)</MudText>
+            </div>
+            <MudChip T="string" Size="Size.Small" Color="@StatusColor(_competition.Status)">
+                @StatusLabel(_competition.Status)
+            </MudChip>
+        </div>
+
+        <MudCard Elevation="1" Class="mb-3">
+            <MudCardContent>
+                <div class="d-flex flex-wrap gap-3">
+                    <div class="d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.Event" Size="Size.Small" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2">@_competition.Date.ToString("d MMM yyyy")</MudText>
+                    </div>
+                    <div class="d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2">@_competition.ScoringFormat</MudText>
+                    </div>
+                    <div class="d-flex align-center gap-1">
+                        <MudIcon Icon="@Icons.Material.Filled.LockOpen" Size="Size.Small" Color="Color.Secondary" />
+                        <MudText Typo="Typo.body2">@(_competition.IsOpen ? "Open entry" : "Members only")</MudText>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_competition.GolfCourseName))
+                {
+                    <MudText Typo="Typo.body2" Class="mt-3">
+                        <MudIcon Icon="@Icons.Material.Filled.GolfCourse" Size="Size.Small" />
+                        @_competition.GolfCourseName
+                    </MudText>
+                }
+                @if (!string.IsNullOrWhiteSpace(_competition.Description))
+                {
+                    <MudText Typo="Typo.body2" Class="mt-3">@_competition.Description</MudText>
+                }
+            </MudCardContent>
+        </MudCard>
+
+        @if (_canManage)
+        {
+            <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Manage competition</MudText>
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (_competition.Status == "Upcoming")
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.PlayArrow"
+                                       Disabled="@_saving" OnClick="@(() => SetStatusAsync("InProgress"))">
+                                Start
+                            </MudButton>
+                        }
+                        @if (_competition.Status == "InProgress")
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Flag"
+                                       Disabled="@_saving" OnClick="@(() => SetStatusAsync("Completed"))">
+                                Complete
+                            </MudButton>
+                        }
+                        @if (_competition.Status is "Upcoming" or "InProgress")
+                        {
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       Disabled="@_saving" OnClick="@(() => SetStatusAsync("Cancelled"))">
+                                Cancel
+                            </MudButton>
+                        }
+                        <MudSpacer />
+                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Error"
+                                   StartIcon="@Icons.Material.Filled.DeleteForever"
+                                   Disabled="@_saving" OnClick="ShowDeleteConfirmation">
+                            Delete
+                        </MudButton>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        <div class="d-flex justify-space-between align-center mb-2">
+            <MudText Typo="Typo.h6">@(_hasResults ? "Results" : $"Entries ({_competition.Entries.Count})")</MudText>
+        </div>
+
+        @if (CanChangeEntries && _enterablePlayers.Count > 0)
+        {
+            <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Enter a player</MudText>
+                    <div class="d-flex align-center gap-2">
+                        <MudSelect T="int?" @bind-Value="_selectedPlayerId" Label="Player"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="flex-grow-1">
+                            @foreach (var player in _enterablePlayers)
+                            {
+                                <MudSelectItem T="int?" Value="@((int?)player.Id)">@player.FullName</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                   Disabled="@(!_selectedPlayerId.HasValue || _saving)"
+                                   OnClick="EnterPlayerAsync">
+                            Enter
+                        </MudButton>
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        @if (_competition.Entries.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">No entries yet.</MudAlert>
+        }
+        else
+        {
+            @foreach (var entry in OrderedEntries)
+            {
+                <MudCard Elevation="0" Outlined="true" Class="mb-2">
+                    <MudCardContent Class="py-2">
+                        <div class="d-flex justify-space-between align-center gap-2">
+                            <div class="d-flex align-center gap-2">
+                                @if (_hasResults)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="@PositionColor(entry.Position)">
+                                        @(entry.Position.HasValue ? $"#{entry.Position.Value}" : "-")
+                                    </MudChip>
+                                }
+                                <div>
+                                    <MudText Typo="Typo.body1">@entry.PlayerName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Handicap @(entry.HandicapAtEntry?.ToString("0.0") ?? "-")
+                                        @if (!string.IsNullOrWhiteSpace(entry.TeeSetName))
+                                        {
+                                            <text> | @entry.TeeSetName</text>
+                                        }
+                                    </MudText>
+                                </div>
+                            </div>
+                            @if (CanWithdraw(entry))
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Color="Color.Error"
+                                               Size="Size.Small" title="Withdraw"
+                                               Disabled="@_saving" OnClick="@(() => WithdrawAsync(entry))" />
+                            }
+                        </div>
+
+                        @if (_hasResults)
+                        {
+                            <div class="d-flex gap-3 mt-2">
+                                <MudText Typo="Typo.caption">Gross: @(entry.GrossScore?.ToString() ?? "-")</MudText>
+                                <MudText Typo="Typo.caption">Net: @(entry.NetScore?.ToString() ?? "-")</MudText>
+                                @if (_competition.ScoringFormat == "Stableford")
+                                {
+                                    <MudText Typo="Typo.caption">Points: @(entry.StablefordPoints?.ToString() ?? "-")</MudText>
+                                }
+                            </div>
+                        }
+                    </MudCardContent>
+                </MudCard>
+            }
+        }
+
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.h6" Class="mb-2">Recorded rounds</MudText>
+
+        @if (CanLinkRounds && _linkableRounds.Count > 0)
+        {
+            <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                <MudCardContent>
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Link one of your rounds</MudText>
+                    <MudSelect T="int?" @bind-Value="_selectedRoundId" Label="Round"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" FullWidth="true">
+                        @foreach (var round in _linkableRounds)
+                        {
+                            <MudSelectItem T="int?" Value="@((int?)round.RoundId)">
+                                @RoundLabel(round)
+                            </MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Class="mt-2"
+                               StartIcon="@Icons.Material.Filled.Link"
+                               Disabled="@(!_selectedRoundId.HasValue || _saving)"
+                               OnClick="LinkRoundAsync">
+                        Link round
+                    </MudButton>
+                </MudCardContent>
+            </MudCard>
+        }
+        else if (CanLinkRounds && _competition.LinkedRoundIds.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-3">
+                No unlinked rounds are available. Record a round first, then return here to link it.
+            </MudAlert>
+        }
+
+        @if (_competition.LinkedRoundIds.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary">No rounds linked yet.</MudText>
+        }
+        else
+        {
+            @foreach (var roundId in _competition.LinkedRoundIds)
+            {
+                var linkedRound = FindRound(roundId);
+                <MudCard Elevation="0" Outlined="true" Class="mb-2">
+                    <MudCardContent Class="py-2">
+                        <div class="d-flex justify-space-between align-center gap-2">
+                            <div>
+                                <MudText Typo="Typo.body1">@(linkedRound is null ? $"Round #{roundId}" : RoundLabel(linkedRound))</MudText>
+                                @if (linkedRound is not null)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Score @linkedRound.TotalScore (@FormatToPar(linkedRound))
+                                    </MudText>
+                                }
+                            </div>
+                            <div class="d-flex gap-1">
+                                @if (linkedRound is not null)
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Visibility" Size="Size.Small"
+                                                   title="View round" OnClick="@(() => OpenRound(roundId))" />
+                                }
+                                @if (CanUnlink(linkedRound))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.LinkOff" Size="Size.Small"
+                                                   Color="Color.Error" title="Unlink round"
+                                                   Disabled="@_saving" OnClick="@(() => UnlinkRoundAsync(roundId))" />
+                                }
+                            </div>
+                        </div>
+                    </MudCardContent>
+                </MudCard>
+            }
+        }
+    }
+</MudContainer>
+
+<MudDialog @bind-Visible="_showDeleteDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.ExtraSmall })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Delete Competition?</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>
+            Entries will be deleted and linked rounds will be unlinked, but the rounds themselves are kept.
+            This cannot be undone.
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showDeleteDialog = false)" Disabled="@_saving">Keep</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="DeleteCompetitionAsync" Disabled="@_saving">
+            @(_saving ? "Deleting..." : "Delete")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public int CompetitionId { get; set; }
+
+    private bool _loading = true;
+    private bool _saving;
+    private bool _canManage;
+    private bool _showDeleteDialog;
+    private bool _hasResults;
+    private string? _error;
+    private int? _selectedPlayerId;
+    private int? _selectedRoundId;
+    private CompetitionDetailDto? _competition;
+    private List<Player> _players = new();
+    private List<Player> _enterablePlayers = new();
+    private List<RoundResponse> _rounds = new();
+    private List<RoundResponse> _linkableRounds = new();
+    private HashSet<int> _manageablePlayerIds = new();
+
+    private bool CanChangeEntries =>
+        _competition?.Status is "Upcoming" or "InProgress";
+
+    private bool CanLinkRounds =>
+        _competition is not null && _competition.Status != "Cancelled";
+
+    private IEnumerable<CompetitionEntryDto> OrderedEntries =>
+        _competition!.Entries
+            .OrderBy(e => e.Position ?? int.MaxValue)
+            .ThenBy(e => e.PlayerName);
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+
+        var competitionTask = CompetitionApi.GetCompetitionAsync(CompetitionId);
+        var playersTask = PlayerApi.GetAllPlayersAsync();
+        var roundsTask = RoundApi.GetAllRoundsAsync();
+        var societiesTask = SocietyApi.GetMySocietiesAsync();
+        var ownPlayerTask = PlayerApi.GetMyProfileAsync();
+        await Task.WhenAll(competitionTask, playersTask, roundsTask, societiesTask, ownPlayerTask);
+
+        _competition = competitionTask.Result;
+        _players = playersTask.Result.OrderBy(p => p.FullName).ToList();
+        if (ownPlayerTask.Result is not null
+            && _players.All(p => p.Id != ownPlayerTask.Result.Id))
+        {
+            _players.Add(ownPlayerTask.Result);
+            _players = _players.OrderBy(p => p.FullName).ToList();
+        }
+        _rounds = roundsTask.Result;
+        _manageablePlayerIds = _players.Select(p => p.Id).ToHashSet();
+
+        if (_competition is null)
+        {
+            _error = CompetitionApi.LastError;
+            _loading = false;
+            return;
+        }
+
+        var isSocietyManager = _competition.GolfSocietyId.HasValue
+            && societiesTask.Result.Any(s =>
+                s.GolfSocietyId == _competition.GolfSocietyId.Value
+                && s.MyRole is "Owner" or "Admin");
+        _canManage = AuthState.IsInRole("Admin") || isSocietyManager;
+
+        var enteredIds = _competition.Entries.Select(e => e.PlayerId).ToHashSet();
+        _enterablePlayers = _players.Where(p => !enteredIds.Contains(p.Id)).ToList();
+        _linkableRounds = _rounds
+            .Where(r => r.CompetitionId is null
+                && string.Equals(r.CreatedByApplicationUserId, AuthState.UserId, StringComparison.Ordinal))
+            .OrderByDescending(r => r.DatePlayed)
+            .ToList();
+        _hasResults = _competition.Entries.Any(e =>
+            e.Position.HasValue || e.GrossScore.HasValue || e.NetScore.HasValue || e.StablefordPoints.HasValue);
+        _selectedPlayerId = null;
+        _selectedRoundId = null;
+        _loading = false;
+    }
+
+    private async Task SetStatusAsync(string status)
+    {
+        _saving = true;
+        var updated = await CompetitionApi.SetStatusAsync(CompetitionId, status);
+        _saving = false;
+
+        if (updated is null)
+        {
+            ShowApiError("Competition status could not be changed.");
+            return;
+        }
+
+        Snackbar.Add(
+            status == "Completed" ? "Competition completed and results calculated." : "Competition updated.",
+            Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task EnterPlayerAsync()
+    {
+        if (!_selectedPlayerId.HasValue) return;
+        var player = _players.FirstOrDefault(p => p.Id == _selectedPlayerId.Value);
+
+        _saving = true;
+        var success = await CompetitionApi.AddEntryAsync(CompetitionId, _selectedPlayerId.Value);
+        _saving = false;
+
+        if (!success)
+        {
+            ShowApiError("The player could not be entered.");
+            return;
+        }
+
+        Snackbar.Add($"{player?.FullName ?? "Player"} entered.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task WithdrawAsync(CompetitionEntryDto entry)
+    {
+        _saving = true;
+        var success = await CompetitionApi.RemoveEntryAsync(CompetitionId, entry.PlayerId);
+        _saving = false;
+
+        if (!success)
+        {
+            ShowApiError("The entry could not be withdrawn.");
+            return;
+        }
+
+        Snackbar.Add("Entry withdrawn.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task LinkRoundAsync()
+    {
+        if (!_selectedRoundId.HasValue) return;
+
+        _saving = true;
+        var success = await CompetitionApi.AssignRoundAsync(CompetitionId, _selectedRoundId.Value);
+        _saving = false;
+
+        if (!success)
+        {
+            ShowApiError("The round could not be linked.");
+            return;
+        }
+
+        Snackbar.Add("Round linked. Its players were entered automatically.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task UnlinkRoundAsync(int roundId)
+    {
+        _saving = true;
+        var success = await CompetitionApi.UnassignRoundAsync(roundId);
+        _saving = false;
+
+        if (!success)
+        {
+            ShowApiError("The round could not be unlinked.");
+            return;
+        }
+
+        Snackbar.Add("Round unlinked. The round itself was kept.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private void ShowDeleteConfirmation() => _showDeleteDialog = true;
+
+    private async Task DeleteCompetitionAsync()
+    {
+        _saving = true;
+        var success = await CompetitionApi.DeleteCompetitionAsync(CompetitionId);
+        _saving = false;
+
+        if (!success)
+        {
+            ShowApiError("The competition could not be deleted.");
+            return;
+        }
+
+        _showDeleteDialog = false;
+        Snackbar.Add("Competition deleted. Linked rounds were kept.", Severity.Success);
+        NavigateBack();
+    }
+
+    private bool CanWithdraw(CompetitionEntryDto entry) =>
+        CanChangeEntries
+        && (AuthState.IsInRole("Admin") || _manageablePlayerIds.Contains(entry.PlayerId));
+
+    private bool CanUnlink(RoundResponse? round) =>
+        round is not null
+        && (AuthState.IsInRole("Admin")
+            || string.Equals(round.CreatedByApplicationUserId, AuthState.UserId, StringComparison.Ordinal));
+
+    private RoundResponse? FindRound(int roundId) => _rounds.FirstOrDefault(r => r.RoundId == roundId);
+
+    private void NavigateBack()
+    {
+        var path = _competition?.GolfSocietyId is int societyId
+            ? $"/competitions/society/{societyId}"
+            : "/competitions";
+        Navigation.NavigateTo(path);
+    }
+
+    private void OpenRound(int roundId) => Navigation.NavigateTo($"/rounds/{roundId}");
+
+    private void ShowApiError(string fallback) =>
+        Snackbar.Add(CompetitionApi.LastError ?? fallback, Severity.Error);
+
+    private static string HostName(CompetitionSummaryDto competition) =>
+        competition.GolfSocietyName ?? competition.GolfClubName ?? "Ad-hoc";
+
+    private static string RoundLabel(RoundResponse round) =>
+        $"{round.DatePlayed:d MMM yyyy} - {round.CourseName}";
+
+    private static string FormatToPar(RoundResponse round)
+    {
+        var toPar = round.TotalScore - round.TotalPar;
+        return toPar == 0 ? "level par" : $"{(toPar > 0 ? "+" : string.Empty)}{toPar}";
+    }
+
+    private static string StatusLabel(string status) => status == "InProgress" ? "In progress" : status;
+
+    private static Color StatusColor(string status) => status switch
+    {
+        "Upcoming" => Color.Info,
+        "InProgress" => Color.Success,
+        "Completed" => Color.Default,
+        _ => Color.Warning,
+    };
+
+    private static Color PositionColor(int? position) => position switch
+    {
+        1 => Color.Warning,
+        2 => Color.Info,
+        3 => Color.Secondary,
+        _ => Color.Default,
+    };
+}

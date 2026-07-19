@@ -178,6 +178,12 @@ public class CompetitionsController : BaseApiController
                 return Forbid();
 
             var updated = await _competitionService.SetStatusAsync(id, status);
+            if (updated is not null && status == CompetitionStatus.Completed)
+            {
+                await _competitionService.ComputeResultsAsync(id);
+                updated = await _competitionService.GetCompetitionByIdAsync(id);
+            }
+
             return updated is null
                 ? NotFound($"Competition with ID {id} not found")
                 : Ok(ToSummary(updated));

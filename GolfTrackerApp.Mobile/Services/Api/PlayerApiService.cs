@@ -8,6 +8,7 @@ namespace GolfTrackerApp.Mobile.Services.Api;
 public interface IPlayerApiService
 {
     Task<List<Player>> GetAllPlayersAsync();
+    Task<Player?> GetMyProfileAsync();
     Task<Player?> GetPlayerByIdAsync(int id);
     Task<List<Player>> SearchPlayersAsync(string searchTerm);
     Task<Player?> CreatePlayerAsync(Player player);
@@ -107,6 +108,30 @@ public class PlayerApiService : IPlayerApiService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error fetching player {PlayerId} from API", id);
+            return null;
+        }
+    }
+
+    public async Task<Player?> GetMyProfileAsync()
+    {
+        try
+        {
+            EnsureAuthorizationHeader();
+
+            var response = await _httpClient.GetAsync("api/players/me");
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<Player>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching the current user's player profile from API");
             return null;
         }
     }
