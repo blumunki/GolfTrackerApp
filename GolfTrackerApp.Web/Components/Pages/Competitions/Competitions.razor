@@ -60,6 +60,7 @@
                 <MudTh>Course</MudTh>
                 <MudTh>Date</MudTh>
                 <MudTh>Format</MudTh>
+                <MudTh>Entry</MudTh>
                 <MudTh>Status</MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -68,6 +69,7 @@
                 <MudTd DataLabel="Course">@(context.GolfCourse?.Name ?? "—")</MudTd>
                 <MudTd DataLabel="Date">@context.Date.ToString("d MMM yyyy")</MudTd>
                 <MudTd DataLabel="Format">@context.ScoringFormat</MudTd>
+                <MudTd DataLabel="Entry">@(context.IsOpen ? "Open" : "Members only")</MudTd>
                 <MudTd DataLabel="Status">
                     <MudChip T="string" Size="Size.Small" Color="@StatusColour(context.Status)" Variant="Variant.Text">
                         @context.Status

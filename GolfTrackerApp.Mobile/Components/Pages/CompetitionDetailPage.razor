@@ -105,11 +105,48 @@
             </MudCard>
         }
 
+        @if (_registrationStatus is not null)
+        {
+            <MudCard Elevation="0" Outlined="true" Class="mb-3">
+                <MudCardContent>
+                    <div class="d-flex justify-space-between align-center gap-3 flex-wrap">
+                        <div>
+                            <div class="d-flex align-center gap-2 mb-1">
+                                <MudIcon Icon="@Icons.Material.Filled.HowToReg" Color="Color.Primary" Size="Size.Small" />
+                                <MudText Typo="Typo.subtitle2">Your entry</MudText>
+                                @if (_registrationStatus.IsRegistered)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">Entered</MudChip>
+                                }
+                            </div>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@_registrationStatus.Message</MudText>
+                        </div>
+                        @if (_registrationStatus.CanRegister)
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.PersonAdd" Disabled="@_saving"
+                                       OnClick="RegisterAsync">
+                                @(_saving ? "Entering..." : "Enter Competition")
+                            </MudButton>
+                        }
+                        else if (_registrationStatus.CanWithdraw)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.PersonRemove" Disabled="@_saving"
+                                       OnClick="WithdrawRegistrationAsync">
+                                @(_saving ? "Withdrawing..." : "Withdraw Entry")
+                            </MudButton>
+                        }
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+
         <div class="d-flex justify-space-between align-center mb-2">
             <MudText Typo="Typo.h6">@(_hasResults ? "Results" : $"Entries ({_competition.Entries.Count})")</MudText>
         </div>
 
-        @if (CanChangeEntries && _enterablePlayers.Count > 0)
+        @if (_canManage && CanChangeEntries && _enterablePlayers.Count > 0)
         {
             <MudCard Elevation="0" Outlined="true" Class="mb-3">
                 <MudCardContent>
@@ -290,17 +327,21 @@
     private int? _selectedPlayerId;
     private int? _selectedRoundId;
     private CompetitionDetailDto? _competition;
+    private CompetitionRegistrationStatusDto? _registrationStatus;
     private List<Player> _players = new();
     private List<Player> _enterablePlayers = new();
     private List<RoundResponse> _rounds = new();
     private List<RoundResponse> _linkableRounds = new();
-    private HashSet<int> _manageablePlayerIds = new();
 
     private bool CanChangeEntries =>
         _competition?.Status is "Upcoming" or "InProgress";
 
     private bool CanLinkRounds =>
-        _competition is not null && _competition.Status != "Cancelled";
+        _competition is not null
+        && _competition.Status != "Cancelled"
+        && (AuthState.IsInRole("Admin")
+            || (_competition.Status is "Upcoming" or "InProgress"
+                && _registrationStatus?.IsRegistered == true));
 
     private IEnumerable<CompetitionEntryDto> OrderedEntries =>
         _competition!.Entries
@@ -337,7 +378,6 @@
             _players = _players.OrderBy(p => p.FullName).ToList();
         }
         _rounds = roundsTask.Result;
-        _manageablePlayerIds = _players.Select(p => p.Id).ToHashSet();
 
         if (_competition is null)
         {
@@ -345,6 +385,8 @@
             _loading = false;
             return;
         }
+
+        _registrationStatus = await CompetitionApi.GetRegistrationStatusAsync(CompetitionId);
 
         var isSocietyManager = _competition.GolfSocietyId.HasValue
             && societiesTask.Result.Any(s =>
@@ -357,7 +399,9 @@
         _canManage = AuthState.IsInRole("Admin") || isSocietyManager || isClubAdmin;
 
         var enteredIds = _competition.Entries.Select(e => e.PlayerId).ToHashSet();
-        _enterablePlayers = _players.Where(p => !enteredIds.Contains(p.Id)).ToList();
+        _enterablePlayers = _canManage
+            ? _players.Where(p => !enteredIds.Contains(p.Id)).ToList()
+            : new List<Player>();
         _linkableRounds = _rounds
             .Where(r => r.CompetitionId is null
                 && string.Equals(r.CreatedByApplicationUserId, AuthState.UserId, StringComparison.Ordinal))
@@ -404,6 +448,38 @@
         }
 
         Snackbar.Add($"{player?.FullName ?? "Player"} entered.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task RegisterAsync()
+    {
+        _saving = true;
+        var success = await CompetitionApi.RegisterAsync(CompetitionId);
+        _saving = false;
+
+        if (!success)
+        {
+            ShowApiError("You could not be entered in this competition.");
+            return;
+        }
+
+        Snackbar.Add("You are entered in the competition.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task WithdrawRegistrationAsync()
+    {
+        _saving = true;
+        var success = await CompetitionApi.WithdrawRegistrationAsync(CompetitionId);
+        _saving = false;
+
+        if (!success)
+        {
+            ShowApiError("Your competition entry could not be withdrawn.");
+            return;
+        }
+
+        Snackbar.Add("Your competition entry was withdrawn.", Severity.Success);
         await LoadAsync();
     }
 
@@ -476,9 +552,8 @@
         NavigateBack();
     }
 
-    private bool CanWithdraw(CompetitionEntryDto entry) =>
-        CanChangeEntries
-        && (AuthState.IsInRole("Admin") || _manageablePlayerIds.Contains(entry.PlayerId));
+    private bool CanWithdraw(CompetitionEntryDto _) =>
+        CanChangeEntries && _canManage;
 
     private bool CanUnlink(RoundResponse? round) =>
         round is not null

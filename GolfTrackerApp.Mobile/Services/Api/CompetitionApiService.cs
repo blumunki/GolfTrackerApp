@@ -17,6 +17,9 @@ public interface ICompetitionApiService
     Task<CompetitionSummaryDto?> UpdateCompetitionAsync(int id, UpdateCompetitionRequest request);
     Task<CompetitionSummaryDto?> SetStatusAsync(int id, string status);
     Task<bool> DeleteCompetitionAsync(int id);
+    Task<CompetitionRegistrationStatusDto?> GetRegistrationStatusAsync(int id);
+    Task<bool> RegisterAsync(int id, int? teeSetId = null);
+    Task<bool> WithdrawRegistrationAsync(int id);
     Task<bool> AddEntryAsync(int id, int playerId, int? teeSetId = null);
     Task<bool> RemoveEntryAsync(int id, int playerId);
     Task<bool> AssignRoundAsync(int id, int roundId);
@@ -73,6 +76,18 @@ public class CompetitionApiService : ICompetitionApiService
 
     public Task<bool> DeleteCompetitionAsync(int id) =>
         SendAsync(HttpMethod.Delete, $"api/competitions/{id}");
+
+    public Task<CompetitionRegistrationStatusDto?> GetRegistrationStatusAsync(int id) =>
+        GetAsync<CompetitionRegistrationStatusDto>($"api/competitions/{id}/registration");
+
+    public async Task<bool> RegisterAsync(int id, int? teeSetId = null) =>
+        await SendForJsonAsync<CompetitionRegistrationStatusDto>(
+            HttpMethod.Post,
+            $"api/competitions/{id}/registration",
+            new CompetitionRegistrationRequest { TeeSetId = teeSetId }) is not null;
+
+    public Task<bool> WithdrawRegistrationAsync(int id) =>
+        SendAsync(HttpMethod.Delete, $"api/competitions/{id}/registration");
 
     public Task<bool> AddEntryAsync(int id, int playerId, int? teeSetId = null) =>
         SendAsync(

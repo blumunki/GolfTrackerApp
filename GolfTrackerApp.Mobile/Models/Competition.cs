@@ -86,6 +86,33 @@ public class CompetitionEntryDto
     public int? Position { get; set; }
 }
 
+public class CompetitionRegistrationStatusDto
+{
+    [JsonPropertyName("competitionId")]
+    public int CompetitionId { get; set; }
+
+    [JsonPropertyName("playerId")]
+    public int? PlayerId { get; set; }
+
+    [JsonPropertyName("isRegistered")]
+    public bool IsRegistered { get; set; }
+
+    [JsonPropertyName("isEligible")]
+    public bool IsEligible { get; set; }
+
+    [JsonPropertyName("hasLinkedRound")]
+    public bool HasLinkedRound { get; set; }
+
+    [JsonPropertyName("canRegister")]
+    public bool CanRegister { get; set; }
+
+    [JsonPropertyName("canWithdraw")]
+    public bool CanWithdraw { get; set; }
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
+}
+
 public class CreateCompetitionRequest
 {
     [JsonPropertyName("name")]
@@ -145,6 +172,12 @@ public class CompetitionEntryRequest
     [JsonPropertyName("playerId")]
     public int PlayerId { get; set; }
 
+    [JsonPropertyName("teeSetId")]
+    public int? TeeSetId { get; set; }
+}
+
+public class CompetitionRegistrationRequest
+{
     [JsonPropertyName("teeSetId")]
     public int? TeeSetId { get; set; }
 }

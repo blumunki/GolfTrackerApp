@@ -86,6 +86,11 @@
                             <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Color="Color.Secondary" />
                             <MudText Typo="Typo.caption">@competition.EntryCount entered</MudText>
                         </div>
+                        <div class="d-flex align-center gap-1">
+                            <MudIcon Icon="@(competition.IsOpen ? Icons.Material.Filled.LockOpen : Icons.Material.Filled.Lock)"
+                                     Size="Size.Small" Color="Color.Secondary" />
+                            <MudText Typo="Typo.caption">@(competition.IsOpen ? "Open entry" : "Members only")</MudText>
+                        </div>
                     </div>
 
                     @if (!string.IsNullOrWhiteSpace(competition.GolfCourseName))
