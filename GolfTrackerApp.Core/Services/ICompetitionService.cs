@@ -5,8 +5,8 @@ namespace GolfTrackerApp.Core.Services;
 /// <summary>
 /// Competition lifecycle, entries and round linking. The service enforces data integrity
 /// (host exclusivity, entry uniqueness, round ownership); WHO may call create/manage is
-/// enforced at the controller/page per the interim authorization model — global admin +
-/// society Owner/Admin (ARCHITECTURE §12.5 3.5).
+/// enforced at the controller/page per the host authorization model — global admin,
+/// society Owner/Admin, or granted club Admin (ARCHITECTURE §12.5 3.5).
 /// </summary>
 public interface ICompetitionService
 {
@@ -72,9 +72,9 @@ public interface ICompetitionService
     Task<List<Competition>> GetCompetitionsForPlayerAsync(int playerId);
 
     /// <summary>
-    /// Whether the user manages the given host under the interim model (§12.5 3.5):
-    /// society Owner/Admin for society-hosted competitions; club-hosted and ad-hoc return
-    /// false (global-admin only — the caller ORs in the Admin role check).
+    /// Whether the user manages the given host (§12.5 3.5): society Owner/Admin for a
+    /// society or ClubMembership.Admin for a club. Ad-hoc competitions return false
+    /// (global-admin only — the caller ORs in the global Admin role check).
     /// </summary>
     Task<bool> IsHostManagerAsync(int? golfClubId, int? golfSocietyId, string userId);
 

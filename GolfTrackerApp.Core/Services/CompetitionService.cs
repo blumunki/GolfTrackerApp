@@ -289,16 +289,25 @@ public class CompetitionService : ICompetitionService
 
     public async Task<bool> IsHostManagerAsync(int? golfClubId, int? golfSocietyId, string userId)
     {
-        if (golfSocietyId is not int societyId)
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        if (golfSocietyId is int societyId)
         {
-            return false; // club-hosted (until 3-8) and ad-hoc: global admin only
+            return await context.SocietyMemberships.AnyAsync(m =>
+                m.GolfSocietyId == societyId
+                && m.UserId == userId
+                && (m.Role == MembershipRole.Admin || m.Role == MembershipRole.Owner));
         }
 
-        await using var context = await _contextFactory.CreateDbContextAsync();
-        return await context.SocietyMemberships.AnyAsync(m =>
-            m.GolfSocietyId == societyId
-            && m.UserId == userId
-            && (m.Role == MembershipRole.Admin || m.Role == MembershipRole.Owner));
+        if (golfClubId is int clubId)
+        {
+            return await context.ClubMemberships.AnyAsync(m =>
+                m.GolfClubId == clubId
+                && m.UserId == userId
+                && m.Role == MembershipRole.Admin);
+        }
+
+        return false; // ad-hoc competitions remain global-admin only
     }
 
     public async Task<List<CompetitionEntry>> ComputeResultsAsync(int competitionId)

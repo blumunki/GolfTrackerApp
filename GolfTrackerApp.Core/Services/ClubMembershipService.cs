@@ -93,4 +93,43 @@ public class ClubMembershipService : IClubMembershipService
         await context.SaveChangesAsync();
         return membership;
     }
+
+    public async Task<ClubMembership?> SetClubAdminAsync(int golfClubId, string userId, bool isAdmin)
+    {
+        await using var context = await _contextFactory.CreateDbContextAsync();
+
+        if (!await context.GolfClubs.AnyAsync(c => c.GolfClubId == golfClubId))
+            throw new ArgumentException($"Golf club with ID {golfClubId} does not exist.", nameof(golfClubId));
+        if (!await context.Users.AnyAsync(u => u.Id == userId))
+            throw new ArgumentException($"User with ID '{userId}' does not exist.", nameof(userId));
+
+        var membership = await context.ClubMemberships
+            .FirstOrDefaultAsync(cm => cm.GolfClubId == golfClubId && cm.UserId == userId);
+
+        if (membership is null)
+        {
+            if (!isAdmin) return null;
+
+            membership = new ClubMembership
+            {
+                GolfClubId = golfClubId,
+                UserId = userId,
+                Role = MembershipRole.Admin,
+                JoinedAt = DateTime.UtcNow,
+            };
+            context.ClubMemberships.Add(membership);
+        }
+        else
+        {
+            membership.Role = isAdmin ? MembershipRole.Admin : MembershipRole.Member;
+        }
+
+        await context.SaveChangesAsync();
+        _logger.LogInformation(
+            "Set club {GolfClubId} admin status for user {UserId} to {IsAdmin}",
+            golfClubId,
+            userId,
+            isAdmin);
+        return membership;
+    }
 }

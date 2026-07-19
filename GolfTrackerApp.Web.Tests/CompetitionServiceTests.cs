@@ -218,9 +218,10 @@ public sealed class CompetitionServiceTests : IDisposable
     // --- Host-manager check ---
 
     [Fact]
-    public async Task IsHostManager_TrueOnlyForSocietyOwnerOrAdmin()
+    public async Task IsHostManager_RecognizesSocietyManagersAndGrantedClubAdmins()
     {
         var (user, course) = await SeedUserAndCourseAsync();
+        var clubMember = await TestDataBuilder.SeedUserAsync(_factory, "club-member");
         var society = await SeedSocietyAsync(user.Id);
         await using (var context = await _factory.CreateDbContextAsync())
         {
@@ -228,13 +229,22 @@ public sealed class CompetitionServiceTests : IDisposable
             {
                 GolfSocietyId = society.GolfSocietyId, UserId = user.Id, Role = MembershipRole.Owner,
             });
+            context.ClubMemberships.AddRange(
+                new ClubMembership
+                {
+                    GolfClubId = course.GolfClubId, UserId = user.Id, Role = MembershipRole.Admin,
+                },
+                new ClubMembership
+                {
+                    GolfClubId = course.GolfClubId, UserId = clubMember.Id, Role = MembershipRole.Member,
+                });
             await context.SaveChangesAsync();
         }
 
         Assert.True(await _service.IsHostManagerAsync(null, society.GolfSocietyId, user.Id));
         Assert.False(await _service.IsHostManagerAsync(null, society.GolfSocietyId, "someone-else"));
-        // Club-hosted and ad-hoc: never (global admin only until 3-8).
-        Assert.False(await _service.IsHostManagerAsync(course.GolfClubId, null, user.Id));
+        Assert.True(await _service.IsHostManagerAsync(course.GolfClubId, null, user.Id));
+        Assert.False(await _service.IsHostManagerAsync(course.GolfClubId, null, clubMember.Id));
         Assert.False(await _service.IsHostManagerAsync(null, null, user.Id));
     }
 

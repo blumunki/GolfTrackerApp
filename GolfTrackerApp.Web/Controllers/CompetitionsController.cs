@@ -9,8 +9,8 @@ namespace GolfTrackerApp.Web.Controllers;
 
 /// <summary>
 /// Competitions API. Reads are open to any authenticated user; create/manage is gated by
-/// the interim authorization model (ARCHITECTURE §12.5 3.5): global Admin always, society
-/// Owner/Admin for their society's competitions, club competitions Admin-only until 3-8.
+/// the host authorization model (ARCHITECTURE §12.5 3.5): global Admin always, society
+/// Owner/Admin for their society, and granted club Admin for their club.
 /// </summary>
 [Route("api/[controller]")]
 public class CompetitionsController : BaseApiController
@@ -312,7 +312,7 @@ public class CompetitionsController : BaseApiController
         }
     }
 
-    /// <summary>Interim gate (§12.5 3.5): Admin always; else defer to the service's host-manager check.</summary>
+    /// <summary>Host gate (§12.5 3.5): global Admin always; otherwise defer to the host-manager check.</summary>
     private async Task<bool> CanManageHostAsync(int? golfClubId, int? golfSocietyId)
     {
         return User.IsInRole("Admin")
