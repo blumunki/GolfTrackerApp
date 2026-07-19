@@ -46,14 +46,24 @@ else
                     @FormatAddress(golfClub)
                 </div>
             </div>
-            <AuthorizeView Roles="Admin">
-                <Authorized>
-                    <MudButton Variant="Variant.Outlined" 
-                               Style="color:white; border-color:rgba(255,255,255,0.3);"
-                               OnClick="@(() => EditThisClub(golfClub.GolfClubId))" 
-                               StartIcon="@Icons.Material.Filled.Edit" Size="Size.Small">Edit</MudButton>
-                </Authorized>
-            </AuthorizeView>
+            <div class="d-flex gap-2">
+                <AuthorizeView>
+                    <Authorized>
+                        <MudButton Variant="Variant.Outlined"
+                                   Style="color:white; border-color:rgba(255,255,255,0.3);"
+                                   Href="@($"/competitions?clubId={golfClub.GolfClubId}")"
+                                   StartIcon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small">Competitions</MudButton>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Roles="Admin">
+                    <Authorized>
+                        <MudButton Variant="Variant.Outlined"
+                                   Style="color:white; border-color:rgba(255,255,255,0.3);"
+                                   OnClick="@(() => EditThisClub(golfClub.GolfClubId))"
+                                   StartIcon="@Icons.Material.Filled.Edit" Size="Size.Small">Edit</MudButton>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
         </div>
         <div class="club-meta">
             <span class="club-meta-item">

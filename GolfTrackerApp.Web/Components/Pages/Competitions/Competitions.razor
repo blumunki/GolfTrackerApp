@@ -4,6 +4,7 @@
 
 @inject ICompetitionService CompetitionService
 @inject IGolfSocietyService SocietyService
+@inject IClubMembershipService ClubMembershipService
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IDialogService DialogService
@@ -81,12 +82,16 @@
     [SupplyParameterFromQuery(Name = "societyId")]
     public int? SocietyId { get; set; }
 
+    [SupplyParameterFromQuery(Name = "clubId")]
+    public int? ClubId { get; set; }
+
     private bool _loading = true;
     private bool _isAdmin;
     private bool _canCreate;
     private string? _userId;
     private List<Competition> _competitions = new();
     private List<GolfSociety> _managedSocieties = new();
+    private List<GolfClub> _managedClubs = new();
     private CompetitionStatus? _statusFilter;
 
     protected override async Task OnInitializedAsync()
@@ -102,8 +107,13 @@
                 .Where(s => s.Memberships.Any(m => m.UserId == _userId
                     && (m.Role == MembershipRole.Admin || m.Role == MembershipRole.Owner)))
                 .ToList();
+            _managedClubs = (await ClubMembershipService.GetMembershipsForUserAsync(_userId))
+                .Where(m => m.Role == MembershipRole.Admin && m.GolfClub is not null)
+                .Select(m => m.GolfClub!)
+                .OrderBy(c => c.Name)
+                .ToList();
         }
-        _canCreate = _isAdmin || _managedSocieties.Any();
+        _canCreate = _isAdmin || _managedSocieties.Any() || _managedClubs.Any();
 
         await LoadAsync();
     }
@@ -112,7 +122,7 @@
     {
         _loading = true;
         _competitions = await CompetitionService.GetCompetitionsAsync(
-            golfSocietyId: SocietyId, status: _statusFilter);
+            golfClubId: ClubId, golfSocietyId: SocietyId, status: _statusFilter);
         _loading = false;
     }
 
@@ -128,6 +138,9 @@
         {
             { x => x.IsAdmin, _isAdmin },
             { x => x.ManagedSocieties, _managedSocieties },
+            { x => x.ManagedClubs, _managedClubs },
+            { x => x.PreferredGolfSocietyId, SocietyId },
+            { x => x.PreferredGolfClubId, ClubId },
             { x => x.CreatedByUserId, _userId ?? "" },
         };
         var dialog = await DialogService.ShowAsync<CreateCompetitionDialog>("New Competition", parameters);

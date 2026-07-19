@@ -537,7 +537,7 @@ Insights are cached against a **data watermark** — the timestamp of the user's
 ### 10.7 Admin Pages
 
 - **Admin Dashboard** (`/admin`): System overview — user/player/round/course/connection/merge counts, recent users, content health summary, quick links
-- **User Management** (`/admin/users`): Search/filter users, view linked players, promote/demote admin roles, see AI opt-out and email confirmation status
+- **User Management** (`/admin/users`): Search/filter users, view linked players, promote/demote global admin roles, grant/revoke per-club `ClubMembership.Admin`, and see AI opt-out and email confirmation status
 - **Player Management** (`/admin/players`): Search/filter players, inline editing (name, handicap), view linked accounts, round counts, linked/unlinked breakdown
 - **Content Health** (`/admin/content-health`): Health score, clubs without courses, courses without holes, hole count mismatches, par mismatches, duplicate stroke indices
 - **Connections & Merges** (`/admin/connections`): All connections/merge requests with status filters, pending counts, tabbed view
@@ -577,7 +577,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | — | Live Round Mode | ✅ Done | Single-device scorecard entry; no real-time multi-player sync, no hole maps |
 | 1 | Tee Sets & Course Ratings | ✅ Done | TeeSet/HoleTee models, per-player tee selection, rating/slope fields |
 | 2 | Golf Societies & Memberships | ✅ Done | Models, services, controllers, web + mobile pages. Feels thin only because competitions/handicaps don't exist yet |
-| 3 | Competitions & Scoring Formats | 🚧 In progress | Core loop complete: schema, service/scoring, API, and web + mobile UI (3-1…3-7, 3-11). Deferred ownership/registration/import rollout remains (3-8…3-10) |
+| 3 | Competitions & Scoring Formats | 🚧 In progress | Core loop and club-admin ownership complete (3-1…3-8, 3-11). Public registration/import rollout remains (3-9…3-10) |
 | 4a | Personal WHS handicap (differentials + index + backfill) | ✅ Done | WHS math, models + migrations, round-completion hook (both paths), and idempotent admin backfill (`/admin/handicap-backfill`). UI dashboards are 4b |
 | 4b | Manual club/regional handicaps + handicap UI | ✅ Done | CRUD + API (2-5), web dashboard (2-6), mobile dashboard (2-7), entry UI + primary selector (2-9). Mobile is read-only; entry/selector are web-only |
 | 4c | Society handicaps | ❌ Not started | Requires Phase 3 (competition-linked rounds) |
@@ -610,7 +610,7 @@ Planned features organised by priority tier. Each item includes the affected pla
 | Feature | Status | Description | Platform |
 |---------|--------|-------------|----------|
 | Admin Dashboard | ✅ Done | System overview — user/round/course counts, recent activity, quick links | Web |
-| User Management | ✅ Done | View/search users, assign roles (promote/demote admin) | Web |
+| User Management | ✅ Done | View/search users, assign global roles, and grant/revoke per-club admin access | Web |
 | Player Management | ✅ Done | View/search/edit all players, linked accounts, round counts | Web |
 | Content Health | ✅ Done | Clubs without courses, hole count mismatches, par mismatches, stroke index duplicates | Web |
 | Connection & Merge Oversight | ✅ Done | View all connections/merges with status filters | Web |
@@ -832,7 +832,7 @@ ClubMembership
 
 **Admin (Web only):**
 - Admin overview: total societies, memberships
-- Future: approve/manage society and club admins
+- Global admins grant/revoke club-admin access from User Management; users cannot self-claim a club
 
 ##### 2.4 Files Affected
 
@@ -919,9 +919,9 @@ API implemented (WORKLOG 3-4, 3-8): `CompetitionsController` (`/api/competitions
 
 Round linking implemented (WORKLOG 3-6, refined in 3-11): the round-recording setup step and the round-details link control offer competitions to link — admins see every open competition (interim beta flow), other users the non-terminal competitions their player has entered (`GetCompetitionsForPlayerAsync`); a hint appears when there are none. The chosen competition is set on the round at creation (both the RecordRound page and the RoundWorkflowService/live path via `RoundWorkflowSession.CompetitionId`), or linked/unlinked later from round details (`AssignRoundAsync`/`UnassignRoundAsync`, ownership-checked). **Assigning a round auto-enters the round's players** (idempotent; handicap + tee snapshotted; works for Completed competitions so the 3-10 backfill can reuse it — playing a linked round is participation). **Deleting a competition** (`DeleteCompetitionAsync`, manager-gated, web + `DELETE /api/competitions/{id}`) unlinks rounds and removes entries but never touches the rounds themselves — safe for test/beta cleanup. `RoundType` remains untouched throughout.
 
-Results implemented (WORKLOG 3-5): `CompetitionService.ComputeResultsAsync` persists per-entry gross/net/Stableford and competition-style positions (ties share, e.g. 1,2,2,4; Stableford ranks by points, other formats by net) from each player's linked round — course handicap from `HandicapAtEntry` + the tee's rating/slope (entry tee → round tee → course default), scratch when data is missing; unlinked entries stay unranked; idempotent. Web UI (WORKLOG 3-5): `/competitions` list (status filter, society query filter, create dialog gated to global admin + society Owner/Admin — hosts they manage only), `/competitions/{id}` detail (entries/results table with medals, enter own/managed players, withdraw, manager status actions — Complete auto-calculates results), Competitions in the nav Directory group and a Competitions button on society detail. Match Play v1 ranks by net like Medal (bracket play is future work).
+Results implemented (WORKLOG 3-5): `CompetitionService.ComputeResultsAsync` persists per-entry gross/net/Stableford and competition-style positions (ties share, e.g. 1,2,2,4; Stableford ranks by points, other formats by net) from each player's linked round — course handicap from `HandicapAtEntry` + the tee's rating/slope (entry tee → round tee → course default), scratch when data is missing; unlinked entries stay unranked; idempotent. Web UI (WORKLOG 3-5, 3-8): `/competitions` list (status and society/club query filters; create dialog offers global admins every host and entity managers only their societies/clubs), `/competitions/{id}` detail (entries/results table with medals, enter own/managed players, withdraw, manager status actions — Complete auto-calculates results), Competitions in the nav Directory group and buttons on society/club detail. Global admins grant or revoke club-admin access from `/admin/users`; grants may create a membership and revocation preserves it as Member. Match Play v1 ranks by net like Medal (bracket play is future work).
 
-Mobile UI implemented (WORKLOG 3-7): explicit `[JsonPropertyName]` DTO mirrors and `ICompetitionApiService` cover the additive competition API; custom routes provide the global/society-filtered list, role-gated create dialog, detail, entries/results, status/delete actions, and owned-round link/unlink flow. The Home and society pages link into those routes. Mobile JWT roles are decoded only to shape controls (the API remains the authority), and the current user's linked player is resolved through `/api/players/me` for entry actions. Round list responses add `CreatedByApplicationUserId` and `CompetitionId` so the client can distinguish owned/linkable rounds without changing existing fields. Completing through the API now computes results before the mobile detail reloads; list queries load entries so summary counts are accurate.
+Mobile UI implemented (WORKLOG 3-7, 3-8): explicit `[JsonPropertyName]` DTO mirrors and `ICompetitionApiService` cover the additive competition API; custom routes provide global and society/club-filtered lists, a role-gated create dialog, detail, entries/results, status/delete actions, and owned-round link/unlink flow. Home, society, and club pages link into those routes. Society roles and club memberships shape host options and management controls (the API remains the authority), while the current user's linked player is resolved through `/api/players/me` for entry actions. Round list responses add `CreatedByApplicationUserId` and `CompetitionId` so the client can distinguish owned/linkable rounds without changing existing fields. Completing through the API now computes results before the mobile detail reloads; list queries load entries so summary counts are accurate.
 
 **Scoring Format Logic:**
 - **Medal**: Gross strokes, net = gross - handicap

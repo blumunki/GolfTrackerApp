@@ -176,6 +176,19 @@
                             }
                         }
                         break;
+                    case var page when page.StartsWith("competitions/club/"):
+                        {
+                            var idStr = currentPage.Substring("competitions/club/".Length);
+                            if (int.TryParse(idStr, out var competitionClubId))
+                            {
+                                <CompetitionsPage ClubId="@competitionClubId" />
+                            }
+                            else
+                            {
+                                <CompetitionsPage />
+                            }
+                        }
+                        break;
                     case var page when page.StartsWith("competition-detail/"):
                         {
                             var idStr = currentPage.Substring("competition-detail/".Length);

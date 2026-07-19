@@ -1,5 +1,6 @@
 @inject ICompetitionApiService CompetitionApi
 @inject ISocietyApiService SocietyApi
+@inject IClubMembershipApiService ClubMembershipApi
 @inject IGolfClubApiService GolfClubApi
 @inject IGolfCourseApiService GolfCourseApi
 @inject AuthenticationStateService AuthState
@@ -114,6 +115,15 @@
                     @society.Name (society)
                 </MudSelectItem>
             }
+            @if (!_isAdmin)
+            {
+                @foreach (var membership in _managedClubMemberships)
+                {
+                    <MudSelectItem T="string" Value="@($"club:{membership.GolfClubId}")">
+                        @membership.ClubName (club)
+                    </MudSelectItem>
+                }
+            }
             @if (_isAdmin
                 && SocietyId.HasValue
                 && !string.IsNullOrWhiteSpace(_contextName)
@@ -169,6 +179,7 @@
 
 @code {
     [Parameter] public int? SocietyId { get; set; }
+    [Parameter] public int? ClubId { get; set; }
 
     private bool _loading = true;
     private bool _permissionsLoaded;
@@ -182,6 +193,8 @@
     private List<CompetitionSummaryDto> _competitions = new();
     private List<GolfSocietyDto> _mySocieties = new();
     private List<GolfSocietyDto> _managedSocieties = new();
+    private List<ClubMembershipDto> _clubMemberships = new();
+    private List<ClubMembershipDto> _managedClubMemberships = new();
     private List<GolfClub> _clubs = new();
     private List<GolfCourse> _courses = new();
 
@@ -203,12 +216,21 @@
     private async Task LoadPermissionsAsync()
     {
         _isAdmin = AuthState.IsInRole("Admin");
-        _mySocieties = await SocietyApi.GetMySocietiesAsync();
+        var societiesTask = SocietyApi.GetMySocietiesAsync();
+        var clubMembershipsTask = ClubMembershipApi.GetMyMembershipsAsync();
+        await Task.WhenAll(societiesTask, clubMembershipsTask);
+
+        _mySocieties = societiesTask.Result;
         _managedSocieties = _mySocieties
             .Where(s => s.MyRole is "Owner" or "Admin")
             .OrderBy(s => s.Name)
             .ToList();
-        _canCreate = _isAdmin || _managedSocieties.Count > 0;
+        _clubMemberships = clubMembershipsTask.Result;
+        _managedClubMemberships = _clubMemberships
+            .Where(m => m.Role == "Admin")
+            .OrderBy(m => m.ClubName)
+            .ToList();
+        _canCreate = _isAdmin || _managedSocieties.Count > 0 || _managedClubMemberships.Count > 0;
 
         if (_canCreate)
         {
@@ -222,15 +244,28 @@
     private async Task LoadContextAsync()
     {
         _contextName = null;
-        if (!SocietyId.HasValue) return;
+        if (SocietyId.HasValue)
+        {
+            _contextName = _mySocieties
+                .FirstOrDefault(s => s.GolfSocietyId == SocietyId.Value)
+                ?.Name;
+            if (!string.IsNullOrWhiteSpace(_contextName)) return;
 
-        _contextName = _mySocieties
-            .FirstOrDefault(s => s.GolfSocietyId == SocietyId.Value)
-            ?.Name;
+            var society = await SocietyApi.GetSocietyByIdAsync(SocietyId.Value);
+            _contextName = society?.Name;
+            return;
+        }
+
+        if (!ClubId.HasValue) return;
+
+        _contextName = _clubMemberships
+            .FirstOrDefault(m => m.GolfClubId == ClubId.Value)
+            ?.ClubName
+            ?? _clubs.FirstOrDefault(c => c.GolfClubId == ClubId.Value)?.Name;
         if (!string.IsNullOrWhiteSpace(_contextName)) return;
 
-        var society = await SocietyApi.GetSocietyByIdAsync(SocietyId.Value);
-        _contextName = society?.Name;
+        var club = await GolfClubApi.GetGolfClubByIdAsync(ClubId.Value);
+        _contextName = club?.Name;
     }
 
     private async Task LoadCompetitionsAsync()
@@ -238,6 +273,7 @@
         _loading = true;
         _error = null;
         _competitions = await CompetitionApi.GetCompetitionsAsync(
+            clubId: ClubId,
             societyId: SocietyId,
             status: _statusFilter == "All" ? null : _statusFilter);
         _error = CompetitionApi.LastError;
@@ -258,9 +294,16 @@
         {
             _hostKey = $"society:{SocietyId.Value}";
         }
-        else if (_managedSocieties.Count == 1 && !_isAdmin)
+        else if (ClubId.HasValue
+                 && (_isAdmin || _managedClubMemberships.Any(m => m.GolfClubId == ClubId.Value)))
         {
-            _hostKey = $"society:{_managedSocieties[0].GolfSocietyId}";
+            _hostKey = $"club:{ClubId.Value}";
+        }
+        else if (!_isAdmin && _managedSocieties.Count + _managedClubMemberships.Count == 1)
+        {
+            _hostKey = _managedSocieties.Count == 1
+                ? $"society:{_managedSocieties[0].GolfSocietyId}"
+                : $"club:{_managedClubMemberships[0].GolfClubId}";
         }
 
         _showCreateDialog = true;
@@ -339,7 +382,11 @@
         Navigation.NavigateTo($"/competition-detail/{competitionId}");
 
     private void NavigateBack() => Navigation.NavigateTo(
-        SocietyId.HasValue ? $"/society-detail/{SocietyId.Value}" : "/home");
+        SocietyId.HasValue
+            ? $"/society-detail/{SocietyId.Value}"
+            : ClubId.HasValue
+                ? $"/club-detail/{ClubId.Value}"
+                : "/home");
 
     private static string HostName(CompetitionSummaryDto competition) =>
         competition.GolfSocietyName ?? competition.GolfClubName ?? "Ad-hoc";

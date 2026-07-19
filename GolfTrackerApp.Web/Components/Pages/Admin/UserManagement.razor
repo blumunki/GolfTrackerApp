@@ -8,6 +8,7 @@
 @inject IDbContextFactory<ApplicationDbContext> ContextFactory
 @inject UserManager<ApplicationUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
+@inject IClubMembershipService ClubMembershipService
 @inject ILogger<UserManagement> Logger
 
 @rendermode InteractiveServer
@@ -63,16 +64,17 @@ else
                         <th>Email</th>
                         <th>Linked Player</th>
                         <th>Role</th>
+                        <th>Club Admin</th>
                         <th>AI Opted Out</th>
                         <th>Email Confirmed</th>
-                        <th style="width: 200px;">Actions</th>
+                        <th style="width: 320px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (!filteredUsers.Any())
                     {
                         <tr>
-                            <td colspan="6" style="text-align: center;">
+                            <td colspan="7" style="text-align: center;">
                                 <MudText Typo="Typo.body2" Color="Color.Tertiary">No users found.</MudText>
                             </td>
                         </tr>
@@ -87,6 +89,16 @@ else
                                          Color="@(user.Role == "Admin" ? Color.Error : Color.Default)">
                                     @user.Role
                                 </MudChip>
+                            </td>
+                            <td>
+                                @if (user.ClubAdminNames.Count == 0)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Tertiary">None</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.caption">@string.Join(", ", user.ClubAdminNames)</MudText>
+                                }
                             </td>
                             <td>
                                 @if (user.AiInsightsOptOut)
@@ -109,26 +121,33 @@ else
                                 }
                             </td>
                             <td>
-                                @if (user.Role != "Admin")
-                                {
+                                <MudStack Row="true" Spacing="1">
                                     <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
-                                               OnClick="@(() => PromoteToAdmin(user))"
-                                               StartIcon="@Icons.Material.Filled.ArrowUpward">
-                                        Make Admin
+                                               OnClick="@(() => OpenClubAdminDialog(user))"
+                                               StartIcon="@Icons.Material.Filled.GolfCourse">
+                                        Club Access
                                     </MudButton>
-                                }
-                                else if (user.UserId != currentAdminId)
-                                {
-                                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Warning"
-                                               OnClick="@(() => DemoteFromAdmin(user))"
-                                               StartIcon="@Icons.Material.Filled.ArrowDownward">
-                                        Remove Admin
-                                    </MudButton>
-                                }
-                                else
-                                {
-                                    <MudText Typo="Typo.caption" Color="Color.Tertiary">Current user</MudText>
-                                }
+                                    @if (user.Role != "Admin")
+                                    {
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                                                   OnClick="@(() => PromoteToAdmin(user))"
+                                                   StartIcon="@Icons.Material.Filled.ArrowUpward">
+                                            Make Admin
+                                        </MudButton>
+                                    }
+                                    else if (user.UserId != currentAdminId)
+                                    {
+                                        <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Warning"
+                                                   OnClick="@(() => DemoteFromAdmin(user))"
+                                                   StartIcon="@Icons.Material.Filled.ArrowDownward">
+                                            Remove Admin
+                                        </MudButton>
+                                    }
+                                    else
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Tertiary">Current user</MudText>
+                                    }
+                                </MudStack>
                             </td>
                         </tr>
                     }
@@ -146,6 +165,49 @@ else
     }
 }
 
+<MudDialog @bind-Visible="showClubAdminDialog"
+           Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.Small })">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Club Admin Access</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (editingClubAdminUser is not null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-3">
+                Choose the clubs that <strong>@editingClubAdminUser.Email</strong> may administer.
+                Only a global admin can grant this access.
+            </MudText>
+            @if (clubs.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No golf clubs are available.</MudAlert>
+            }
+            else
+            {
+                <MudStack Spacing="1">
+                    @foreach (var club in clubs)
+                    {
+                        <MudCheckBox T="bool"
+                                     Value="@selectedClubAdminIds.Contains(club.GolfClubId)"
+                                     ValueChanged="@(selected => SetClubSelection(club.GolfClubId, selected))"
+                                     Label="@club.Name"
+                                     Color="Color.Primary" />
+                    }
+                </MudStack>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-3">
+                    Removing club-admin access keeps the user's ordinary club membership.
+                </MudText>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseClubAdminDialog" Disabled="@savingClubAdmins">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   OnClick="SaveClubAdminAccess" Disabled="@(savingClubAdmins || clubs.Count == 0)">
+            @(savingClubAdmins ? "Saving..." : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private bool loading = true;
     private string searchTerm = string.Empty;
@@ -154,8 +216,13 @@ else
     private Severity statusSeverity = Severity.Info;
     private string? currentAdminId;
     private int totalUserCount;
+    private bool showClubAdminDialog;
+    private bool savingClubAdmins;
+    private UserViewModel? editingClubAdminUser;
+    private HashSet<int> selectedClubAdminIds = new();
 
     private List<UserViewModel> filteredUsers = new();
+    private List<GolfClub> clubs = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -181,6 +248,8 @@ else
 
             var query = context.Users
                 .Include(u => u.LinkedPlayer)
+                .Include(u => u.ClubMemberships)
+                    .ThenInclude(cm => cm.GolfClub)
                 .AsNoTracking()
                 .AsQueryable();
 
@@ -192,6 +261,10 @@ else
 
             totalUserCount = await context.Users.CountAsync();
             var allUsers = await query.OrderBy(u => u.Email).Take(100).ToListAsync();
+            clubs = await context.GolfClubs
+                .AsNoTracking()
+                .OrderBy(c => c.Name)
+                .ToListAsync();
 
             // Get all admin user IDs
             var adminRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Admin");
@@ -216,7 +289,16 @@ else
                 LinkedPlayerName = u.LinkedPlayer != null ? $"{u.LinkedPlayer.FirstName} {u.LinkedPlayer.LastName}" : null,
                 Role = adminUserIds.Contains(u.Id) ? "Admin" : "User",
                 AiInsightsOptOut = u.AiInsightsOptOut,
-                EmailConfirmed = u.EmailConfirmed
+                EmailConfirmed = u.EmailConfirmed,
+                ClubAdminIds = u.ClubMemberships
+                    .Where(cm => cm.Role == MembershipRole.Admin)
+                    .Select(cm => cm.GolfClubId)
+                    .ToHashSet(),
+                ClubAdminNames = u.ClubMemberships
+                    .Where(cm => cm.Role == MembershipRole.Admin && cm.GolfClub != null)
+                    .Select(cm => cm.GolfClub!.Name)
+                    .OrderBy(name => name)
+                    .ToList(),
             }).ToList();
 
             // Apply role filter
@@ -281,6 +363,68 @@ else
         }
     }
 
+    private void OpenClubAdminDialog(UserViewModel userVm)
+    {
+        editingClubAdminUser = userVm;
+        selectedClubAdminIds = userVm.ClubAdminIds.ToHashSet();
+        showClubAdminDialog = true;
+    }
+
+    private void CloseClubAdminDialog()
+    {
+        showClubAdminDialog = false;
+        editingClubAdminUser = null;
+        selectedClubAdminIds.Clear();
+    }
+
+    private void SetClubSelection(int clubId, bool selected)
+    {
+        if (selected)
+            selectedClubAdminIds.Add(clubId);
+        else
+            selectedClubAdminIds.Remove(clubId);
+    }
+
+    private async Task SaveClubAdminAccess()
+    {
+        if (editingClubAdminUser is null) return;
+        var user = editingClubAdminUser;
+
+        savingClubAdmins = true;
+        try
+        {
+            var existingIds = user.ClubAdminIds;
+            var changedClubIds = existingIds
+                .Where(id => !selectedClubAdminIds.Contains(id))
+                .Concat(selectedClubAdminIds.Where(id => !existingIds.Contains(id)))
+                .ToList();
+
+            foreach (var clubId in changedClubIds)
+            {
+                await ClubMembershipService.SetClubAdminAsync(
+                    clubId,
+                    user.UserId,
+                    selectedClubAdminIds.Contains(clubId));
+            }
+
+            statusMessage = $"Club-admin access updated for {user.Email}.";
+            statusSeverity = Severity.Success;
+            showClubAdminDialog = false;
+            editingClubAdminUser = null;
+            await LoadUsers();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating club-admin access for user {UserId}", user.UserId);
+            statusMessage = "Failed to update club-admin access.";
+            statusSeverity = Severity.Error;
+        }
+        finally
+        {
+            savingClubAdmins = false;
+        }
+    }
+
     private class UserViewModel
     {
         public string UserId { get; set; } = string.Empty;
@@ -289,5 +433,7 @@ else
         public string Role { get; set; } = "User";
         public bool AiInsightsOptOut { get; set; }
         public bool EmailConfirmed { get; set; }
+        public HashSet<int> ClubAdminIds { get; set; } = new();
+        public List<string> ClubAdminNames { get; set; } = new();
     }
 }

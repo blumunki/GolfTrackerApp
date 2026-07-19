@@ -32,6 +32,8 @@
                 Golf Clubs
             </MudButton>
             <div style="display:flex; gap:4px;">
+                <MudIconButton Icon="@Icons.Material.Filled.EmojiEvents" Size="Size.Small" Color="Color.Primary"
+                               title="Competitions" OnClick="NavigateToCompetitions" />
                 <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary" OnClick="ShowEditClubDialog" />
             </div>
         </div>
@@ -414,6 +416,11 @@
     private void NavigateToCourse(int courseId)
     {
         NavigationManager.NavigateTo($"/course-detail/{courseId}");
+    }
+
+    private void NavigateToCompetitions()
+    {
+        NavigationManager.NavigateTo($"/competitions/club/{ClubId}");
     }
 
     private void ShowEditClubDialog()

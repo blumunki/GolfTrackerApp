@@ -19,12 +19,12 @@
             {
                 <MudSelectItem T="string" Value="@($"society:{society.GolfSocietyId}")">@society.Name (society)</MudSelectItem>
             }
+            @foreach (var club in _clubs)
+            {
+                <MudSelectItem T="string" Value="@($"club:{club.GolfClubId}")">@club.Name (club)</MudSelectItem>
+            }
             @if (IsAdmin)
             {
-                @foreach (var club in _clubs)
-                {
-                    <MudSelectItem T="string" Value="@($"club:{club.GolfClubId}")">@club.Name (club)</MudSelectItem>
-                }
                 <MudSelectItem T="string" Value="@("adhoc")">No host (ad-hoc)</MudSelectItem>
             }
         </MudSelect>
@@ -58,6 +58,9 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter] public bool IsAdmin { get; set; }
     [Parameter] public List<GolfSociety> ManagedSocieties { get; set; } = new();
+    [Parameter] public List<GolfClub> ManagedClubs { get; set; } = new();
+    [Parameter] public int? PreferredGolfSocietyId { get; set; }
+    [Parameter] public int? PreferredGolfClubId { get; set; }
     [Parameter] public string CreatedByUserId { get; set; } = "";
 
     private string _name = "";
@@ -76,12 +79,27 @@
         {
             _clubs = await GolfClubService.GetAllGolfClubsAsync();
         }
+        else
+        {
+            _clubs = ManagedClubs.OrderBy(c => c.Name).ToList();
+        }
         _courses = await GolfCourseService.GetAllGolfCoursesAsync();
 
-        // Sensible default host: the only managed society, if there is exactly one.
-        if (ManagedSocieties.Count == 1 && !IsAdmin)
+        if (PreferredGolfSocietyId is int societyId
+            && (IsAdmin || ManagedSocieties.Any(s => s.GolfSocietyId == societyId)))
         {
-            _hostKey = $"society:{ManagedSocieties[0].GolfSocietyId}";
+            _hostKey = $"society:{societyId}";
+        }
+        else if (PreferredGolfClubId is int clubId
+                 && (IsAdmin || _clubs.Any(c => c.GolfClubId == clubId)))
+        {
+            _hostKey = $"club:{clubId}";
+        }
+        else if (!IsAdmin && ManagedSocieties.Count + _clubs.Count == 1)
+        {
+            _hostKey = ManagedSocieties.Count == 1
+                ? $"society:{ManagedSocieties[0].GolfSocietyId}"
+                : $"club:{_clubs[0].GolfClubId}";
         }
     }
 
@@ -104,8 +122,36 @@
         }
 
         int? clubId = null, societyId = null;
-        if (_hostKey.StartsWith("society:")) societyId = int.Parse(_hostKey["society:".Length..]);
-        else if (_hostKey.StartsWith("club:")) clubId = int.Parse(_hostKey["club:".Length..]);
+        if (_hostKey.StartsWith("society:", StringComparison.Ordinal))
+        {
+            if (!int.TryParse(_hostKey["society:".Length..], out var parsedSocietyId))
+            {
+                Snackbar.Add("Please choose a valid host.", Severity.Warning);
+                return;
+            }
+            societyId = parsedSocietyId;
+        }
+        else if (_hostKey.StartsWith("club:", StringComparison.Ordinal))
+        {
+            if (!int.TryParse(_hostKey["club:".Length..], out var parsedClubId))
+            {
+                Snackbar.Add("Please choose a valid host.", Severity.Warning);
+                return;
+            }
+            clubId = parsedClubId;
+        }
+        else if (_hostKey != "adhoc")
+        {
+            Snackbar.Add("Please choose a valid host.", Severity.Warning);
+            return;
+        }
+
+        if (!IsAdmin
+            && !await CompetitionService.IsHostManagerAsync(clubId, societyId, CreatedByUserId))
+        {
+            Snackbar.Add("You do not have permission to create competitions for that host.", Severity.Error);
+            return;
+        }
 
         try
         {

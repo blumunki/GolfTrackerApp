@@ -2,6 +2,7 @@
 @inject IPlayerApiService PlayerApi
 @inject IRoundApiService RoundApi
 @inject ISocietyApiService SocietyApi
+@inject IClubMembershipApiService ClubMembershipApi
 @inject AuthenticationStateService AuthState
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -317,8 +318,15 @@
         var playersTask = PlayerApi.GetAllPlayersAsync();
         var roundsTask = RoundApi.GetAllRoundsAsync();
         var societiesTask = SocietyApi.GetMySocietiesAsync();
+        var clubMembershipsTask = ClubMembershipApi.GetMyMembershipsAsync();
         var ownPlayerTask = PlayerApi.GetMyProfileAsync();
-        await Task.WhenAll(competitionTask, playersTask, roundsTask, societiesTask, ownPlayerTask);
+        await Task.WhenAll(
+            competitionTask,
+            playersTask,
+            roundsTask,
+            societiesTask,
+            clubMembershipsTask,
+            ownPlayerTask);
 
         _competition = competitionTask.Result;
         _players = playersTask.Result.OrderBy(p => p.FullName).ToList();
@@ -342,7 +350,11 @@
             && societiesTask.Result.Any(s =>
                 s.GolfSocietyId == _competition.GolfSocietyId.Value
                 && s.MyRole is "Owner" or "Admin");
-        _canManage = AuthState.IsInRole("Admin") || isSocietyManager;
+        var isClubAdmin = _competition.GolfClubId.HasValue
+            && clubMembershipsTask.Result.Any(m =>
+                m.GolfClubId == _competition.GolfClubId.Value
+                && m.Role == "Admin");
+        _canManage = AuthState.IsInRole("Admin") || isSocietyManager || isClubAdmin;
 
         var enteredIds = _competition.Entries.Select(e => e.PlayerId).ToHashSet();
         _enterablePlayers = _players.Where(p => !enteredIds.Contains(p.Id)).ToList();
@@ -479,7 +491,9 @@
     {
         var path = _competition?.GolfSocietyId is int societyId
             ? $"/competitions/society/{societyId}"
-            : "/competitions";
+            : _competition?.GolfClubId is int clubId
+                ? $"/competitions/club/{clubId}"
+                : "/competitions";
         Navigation.NavigateTo(path);
     }
 
