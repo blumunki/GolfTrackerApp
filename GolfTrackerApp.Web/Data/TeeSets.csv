@@ -24,7 +24,7 @@ Mount Pleasant Golf Club,Mount Pleasant Golf Club,White,#FFFFFF,67.6,123,Male,1
 Mount Pleasant Golf Club,Mount Pleasant Golf Club,Yellow,#FFD700,66.5,119,Male,2
 Mount Pleasant Golf Club,Mount Pleasant Golf Club,Red,#FF0000,69.9,124,Female,3
 Tilsworth Golf Centre,Tilsworth,White,#FFFFFF,67,N/A,Male,1
-Tilsworth Golf Centre,Tilsworth,Yellow,#FFD700,66,N/A,Male,2
+Tilsworth Golf Centre,Tilsworth,Yellow,#FFD700,66,117,Male,2
 Tilsworth Golf Centre,Tilsworth,Red,#FF0000,68.8,120,Female,3
 Abbey Hill Golf Centre,Abbey Hill Golf Centre,White,#FFFFFF,69.1,124,Male,1
 Abbey Hill Golf Centre,Abbey Hill Golf Centre,Yellow,#FFD700,67.7,115,Male,2
@@ -50,3 +50,6 @@ Batchwood Golf & Sports Centre,Batchwood Golf & Sports Centre,Red,#FF0000,73.9,1
 Windmill Hill Golf Centre,Windmill Hill Golf Centre,White,#FFFFFF,73,136,Male,1
 Windmill Hill Golf Centre,Windmill Hill Golf Centre,Yellow,#FFD700,73,130,Male,2
 Windmill Hill Golf Centre,Windmill Hill Golf Centre,Red,#FF0000,71,126,Female,3
+The Three Locks Golf Club,Three Locks,White,#FFFFFF,69,116,Male,1
+The Three Locks Golf Club,Three Locks,Yellow,#FFD700,68.3,114,Male,2
+The Three Locks Golf Club,Three Locks,Red,#FF0000,70.3,121,Female,3
