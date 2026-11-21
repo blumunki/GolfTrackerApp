@@ -6,7 +6,7 @@ Cainhoe Wood Golf Club,The Manor,White,#FFFFFF,69.9,122,Male,1
 Cainhoe Wood Golf Club,The Manor,Yellow,#FFD700,68.3,118,Male,2
 Cainhoe Wood Golf Club,The Manor,Red,#FF0000,71.6,124,Female,3
 Chalgrave Manor Golf Club,Chalgrave Manor Golf Club,White,#FFFFFF,70,N/A,Male,1
-Chalgrave Manor Golf Club,Chalgrave Manor Golf Club,Yellow,#FFD700,69,N/A,Male,2
+Chalgrave Manor Golf Club,Chalgrave Manor Golf Club,Yellow,#FFD700,69,122,Male,2
 Chalgrave Manor Golf Club,Chalgrave Manor Golf Club,Red,#FF0000,72.2,121,Female,3
 Mowsbury Golf Club,Mowsbury Golf Club,White,#FFFFFF,71,133,Male,1
 Mowsbury Golf Club,Mowsbury Golf Club,Yellow,#FFD700,69.1,127,Male,2
@@ -17,9 +17,9 @@ South Beds Golf Club,Galley Hill,Red,#FF0000,72.4,124,Female,3
 Belton Woods Golf Club,Lakes,White,#FFFFFF,73.8,132,Male,1
 Belton Woods Golf Club,Lakes,Yellow,#FFD700,71.2,131,Male,2
 Belton Woods Golf Club,Lakes,Red,#FF0000,73.6,137,Female,3
-Belton Woods Golf Club,Woodside,White,#FFFFFF,72,N/A,Male,1
-Belton Woods Golf Club,Woodside,Yellow,#FFD700,73,N/A,Male,2
-Belton Woods Golf Club,Woodside,Red,#FF0000,72,N/A,Female,3
+Belton Woods Golf Club,Woodside,White,#FFFFFF,72,127,Male,1
+Belton Woods Golf Club,Woodside,Yellow,#FFD700,73,129,Male,2
+Belton Woods Golf Club,Woodside,Red,#FF0000,72,127,Female,3
 Mount Pleasant Golf Club,Mount Pleasant Golf Club,White,#FFFFFF,67.6,123,Male,1
 Mount Pleasant Golf Club,Mount Pleasant Golf Club,Yellow,#FFD700,66.5,119,Male,2
 Mount Pleasant Golf Club,Mount Pleasant Golf Club,Red,#FF0000,69.9,124,Female,3
